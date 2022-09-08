@@ -1,0 +1,5 @@
+- [ ] ethereum-indexer / ethereum-indexer-server : :add mechanism to inject fake event in the stream, could be a list provided by processor (so they are valid) and injection could pick a depth
+- [ ] ethereum-indexer : prefetch phase => allow processors to focus on core logic, might want to make db writes synchronous with actual writes happenign at the end of the batch / block
+- [ ] ethereum-indexer : group processing into block
+- [ ] ethereum-indexer-server : check filter is working
+- [ ] EventWithId type to reexport in ethereum-indexer-processors so single event processors do not even need to import ethereum-indexer
