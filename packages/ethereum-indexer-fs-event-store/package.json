@@ -1,7 +1,10 @@
 {
   "name": "ethereum-indexer-fs-event-store",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
