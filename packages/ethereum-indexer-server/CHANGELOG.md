@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.2.17
+
+### Patch Changes
+
+- fix dep
+
 ## 0.2.15
 
 ### Patch Changes

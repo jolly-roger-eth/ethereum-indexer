@@ -15,8 +15,8 @@ import { ContractsInfo, EthereumIndexer, EventProcessor, LastSync } from 'ethere
 import { logs } from 'named-logs';
 import { JSONRPCProvider } from '../utils/JSONRPCProvider';
 
-// TODO We should move EventCache, PouchDatabase and QueriableEventProcessor in a separate low-level module so server does not need to import 'ethereum-indexer-processors';
-import { EventCache, PouchDatabase, QueriableEventProcessor } from 'ethereum-indexer-processors';
+// TODO We should move EventCache, PouchDatabase and QueriableEventProcessor in a separate low-level module so server does not need to import 'ethereum-indexer-db-processors';
+import { EventCache, PouchDatabase, QueriableEventProcessor, Query } from 'ethereum-indexer-db-processors';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -214,7 +214,7 @@ export class SimpleServer {
     });
 
     router.post('/query', async (ctx, next) => {
-      const response = await this.processor.query(ctx.request.body);
+      const response = await this.processor.query(ctx.request.body as Query);
       // TODO clean response ? or force fields to be specified and prevent some (like underscore)
       ctx.body = response;
       await next();
@@ -267,7 +267,7 @@ export class SimpleServer {
       if (!isAuthorized(ctx)) {
         ctx.body = { error: { code: 4030, message: 'Forbidden' } };
       } else {
-        const response = await this.cache.query(ctx.request.body);
+        const response = await this.cache.query(ctx.request.body as Query);
         ctx.body = response;
       }
       await next();

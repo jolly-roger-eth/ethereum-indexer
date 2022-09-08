@@ -2,4 +2,4 @@
 - [ ] ethereum-indexer : prefetch phase => allow processors to focus on core logic, might want to make db writes synchronous with actual writes happenign at the end of the batch / block
 - [ ] ethereum-indexer : group processing into block
 - [ ] ethereum-indexer-server : check filter is working
-- [ ] EventWithId type to reexport in ethereum-indexer-processors so single event processors do not even need to import ethereum-indexer
+- [ ] EventWithId type to reexport in ethereum-indexer-db-processors so single event processors do not even need to import ethereum-indexer

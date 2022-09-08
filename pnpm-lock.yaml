@@ -25,6 +25,25 @@ importers:
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
 
+  packages/ethereum-indexer-db-processors:
+    specifiers:
+      '@types/pouchdb': ^6.4.0
+      ethereum-indexer: workspace:*
+      named-logs: ^0.2.0
+      pouchdb: ^7.3.0
+      pouchdb-find: ^7.3.0
+      tsup: ^6.2.1
+      typescript: ^4.7.4
+    dependencies:
+      ethereum-indexer: link:../ethereum-indexer
+      named-logs: 0.2.0
+      pouchdb: 7.3.0
+      pouchdb-find: 7.3.0
+    devDependencies:
+      '@types/pouchdb': 6.4.0
+      tsup: 6.2.3_typescript@4.8.3
+      typescript: 4.8.3
+
   packages/ethereum-indexer-fs-event-store:
     specifiers:
       '@types/node': ^18.7.16
@@ -46,25 +65,6 @@ importers:
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
 
-  packages/ethereum-indexer-processors:
-    specifiers:
-      '@types/pouchdb': ^6.4.0
-      ethereum-indexer: workspace:*
-      named-logs: ^0.2.0
-      pouchdb: ^7.3.0
-      pouchdb-find: ^7.3.0
-      tsup: ^6.2.1
-      typescript: ^4.7.4
-    dependencies:
-      ethereum-indexer: link:../ethereum-indexer
-      named-logs: 0.2.0
-      pouchdb: 7.3.0
-      pouchdb-find: 7.3.0
-    devDependencies:
-      '@types/pouchdb': 6.4.0
-      tsup: 6.2.3_typescript@4.8.3
-      typescript: 4.8.3
-
   packages/ethereum-indexer-server:
     specifiers:
       '@ethersproject/bignumber': ^5.7.0
@@ -80,7 +80,7 @@ importers:
       '@types/pouchdb': ^6.4.0
       dotenv: ^16.0.1
       ethereum-indexer: workspace:*
-      ethereum-indexer-processors: workspace:*
+      ethereum-indexer-db-processors: workspace:*
       koa: ^2.13.4
       koa-bodyparser: ^4.3.0
       koa-json: ^2.0.2
@@ -102,7 +102,7 @@ importers:
       '@types/node-fetch': 2.6.2
       dotenv: 16.0.2
       ethereum-indexer: link:../ethereum-indexer
-      ethereum-indexer-processors: link:../ethereum-indexer-processors
+      ethereum-indexer-db-processors: link:../ethereum-indexer-db-processors
       koa: 2.13.4
       koa-bodyparser: 4.3.0
       koa-json: 2.0.2
