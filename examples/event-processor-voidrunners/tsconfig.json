@@ -4,6 +4,7 @@
     "lib": ["es5", "es6"],
     "target": "es6",
     "declaration": true,
+    "declarationMap": true,
     "sourceMap": true,
     "module": "commonjs",
     "moduleResolution": "node",
@@ -12,5 +13,5 @@
     "esModuleInterop": true,
     "resolveJsonModule": true
   },
-  "include": ["./src/**/*"]
+  "include": ["./src/**/*", "./src/**/*.json"]
 }

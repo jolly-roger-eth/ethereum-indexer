@@ -4,6 +4,7 @@
     "lib": ["es5", "es6", "es2017"],
     "target": "es6",
     "declaration": true,
+    "declarationMap": true,
     "sourceMap": true,
     "module": "commonjs",
     "moduleResolution": "node",
