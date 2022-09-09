@@ -17,10 +17,10 @@ const VoidrunnerEventProcessor: SingleJSONEventProcessorObject<Data> = {
   async setup(json: Data): Promise<void> {
     json.voidrunners = [];
     json.spaceships = [];
-    namedLogger.info(`setup complete!`);
+    // namedLogger.info(`setup complete!`);
   },
   onTransfer(data: Data, event: EventWithId) {
-    namedLogger.info(`onTransfer...`);
+    // namedLogger.info(`onTransfer...`);
 
     const to = event.args.to as string;
 
@@ -33,25 +33,25 @@ const VoidrunnerEventProcessor: SingleJSONEventProcessorObject<Data> = {
     }
 
     if (!spaceship) {
-      namedLogger.info(`new token ${tokenID}: with owner: ${to}`);
+      // namedLogger.info(`new token ${tokenID}: with owner: ${to}`);
       spaceship = {
         tokenID,
         owner: to,
       };
       data.spaceships.push(spaceship);
     } else {
-      namedLogger.info(`token ${tokenID} already exists`);
+      // namedLogger.info(`token ${tokenID} already exists`);
       if (to === ZERO_ADDRESS) {
-        namedLogger.info(`deleting it...`);
+        // namedLogger.info(`deleting it...`);
         data.spaceships.splice(spaceshipIndex, 1);
         return;
       } else {
-        namedLogger.info(`setting new owner: ${to}`);
+        // namedLogger.info(`setting new owner: ${to}`);
         spaceship.owner = to;
       }
     }
 
-    namedLogger.info(JSON.stringify(data, null, 2));
+    // namedLogger.info(JSON.stringify(data, null, 2));
   },
 };
 

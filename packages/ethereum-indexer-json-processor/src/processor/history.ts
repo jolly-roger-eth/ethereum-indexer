@@ -91,6 +91,7 @@ export class History {
         delete this.historyJSON.blockHashes[key];
       }
     }
+    this.historyJSON.blockHashes[blockNumber] = blockHash;
   }
 
   reverseBlock(blockNumber: number, blockHash: string, json: JSONObject) {

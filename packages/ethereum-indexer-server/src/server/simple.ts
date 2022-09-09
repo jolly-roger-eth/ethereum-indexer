@@ -198,7 +198,19 @@ export class SimpleServer {
       lastSyncObject.syncPercentage = Math.floor((numBlocksProcessedSoFar * 1000000) / totalToProcess) / 10000;
       lastSyncObject.totalPercentage = Math.floor((lastToBlock * 1000000) / latestBlock) / 10000;
 
-      ctx.body = { lastSync: lastSyncObject };
+      // allow to get state whole
+      const data = (this.processor as any).json;
+      if (data) {
+        const _data = (this.processor as any)._json;
+        if (_data) {
+          ctx.body = { lastSync: lastSyncObject, data, _data };
+        } else {
+          ctx.body = { lastSync: lastSyncObject, data };
+        }
+      } else {
+        ctx.body = { lastSync: lastSyncObject };
+      }
+
       await next();
     });
 
