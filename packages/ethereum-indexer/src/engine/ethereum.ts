@@ -23,14 +23,11 @@ export type ETHJSONRPC_TransactionReceipt = {
   status: 0 | 1;
 };
 
-export type JSONType =
-  | string
-  | number
-  | boolean
-  | JSONType[]
-  | {
-      [key: string]: JSONType;
-    };
+export type JSONObject = {
+  [key: string]: JSONType;
+};
+
+export type JSONType = string | number | boolean | JSONType[] | JSONObject;
 
 type LogDescription = {
   readonly name: string;

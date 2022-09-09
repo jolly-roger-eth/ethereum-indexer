@@ -2,7 +2,7 @@
   "compilerOptions": {
     "importHelpers": true,
     "declaration": true,
-    "lib": ["es5", "es6"],
+    "lib": ["es5", "es6", "es2017"],
     "outDir": "dist",
     "rootDir": "src",
     "target": "ES2019",

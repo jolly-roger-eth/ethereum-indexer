@@ -29,7 +29,7 @@ function mergeDependenciesIn(dependencies: Dependency[], deps: Dependency[]) {
 
 // TODO
 // is this something like taht possible ?
-type OnFunction = `on${string}`;
+export type OnFunction = `on${string}`;
 
 export type SingleEventProcessorWithBatchSupport = {
   setup?(db: Database): Promise<void>;

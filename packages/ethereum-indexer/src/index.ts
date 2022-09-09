@@ -24,6 +24,8 @@ export {
   LogFetcherConfig,
 } from './engine/ethereum';
 
+export { ethereum_send, JSONRPCProvider } from './utils/JSONRPCProvider';
+
 export type EventProcessor = {
   load: (contractsData: ContractsInfo) => Promise<LastSync>;
   process: (eventStream: EventWithId[], lastSync: LastSync) => Promise<void>;
@@ -118,7 +120,7 @@ export class EthereumIndexer {
     }
   }
 
-  async load(): Promise<LastSync> {
+  load(): Promise<LastSync> {
     if (!this._loading) {
       this._loading = this.promiseToLoad();
     }

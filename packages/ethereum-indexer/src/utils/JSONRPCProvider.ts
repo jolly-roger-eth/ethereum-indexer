@@ -1,8 +1,8 @@
-import fetch from 'node-fetch';
-import type { EIP1193Provider, EIP1193RequestArguments } from 'ethereum-indexer/src/engine/ethereum';
+import fetch from 'isomorphic-unfetch';
+import type { EIP1193Provider, EIP1193RequestArguments } from '../engine/ethereum';
 
 let counter = 0;
-export async function send<U extends any, T>(endpoint: string, method: string, params?: U): Promise<T> {
+export async function ethereum_send<U extends any, T>(endpoint: string, method: string, params?: U): Promise<T> {
   // NOTE: special case to allow batch request via EIP-1193
   if (method === 'eth_batch') {
     if (params && (params as any[]).length === 0) {
@@ -54,6 +54,6 @@ export class JSONRPCProvider implements EIP1193Provider {
   constructor(protected endpoint: string) {}
 
   request<T>(args: EIP1193RequestArguments): Promise<T> {
-    return send(this.endpoint, args.method, args.params);
+    return ethereum_send(this.endpoint, args.method, args.params);
   }
 }

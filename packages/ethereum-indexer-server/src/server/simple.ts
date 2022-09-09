@@ -10,10 +10,9 @@ import logger from 'koa-logger';
 import json from 'koa-json';
 import bodyParser from 'koa-bodyparser';
 
-import { ContractsInfo, EthereumIndexer, EventProcessor, LastSync } from 'ethereum-indexer';
+import { ContractsInfo, EthereumIndexer, LastSync, JSONRPCProvider } from 'ethereum-indexer';
 
 import { logs } from 'named-logs';
-import { JSONRPCProvider } from '../utils/JSONRPCProvider';
 
 // TODO We should move EventCache, PouchDatabase and QueriableEventProcessor in a separate low-level module so server does not need to import 'ethereum-indexer-db-processors';
 import { EventCache, PouchDatabase, QueriableEventProcessor, Query } from 'ethereum-indexer-db-processors';
@@ -155,6 +154,7 @@ export class SimpleServer {
       providerSupportsETHBatch: true,
     });
 
+    namedLogger.info(`LOADING....`);
     this.lastSync = await this.indexer.load();
   }
 
