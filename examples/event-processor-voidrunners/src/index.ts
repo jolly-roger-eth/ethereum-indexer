@@ -50,6 +50,8 @@ const VoidrunnerEventProcessor: SingleJSONEventProcessorObject<Data> = {
         spaceship.owner = to;
       }
     }
+
+    namedLogger.info(JSON.stringify(data, null, 2));
   },
 };
 

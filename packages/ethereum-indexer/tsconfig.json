@@ -1,6 +1,8 @@
 {
-    "compilerOptions": {
-        "moduleResolution": "node",
-        "lib": ["ES2015"]
-    }
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "lib": ["ES2015"],
+    "declaration": true,
+    "sourceMap": true
+  }
 }

@@ -100,7 +100,8 @@ export class History {
   }
 
   setReversal(fieldPath: string[], action: ReversalAction) {
-    const found = getReversal(this.historyJSON.reversals[this.blockHash], fieldPath);
+    let reversalPerBlockHash = this.historyJSON.reversals[this.blockHash];
+    const found = reversalPerBlockHash && getReversal(reversalPerBlockHash, fieldPath);
     if (!found) {
       let rootReversal: Reversal | ReversalAction = action;
       for (let i = fieldPath.length - 2; i >= 0; i--) {
@@ -109,6 +110,7 @@ export class History {
           rootReversal = { [property]: rootReversal };
         }
       }
+      this.historyJSON.reversals[this.blockHash] = rootReversal as Reversal;
     } else if ('action' in found) {
       if (action.__action__ === 'ValueSet') {
         found.parent[found.action] = action;
