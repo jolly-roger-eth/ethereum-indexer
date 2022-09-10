@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.10.3/dist/cdn.min.js"></script>
+  </head>
+  <body>
+    <!-- This example requires Tailwind CSS v2.0+ -->
+    <div class="bg-white">
+      <div class="mx-auto max-w-7xl py-12 px-4 text-center sm:px-6 lg:py-16 lg:px-8">
+        <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl" x-data>
+          <span class="block">Indexer</span>
+          <span class="block text-base" x-text="$store.status.label"></span>
+        </h2>
+        <div class="mt-8 flex justify-center">
+          <div class="inline-flex rounded-md shadow" x-data @click="$store.status.toggle()">
+            <a
+              href="#"
+              class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-5 py-3 text-base font-medium text-white hover:bg-indigo-700"
+              x-text="$store.status.toggleActionLabel"
+            ></a>
+          </div>
+          <div class="ml-3 inline-flex" x-data x-show="!$store.status.started" @click="indexMore">
+            <a
+              href="#"
+              class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-100 px-5 py-3 text-base font-medium text-indigo-700 hover:bg-indigo-200"
+              >next batch</a
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function createStatus(func) {
+        let _data;
+        let _dataPromise;
+        let _dataPromiseResolve;
+        async function refresh() {
+          const result = await fetch('/').then((r) => r.json());
+          _data = result;
+          if (_dataPromiseResolve) {
+            const copy = _dataPromiseResolve;
+            _dataPromiseResolve = undefined;
+            copy(_data);
+          }
+          func && func(_data);
+          setTimeout(refresh, 1000);
+        }
+        refresh();
+
+        return {
+          lastValue() {
+            if (!_data) {
+              if (_dataPromise) {
+                return _dataPromise;
+              }
+              _dataPromise = new Promise((resolve) => {
+                _dataPromiseResolve = resolve;
+              });
+              return _dataPromise;
+            } else {
+              return Promise.resolve(_data);
+            }
+          },
+          get data() {
+            return _data;
+          },
+        };
+      }
+
+      document.addEventListener('alpine:init', () => {
+        Alpine.store('status', {
+          started: false,
+          label: '',
+          toggleActionLabel: '',
+
+          init() {
+            this.status = createStatus((data) => {
+              this.started = data.indexing;
+              this.label = data.indexing ? 'started' : 'stopped';
+              this.toggleActionLabel = data.indexing ? 'stop' : 'start';
+            });
+          },
+
+          toggle() {
+            if (this.started) {
+              stop();
+            } else {
+              start();
+            }
+          },
+        });
+      });
+
+      async function stop() {
+        const result = await fetch('/stop', { method: 'POST' }).then((r) => r.json());
+        if (result.error) {
+          console.log(result.error);
+        }
+      }
+
+      async function start() {
+        const result = await fetch('/start', { method: 'POST' }).then((r) => r.json());
+        if (result.error) {
+          console.log(result.error);
+        }
+      }
+
+      async function indexMore() {
+        const result = await fetch('/indexMore', { method: 'POST' }).then((r) => r.json());
+        if (result.error) {
+          console.log(result.error);
+        }
+      }
+    </script>
+  </body>
+</html>

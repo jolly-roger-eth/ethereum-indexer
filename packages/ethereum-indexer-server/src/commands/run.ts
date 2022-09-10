@@ -38,6 +38,10 @@ export default class Run extends Command {
       description: `disable caching (that caches the event strean so you can replay the event when processor changes instead of having to fetch them again. Note that chaging the contracts data will require a full reset)`,
       default: false,
     }),
+    disableSecurity: Flags.boolean({
+      description: `ALLOW ANYONE TO CALL ADMIN FUNCTIONS`,
+      default: false,
+    }),
   };
 
   public async run(): Promise<void> {

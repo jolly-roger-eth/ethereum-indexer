@@ -16,6 +16,7 @@ import { logs } from 'named-logs';
 
 // TODO We should move EventCache, PouchDatabase and QueriableEventProcessor in a separate low-level module so server does not need to import 'ethereum-indexer-db-processors';
 import { EventCache, PouchDatabase, QueriableEventProcessor, Query } from 'ethereum-indexer-db-processors';
+import { adminPage } from '../pages';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -25,6 +26,7 @@ export type UserConfig = {
   processorPath: string;
   contractsData?: ContractsInfo;
   useCache?: boolean;
+  disableSecurity?: boolean;
 };
 
 type Config = {
@@ -32,6 +34,7 @@ type Config = {
   folder: string;
   processorPath: string;
   useCache: boolean;
+  disableSecurity: boolean;
 };
 
 function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: string[]): U {
@@ -73,12 +76,13 @@ export class SimpleServer {
   protected config: Config;
   protected cache: EventCache;
   protected processor: QueriableEventProcessor;
-  protected indexingStarted: boolean = false;
+  protected indexing: boolean = false;
+  protected indexingTimeout: NodeJS.Timeout | undefined;
 
   protected contractsData: ContractsInfo;
 
   constructor(config: UserConfig) {
-    this.config = Object.assign({ useCache: false }, config);
+    this.config = Object.assign({ useCache: false, disableSecurity: false }, config);
     this.contractsData = config.contractsData;
   }
 
@@ -159,7 +163,7 @@ export class SimpleServer {
   }
 
   private startIndexing(): boolean {
-    if (!this.indexingStarted) {
+    if (!this.indexing) {
       this.index();
       return true;
     } else {
@@ -167,7 +171,20 @@ export class SimpleServer {
     }
   }
 
+  private stopIndexing(): boolean {
+    if (this.indexing) {
+      if (this.indexingTimeout) {
+        clearTimeout(this.indexingTimeout);
+      }
+      this.indexing = false;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   private async startServer() {
+    const self = this;
     this.app = new Koa();
     const router = new Router();
 
@@ -181,6 +198,9 @@ export class SimpleServer {
     }
 
     function isAuthorized(ctx): boolean {
+      if (self.config.disableSecurity) {
+        return true;
+      }
       const apiKeyProvided = ctx.request.header.authorization || ctx.request.body.apiKey;
       return apiKeys.includes(apiKeyProvided);
     }
@@ -191,7 +211,7 @@ export class SimpleServer {
       const lastToBlock = this.lastSync.lastToBlock;
 
       const totalToProcess = latestBlock - startingBlock;
-      const numBlocksProcessedSoFar = lastToBlock - startingBlock;
+      const numBlocksProcessedSoFar = Math.max(0, lastToBlock - startingBlock);
 
       const lastSyncObject = formatLastSync(this.lastSync);
       lastSyncObject.numBlocksProcessedSoFar = numBlocksProcessedSoFar;
@@ -203,12 +223,12 @@ export class SimpleServer {
       if (data) {
         const _data = (this.processor as any)._json;
         if (_data) {
-          ctx.body = { lastSync: lastSyncObject, data, _data };
+          ctx.body = { lastSync: lastSyncObject, indexing: this.indexing, data, _data };
         } else {
-          ctx.body = { lastSync: lastSyncObject, data };
+          ctx.body = { lastSync: lastSyncObject, indexing: this.indexing, data };
         }
       } else {
-        ctx.body = { lastSync: lastSyncObject };
+        ctx.body = { lastSync: lastSyncObject, indexing: this.indexing };
       }
 
       await next();
@@ -236,6 +256,11 @@ export class SimpleServer {
     // ADMIN ROUTES
     // ----------------------------------------------------------------------------------------------------------------
 
+    router.get('/admin', async (ctx, next) => {
+      ctx.body = adminPage;
+      await next();
+    });
+
     router.post('/replay', async (ctx, next) => {
       if (!isAuthorized(ctx)) {
         ctx.body = { error: { code: 4030, message: 'Forbidden' } };
@@ -258,10 +283,35 @@ export class SimpleServer {
       await next();
     });
 
+    router.post('/stop', async (ctx, next) => {
+      if (!isAuthorized(ctx)) {
+        ctx.body = { error: { code: 4030, message: 'Forbidden' } };
+      } else {
+        ctx.body = { started: this.stopIndexing() };
+      }
+
+      await next();
+    });
+
+    router.post('/indexMore', async (ctx, next) => {
+      if (!isAuthorized(ctx)) {
+        ctx.body = { error: { code: 4030, message: 'Forbidden' } };
+      } else {
+        if (this.indexing) {
+          ctx.body = { error: { code: 4040, message: 'Indexing Already' } };
+        } else {
+          this.lastSync = await this.indexer.indexMore();
+          ctx.body = { lastSync: this.lastSync };
+        }
+      }
+
+      await next();
+    });
+
     router.post('/feed', async (ctx, next) => {
       if (!isAuthorized(ctx)) {
         ctx.body = { error: { code: 4030, message: 'Forbidden' } };
-      } else if (this.indexingStarted) {
+      } else if (this.indexing) {
         ctx.body = { error: { code: 222, message: 'Server is Indexing, cannot import.' } };
       } else {
         const eventStream = ctx.body.events;
@@ -305,21 +355,21 @@ export class SimpleServer {
   }
 
   async index() {
-    this.indexingStarted = true;
+    this.indexing = true;
     try {
       namedLogger.info('server indexing more...');
       this.lastSync = await this.indexer.indexMore();
     } catch (err) {
       namedLogger.info('server error: ', err);
-      setTimeout(this.index.bind(this), 1000);
+      this.indexingTimeout = setTimeout(this.index.bind(this), 1000);
       return;
     }
 
     if (this.lastSync.latestBlock - this.lastSync.lastToBlock < 1) {
       namedLogger.info('no new block, skip');
-      setTimeout(this.index.bind(this), 1000);
+      this.indexingTimeout = setTimeout(this.index.bind(this), 1000);
     } else {
-      setTimeout(this.index.bind(this), 1);
+      this.indexingTimeout = setTimeout(this.index.bind(this), 1);
     }
   }
 }

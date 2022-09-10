@@ -11,6 +11,7 @@ export function runServer(args: {
   folder?: string;
   wait: boolean;
   disableCache: boolean;
+  disableSecurity: boolean;
 }) {
   let contractsData: ContractsInfo | undefined;
   if (args.deployments) {
@@ -32,6 +33,7 @@ export function runServer(args: {
     processorPath,
     useCache: !args.disableCache,
     nodeURL: args.nodeURL,
+    disableSecurity: args.disableSecurity,
   });
 
   server.start({ autoIndex: !args.wait });
