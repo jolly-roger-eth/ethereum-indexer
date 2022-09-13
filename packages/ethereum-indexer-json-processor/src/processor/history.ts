@@ -14,9 +14,7 @@ type ReversalAction =
       )[];
     };
 
-type Reversal = {
-  [property: string]: Reversal | ReversalAction;
-};
+type Reversal = { [property: string]: Reversal | ReversalAction };
 
 export type HistoryJSONObject = {
   reversals: { [blockHash: string]: Reversal };
@@ -27,7 +25,7 @@ function getReversal(
   previousReversal: Reversal,
   fieldPath: string[],
   index?: number,
-): { action: string; parent: Reversal } | { reversal: Reversal } | undefined {
+): { actionField: string; parent: Reversal } | { reversal: Reversal } | undefined {
   index = index || 0;
   if (index >= fieldPath.length) {
     return { reversal: previousReversal };
@@ -37,10 +35,10 @@ function getReversal(
   if (!reversal) {
     return undefined;
   } else if (reversal.__action__) {
-    return { action: property, parent: previousReversal };
+    return { actionField: property, parent: previousReversal };
   } else {
     // we stop right there
-    return { reversal: reversal as Reversal };
+    return getReversal(reversal as Reversal, fieldPath, index + 1);
   }
 }
 
@@ -101,22 +99,22 @@ export class History {
   }
 
   setReversal(fieldPath: string[], action: ReversalAction) {
-    let reversalPerBlockHash = this.historyJSON.reversals[this.blockHash];
+    let reversalPerBlockHash: Reversal = this.historyJSON.reversals[this.blockHash];
     const found = reversalPerBlockHash && getReversal(reversalPerBlockHash, fieldPath);
     if (!found) {
-      let rootReversal: Reversal | ReversalAction = action;
-      for (let i = fieldPath.length - 2; i >= 0; i--) {
+      let rootReversal: Reversal;
+      for (let i = fieldPath.length - 1; i >= 0; i--) {
         const property = fieldPath[i];
         if (property) {
-          rootReversal = { [property]: rootReversal };
+          rootReversal = { [property]: rootReversal || action };
         }
       }
       this.historyJSON.reversals[this.blockHash] = rootReversal as Reversal;
-    } else if ('action' in found) {
+    } else if ('actionField' in found) {
       if (action.__action__ === 'ValueSet') {
-        found.parent[found.action] = action;
+        found.parent[found.actionField] = action;
       } else {
-        const previousAction = found.parent[found.action] as ReversalAction;
+        const previousAction = found.parent[found.actionField] as ReversalAction;
         if (previousAction.__action__ === 'ValueSet') {
           throw new Error(`previous action is "ValueSet", new action is ${action.__action__}`);
         } else {
@@ -161,7 +159,7 @@ function arrayGetter(
   return (target, property) => {
     const value = target[property];
     if (typeof value === 'function') {
-      if (['indexOf', 'find', 'findIndex'].indexOf(property)) {
+      if (['indexOf', 'find', 'findIndex'].indexOf(property) !== -1) {
         return value;
       }
       if (property === 'push') {
@@ -212,7 +210,7 @@ function setter(
   history: History,
 ): (target: JSONObject | JSONType[], property: string, value: JSONType) => boolean {
   return (target, property, value) => {
-    history.setReversal(fieldPath, {
+    history.setReversal([...fieldPath, property], {
       __action__: 'ValueSet',
       value: target[property], // TODO deepCopy
     });
@@ -222,7 +220,7 @@ function setter(
 }
 function deleter(fieldPath: string[], history: History): (target: JSONObject, property: string) => boolean {
   return (target, property) => {
-    history.setReversal(fieldPath, {
+    history.setReversal([...fieldPath, property], {
       __action__: 'ValueSet',
       value: target[property], // TODO deepCopy
     });

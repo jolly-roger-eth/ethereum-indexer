@@ -33,21 +33,26 @@ export async function ethereum_send<U extends any, T>(endpoint: string, method: 
     }
     return jsonArray.map((v) => v.result) as unknown as T;
   }
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: ++counter,
-      jsonrpc: '2.0',
-      method,
-      params,
-    }),
-  });
-  const json: { result?: T; error?: any } = await response.json();
-  if (json.error || !json.result) {
-    throw json.error || { code: 5000, message: 'No Result' };
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: ++counter,
+        jsonrpc: '2.0',
+        method,
+        params,
+      }),
+    });
+    const json: { result?: T; error?: any } = await response.json();
+    if (json.error || !json.result) {
+      throw json.error || { code: 5000, message: 'No Result' };
+    }
+    return json.result;
+  } catch (err) {
+    console.log(`FETCH error`, err);
+    throw err;
   }
-  return json.result;
 }
 
 export class JSONRPCProvider implements EIP1193Provider {

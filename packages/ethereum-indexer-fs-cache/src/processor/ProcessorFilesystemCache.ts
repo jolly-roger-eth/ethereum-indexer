@@ -2,11 +2,8 @@ import { ContractsInfo, EventProcessor, EventWithId, LastSync, LogEvent } from '
 import fs from 'fs';
 import path from 'path';
 import { logs } from 'named-logs';
+import { lexicographicNumber15 } from './utils';
 const namedLogger = logs('EventListFSStore');
-
-function lexicographicNumber15(num: number): string {
-  return num.toString().padStart(15, '0');
-}
 
 function identity(arg: any): any {
   return arg;

@@ -12,7 +12,7 @@ import {
 } from './engine/ethereum';
 
 import { logs } from 'named-logs';
-const console = logs('ethereum-indexer');
+const namedLogger = logs('ethereum-indexer');
 
 export {
   EIP1193Provider,
@@ -196,15 +196,15 @@ export class EthereumIndexer {
   protected _processing: Promise<LastSync> | undefined;
   indexMore(): Promise<LastSync> {
     if (this._processing) {
-      console.info(`still processing...`);
+      namedLogger.info(`still processing...`);
       return this._processing;
     }
 
     if (this._reseting) {
-      console.info(`reseting...`);
+      namedLogger.info(`reseting...`);
       this._processing = this._reseting.then(() => this.promiseToIndex());
     } else {
-      console.info(`go!`);
+      namedLogger.info(`go!`);
       this._processing = this.promiseToIndex();
     }
     return this._processing;
@@ -216,7 +216,7 @@ export class EthereumIndexer {
     } else {
       const result = [];
       for (const blockHash of blockHashes) {
-        console.info(`getting block ${blockHash}...`);
+        namedLogger.info(`getting block ${blockHash}...`);
         const actualBlock = await getBlock(this.provider, blockHash);
         if (!this._processing) {
           return;
@@ -233,7 +233,7 @@ export class EthereumIndexer {
     } else {
       const result = [];
       for (const transactionHash of transactionHashes) {
-        console.info(`getting block ${transactionHash}...`);
+        namedLogger.info(`getting block ${transactionHash}...`);
         const tx = await getTransactionReceipt(this.provider, transactionHash);
         if (!this._processing) {
           return;
@@ -248,7 +248,7 @@ export class EthereumIndexer {
     return new Promise(async (resolve, reject) => {
       try {
         if (!this.lastSync) {
-          console.info(`load lastSync...`);
+          namedLogger.info(`load lastSync...`);
           await this.load();
         }
         const lastSync = this.lastSync as LastSync;
@@ -265,11 +265,11 @@ export class EthereumIndexer {
           }
         }
 
-        console.info(`getting latest block...`);
+        namedLogger.info(`getting latest block...`);
         const latestBlock = await getBlockNumber(this.provider);
 
         if (!this._processing) {
-          console.info(`not processing anymore...`);
+          namedLogger.info(`not processing anymore...`);
           reject('aborted');
           return;
         }
@@ -277,7 +277,7 @@ export class EthereumIndexer {
         let toBlock = latestBlock;
 
         if (fromBlock > toBlock) {
-          console.info(`no new block`);
+          namedLogger.info(`no new block`);
           this._processing = undefined;
           return resolve(lastSync);
         }
@@ -289,7 +289,7 @@ export class EthereumIndexer {
         toBlock = newToBlock;
 
         if (!this._processing) {
-          console.info(`not processing anymore...`);
+          namedLogger.info(`not processing anymore...`);
           reject('aborted');
           return;
         }
@@ -334,11 +334,11 @@ export class EthereumIndexer {
           }
         }
         if (blockHashes.length > 0) {
-          console.info(`fetching a batch of  ${blockHashes.length} blocks...`);
+          namedLogger.info(`fetching a batch of  ${blockHashes.length} blocks...`);
           const blocks = await this.getBlocks(blockHashes);
-          console.info(`...got  ${blocks.length} blocks back`);
+          namedLogger.info(`...got  ${blocks.length} blocks back`);
           if (!this._processing) {
-            console.info(`not processing anymore...`);
+            namedLogger.info(`not processing anymore...`);
             reject('aborted');
             return;
           }
@@ -350,11 +350,11 @@ export class EthereumIndexer {
         }
 
         if (transactionHashes.length > 0) {
-          console.info(`fetching a batch of ${transactionHashes.length} transactions...`);
+          namedLogger.info(`fetching a batch of ${transactionHashes.length} transactions...`);
           const transactionReceipts = await this.getTransactions(transactionHashes);
-          console.info(`...got ${transactionReceipts.length} transactions back`);
+          namedLogger.info(`...got ${transactionReceipts.length} transactions back`);
           if (!this._processing) {
-            console.info(`not processing anymore...`);
+            namedLogger.info(`not processing anymore...`);
             reject('aborted');
             return;
           }
@@ -374,17 +374,17 @@ export class EthereumIndexer {
 
         let newEvents = eventsFetched;
         if (this.processor.filter) {
-          console.info(`filtering...`);
+          namedLogger.info(`filtering...`);
           newEvents = await this.processor.filter(eventsFetched);
         }
 
         if (!this._processing) {
-          console.info(`not processing anymore...`);
+          namedLogger.info(`not processing anymore...`);
           reject('aborted');
           return;
         }
 
-        console.info(`populating stream...`);
+        namedLogger.info(`populating stream...`);
         const { eventStream, newLastSync } = await this._generateStreamToAppend(newEvents, {
           latestBlock,
           lastToBlock: toBlock,
@@ -393,17 +393,17 @@ export class EthereumIndexer {
         });
 
         if (!this._processing) {
-          console.info(`not processing anymore...`);
+          namedLogger.info(`not processing anymore...`);
           reject('aborted');
           return;
         }
 
-        console.info(`PROCESSING`);
+        namedLogger.info(`PROCESSING`);
         await this.processor.process(eventStream, newLastSync);
-        console.info(`DONE`);
+        namedLogger.info(`DONE`);
 
         if (!this._processing) {
-          console.info(`not processing anymore...`);
+          namedLogger.info(`not processing anymore...`);
           reject('aborted');
           return;
         }
@@ -413,7 +413,7 @@ export class EthereumIndexer {
         this._processing = undefined;
         return resolve(newLastSync);
       } catch (e: any) {
-        console.info(`error`, e);
+        globalThis.console.error(`error`, e);
         this._processing = undefined;
         return reject(e);
       }

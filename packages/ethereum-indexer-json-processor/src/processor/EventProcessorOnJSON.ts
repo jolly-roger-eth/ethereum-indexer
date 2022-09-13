@@ -67,6 +67,7 @@ export class EventProcessorOnJSON<T extends JSONObject> implements EventProcesso
 
     try {
       let lastBlock: number | undefined;
+      let lastBlockHash: string | undefined;
       let lastBlockDeleted: string | undefined;
       for (const event of eventStream) {
         if (this.lastEventID && event.streamID <= this.lastEventID) {
@@ -81,9 +82,10 @@ export class EventProcessorOnJSON<T extends JSONObject> implements EventProcesso
             lastBlockDeleted = event.blockHash;
           }
         } else {
-          if (!lastBlock || event.blockNumber > lastBlock) {
+          if (!lastBlockHash || event.blockHash != lastBlockHash) {
             this.history.setBlock(event.blockNumber, event.blockHash);
             lastBlock = event.blockNumber;
+            lastBlockHash = event.blockHash;
           }
 
           this.singleEventProcessor.processEvent(this.json, event);

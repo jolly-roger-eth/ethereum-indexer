@@ -127,7 +127,13 @@ export class SimpleServer {
     if (!this.contractsData) {
       let chainIDAsDecimal: string | undefined;
       if (processorModule.contractsDataPerChain) {
-        const chainIDAsHex = await eip1193Provider.request<string>({ method: 'eth_chainId', params: [] });
+        let chainIDAsHex;
+        try {
+          chainIDAsHex = await eip1193Provider.request<string>({ method: 'eth_chainId', params: [] });
+        } catch (err) {
+          console.error(`could not fetch chainID`);
+          throw err;
+        }
         chainIDAsDecimal = '' + parseInt(chainIDAsHex.slice(2), 16);
         namedLogger.info({ chainIDAsHex, chainIDAsDecimal });
         this.contractsData = processorModule.contractsDataPerChain[chainIDAsDecimal];

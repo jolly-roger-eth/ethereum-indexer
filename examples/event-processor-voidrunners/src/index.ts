@@ -70,4 +70,4 @@ export const contractsData = [
 ];
 
 // we also expose a object keyed by chainId
-export const contractsDataPerChain = { 1: contractsData };
+// export const contractsDataPerChain = { 1: contractsData };
