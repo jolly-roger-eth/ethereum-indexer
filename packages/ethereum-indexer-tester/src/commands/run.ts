@@ -1,5 +1,4 @@
 import { Command, Flags } from '@oclif/core';
-import { runServer } from '../server';
 
 export default class Run extends Command {
   static description = 'Run The Indexer as Server';
@@ -42,10 +41,6 @@ export default class Run extends Command {
       description: `ALLOW ANYONE TO CALL ADMIN FUNCTIONS`,
       default: false,
     }),
-    useFSCache: Flags.boolean({
-      description: `use fs cache to store event stream`,
-      default: false,
-    }),
   };
 
   public async run(): Promise<void> {
@@ -53,6 +48,7 @@ export default class Run extends Command {
     if (process.env.ETHEREUM_NODE && !flags.nodeURL) {
       flags.nodeURL = process.env.ETHEREUM_NODE;
     }
-    runServer(flags as any);
+    // TODO
+    // runTest(flags as any);
   }
 }

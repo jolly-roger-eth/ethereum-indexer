@@ -1,5 +1,5 @@
 import fetch from 'isomorphic-unfetch';
-import type { EIP1193Provider, EIP1193RequestArguments } from '../engine/ethereum';
+import type { EIP1193Provider, EIP1193RequestArguments } from 'ethereum-indexer';
 
 let counter = 0;
 export async function ethereum_send<U extends any, T>(endpoint: string, method: string, params?: U): Promise<T> {

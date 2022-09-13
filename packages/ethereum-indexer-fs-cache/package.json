@@ -1,5 +1,5 @@
 {
-  "name": "ethereum-indexer-fs-event-store",
+  "name": "ethereum-indexer-fs-cache",
   "version": "0.1.8",
   "description": "",
   "publishConfig": {

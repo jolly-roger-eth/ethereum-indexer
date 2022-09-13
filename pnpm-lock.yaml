@@ -30,7 +30,6 @@ importers:
       '@ethersproject/abi': ^5.6.4
       '@ethersproject/address': ^5.6.1
       '@ethersproject/bytes': ^5.6.1
-      isomorphic-unfetch: ^3.1.0
       named-logs: ^0.2.0
       tsup: ^6.2.1
       typescript: ^4.6.4
@@ -38,7 +37,6 @@ importers:
       '@ethersproject/abi': 5.7.0
       '@ethersproject/address': 5.7.0
       '@ethersproject/bytes': 5.7.0
-      isomorphic-unfetch: 3.1.0
       named-logs: 0.2.0
     devDependencies:
       tsup: 6.2.3_typescript@4.8.3
@@ -63,7 +61,7 @@ importers:
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
 
-  packages/ethereum-indexer-fs-event-store:
+  packages/ethereum-indexer-fs-cache:
     specifiers:
       '@types/node': ^18.7.16
       '@types/pouchdb': ^6.4.0
@@ -112,6 +110,8 @@ importers:
       dotenv: ^16.0.1
       ethereum-indexer: workspace:*
       ethereum-indexer-db-processors: workspace:*
+      ethereum-indexer-fs-cache: workspace:*
+      ethereum-indexer-utils: workspace:*
       koa: ^2.13.4
       koa-bodyparser: ^4.3.0
       koa-json: ^2.0.2
@@ -133,6 +133,8 @@ importers:
       dotenv: 16.0.2
       ethereum-indexer: link:../ethereum-indexer
       ethereum-indexer-db-processors: link:../ethereum-indexer-db-processors
+      ethereum-indexer-fs-cache: link:../ethereum-indexer-fs-cache
+      ethereum-indexer-utils: link:../ethereum-indexer-utils
       koa: 2.13.4
       koa-bodyparser: 4.3.0
       koa-json: 2.0.2
@@ -153,6 +155,56 @@ importers:
       nodemon: 2.0.19
       shx: 0.3.4
       tslib: 2.4.0
+      tsup: 6.2.3_typescript@4.8.3
+      typescript: 4.8.3
+
+  packages/ethereum-indexer-tester:
+    specifiers:
+      '@oclif/core': ^1.16.0
+      '@oclif/plugin-help': ^5.1.12
+      '@types/node': 15.6.1
+      dotenv: ^16.0.1
+      ethereum-indexer: workspace:*
+      ethereum-indexer-fs-cache: workspace:*
+      ethereum-indexer-utils: workspace:*
+      named-logs: ^0.2.0
+      named-logs-console: ^0.2.1
+      tslib: ^2.4.0
+      tsup: ^6.2.1
+      typescript: ^4.7.4
+    dependencies:
+      '@oclif/core': 1.16.1
+      '@oclif/plugin-help': 5.1.12
+      dotenv: 16.0.2
+      ethereum-indexer: link:../ethereum-indexer
+      ethereum-indexer-fs-cache: link:../ethereum-indexer-fs-cache
+      ethereum-indexer-utils: link:../ethereum-indexer-utils
+      named-logs: 0.2.0
+      named-logs-console: 0.2.1
+    devDependencies:
+      '@types/node': 15.6.1
+      tslib: 2.4.0
+      tsup: 6.2.3_typescript@4.8.3
+      typescript: 4.8.3
+
+  packages/ethereum-indexer-utils:
+    specifiers:
+      '@ethersproject/abi': ^5.6.4
+      '@ethersproject/address': ^5.6.1
+      '@ethersproject/bytes': ^5.6.1
+      ethereum-indexer: workspace:*
+      isomorphic-unfetch: ^3.1.0
+      named-logs: ^0.2.0
+      tsup: ^6.2.1
+      typescript: ^4.6.4
+    dependencies:
+      '@ethersproject/abi': 5.7.0
+      '@ethersproject/address': 5.7.0
+      '@ethersproject/bytes': 5.7.0
+      ethereum-indexer: link:../ethereum-indexer
+      isomorphic-unfetch: 3.1.0
+      named-logs: 0.2.0
+    devDependencies:
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
 

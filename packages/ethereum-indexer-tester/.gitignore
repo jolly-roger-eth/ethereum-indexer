@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env*
+data/
+.vscode/
+log.txt
+ethereum-indexer-data
+.yalc
+yalc.lock

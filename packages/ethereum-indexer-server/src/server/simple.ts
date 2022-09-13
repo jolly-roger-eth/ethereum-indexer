@@ -10,7 +10,9 @@ import logger from 'koa-logger';
 import json from 'koa-json';
 import bodyParser from 'koa-bodyparser';
 
-import { ContractsInfo, EthereumIndexer, LastSync, JSONRPCProvider } from 'ethereum-indexer';
+import { ContractsInfo, EthereumIndexer, EventProcessor, LastSync } from 'ethereum-indexer';
+import { JSONRPCProvider } from 'ethereum-indexer-utils';
+import { ProcessorFilesystemCache } from 'ethereum-indexer-fs-cache';
 
 import { logs } from 'named-logs';
 
@@ -27,6 +29,7 @@ export type UserConfig = {
   contractsData?: ContractsInfo;
   useCache?: boolean;
   disableSecurity?: boolean;
+  useFSCache?: boolean;
 };
 
 type Config = {
@@ -35,6 +38,7 @@ type Config = {
   processorPath: string;
   useCache: boolean;
   disableSecurity: boolean;
+  useFSCache: boolean;
 };
 
 function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: string[]): U {
@@ -82,7 +86,7 @@ export class SimpleServer {
   protected contractsData: ContractsInfo;
 
   constructor(config: UserConfig) {
-    this.config = Object.assign({ useCache: false, disableSecurity: false }, config);
+    this.config = Object.assign({ useCache: false, disableSecurity: false, useFSCache: false }, config);
     this.contractsData = config.contractsData;
   }
 
@@ -149,12 +153,18 @@ export class SimpleServer {
       );
     }
 
+    let rootProcessor: EventProcessor = this.processor;
     if (this.config.useCache) {
       const eventCacheDB = new PouchDatabase(`${this.config.folder}/event-stream.db`);
       this.cache = new EventCache(this.processor, eventCacheDB);
+      rootProcessor = this.cache;
     }
 
-    this.indexer = new EthereumIndexer(eip1193Provider, this.cache || this.processor, this.contractsData, {
+    if (this.config.useFSCache) {
+      rootProcessor = new ProcessorFilesystemCache(rootProcessor, this.config.folder);
+    }
+
+    this.indexer = new EthereumIndexer(eip1193Provider, rootProcessor, this.contractsData, {
       providerSupportsETHBatch: true,
     });
 

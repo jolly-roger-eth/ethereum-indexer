@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "lib": ["ES2015"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  }
+}

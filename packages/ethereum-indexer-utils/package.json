@@ -1,5 +1,5 @@
 {
-  "name": "ethereum-indexer",
+  "name": "ethereum-indexer-utils",
   "version": "0.0.15",
   "publishConfig": {
     "access": "public"
@@ -19,6 +19,8 @@
     "@ethersproject/abi": "^5.6.4",
     "@ethersproject/address": "^5.6.1",
     "@ethersproject/bytes": "^5.6.1",
+    "ethereum-indexer": "workspace:*",
+    "isomorphic-unfetch": "^3.1.0",
     "named-logs": "^0.2.0"
   }
 }
