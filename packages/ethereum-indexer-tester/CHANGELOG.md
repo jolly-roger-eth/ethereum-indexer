@@ -1,4 +1,4 @@
-# ethereum-indexer
+# ethereum-indexer-tester
 
 ## 0.3.0
 
@@ -10,9 +10,5 @@
 
 - Updated dependencies
   - ethereum-indexer@0.3.0
-
-## 0.0.15
-
-### Patch Changes
-
-- use monorepo
+  - ethereum-indexer-fs-cache@0.3.0
+  - ethereum-indexer-utils@0.3.0
