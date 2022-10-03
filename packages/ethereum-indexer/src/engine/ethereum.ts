@@ -67,14 +67,21 @@ interface Log {
 	logIndex: number;
 }
 
-export interface LogEvent extends Log {
+export interface LogEvent<
+	Args extends {
+		[key: string | number]: string | number | boolean;
+	} = {
+		[key: string | number]: string | number | boolean;
+	},
+	Extra extends JSONType = JSONType
+> extends Log {
 	name?: string;
 	topic?: string;
 	signature?: string;
-	args?: {[key: string | number]: string | number | boolean};
+	args?: Args;
 	// If parsing the arguments failed, this is the error
 	decodeError?: Error;
-	extra?: JSONType;
+	extra?: Extra;
 	blockTimestamp?: number;
 	transaction?: TransactionData;
 }
