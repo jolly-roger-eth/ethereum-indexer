@@ -1,13 +1,13 @@
 export type Voidrunner = {
-  address: string;
+	address: string;
 };
 
 export type Spaceship = {
-  tokenID: string;
-  owner: string;
+	tokenID: string;
+	owner: string;
 };
 
 export type Data = {
-  spaceships: Spaceship[];
-  voidrunners: Voidrunner[];
+	spaceships: Spaceship[];
+	voidrunners: Voidrunner[];
 };

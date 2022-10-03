@@ -3,9 +3,12 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "format": "prettier --check \"**/*.{ts,js,sol}\"",
+    "format:fix": "prettier --write \"**/*.{ts,js,sol}\""
   },
   "devDependencies": {
-    "@changesets/cli": "^2.24.4"
+    "@changesets/cli": "^2.24.4",
+    "prettier": "^2.7.1"
   }
 }

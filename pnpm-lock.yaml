@@ -5,8 +5,10 @@ importers:
   .:
     specifiers:
       '@changesets/cli': ^2.24.4
+      prettier: ^2.7.1
     devDependencies:
       '@changesets/cli': 2.24.4
+      prettier: 2.7.1
 
   examples/event-processor-voidrunners:
     specifiers:
