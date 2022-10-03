@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.3.1
+
+### Patch Changes
+
+- allow to specify type on EventWithId
+
 ## 0.3.0
 
 ### Minor Changes
