@@ -1,5 +1,6 @@
 {
   "name": "event-processor-voidrunners",
+  "private": true,
   "version": "0.0.1",
   "description": "",
   "type": "module",
@@ -9,9 +10,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "volta": {
-    "node": "18.7.0"
-  },
   "dependencies": {
     "dotenv": "^16.0.1",
     "ethereum-indexer-json-processor": "workspace:*",
