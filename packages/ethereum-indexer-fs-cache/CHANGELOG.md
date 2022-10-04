@@ -1,5 +1,11 @@
 # ethereum-indexer-fs-event-store
 
+## 0.3.3
+
+### Patch Changes
+
+- fix export types again
+
 ## 0.3.2
 
 ### Patch Changes
