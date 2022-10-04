@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"outDir": "./dist",
+		"lib": ["es2020"],
+		"target": "es2020",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"emitDecoratorMetadata": true,
+		"experimentalDecorators": true,
+		"esModuleInterop": true,
+		"resolveJsonModule": true
+	},
+	"include": ["./src/**/*", "./src/**/*.json"]
+}
