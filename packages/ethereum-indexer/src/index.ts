@@ -15,7 +15,7 @@ import {
 import {logs} from 'named-logs';
 const namedLogger = logs('ethereum-indexer');
 
-export {
+export type {
 	EIP1193Provider,
 	LogEvent,
 	EIP1193RequestArguments,
