@@ -50,7 +50,16 @@ function getOrCreatePlanet(data: Data, location: string): Planet {
 		planet = {
 			location,
 			owner: undefined,
-			exiting: false
+			exitTime: 0,
+			numSpaceships: 0,
+			travelingUpkeep: 0,
+			overflow: 0,
+			active: false,
+			lastUpdated: 0,
+			firstAcquired: 0,
+			lastAcquired: 0,
+			flagTime: 0,
+			stakeDeposited: 0n
 		};
 		data.planets[planetID] = planet;
 	}
@@ -72,7 +81,13 @@ function getOrCreatePlayer(data: Data, address: string): Player {
 	let player = data.players[playerID];
 	if (!player) {
 		player = {
-			address
+			address,
+			totalStaked: 0n,
+			currentStake: 0n,
+			totalCollected: 0n,
+			playTokenBalance: 0n,
+			freePlayTokenBalance: 0n,
+			tokenToWithdraw: 0n
 		};
 		data.players[playerID] = player;
 	}
@@ -91,6 +106,14 @@ function getPlayer(data: Data, address: string): Player {
 
 const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 	async setup(json: Data): Promise<void> {
+		json.space = {
+			address: '', // TODO
+			expansionDelta: 0,
+			maxX: 0,
+			maxY: 0,
+			minX: 0,
+			minY: 0
+		};
 		json.players = {};
 		json.planets = {};
 		json.fleets = {};
@@ -110,7 +133,7 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 	onPlanetExit(data: Data, event: PlanetExit) {
 		// getPlayer(data, event.args.owner);
 		const planet = getPlanet(data, event.args.location);
-		planet.exiting = true;
+		planet.exitTime = event.blockNumber; // TODO block timestamp
 	},
 	// TODO
 	// onTravelingUpkeepRefund(data: Data, event: TravelingUpkeepRefund) {
@@ -118,21 +141,33 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 	// },
 	onExitComplete(data: Data, event: ExitComplete) {
 		const planet = getPlanet(data, event.args.location);
-		planet.exiting = false;
+		planet.exitTime = 0;
 		planet.owner = undefined;
 	},
 	onFleetSent(data: Data, event: FleetSent) {
-		data.fleets[event.args.fleet] = {id: event.args.fleet, arrived: false};
+		data.fleets[event.args.fleet] = {
+			id: event.args.fleet,
+			owner: event.args.fleetOwner,
+			sender: event.args.fleetSender,
+			operator: event.args.fleetSender, // TODO fix using tx data
+			launchTime: event.blockNumber, // TODO fix using block timestamp
+			from: event.args.from,
+			quantity: event.args.quantity,
+			resolved: false,
+			sendTransaction: event.transactionHash
+		};
 	},
 	onFleetArrived(data: Data, event: FleetArrived) {
 		const planet = getOrCreatePlanet(data, event.args.destination);
 
-		namedLogger.info(event.args.data);
+		// namedLogger.info(event.args.data);
 
-		data.fleets[event.args.fleet].arrived = true;
+		const fleet = data.fleets[event.args.fleet];
+		fleet.resolveTransaction = event.transactionHash;
+		// TODO result
 		if (event.args.won) {
 			planet.owner = event.args.fleetOwner;
-			planet.exiting = false;
+			planet.exitTime = 0;
 		}
 	}
 };
