@@ -35,7 +35,7 @@ export function runServer(args: {
 		useCache: !args.disableCache,
 		useFSCache: args.useFSCache,
 		nodeURL: args.nodeURL,
-		disableSecurity: args.disableSecurity
+		disableSecurity: args.disableSecurity,
 	});
 
 	server.start({autoIndex: !args.wait});

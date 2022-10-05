@@ -22,8 +22,8 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 			data: {} as T,
 			history: {
 				blockHashes: {},
-				reversals: {}
-			}
+				reversals: {},
+			},
 		};
 		this.history = new History(this._json.history, 12); // TODO finality
 		this.json = proxifyJSON<T>(this._json.data, this.history);
@@ -37,7 +37,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 		}
 		this._json.history = {
 			blockHashes: {},
-			reversals: {}
+			reversals: {},
 		};
 		this.history.setBlock(0, '0x0000');
 		await this.singleEventProcessor.setup(this._json.data);
@@ -56,7 +56,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 				lastToBlock: 0,
 				latestBlock: 0,
 				nextStreamID: 1,
-				unconfirmedBlocks: []
+				unconfirmedBlocks: [],
 			};
 		}
 	}
@@ -100,7 +100,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 			const lastSyncDoc = {
 				_id: 'lastSync',
 				_rev: lastLastSync?._rev,
-				...lastSync
+				...lastSync,
 			};
 			this._json.lastSync = lastSyncDoc;
 		} finally {

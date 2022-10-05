@@ -6,6 +6,6 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 export default defineConfig({
 	plugins: [tsconfigPaths(), svelte()],
 	build: {
-		target: ['ES2020']
-	}
+		target: ['ES2020'],
+	},
 });

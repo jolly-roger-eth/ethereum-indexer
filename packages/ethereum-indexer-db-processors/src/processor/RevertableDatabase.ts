@@ -8,7 +8,7 @@ import {
 	JSONObject,
 	PutAndGetDatabaseWithBatchSupport,
 	Query,
-	Result
+	Result,
 } from './Database';
 
 import {computeEventID, computeArchiveID} from './utils';
@@ -41,8 +41,8 @@ export class RevertableDatabase implements PutAndGetDatabaseWithBatchSupport {
 			// This DB do not support time-travel query, except for recent blocks
 			const {docs: oldArchives} = await this.db.query({
 				selector: {
-					endBlock: {$lt: blockNumber - 13}
-				}
+					endBlock: {$lt: blockNumber - 13},
+				},
 			});
 
 			// TODO batch, require update Database interface
@@ -63,8 +63,8 @@ export class RevertableDatabase implements PutAndGetDatabaseWithBatchSupport {
 
 		const {docs} = await this.db.query({
 			selector: {
-				eventID
-			}
+				eventID,
+			},
 		});
 
 		if (docs.length >= 1) {
@@ -105,7 +105,7 @@ export class RevertableDatabase implements PutAndGetDatabaseWithBatchSupport {
 			...doc,
 			startBlock: this.currentEvent.blockNumber,
 			endBlock: Number.MAX_SAFE_INTEGER,
-			eventID: computeEventID(this.currentEvent)
+			eventID: computeEventID(this.currentEvent),
 		});
 		console.info(`DONE`);
 	}
@@ -151,7 +151,7 @@ export class RevertableDatabase implements PutAndGetDatabaseWithBatchSupport {
 			removed: true,
 			startBlock: this.currentEvent.blockNumber,
 			endBlock: Number.MAX_SAFE_INTEGER,
-			eventID: computeEventID(this.currentEvent)
+			eventID: computeEventID(this.currentEvent),
 		});
 		console.info(`DONE`);
 	}

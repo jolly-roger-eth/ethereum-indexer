@@ -17,7 +17,7 @@ export class EventCache implements EventProcessor {
 
 	protected init(): Promise<void> {
 		this.initialization = this.eventDB.setup({
-			indexes: [{fields: ['batch']}] // 'blockNumber', 'blockHash', 'address', 'transactionHash', 'name', 'signature', 'topic'
+			indexes: [{fields: ['batch']}], // 'blockNumber', 'blockHash', 'address', 'transactionHash', 'name', 'signature', 'topic'
 		});
 		return this.initialization;
 	}
@@ -41,7 +41,7 @@ export class EventCache implements EventProcessor {
 				lastToBlock: 0,
 				latestBlock: 0,
 				nextStreamID: 1,
-				unconfirmedBlocks: []
+				unconfirmedBlocks: [],
 			};
 		}
 	}
@@ -63,9 +63,9 @@ export class EventCache implements EventProcessor {
 				const events = (
 					await this.eventDB.query({
 						selector: {
-							batch: i
+							batch: i,
 						},
-						sort: ['_id']
+						sort: ['_id'],
 					})
 				).docs.filter((v) => v._id !== 'lastSync') as unknown as EventWithId[];
 				if (events.length > 0) {
@@ -83,14 +83,14 @@ export class EventCache implements EventProcessor {
 						lastToBlock: lastEvent.blockNumber,
 						latestBlock: lastEvent.blockNumber,
 						nextStreamID: lastEvent.streamID + 1,
-						unconfirmedBlocks: []
+						unconfirmedBlocks: [],
 					});
 					console.info(`EventCache ...done`);
 				}
 			}
 		} catch (err) {
 			console.error({
-				err
+				err,
 			});
 		}
 
@@ -126,7 +126,7 @@ export class EventCache implements EventProcessor {
 					signature: event.signature,
 					args: event.args,
 					extra: event.extra,
-					batch: this.batchCounter
+					batch: this.batchCounter,
 				});
 			}
 			this.batchCounter++;
@@ -142,7 +142,7 @@ export class EventCache implements EventProcessor {
 			_id: 'lastSync',
 			_rev: lastLastSync?._rev,
 			...lastSync,
-			batch: this.batchCounter
+			batch: this.batchCounter,
 		};
 
 		console.info(`nextStreamID: ${lastSync.nextStreamID}`);

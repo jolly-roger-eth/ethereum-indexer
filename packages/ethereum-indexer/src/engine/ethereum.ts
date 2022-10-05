@@ -140,7 +140,7 @@ export class LogFetcher {
 				percentageToReach: 80,
 				maxEventsPerFetch: 10000,
 				maxBlocksPerFetch: 100000,
-				numRetry: 3
+				numRetry: 3,
 			},
 			config
 		);
@@ -162,7 +162,7 @@ export class LogFetcher {
 		try {
 			logs = await getLogs(this.provider, this.contractAddresses, this.eventNameTopics, {
 				fromBlock,
-				toBlock
+				toBlock,
 			});
 		} catch (err: any) {
 			if (retry <= 0) {
@@ -194,7 +194,7 @@ export class LogFetcher {
 			const result = await this.getLogs({
 				fromBlock,
 				toBlock,
-				retry: retry - 1
+				retry: retry - 1,
 			});
 			logs = result.logs;
 			toBlock = result.toBlockUsed;
@@ -231,7 +231,7 @@ export class LogEventFetcher extends LogFetcher {
 		if (Array.isArray(contractsData)) {
 			contracts = contractsData.map((v) => ({
 				address: v.address,
-				interface: new InterfaceWithLowerCaseAddresses(v.eventsABI)
+				interface: new InterfaceWithLowerCaseAddresses(v.eventsABI),
 			}));
 			contractAddresses = contracts.map((v) => v.address);
 			eventABIS = contracts.map((v) => v.interface);
@@ -286,7 +286,7 @@ export class LogEventFetcher extends LogFetcher {
 					data: log.data,
 					topics: log.topics,
 					transactionHash: log.transactionHash,
-					logIndex: parseInt(log.logIndex.slice(2), 16)
+					logIndex: parseInt(log.logIndex.slice(2), 16),
 				};
 				let parsed: LogDescription | null = null;
 				try {
@@ -327,7 +327,7 @@ export async function getBlockNumber(provider: EIP1193Provider): Promise<number>
 export async function getBlock(provider: EIP1193Provider, hash: string): Promise<{timestamp: number}> {
 	const blockWithHexStringFields = await send<any, {timestamp: string}>(provider, 'eth_getBlockByHash', [hash, false]);
 	return {
-		timestamp: parseInt(blockWithHexStringFields.timestamp.slice(2), 16)
+		timestamp: parseInt(blockWithHexStringFields.timestamp.slice(2), 16),
 	};
 }
 
@@ -337,13 +337,13 @@ export async function getBlocks(provider: EIP1193Provider, hashes: string[]): Pr
 	for (const hash of hashes) {
 		requests.push({
 			method: 'eth_getBlockByHash',
-			params: [hash, false]
+			params: [hash, false],
 		});
 	}
 	const blocksWithHexStringFields = await batch(provider, requests);
 
 	return blocksWithHexStringFields.map((block) => ({
-		timestamp: parseInt(block.timestamp.slice(2), 16)
+		timestamp: parseInt(block.timestamp.slice(2), 16),
 	}));
 }
 
@@ -356,7 +356,7 @@ export async function getTransactionReceipt(provider: EIP1193Provider, hash: str
 	return {
 		from: transactionReceiptWithHexStringFields.from,
 		gasUsed: parseInt(transactionReceiptWithHexStringFields.gasUsed.slice(2), 16),
-		status: transactionReceiptWithHexStringFields.status
+		status: transactionReceiptWithHexStringFields.status,
 	};
 }
 
@@ -365,7 +365,7 @@ export async function getTransactionReceipts(provider: EIP1193Provider, hashes: 
 	for (const hash of hashes) {
 		requests.push({
 			method: 'eth_getTransactionReceipt',
-			params: [hash]
+			params: [hash],
 		});
 	}
 	const transactionReceiptsWithHexStringFields = await batch(provider, requests);
@@ -373,7 +373,7 @@ export async function getTransactionReceipts(provider: EIP1193Provider, hashes: 
 	return transactionReceiptsWithHexStringFields.map((transaction) => ({
 		from: transaction.from,
 		gasUsed: parseInt(transaction.gasUsed.slice(2), 16),
-		status: transaction.status
+		status: transaction.status,
 	}));
 }
 
@@ -388,8 +388,8 @@ export async function getLogs(
 			address: contractAddresses,
 			fromBlock: '0x' + options.fromBlock.toString(16),
 			toBlock: '0x' + options.toBlock.toString(16),
-			topics: eventNameTopics ? [eventNameTopics] : undefined
-		}
+			topics: eventNameTopics ? [eventNameTopics] : undefined,
+		},
 	]);
 	return logs;
 }
@@ -397,7 +397,7 @@ export async function getLogs(
 export async function send<U extends any[], T>(provider: EIP1193Provider, method: string, params: U): Promise<T> {
 	return await provider.request({
 		method,
-		params
+		params,
 	});
 }
 
@@ -411,49 +411,49 @@ const multicallInterface = new InterfaceWithLowerCaseAddresses([
 			{
 				internalType: 'contract IERC165[]',
 				name: 'contracts',
-				type: 'address[]'
+				type: 'address[]',
 			},
 			{
 				internalType: 'bytes4',
 				name: 'interfaceId',
-				type: 'bytes4'
-			}
+				type: 'bytes4',
+			},
 		],
 		name: 'supportsInterface',
 		outputs: [
 			{
 				internalType: 'bool[]',
 				name: 'result',
-				type: 'bool[]'
-			}
+				type: 'bool[]',
+			},
 		],
 		stateMutability: 'view',
-		type: 'function'
+		type: 'function',
 	},
 	{
 		inputs: [
 			{
 				internalType: 'contract IERC165[]',
 				name: 'contracts',
-				type: 'address[]'
+				type: 'address[]',
 			},
 			{
 				internalType: 'bytes4[]',
 				name: 'interfaceIds',
-				type: 'bytes4[]'
-			}
+				type: 'bytes4[]',
+			},
 		],
 		name: 'supportsMultipleInterfaces',
 		outputs: [
 			{
 				internalType: 'bool[]',
 				name: 'result',
-				type: 'bool[]'
-			}
+				type: 'bool[]',
+			},
 		],
 		stateMutability: 'view',
-		type: 'function'
-	}
+		type: 'function',
+	},
 ]);
 
 export function getmMulti165CallData(contractAddresses: string[]): {
@@ -532,20 +532,20 @@ const tokenURIInterface = new InterfaceWithLowerCaseAddresses([
 			{
 				internalType: 'uint256',
 				name: 'id',
-				type: 'uint256'
-			}
+				type: 'uint256',
+			},
 		],
 		name: 'tokenURI',
 		outputs: [
 			{
 				internalType: 'string',
 				name: '',
-				type: 'string'
-			}
+				type: 'string',
+			},
 		],
 		stateMutability: 'view',
-		type: 'function'
-	}
+		type: 'function',
+	},
 ]);
 
 export async function tokenURI(
@@ -577,7 +577,7 @@ export function createER721TokenURIFetcher(
 			const uri = await tokenURI(provider, event.address, event.args['tokenId'] as string, event.blockHash);
 			if (uri) {
 				return {
-					tokenURIAtMint: uri
+					tokenURIAtMint: uri,
 				};
 			}
 		} catch (e) {}
