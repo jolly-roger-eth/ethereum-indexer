@@ -76,7 +76,7 @@ export class BrowserIndexer {
 		let lastSync;
 		try {
 			lastSync = await this.indexer.indexMore();
-		this.set(lastSync);
+			this.set(lastSync);
 		} catch (err) {
 			namedLogger.error('ERROR, retry indexToLatest in 1 second', err);
 			lastSync = await new Promise((resolve) => {
@@ -91,8 +91,8 @@ export class BrowserIndexer {
 		while (lastSync.lastToBlock !== lastSync.latestBlock) {
 			namedLogger.info(`indexing...`);
 			try {
-			lastSync = await this.indexer.indexMore();
-			this.set(lastSync);
+				lastSync = await this.indexer.indexMore();
+				this.set(lastSync);
 			} catch (err) {
 				namedLogger.error('ERROR, retry indexing in 1 second', err);
 				await new Promise((resolve) => {
@@ -106,9 +106,7 @@ export class BrowserIndexer {
 
 	private async setupIndexing(): Promise<LastSync> {
 		namedLogger.info(`setting up indexer...`);
-		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.contractsInfo, {
-			providerSupportsETHBatch: true
-		});
+		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.contractsInfo);
 		return this.indexer.load();
 	}
 
