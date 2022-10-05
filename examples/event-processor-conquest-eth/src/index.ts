@@ -127,6 +127,8 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 	onFleetArrived(data: Data, event: FleetArrived) {
 		const planet = getOrCreatePlanet(data, event.args.destination);
 
+		namedLogger.info(event.args.data);
+
 		data.fleets[event.args.fleet].arrived = true;
 		if (event.args.won) {
 			planet.owner = event.args.fleetOwner;

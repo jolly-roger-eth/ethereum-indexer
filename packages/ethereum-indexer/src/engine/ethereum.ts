@@ -69,11 +69,11 @@ interface Log {
 
 export interface LogEvent<
 	Args extends {
-		[key: string | number]: string | number | boolean;
+		[key: string]: JSONType;
 	} = {
-		[key: string | number]: string | number | boolean;
+		[key: string]: JSONType;
 	},
-	Extra extends JSONType = JSONType
+	Extra extends JSONObject = JSONObject
 > extends Log {
 	name?: string;
 	topic?: string;

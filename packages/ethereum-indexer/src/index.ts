@@ -5,6 +5,7 @@ import {
 	getBlocks,
 	getTransactionReceipt,
 	getTransactionReceipts,
+	JSONObject,
 	JSONType,
 	LogEvent,
 	LogEventFetcher,
@@ -49,11 +50,11 @@ export type LastSync = {
 
 export type EventWithId<
 	Args extends {
-		[key: string | number]: string | number | boolean;
+		[key: string]: JSONType;
 	} = {
-		[key: string | number]: string | number | boolean;
+		[key: string]: JSONType;
 	},
-	Extra extends JSONType = JSONType
+	Extra extends JSONObject = JSONObject
 > = LogEvent<Args, Extra> & {
 	streamID: number;
 };

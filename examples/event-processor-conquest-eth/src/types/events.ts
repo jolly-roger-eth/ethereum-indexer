@@ -21,12 +21,21 @@ export type FleetArrived = EventWithId<{
 	won: boolean;
 	gift: boolean;
 
-	data: string; // TODO
+	data: {
+		newNumspaceships: number;
+		newTravelingUpkeep: number;
+		newOverflow: number;
+		numSpaceshipsAtArrival: number;
+		taxLoss: number;
+		fleetLoss: number;
+		planetLoss: number;
+		inFlightFleetLoss: number;
+		inFlightPlanetLoss: number;
+		accumulatedDefenseAdded: number;
+		accumulatedAttackAdded: number;
+	};
 
 	// lastUpdated = event.block.timestamp; // TODO
-	newNumSpaceships: number;
-	newTravelingUpkeep: number;
-	newOverflow: number;
 }>;
 
 export type PlanetStake = EventWithId<{
