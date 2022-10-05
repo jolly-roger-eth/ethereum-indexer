@@ -56,6 +56,7 @@ importers:
       prettier-plugin-svelte: ^2.7.1
       svelte: ^3.49.0
       svelte-check: ^2.8.1
+      svelte-json-tree: ^1.0.0
       svelte-preprocess: ^4.10.7
       sveltore: ^0.0.1
       tslib: ^2.4.0
@@ -66,6 +67,7 @@ importers:
       ethereum-indexer: link:../../packages/ethereum-indexer
       named-logs: 0.2.0
       named-logs-console: 0.2.1
+      svelte-json-tree: 1.0.0
       sveltore: 0.0.1
     devDependencies:
       '@sveltejs/vite-plugin-svelte': 1.0.8_svelte@3.50.1+vite@3.1.4
@@ -4179,6 +4181,10 @@ packages:
     dependencies:
       svelte: 3.50.1
     dev: true
+
+  /svelte-json-tree/1.0.0:
+    resolution: {integrity: sha512-scs1OdkC8uFpTN4MX0yKkOzZ1/EG3eP1ARC+xcFthXp2IfcwBaXgab0FqA4Am0vQwffNNB+1Gd1LFkJBlynWTA==}
+    dev: false
 
   /svelte-preprocess/4.10.7_iprco5tylfmvffqgrvqxc46njy:
     resolution: {integrity: sha512-sNPBnqYD6FnmdBrUmBCaqS00RyCsCpj2BG58A1JBswNF7b0OKviwxqVrOL/CKyJrLSClrSeqQv5BXNg2RUbPOw==}
