@@ -27,6 +27,7 @@
 		"ethereum-indexer": "^0.3.1",
 		"named-logs": "^0.2.0",
 		"named-logs-console": "^0.2.1",
+		"svelte-json-tree": "^1.0.0",
 		"sveltore": "^0.0.1"
 	}
 }
