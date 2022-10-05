@@ -73,13 +73,32 @@ export class BrowserIndexer {
 			await this.setupIndexing();
 		}
 		namedLogger.info(`indexing...`);
-		let lastSync = await this.indexer.indexMore();
+		let lastSync;
+		try {
+			lastSync = await this.indexer.indexMore();
 		this.set(lastSync);
+		} catch (err) {
+			namedLogger.error('ERROR, retry indexToLatest in 1 second', err);
+			lastSync = await new Promise((resolve) => {
+				setTimeout(async () => {
+					const result = await this.indexToLatest();
+					resolve(result);
+				}, 1000);
+			});
+		}
+
 		// const latestBlock = await this.eip1193Provider.request({method: 'eth_blockNumber', params:[]});
 		while (lastSync.lastToBlock !== lastSync.latestBlock) {
 			namedLogger.info(`indexing...`);
+			try {
 			lastSync = await this.indexer.indexMore();
 			this.set(lastSync);
+			} catch (err) {
+				namedLogger.error('ERROR, retry indexing in 1 second', err);
+				await new Promise((resolve) => {
+					setTimeout(resolve, 1000);
+				});
+			}
 		}
 		namedLogger.info(`... done.`);
 		return lastSync;
@@ -131,6 +150,7 @@ export class BrowserIndexer {
 				this.indexingTimeout = setTimeout(this._auto_index.bind(this), 1);
 			}
 		} catch (err) {
+			namedLogger.error('ERROR, retry in 1 seconds', err);
 			this.indexingTimeout = setTimeout(this._auto_index.bind(this), 1000);
 			return;
 		}
