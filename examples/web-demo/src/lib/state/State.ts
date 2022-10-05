@@ -1,7 +1,7 @@
 import {processor as processorFactory, contractsDataPerChain} from 'event-processor-conquest-eth';
 import {BrowserIndexer} from '$lib/indexer/BrowserIndexer';
 import {readable} from 'sveltore';
-import type {EIP1193Provider} from 'ethereum-indexer';
+import type {EIP1193Provider, LastSync} from 'ethereum-indexer';
 
 const eip1193Provider = (window as any).ethereum as EIP1193Provider;
 

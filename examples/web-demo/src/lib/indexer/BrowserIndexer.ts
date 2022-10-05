@@ -11,6 +11,22 @@ import {writable, type Writable} from 'sveltore';
 import {logs} from 'named-logs';
 const namedLogger = logs('ethereum-index-browser');
 
+function formatLastSync(lastSync: LastSync): any {
+	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);
+}
+
+function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: string[]): U {
+	const keys = Object.keys(obj);
+	const newObj: U = {} as U;
+	for (const key of keys) {
+		if (fields.includes(key)) {
+			continue;
+		}
+		newObj[key] = obj[key];
+	}
+	return newObj;
+}
+
 export class BrowserIndexer {
 	protected indexer: EthereumIndexer;
 
@@ -27,12 +43,28 @@ export class BrowserIndexer {
 		this.store = writable(undefined);
 	}
 
+	private set(lastSync: LastSync) {
+		const startingBlock = this.indexer.defaultFromBlock;
+		const latestBlock = lastSync.latestBlock;
+		const lastToBlock = lastSync.lastToBlock;
+
+		const totalToProcess = latestBlock - startingBlock;
+		const numBlocksProcessedSoFar = Math.max(0, lastToBlock - startingBlock);
+
+		const lastSyncObject = formatLastSync(lastSync);
+		lastSyncObject.numBlocksProcessedSoFar = numBlocksProcessedSoFar;
+		lastSyncObject.syncPercentage = Math.floor((numBlocksProcessedSoFar * 1000000) / totalToProcess) / 10000;
+		lastSyncObject.totalPercentage = Math.floor((lastToBlock * 1000000) / latestBlock) / 10000;
+
+		this.store.set(lastSyncObject);
+	}
+
 	async indexMore(): Promise<LastSync> {
 		if (!this.indexer) {
 			await this.setupIndexing();
 		}
 		const lastSync = await this.indexer.indexMore();
-		this.store.set(lastSync);
+		this.set(lastSync);
 		return lastSync;
 	}
 
@@ -42,12 +74,12 @@ export class BrowserIndexer {
 		}
 		namedLogger.info(`indexing...`);
 		let lastSync = await this.indexer.indexMore();
-		this.store.set(lastSync);
+		this.set(lastSync);
 		// const latestBlock = await this.eip1193Provider.request({method: 'eth_blockNumber', params:[]});
 		while (lastSync.lastToBlock !== lastSync.latestBlock) {
 			namedLogger.info(`indexing...`);
 			lastSync = await this.indexer.indexMore();
-			this.store.set(lastSync);
+			this.set(lastSync);
 		}
 		namedLogger.info(`... done.`);
 		return lastSync;
