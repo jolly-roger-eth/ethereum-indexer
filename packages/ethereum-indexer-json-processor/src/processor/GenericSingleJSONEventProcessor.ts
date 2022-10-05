@@ -1,8 +1,8 @@
 import {EventWithId} from 'ethereum-indexer';
-import {JSONObject} from './types';
+import {JSObject} from './types';
 import {SingleEventJSONProcessor} from './EventProcessorOnJSON';
 
-export abstract class GenericSingleEventJSONProcessor<T extends JSONObject> implements SingleEventJSONProcessor<T> {
+export abstract class GenericSingleEventJSONProcessor<T extends JSObject> implements SingleEventJSONProcessor<T> {
 	protected json: T;
 	processEvent(json: T, event: EventWithId): void {
 		this.json = json;

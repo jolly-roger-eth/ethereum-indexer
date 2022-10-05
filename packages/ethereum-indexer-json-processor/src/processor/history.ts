@@ -1,22 +1,22 @@
-import {JSONObject, JSONType} from './types';
+import {JSObject, JSType} from './types';
 
 type ReversalAction =
 	| {
 			readonly __action__: 'ValueSet';
-			value: JSONType | undefined | null;
+			value: JSType | undefined | null;
 	  }
 	| {
 			readonly __action__: 'ArraySet';
 			actions: (
-				| {index: number; value: JSONType}
-				| {index?: number; values: JSONType[]}
+				| {index: number; value: JSType}
+				| {index?: number; values: JSType[]}
 				| {index: number; deleteCount: number}
 			)[];
 	  };
 
 type Reversal = {[property: string]: Reversal | ReversalAction};
 
-export type HistoryJSONObject = {
+export type HistoryJSObject = {
 	reversals: {[blockHash: string]: Reversal};
 	blockHashes: {[blockNumber: number]: string};
 };
@@ -42,7 +42,7 @@ function getReversal(
 	}
 }
 
-function applyAction(json: JSONObject | JSONType[], action: ReversalAction, property: string) {
+function applyAction(json: JSObject | JSType[], action: ReversalAction, property: string) {
 	if (action.__action__ === 'ValueSet') {
 		if (action.value === undefined) {
 			delete json[property];
@@ -63,7 +63,7 @@ function applyAction(json: JSONObject | JSONType[], action: ReversalAction, prop
 	}
 }
 
-function applyReversals(json: JSONObject | JSONType[], reversal: Reversal) {
+function applyReversals(json: JSObject | JSType[], reversal: Reversal) {
 	for (const key of Object.keys(reversal)) {
 		const item = reversal[key];
 		if (item.__action__) {
@@ -77,7 +77,7 @@ function applyReversals(json: JSONObject | JSONType[], reversal: Reversal) {
 export class History {
 	protected blockNumber: number;
 	protected blockHash: string;
-	constructor(protected historyJSON: HistoryJSONObject, protected finality: number) {}
+	constructor(protected historyJSON: HistoryJSObject, protected finality: number) {}
 
 	setBlock(blockNumber: number, blockHash: string) {
 		this.blockNumber = blockNumber;
@@ -92,7 +92,7 @@ export class History {
 		this.historyJSON.blockHashes[blockNumber] = blockHash;
 	}
 
-	reverseBlock(blockNumber: number, blockHash: string, json: JSONObject) {
+	reverseBlock(blockNumber: number, blockHash: string, json: JSObject) {
 		applyReversals(json, this.historyJSON.reversals[this.blockHash]);
 		delete this.historyJSON.reversals[blockHash];
 		delete this.historyJSON.blockHashes[blockNumber];
@@ -130,20 +130,20 @@ export class History {
 function isPrimitive(v: any): boolean {
 	return typeof v !== 'function' && typeof v !== 'object';
 }
-function proxify<T extends JSONType | JSONType[]>(
+function proxify<T extends JSType | JSType[]>(
 	object: T,
-	rootObject: JSONObject,
+	rootObject: JSObject,
 	fieldPath: string[],
 	history: History
 ): T {
 	if (Array.isArray(object)) {
-		return new Proxy(object as JSONType[], {
+		return new Proxy(object as JSType[], {
 			get: arrayGetter(rootObject, fieldPath, history),
 			set: setter(fieldPath, history),
 			deleteProperty: deleter(fieldPath, history)
 		}) as T;
 	} else {
-		return new Proxy(object as JSONObject, {
+		return new Proxy(object as JSObject, {
 			get: getter(rootObject, fieldPath, history),
 			set: setter(fieldPath, history),
 			deleteProperty: deleter(fieldPath, history)
@@ -152,10 +152,10 @@ function proxify<T extends JSONType | JSONType[]>(
 }
 
 function arrayGetter(
-	rootObject: JSONObject,
+	rootObject: JSObject,
 	fieldPath: string[],
 	history: History
-): (target: JSONType[], property: string) => JSONType {
+): (target: JSType[], property: string) => JSType {
 	return (target, property) => {
 		const value = target[property];
 		if (typeof value === 'function') {
@@ -163,7 +163,7 @@ function arrayGetter(
 				return value;
 			}
 			if (property === 'push') {
-				return (...values: JSONType[]) => {
+				return (...values: JSType[]) => {
 					history.setReversal(fieldPath, {
 						__action__: 'ArraySet',
 						actions: [{index: target.length, deleteCount: values.length}]
@@ -171,7 +171,7 @@ function arrayGetter(
 					target.push(...values);
 				};
 			} else if (property === 'splice') {
-				return (start: number, deleteCount?: number, ...items: JSONType[]) => {
+				return (start: number, deleteCount?: number, ...items: JSType[]) => {
 					if (items) {
 						throw new Error(`splice in proxy do not support items to add yet...`);
 					}
@@ -193,10 +193,10 @@ function arrayGetter(
 }
 
 function getter(
-	rootObject: JSONObject,
+	rootObject: JSObject,
 	fieldPath: string[],
 	history: History
-): (target: JSONObject, property: string) => JSONType {
+): (target: JSObject, property: string) => JSType {
 	return (target, property) => {
 		const value = target[property];
 		if (isPrimitive(value)) {
@@ -208,7 +208,7 @@ function getter(
 function setter(
 	fieldPath: string[],
 	history: History
-): (target: JSONObject | JSONType[], property: string, value: JSONType) => boolean {
+): (target: JSObject | JSType[], property: string, value: JSType) => boolean {
 	return (target, property, value) => {
 		history.setReversal([...fieldPath, property], {
 			__action__: 'ValueSet',
@@ -218,7 +218,7 @@ function setter(
 		return true;
 	};
 }
-function deleter(fieldPath: string[], history: History): (target: JSONObject, property: string) => boolean {
+function deleter(fieldPath: string[], history: History): (target: JSObject, property: string) => boolean {
 	return (target, property) => {
 		history.setReversal([...fieldPath, property], {
 			__action__: 'ValueSet',
@@ -229,6 +229,6 @@ function deleter(fieldPath: string[], history: History): (target: JSONObject, pr
 	};
 }
 
-export function proxifyJSON<T extends JSONObject>(object: T, history: History) {
+export function proxifyJSON<T extends JSObject>(object: T, history: History) {
 	return proxify<T>(object, object, [], history);
 }

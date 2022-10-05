@@ -1,8 +1,8 @@
 import {SingleEventJSONProcessor, EventProcessorOnJSON} from './EventProcessorOnJSON';
 import {EventWithId, LogEvent} from 'ethereum-indexer';
-import {JSONObject} from './types';
+import {JSObject} from './types';
 
-export function fromSingleJSONEventProcessor<T extends JSONObject>(
+export function fromSingleJSONEventProcessor<T extends JSObject>(
 	v: SingleEventJSONProcessor<T> | (() => SingleEventJSONProcessor<T>)
 ): (folder: string) => EventProcessorOnJSON<T> {
 	return (folder: string) => {
@@ -10,7 +10,7 @@ export function fromSingleJSONEventProcessor<T extends JSONObject>(
 	};
 }
 
-export type SingleJSONEventProcessorObject<T extends JSONObject> = {
+export type SingleJSONEventProcessorObject<T extends JSObject> = {
 	[func: string]: (json: T, event: EventWithId) => void;
 } & {
 	setup?(json: T): Promise<void>;
@@ -19,7 +19,7 @@ export type SingleJSONEventProcessorObject<T extends JSONObject> = {
 	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
 };
 
-export class SingleJSONEventProcessorWrapper<T extends JSONObject> implements SingleEventJSONProcessor<T> {
+export class SingleJSONEventProcessorWrapper<T extends JSObject> implements SingleEventJSONProcessor<T> {
 	constructor(protected obj: SingleJSONEventProcessorObject<T>) {}
 
 	processEvent(json: T, event: EventWithId) {
@@ -53,7 +53,7 @@ export class SingleJSONEventProcessorWrapper<T extends JSONObject> implements Si
 	}
 }
 
-export function fromSingleJSONEventProcessorObject<T extends JSONObject>(
+export function fromSingleJSONEventProcessorObject<T extends JSObject>(
 	v: SingleJSONEventProcessorObject<T> | (() => SingleJSONEventProcessorObject<T>)
 ): (folder: string) => EventProcessorOnJSON<T> {
 	return (folder: string) => {

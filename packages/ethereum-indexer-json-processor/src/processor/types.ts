@@ -1,5 +1,5 @@
-export type JSONObject = {
-	[key: string]: JSONType;
+export type JSObject = {
+	[key: string]: JSType;
 };
 
-export type JSONType = string | number | boolean | JSONType[] | JSONObject;
+export type JSType = string | number | boolean | bigint | JSType[] | JSObject;

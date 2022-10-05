@@ -1,11 +1,11 @@
 import {ContractsInfo, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
 import {logs} from 'named-logs';
-import {History, HistoryJSONObject, proxifyJSON} from './history';
-import {JSONObject} from './types';
+import {History, HistoryJSObject, proxifyJSON} from './history';
+import {JSObject} from './types';
 
 const namedLogger = logs('EventProcessorOnJSON');
 
-export interface SingleEventJSONProcessor<T extends JSONObject> {
+export interface SingleEventJSONProcessor<T extends JSObject> {
 	setup?(json: T): Promise<void>;
 	processEvent(json: T, event: EventWithId): void;
 	shouldFetchTimestamp?(event: LogEvent): boolean;
@@ -13,9 +13,9 @@ export interface SingleEventJSONProcessor<T extends JSONObject> {
 	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
 }
 
-export class EventProcessorOnJSON<T extends JSONObject> implements EventProcessor {
+export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor {
 	public readonly json: T;
-	protected _json: {data: T; lastSync?: LastSync; history: HistoryJSONObject};
+	protected _json: {data: T; lastSync?: LastSync; history: HistoryJSObject};
 	protected history: History;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<T>) {
 		this._json = {
