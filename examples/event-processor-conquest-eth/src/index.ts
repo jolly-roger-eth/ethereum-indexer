@@ -1,6 +1,7 @@
 import {
 	EventWithId,
 	fromSingleJSONEventProcessorObject,
+	LogEvent,
 	SingleJSONEventProcessorObject
 } from 'ethereum-indexer-json-processor';
 
@@ -119,6 +120,9 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 		json.fleets = {};
 		// namedLogger.info(`setup complete!`);
 	},
+	shouldFetchTimestamp(event: LogEvent): boolean {
+		return true;
+	},
 	onPlanetStake(data: Data, event: PlanetStake) {
 		getOrCreatePlayer(data, event.args.acquirer);
 		const planet = getOrCreatePlanet(data, event.args.location);
@@ -170,7 +174,7 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 			planet.exitTime = 0;
 		}
 	}
-};
+} as unknown as SingleJSONEventProcessorObject<Data>; // TODO
 
 export const processor = fromSingleJSONEventProcessorObject(() => ConquestEventProcessor);
 
