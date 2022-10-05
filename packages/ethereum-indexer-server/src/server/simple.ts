@@ -22,6 +22,27 @@ import {adminPage} from '../pages';
 
 const namedLogger = logs('ethereum-index-server');
 
+function bnReplacer(v: any): any {
+	if (typeof v === 'bigint') {
+		return v.toString() + 'n';
+	} else {
+		if (typeof v === 'object') {
+			if (Array.isArray(v)) {
+				return v.map((v) => bnReplacer(v));
+			} else {
+				const keys = Object.keys(v);
+				const n = {};
+				for (const key of keys) {
+					n[key] = bnReplacer(v[key]);
+				}
+				return n;
+			}
+		} else {
+			return v;
+		}
+	}
+}
+
 export type UserConfig = {
 	nodeURL: string;
 	folder: string;
@@ -239,12 +260,12 @@ export class SimpleServer {
 			if (data) {
 				const _data = (this.processor as any)._json;
 				if (_data) {
-					ctx.body = {lastSync: lastSyncObject, indexing: this.indexing, data, _data};
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, data, _data});
 				} else {
-					ctx.body = {lastSync: lastSyncObject, indexing: this.indexing, data};
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, data});
 				}
 			} else {
-				ctx.body = {lastSync: lastSyncObject, indexing: this.indexing};
+				ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing});
 			}
 
 			await next();
@@ -257,14 +278,14 @@ export class SimpleServer {
 		router.get('/get/:id', async (ctx, next) => {
 			const documentID = ctx.params['id'];
 			const response = await this.processor.get(documentID);
-			ctx.body = clean(response);
+			ctx.body = bnReplacer(clean(response));
 			await next();
 		});
 
 		router.post('/query', async (ctx, next) => {
 			const response = await this.processor.query(ctx.request.body as Query);
 			// TODO clean response ? or force fields to be specified and prevent some (like underscore)
-			ctx.body = response;
+			ctx.body = bnReplacer(response);
 			await next();
 		});
 
