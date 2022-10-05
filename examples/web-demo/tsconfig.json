@@ -1,6 +1,7 @@
 {
 	"extends": "@tsconfig/svelte/tsconfig.json",
 	"compilerOptions": {
+		"lib": ["ES2020", "DOM"],
 		"target": "ES2020",
 		"useDefineForClassFields": true,
 		"module": "ES2020",

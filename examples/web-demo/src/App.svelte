@@ -24,8 +24,6 @@
 
 {#if $state}
 	<JSONTree value={stateDisplayed} />
-{:else}{/if}
-
-<!-- <details>
-	{$state ? stringify($state) : $browserIndexer ? stringify($browserIndexer) : 'Please wait...'}
-</details> -->
+{:else if $browserIndexer}
+	<JSONTree value={$browserIndexer} />
+{/if}
