@@ -1,7 +1,7 @@
 import {
 	EventWithId,
 	fromSingleJSONEventProcessorObject,
-	SingleJSONEventProcessorObject
+	SingleJSONEventProcessorObject,
 } from 'ethereum-indexer-json-processor';
 
 import {logs} from 'named-logs';
@@ -36,7 +36,7 @@ const VoidrunnerEventProcessor: SingleJSONEventProcessorObject<Data> = {
 			// namedLogger.info(`new token ${tokenID}: with owner: ${to}`);
 			spaceship = {
 				tokenID,
-				owner: to
+				owner: to,
 			};
 			data.spaceships.push(spaceship);
 		} else {
@@ -52,7 +52,7 @@ const VoidrunnerEventProcessor: SingleJSONEventProcessorObject<Data> = {
 		}
 
 		// namedLogger.info(JSON.stringify(data, null, 2));
-	}
+	},
 };
 
 // we export a factory function called processor
@@ -65,8 +65,8 @@ export const contractsData = [
 	{
 		eventsABI: eip721,
 		address: '0x4658e9c5e1e05280e3708741aba63b7ff4e81055',
-		startBlock: 14953977
-	}
+		startBlock: 14953977,
+	},
 ];
 
 // we also expose a object keyed by chainId

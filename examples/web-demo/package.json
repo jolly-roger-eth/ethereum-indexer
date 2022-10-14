@@ -1,7 +1,7 @@
 {
 	"name": "web-demo",
 	"private": true,
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
@@ -12,7 +12,6 @@
 	"devDependencies": {
 		"@sveltejs/vite-plugin-svelte": "^1.0.2",
 		"@tsconfig/svelte": "^3.0.0",
-		"event-processor-conquest-eth": "workspace:*",
 		"prettier": "^2.7.1",
 		"prettier-plugin-svelte": "^2.7.1",
 		"svelte": "^3.49.0",
@@ -24,7 +23,9 @@
 		"vite-tsconfig-paths": "^3.5.1"
 	},
 	"dependencies": {
-		"ethereum-indexer": "^0.3.1",
+		"ethereum-indexer": "workspace:*",
+		"ethereum-indexer-browser": "workspace:*",
+		"event-processor-conquest-eth": "workspace:*",
 		"named-logs": "^0.2.0",
 		"named-logs-console": "^0.2.1",
 		"svelte-json-tree": "^1.0.0",

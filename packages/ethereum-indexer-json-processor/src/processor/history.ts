@@ -140,13 +140,13 @@ function proxify<T extends JSType | JSType[]>(
 		return new Proxy(object as JSType[], {
 			get: arrayGetter(rootObject, fieldPath, history),
 			set: setter(fieldPath, history),
-			deleteProperty: deleter(fieldPath, history)
+			deleteProperty: deleter(fieldPath, history),
 		}) as T;
 	} else {
 		return new Proxy(object as JSObject, {
 			get: getter(rootObject, fieldPath, history),
 			set: setter(fieldPath, history),
-			deleteProperty: deleter(fieldPath, history)
+			deleteProperty: deleter(fieldPath, history),
 		}) as T;
 	}
 }
@@ -166,7 +166,7 @@ function arrayGetter(
 				return (...values: JSType[]) => {
 					history.setReversal(fieldPath, {
 						__action__: 'ArraySet',
-						actions: [{index: target.length, deleteCount: values.length}]
+						actions: [{index: target.length, deleteCount: values.length}],
 					});
 					target.push(...values);
 				};
@@ -177,7 +177,7 @@ function arrayGetter(
 					}
 					history.setReversal(fieldPath, {
 						__action__: 'ArraySet',
-						actions: [{index: target.length, values: target.slice(start, deleteCount)}] // TODO deepCopy
+						actions: [{index: target.length, values: target.slice(start, deleteCount)}], // TODO deepCopy
 					});
 					target.splice(start, deleteCount, items);
 				};
@@ -212,7 +212,7 @@ function setter(
 	return (target, property, value) => {
 		history.setReversal([...fieldPath, property], {
 			__action__: 'ValueSet',
-			value: target[property] // TODO deepCopy
+			value: target[property], // TODO deepCopy
 		});
 		target[property] = value;
 		return true;
@@ -222,7 +222,7 @@ function deleter(fieldPath: string[], history: History): (target: JSObject, prop
 	return (target, property) => {
 		history.setReversal([...fieldPath, property], {
 			__action__: 'ValueSet',
-			value: target[property] // TODO deepCopy
+			value: target[property], // TODO deepCopy
 		});
 		delete target[property];
 		return true;

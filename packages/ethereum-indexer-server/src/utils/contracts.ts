@@ -46,7 +46,7 @@ export function loadContracts(folder: string): ContractData[] {
 			contractsData.push({
 				address: deployment.address,
 				eventsABI: deployment.abi,
-				startBlock: deployment.receipt?.blockNumber
+				startBlock: deployment.receipt?.blockNumber,
 			});
 			contractsAdded[deployment.address] = {index: contractsData.length - 1};
 		}

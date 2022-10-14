@@ -192,7 +192,7 @@ export class SimpleServer {
 		}
 
 		this.indexer = new EthereumIndexer(eip1193Provider, rootProcessor, this.contractsData, {
-			providerSupportsETHBatch: true
+			providerSupportsETHBatch: true,
 		});
 
 		namedLogger.info(`LOADING....`);

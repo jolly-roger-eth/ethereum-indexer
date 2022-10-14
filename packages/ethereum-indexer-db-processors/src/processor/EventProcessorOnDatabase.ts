@@ -49,7 +49,7 @@ export class EventProcessorOnDatabase implements QueriableEventProcessor {
 				lastToBlock: 0,
 				latestBlock: 0,
 				nextStreamID: 1,
-				unconfirmedBlocks: []
+				unconfirmedBlocks: [],
 			};
 		}
 	}
@@ -117,7 +117,7 @@ export class EventProcessorOnDatabase implements QueriableEventProcessor {
 			const lastSyncDoc = {
 				_id: 'lastSync',
 				_rev: lastLastSync?._rev,
-				...lastSync
+				...lastSync,
 			};
 			await this.db.put(lastSyncDoc);
 		} finally {
@@ -140,7 +140,7 @@ export class EventProcessorOnDatabase implements QueriableEventProcessor {
 		}
 		return this.db.query({
 			...request,
-			selector: {...request.selector, endBlock: Number.MAX_SAFE_INTEGER}
+			selector: {...request.selector, endBlock: Number.MAX_SAFE_INTEGER},
 		});
 	}
 

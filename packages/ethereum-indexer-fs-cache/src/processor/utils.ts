@@ -25,7 +25,7 @@ export function exportEvents(
 	config = Object.assign(
 		{
 			batchSize: 9000,
-			overrideLastSync: false
+			overrideLastSync: false,
 		},
 		config || {}
 	);

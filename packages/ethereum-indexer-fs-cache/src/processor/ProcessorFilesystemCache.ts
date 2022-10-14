@@ -39,7 +39,7 @@ export class ProcessorFilesystemCache implements EventProcessor {
 				lastToBlock: 0,
 				latestBlock: 0,
 				nextStreamID: 1,
-				unconfirmedBlocks: []
+				unconfirmedBlocks: [],
 			};
 		}
 
@@ -64,7 +64,7 @@ export class ProcessorFilesystemCache implements EventProcessor {
 								lastToBlock: subStream[subStream.length - 1].blockNumber,
 								latestBlock: lastSync.latestBlock,
 								nextStreamID: subStream[subStream.length - 1].streamID + 1,
-								unconfirmedBlocks: [] // TODO ?
+								unconfirmedBlocks: [], // TODO ?
 							};
 							namedLogger.info('processing substream...');
 							await this.processor.process(subStream, lastSyncFromProcessor);
@@ -80,7 +80,7 @@ export class ProcessorFilesystemCache implements EventProcessor {
 							lastToBlock: eventStream[eventStream.length - 1].blockNumber,
 							latestBlock: lastSync.latestBlock,
 							nextStreamID: eventStream[eventStream.length - 1].streamID + 1,
-							unconfirmedBlocks: [] // TODO ?
+							unconfirmedBlocks: [], // TODO ?
 						};
 						namedLogger.info('processing stream...');
 						await this.processor.process(eventStream, lastSyncFromProcessor);

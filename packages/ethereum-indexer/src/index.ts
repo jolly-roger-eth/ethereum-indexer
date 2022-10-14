@@ -10,7 +10,7 @@ import {
 	LogEvent,
 	LogEventFetcher,
 	LogFetcherConfig,
-	TransactionData
+	TransactionData,
 } from './engine/ethereum';
 
 import {logs} from 'named-logs';
@@ -23,7 +23,7 @@ export type {
 	RawLog,
 	LogEventFetcher,
 	LogFetcher,
-	LogFetcherConfig
+	LogFetcherConfig,
 } from './engine/ethereum';
 
 export type EventProcessor = {
@@ -145,7 +145,7 @@ export class EthereumIndexer {
 				lastToBlock: 0,
 				latestBlock: 0,
 				nextStreamID: 1,
-				unconfirmedBlocks: []
+				unconfirmedBlocks: [],
 			};
 			try {
 				await this.processor.reset();
@@ -177,7 +177,7 @@ export class EthereumIndexer {
 					latestBlock: latestBlock,
 					lastToBlock: lastEvent.blockNumber,
 					unconfirmedBlocks: [],
-					nextStreamID: lastEvent.streamID + 1
+					nextStreamID: lastEvent.streamID + 1,
 				};
 				await this.processor.process(eventStream, newLastSync);
 				this.lastSync = newLastSync;
@@ -293,7 +293,7 @@ export class EthereumIndexer {
 
 				const {events: eventsFetched, toBlockUsed: newToBlock} = await this.logEventFetcher.getLogEvents({
 					fromBlock,
-					toBlock: toBlock
+					toBlock: toBlock,
 				});
 				toBlock = newToBlock;
 
@@ -398,7 +398,7 @@ export class EthereumIndexer {
 					latestBlock,
 					lastToBlock: toBlock,
 					nextStreamID: streamID,
-					unconfirmedBlocks
+					unconfirmedBlocks,
 				});
 
 				if (!this._processing) {
@@ -442,7 +442,7 @@ export class EthereumIndexer {
 				group = groups[event.blockHash] = {
 					hash: event.blockHash,
 					number: event.blockNumber,
-					events: []
+					events: [],
 				};
 				eventsGroupedPerBlock.push(group);
 			}
@@ -474,7 +474,7 @@ export class EthereumIndexer {
 					eventStream.push({
 						...event,
 						streamID: nextStreamID++,
-						removed: true
+						removed: true,
 					});
 				}
 			}
@@ -511,7 +511,7 @@ export class EthereumIndexer {
 					newUnconfirmedBlocks.push({
 						hash: block.hash,
 						number: block.number,
-						events: block.events
+						events: block.events,
 					});
 
 					for (const event of block.events) {
@@ -534,8 +534,8 @@ export class EthereumIndexer {
 				latestBlock,
 				lastToBlock,
 				unconfirmedBlocks: newUnconfirmedBlocks,
-				nextStreamID
-			}
+				nextStreamID,
+			},
 		};
 	}
 }

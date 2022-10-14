@@ -16,7 +16,7 @@ export class PouchDatabase implements Database {
 	async setup(config: {indexes: {fields: string[]}[]}): Promise<void> {
 		for (const index of config.indexes) {
 			this.pouchDB.createIndex({
-				index
+				index,
 			});
 		}
 	}
@@ -79,7 +79,7 @@ export class PouchDatabase implements Database {
 		const deletions = objects.concat(objectsMissing).map((v: DBObjectWithRev) => ({
 			_deleted: true,
 			_id: v._id,
-			_rev: v._rev
+			_rev: v._rev,
 		}));
 		await this.pouchDB.bulkDocs(deletions);
 	}

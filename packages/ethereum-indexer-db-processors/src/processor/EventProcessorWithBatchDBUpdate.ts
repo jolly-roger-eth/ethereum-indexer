@@ -79,7 +79,7 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 				lastToBlock: 0,
 				latestBlock: 0,
 				nextStreamID: 1,
-				unconfirmedBlocks: []
+				unconfirmedBlocks: [],
 			};
 		}
 	}
@@ -241,7 +241,7 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 			const lastSyncDoc = {
 				_id: 'lastSync',
 				_rev: lastLastSync?._rev,
-				...lastSync
+				...lastSync,
 			};
 			await this.db.put(lastSyncDoc);
 		} finally {
@@ -264,7 +264,7 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 		}
 		return this.db.query({
 			...request,
-			selector: {...request.selector, endBlock: Number.MAX_SAFE_INTEGER}
+			selector: {...request.selector, endBlock: Number.MAX_SAFE_INTEGER},
 		});
 	}
 

@@ -1,0 +1,23 @@
+{
+	"name": "ethereum-indexer-browser",
+	"version": "0.3.3",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"main": "dist/index.cjs",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsup-node src/index.ts --dts --format esm,cjs"
+	},
+	"devDependencies": {
+		"tsup": "^6.2.1",
+		"typescript": "^4.6.4"
+	},
+	"dependencies": {
+		"ethereum-indexer": "workspace:*",
+		"named-logs": "^0.2.0",
+		"sveltore": "^0.0.1"
+	}
+}

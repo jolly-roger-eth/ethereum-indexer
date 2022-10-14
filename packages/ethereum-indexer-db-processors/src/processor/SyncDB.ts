@@ -34,7 +34,7 @@ export class BasicSyncDB implements SyncDB {
 			...object,
 			startBlock: this.currentEvent.blockNumber,
 			endBlock: Number.MAX_SAFE_INTEGER,
-			eventID: computeEventID(this.currentEvent)
+			eventID: computeEventID(this.currentEvent),
 		};
 	}
 

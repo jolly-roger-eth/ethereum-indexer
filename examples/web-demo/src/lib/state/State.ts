@@ -1,12 +1,27 @@
 import {processor as processorFactory, contractsDataPerChain} from 'event-processor-conquest-eth';
-import {BrowserIndexer} from '$lib/indexer/BrowserIndexer';
+import {BrowserIndexer} from 'ethereum-indexer-browser';
 import {readable} from 'sveltore';
 import type {EIP1193Provider, LastSync} from 'ethereum-indexer';
+import {writable} from 'svelte/store';
 
 const eip1193Provider = (window as any).ethereum as EIP1193Provider;
 
+export const numRequests = writable(0);
+
+const eip1193ProviderWithCounter = new Proxy(eip1193Provider, {
+	get(target, p, receiver) {
+		if (p === 'request') {
+			return (args: {method: string; params?: readonly unknown[] | object}) => {
+				numRequests.update((v) => v + 1);
+				return target[p](args);
+			};
+		}
+		return target[p];
+	},
+});
+
 export const processor = processorFactory('local');
-export const browserIndexer = new BrowserIndexer(processor, contractsDataPerChain[100], eip1193Provider);
+export const browserIndexer = new BrowserIndexer(processor, contractsDataPerChain[100], eip1193ProviderWithCounter);
 
 export function stringify(v) {
 	return JSON.stringify(v, (k, v) => (typeof v === 'bigint' ? v.toString() + 'n' : v), 2);

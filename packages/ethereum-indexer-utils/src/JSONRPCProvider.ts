@@ -14,13 +14,13 @@ export async function ethereum_send<U extends any, T>(endpoint: string, method: 
 				id: ++counter,
 				jsonrpc: '2.0',
 				method: param.method,
-				params: param.params
+				params: param.params,
 			});
 		}
 		const response = await fetch(endpoint, {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify(requests)
+			body: JSON.stringify(requests),
 		});
 
 		// console.info(await response.clone().text());
@@ -41,8 +41,8 @@ export async function ethereum_send<U extends any, T>(endpoint: string, method: 
 				id: ++counter,
 				jsonrpc: '2.0',
 				method,
-				params
-			})
+				params,
+			}),
 		});
 		const json: {result?: T; error?: any} = await response.json();
 		if (json.error || !json.result) {

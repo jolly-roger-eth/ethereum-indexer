@@ -1,5 +1,13 @@
 # ethereum-indexer-db-processors
 
+## 0.3.4
+
+### Patch Changes
+
+- republish with new types
+- Updated dependencies
+  - ethereum-indexer@0.3.3
+
 ## 0.3.3
 
 ### Patch Changes

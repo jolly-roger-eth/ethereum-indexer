@@ -3,13 +3,13 @@ import {
 	type EventProcessor,
 	type LastSync,
 	type EIP1193Provider,
-	type ContractsInfo
+	type ContractsInfo,
 } from 'ethereum-indexer';
 
 import {writable, type Writable} from 'sveltore';
 
 import {logs} from 'named-logs';
-const namedLogger = logs('ethereum-index-browser');
+const namedLogger = logs('ethereum-indexer-browser');
 
 function formatLastSync(lastSync: LastSync): any {
 	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);

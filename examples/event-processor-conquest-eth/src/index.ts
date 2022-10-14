@@ -2,7 +2,7 @@ import {
 	EventWithId,
 	fromSingleJSONEventProcessorObject,
 	LogEvent,
-	SingleJSONEventProcessorObject
+	SingleJSONEventProcessorObject,
 } from 'ethereum-indexer-json-processor';
 
 import {logs} from 'named-logs';
@@ -60,7 +60,7 @@ function getOrCreatePlanet(data: Data, location: string): Planet {
 			firstAcquired: 0,
 			lastAcquired: 0,
 			flagTime: 0,
-			stakeDeposited: 0n
+			stakeDeposited: 0n,
 		};
 		data.planets[planetID] = planet;
 	}
@@ -88,7 +88,7 @@ function getOrCreatePlayer(data: Data, address: string): Player {
 			totalCollected: 0n,
 			playTokenBalance: 0n,
 			freePlayTokenBalance: 0n,
-			tokenToWithdraw: 0n
+			tokenToWithdraw: 0n,
 		};
 		data.players[playerID] = player;
 	}
@@ -113,7 +113,7 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 			maxX: 0,
 			maxY: 0,
 			minX: 0,
-			minY: 0
+			minY: 0,
 		};
 		json.players = {};
 		json.planets = {};
@@ -158,7 +158,7 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 			from: event.args.from,
 			quantity: event.args.quantity,
 			resolved: false,
-			sendTransaction: event.transactionHash
+			sendTransaction: event.transactionHash,
 		};
 	},
 	onFleetArrived(data: Data, event: FleetArrived) {
@@ -173,7 +173,7 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 			planet.owner = event.args.fleetOwner;
 			planet.exitTime = 0;
 		}
-	}
+	},
 } as unknown as SingleJSONEventProcessorObject<Data>; // TODO
 
 export const processor = fromSingleJSONEventProcessorObject(() => ConquestEventProcessor);
@@ -182,8 +182,8 @@ const contractsDataonGnosis = [
 	{
 		eventsABI: OuterSpace,
 		address: '0x7ed5118E042F22DA546C9aaA9540D515A6F776E9',
-		startBlock: 21704746
-	}
+		startBlock: 21704746,
+	},
 ];
 
 export const contractsDataPerChain = {100: contractsDataonGnosis};
