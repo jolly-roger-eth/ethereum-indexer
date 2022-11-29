@@ -43,6 +43,7 @@ _subsection: Features @<features>
 
 
 - when event subscription is changed (new event added, or removed ?) the system could attempt to detect safety mechanism for not re-indexing (assuming block number at which change happen is provided) or be told that the change is safe and does not need re-indexing (for example if only new event is added and the update is made before the deployment of the new contract is live)
+- main task is to first support the latter.
 
 _subsection: Developer Documentation
 
