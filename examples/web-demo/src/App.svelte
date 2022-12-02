@@ -19,9 +19,11 @@
 
 <progress value={($browserIndexer.lastSync?.syncPercentage || 0) / 100} style="width:100%;" />
 
-<p>loading: {$browserIndexer.loading}</p>
-<p>catchingUp: {$browserIndexer.catchingUp}</p>
+<p>loading: {$browserIndexer && $browserIndexer.loading}</p>
+<p>catchingUp: {$browserIndexer && $browserIndexer.catchingUp}</p>
 <p>autoIndexing: {$browserIndexer.autoIndexing}</p>
+<p>fetchingLogs: {$browserIndexer.fetchingLogs}</p>
+<p>processingFetchedLogs: {$browserIndexer.processingFetchedLogs}</p>
 
 <p>requests sent: {$numRequests}</p>
 <p>block processed: {$browserIndexer.lastSync?.numBlocksProcessedSoFar.toLocaleString()}</p>

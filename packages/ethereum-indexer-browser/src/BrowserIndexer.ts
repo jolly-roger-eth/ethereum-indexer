@@ -16,6 +16,12 @@ function formatLastSync(lastSync: LastSync): any {
 	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);
 }
 
+function wait(seconds: number): Promise<void> {
+	return new Promise<void>((resolve) => {
+		globalThis.setTimeout(() => resolve(), seconds * 1000);
+	});
+}
+
 function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: string[]): U {
 	const keys = Object.keys(obj);
 	const newObj: U = {} as U;
@@ -38,17 +44,17 @@ export type BrowserIndexerState = {
 	lastSync?: ExtendedLastSync;
 	autoIndexing: boolean;
 	loading: boolean;
+	processingFetchedLogs: boolean;
+	fetchingLogs: boolean;
 	catchingUp: boolean;
 };
 
 export class BrowserIndexer {
 	protected indexer: EthereumIndexer;
 
-	protected autoIndexing: boolean = false;
-	protected catchingUp: boolean = false;
-	protected loading: boolean = false;
 	protected indexingTimeout: number | undefined;
 
+	protected state: BrowserIndexerState;
 	protected store: Writable<BrowserIndexerState>;
 
 	constructor(
@@ -58,11 +64,14 @@ export class BrowserIndexer {
 
 		protected indexerConfig?: IndexerConfig
 	) {
-		this.store = writable({
-			loading: this.loading,
-			autoIndexing: this.autoIndexing,
-			catchingUp: this.catchingUp,
-		});
+		this.state = {
+			loading: false,
+			autoIndexing: false,
+			catchingUp: false,
+			fetchingLogs: false,
+			processingFetchedLogs: false,
+		};
+		this.store = writable(this.state);
 	}
 
 	private set(lastSync: LastSync) {
@@ -78,15 +87,15 @@ export class BrowserIndexer {
 		lastSyncObject.syncPercentage = Math.floor((numBlocksProcessedSoFar * 1000000) / totalToProcess) / 10000;
 		lastSyncObject.totalPercentage = Math.floor((lastToBlock * 1000000) / latestBlock) / 10000;
 
-		this.store.update((state) => {
-			state.lastSync = lastSyncObject;
-			return state;
-		});
+		this.state.lastSync = lastSyncObject;
+		this.store.set(this.state);
 	}
 
 	async indexMore(): Promise<LastSync> {
 		if (!this.indexer) {
+			namedLogger.info('setting up...');
 			await this.setupIndexing();
+			namedLogger.info('...setup done');
 		}
 		const lastSync = await this.indexer.indexMore();
 		this.set(lastSync);
@@ -101,11 +110,8 @@ export class BrowserIndexer {
 		}
 
 		namedLogger.info(`indexing...`);
-		this.store.update((state) => {
-			state.catchingUp = true;
-			this.catchingUp = true;
-			return state;
-		});
+		this.state.catchingUp = true;
+		this.store.set(this.state);
 		try {
 			lastSync = await this.indexer.indexMore();
 			this.set(lastSync);
@@ -132,11 +138,8 @@ export class BrowserIndexer {
 				});
 			}
 		}
-		this.store.update((state) => {
-			state.catchingUp = false;
-			this.catchingUp = false;
-			return state;
-		});
+		this.state.catchingUp = false;
+		this.store.set(this.state);
 		namedLogger.info(`... done.`);
 		return lastSync;
 	}
@@ -144,19 +147,38 @@ export class BrowserIndexer {
 	private async setupIndexing(): Promise<LastSync> {
 		namedLogger.info(`setting up indexer...`);
 		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.contractsInfo, this.indexerConfig);
+		this.indexer.onLoad = async (loadingState) => {
+			if (loadingState === 'Loading') {
+				namedLogger.info('indexer Loading');
+				// this.store.update((state) => {
+				// 	state.loading = true;
+				// 	this.loading = true;
+				// 	return state;
+				// });
+			} else if (loadingState === 'Fetching') {
+				namedLogger.info('indexer Fetching');
+				this.state.fetchingLogs = true;
+				this.store.set(this.state);
+			} else if (loadingState === 'Processing') {
+				namedLogger.info('indexer Processing');
+				this.state.fetchingLogs = false;
+				this.state.processingFetchedLogs = true;
+				this.store.set(this.state);
+			} else if (loadingState === 'Done') {
+				namedLogger.info('indexer Init DOne');
+				this.state.processingFetchedLogs = false;
+				this.store.set(this.state);
+			}
+			await wait(0.001); // allow svelte to capture it
+		};
 
 		namedLogger.info(`loading...`);
-		this.store.update((state) => {
-			state.loading = true;
-			this.loading = true;
-			return state;
-		});
+		this.state.loading = true;
+		this.store.set(this.state);
 		const lastSync = await this.indexer.load();
-		this.store.update((state) => {
-			state.loading = false;
-			this.loading = false;
-			return state;
-		});
+		namedLogger.info('...done loading');
+		this.state.loading = false;
+		this.store.set(this.state);
 
 		return lastSync;
 	}
@@ -165,7 +187,7 @@ export class BrowserIndexer {
 		if (!this.indexer) {
 			await this.setupIndexing();
 		}
-		if (!this.autoIndexing) {
+		if (!this.state.autoIndexing) {
 			this._auto_index();
 			return true;
 		} else {
@@ -174,14 +196,15 @@ export class BrowserIndexer {
 	}
 
 	stopAutoIndexing(): boolean {
-		if (this.autoIndexing) {
+		if (this.state.autoIndexing) {
 			if (this.indexingTimeout) {
 				clearTimeout(this.indexingTimeout);
 			}
 
 			this.store.update((state) => {
 				state.autoIndexing = false;
-				this.autoIndexing = false;
+				this.state.autoIndexing = false;
+				this.store.set(this.state);
 				return state;
 			});
 			return true;
@@ -195,11 +218,8 @@ export class BrowserIndexer {
 	}
 
 	private async _auto_index() {
-		this.store.update((state) => {
-			state.autoIndexing = true;
-			this.autoIndexing = true;
-			return state;
-		});
+		this.state.autoIndexing = true;
+		this.store.set(this.state);
 		try {
 			const lastSync = await this.indexMore();
 			if (lastSync.latestBlock - lastSync.lastToBlock < 1) {

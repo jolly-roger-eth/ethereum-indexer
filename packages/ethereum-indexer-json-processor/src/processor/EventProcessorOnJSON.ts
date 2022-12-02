@@ -120,7 +120,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 					}
 
 					this.singleEventProcessor.processEvent(this.json, event);
-					namedLogger.info(`EventProcessorOnJSON DONE`);
+					// namedLogger.info(`EventProcessorOnJSON DONE`);
 				}
 				this.lastEventID = event.streamID;
 			}

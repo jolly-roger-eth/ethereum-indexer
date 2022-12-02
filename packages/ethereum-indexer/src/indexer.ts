@@ -28,12 +28,15 @@ const namedLogger = logs('ethereum-indexer');
 // TODO document contractsInfo type, including startBlock (refers to hardhat-deploy ?)
 // TODO allow finality configuration separated from reorg history length (to allow processing of abi changes for longer time than finality)
 
+export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
+
 export class EthereumIndexer {
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC VARIABLES
 	// ------------------------------------------------------------------------------------------------------------------
 
 	public readonly defaultFromBlock: number;
+	public onLoad: ((state: LoadingState) => Promise<void>) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
@@ -152,14 +155,24 @@ export class EthereumIndexer {
 	// INTERNALS
 	// ------------------------------------------------------------------------------------------------------------------
 
+	protected async signal(state: LoadingState) {
+		if (this.onLoad) {
+			namedLogger.info(`onLoad ${state}...`);
+			await this.onLoad(state);
+			namedLogger.info(`...onLoad ${state}`);
+		}
+	}
+
 	protected async promiseToLoad(): Promise<LastSync> {
 		try {
 			let lastSync = this.lastSync;
 			if (!lastSync) {
+				await this.signal('Loading');
 				lastSync = await this.processor.load(this.contractsData);
 			}
 
 			if (this.fetchExistingStream) {
+				await this.signal('Fetching');
 				const {eventStream, lastSync: lastSyncFetched} = await this.fetchExistingStream(lastSync.nextStreamID);
 
 				const eventStreamToFeed = eventStream.filter(
@@ -170,10 +183,13 @@ export class EthereumIndexer {
 
 				namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
 				if (eventStreamToFeed.length > 0) {
+					await this.signal('Processing');
 					lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
 				}
 				namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 			}
+
+			await this.signal('Done');
 
 			this.lastSync = lastSync;
 			return this.lastSync;
