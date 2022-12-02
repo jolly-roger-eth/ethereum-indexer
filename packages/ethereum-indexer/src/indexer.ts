@@ -120,7 +120,7 @@ export class EthereumIndexer {
 		return this._reseting;
 	}
 
-	async feed(eventStream: EventWithId[]): Promise<LastSync> {
+	async feed(eventStream: EventWithId[], lastSyncFetched?: LastSync): Promise<LastSync> {
 		if (this._processing) {
 			throw new Error(`processing... should not feed`);
 		}
@@ -128,7 +128,7 @@ export class EthereumIndexer {
 			throw new Error(`reseting... should not feed`);
 		}
 
-		this._processing = this.promiseToFeed(eventStream);
+		this._processing = this.promiseToFeed(eventStream, lastSyncFetched);
 		return this._processing;
 	}
 
@@ -170,7 +170,7 @@ export class EthereumIndexer {
 
 				namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
 				if (eventStreamToFeed.length > 0) {
-					lastSync = await this.feed(eventStreamToFeed);
+					lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
 				}
 				namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 			}
@@ -182,7 +182,7 @@ export class EthereumIndexer {
 		}
 	}
 
-	protected async promiseToFeed(eventStream: EventWithId[]): Promise<LastSync> {
+	protected async promiseToFeed(eventStream: EventWithId[], lastSyncFetched?: LastSync): Promise<LastSync> {
 		try {
 			const lastSync: LastSync = this.lastSync || {
 				lastToBlock: 0,
@@ -194,19 +194,22 @@ export class EthereumIndexer {
 			const firstEvent = eventStream[0];
 			const lastEvent = eventStream[eventStream.length - 1];
 
-			const latestBlock = await getBlockNumber(this.provider);
+			let newLastSync = lastSyncFetched;
 
-			if (latestBlock - lastEvent.blockNumber < this.finality) {
-				throw new Error('do not accept unconfirmed blocks');
-			}
+			if (!newLastSync) {
+				const latestBlock = await getBlockNumber(this.provider);
 
-			if (firstEvent.streamID === lastSync.nextStreamID) {
-				const newLastSync = {
+				if (latestBlock - lastEvent.blockNumber < this.finality) {
+					throw new Error('do not accept unconfirmed blocks');
+				}
+				newLastSync = {
 					latestBlock: latestBlock,
 					lastToBlock: lastEvent.blockNumber,
 					unconfirmedBlocks: [],
 					nextStreamID: lastEvent.streamID + 1,
 				};
+			}
+			if (firstEvent.streamID === lastSync.nextStreamID) {
 				await this.processor.process(eventStream, newLastSync);
 				this.lastSync = newLastSync;
 			} else {
