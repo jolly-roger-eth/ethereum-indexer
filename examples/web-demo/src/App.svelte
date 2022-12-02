@@ -17,11 +17,15 @@
 	$: stateDisplayed = addLengthToFields($state);
 </script>
 
-<progress value={($browserIndexer?.syncPercentage || 0) / 100} style="width:100%;" />
+<progress value={($browserIndexer.lastSync?.syncPercentage || 0) / 100} style="width:100%;" />
+
+<p>loading: {$browserIndexer.loading}</p>
+<p>catchingUp: {$browserIndexer.catchingUp}</p>
+<p>autoIndexing: {$browserIndexer.autoIndexing}</p>
 
 <p>requests sent: {$numRequests}</p>
-<p>block processed: {$browserIndexer?.numBlocksProcessedSoFar.toLocaleString()}</p>
-<p>num events: {$browserIndexer?.nextStreamID.toLocaleString()}</p>
+<p>block processed: {$browserIndexer.lastSync?.numBlocksProcessedSoFar.toLocaleString()}</p>
+<p>num events: {$browserIndexer.lastSync?.nextStreamID.toLocaleString()}</p>
 
 {#if $state}
 	<JSONTree value={stateDisplayed} />

@@ -7,9 +7,9 @@ import {EventProcessorWithBatchDBUpdate, SingleEventProcessorWithBatchSupport} f
 
 export function fromSingleEventProcessor(
 	v: SingleEventProcessor | (() => SingleEventProcessor)
-): (folder: string) => QueriableEventProcessor {
-	return (folder: string) => {
-		const db = new PouchDatabase(`${folder}/data.db`);
+): (config?: {folder: string}) => QueriableEventProcessor {
+	return (config?: {folder: string}) => {
+		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorOnDatabase(typeof v === 'function' ? v() : v, db);
 	};
 }
@@ -59,9 +59,9 @@ export class SingleEventProcessorWrapper implements SingleEventProcessor {
 
 export function fromSingleEventProcessorObject(
 	v: SingleEventProcessorObject | (() => SingleEventProcessorObject)
-): (folder: string) => QueriableEventProcessor {
-	return (folder: string) => {
-		const db = new PouchDatabase(`${folder}/data.db`);
+): (config?: {folder: string}) => QueriableEventProcessor {
+	return (config?: {folder: string}) => {
+		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorOnDatabase(
 			typeof v === 'function' ? new SingleEventProcessorWrapper(v()) : new SingleEventProcessorWrapper(v),
 			db
@@ -71,9 +71,9 @@ export function fromSingleEventProcessorObject(
 
 export function fromSingleEventProcessorWithBatchSupportObject(
 	v: SingleEventProcessorWithBatchSupport | (() => SingleEventProcessorWithBatchSupport)
-): (folder: string) => QueriableEventProcessor {
-	return (folder: string) => {
-		const db = new PouchDatabase(`${folder}/data.db`);
+): (config?: {folder: string}) => QueriableEventProcessor {
+	return (config?: {folder: string}) => {
+		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorWithBatchDBUpdate(typeof v === 'function' ? v() : v, db);
 	};
 }

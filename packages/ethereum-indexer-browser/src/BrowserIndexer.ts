@@ -4,6 +4,7 @@ import {
 	type LastSync,
 	type EIP1193Provider,
 	type ContractsInfo,
+	IndexerConfig,
 } from 'ethereum-indexer';
 
 import {writable, type Writable} from 'sveltore';
@@ -27,20 +28,40 @@ function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: strin
 	return newObj;
 }
 
+export type ExtendedLastSync = LastSync & {
+	numBlocksProcessedSoFar: number;
+	syncPercentage: number;
+	totalPercentage: number;
+};
+
+export type BrowserIndexerState = {
+	lastSync?: ExtendedLastSync;
+	autoIndexing: boolean;
+	loading: boolean;
+	catchingUp: boolean;
+};
+
 export class BrowserIndexer {
 	protected indexer: EthereumIndexer;
 
-	protected indexing: boolean = false;
+	protected autoIndexing: boolean = false;
+	protected catchingUp: boolean = false;
+	protected loading: boolean = false;
 	protected indexingTimeout: number | undefined;
 
-	protected store: Writable<LastSync>;
+	protected store: Writable<BrowserIndexerState>;
 
 	constructor(
 		protected processor: EventProcessor,
 		protected contractsInfo: ContractsInfo,
-		protected eip1193Provider: EIP1193Provider
+		protected eip1193Provider: EIP1193Provider,
+		protected indexerConfig?: IndexerConfig
 	) {
-		this.store = writable(undefined);
+		this.store = writable({
+			loading: this.loading,
+			autoIndexing: this.autoIndexing,
+			catchingUp: this.catchingUp,
+		});
 	}
 
 	private set(lastSync: LastSync) {
@@ -56,7 +77,10 @@ export class BrowserIndexer {
 		lastSyncObject.syncPercentage = Math.floor((numBlocksProcessedSoFar * 1000000) / totalToProcess) / 10000;
 		lastSyncObject.totalPercentage = Math.floor((lastToBlock * 1000000) / latestBlock) / 10000;
 
-		this.store.set(lastSyncObject);
+		this.store.update((state) => {
+			state.lastSync = lastSyncObject;
+			return state;
+		});
 	}
 
 	async indexMore(): Promise<LastSync> {
@@ -69,11 +93,18 @@ export class BrowserIndexer {
 	}
 
 	async indexToLatest(): Promise<LastSync> {
+		let lastSync: LastSync | undefined;
 		if (!this.indexer) {
-			await this.setupIndexing();
+			lastSync = await this.setupIndexing();
+			this.set(lastSync);
 		}
+
 		namedLogger.info(`indexing...`);
-		let lastSync;
+		this.store.update((state) => {
+			state.catchingUp = true;
+			this.catchingUp = true;
+			return state;
+		});
 		try {
 			lastSync = await this.indexer.indexMore();
 			this.set(lastSync);
@@ -100,21 +131,40 @@ export class BrowserIndexer {
 				});
 			}
 		}
+		this.store.update((state) => {
+			state.catchingUp = false;
+			this.catchingUp = false;
+			return state;
+		});
 		namedLogger.info(`... done.`);
 		return lastSync;
 	}
 
 	private async setupIndexing(): Promise<LastSync> {
 		namedLogger.info(`setting up indexer...`);
-		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.contractsInfo);
-		return this.indexer.load();
+		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.contractsInfo, this.indexerConfig);
+
+		namedLogger.info(`loading...`);
+		this.store.update((state) => {
+			state.loading = true;
+			this.loading = true;
+			return state;
+		});
+		const lastSync = await this.indexer.load();
+		this.store.update((state) => {
+			state.loading = false;
+			this.loading = false;
+			return state;
+		});
+
+		return lastSync;
 	}
 
 	async startAutoIndexing(): Promise<boolean> {
 		if (!this.indexer) {
 			await this.setupIndexing();
 		}
-		if (!this.indexing) {
+		if (!this.autoIndexing) {
 			this._auto_index();
 			return true;
 		} else {
@@ -123,23 +173,32 @@ export class BrowserIndexer {
 	}
 
 	stopAutoIndexing(): boolean {
-		if (this.indexing) {
+		if (this.autoIndexing) {
 			if (this.indexingTimeout) {
 				clearTimeout(this.indexingTimeout);
 			}
-			this.indexing = false;
+
+			this.store.update((state) => {
+				state.autoIndexing = false;
+				this.autoIndexing = false;
+				return state;
+			});
 			return true;
 		} else {
 			return false;
 		}
 	}
 
-	subscribe(subscription: (value: any) => void): () => void {
+	subscribe(subscription: (value: BrowserIndexerState) => void): () => void {
 		return this.store.subscribe(subscription);
 	}
 
 	private async _auto_index() {
-		this.indexing = true;
+		this.store.update((state) => {
+			state.autoIndexing = true;
+			this.autoIndexing = true;
+			return state;
+		});
 		try {
 			const lastSync = await this.indexMore();
 			if (lastSync.latestBlock - lastSync.lastToBlock < 1) {

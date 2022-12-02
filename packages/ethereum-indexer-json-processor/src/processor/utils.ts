@@ -2,10 +2,15 @@ import {SingleEventJSONProcessor, EventProcessorOnJSON} from './EventProcessorOn
 import {EventWithId, LogEvent} from 'ethereum-indexer';
 import {JSObject} from './types';
 
+export type EventProcessorOnJSONConfig = {
+	// TODO state saver and fetcher
+};
+
 export function fromSingleJSONEventProcessor<T extends JSObject>(
 	v: SingleEventJSONProcessor<T> | (() => SingleEventJSONProcessor<T>)
-): (folder: string) => EventProcessorOnJSON<T> {
-	return (folder: string) => {
+): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<T> {
+	return (config?: EventProcessorOnJSONConfig) => {
+		// TODO pass state saver and fetcher
 		return new EventProcessorOnJSON<T>(typeof v === 'function' ? v() : v);
 	};
 }
@@ -55,8 +60,9 @@ export class SingleJSONEventProcessorWrapper<T extends JSObject> implements Sing
 
 export function fromSingleJSONEventProcessorObject<T extends JSObject>(
 	v: SingleJSONEventProcessorObject<T> | (() => SingleJSONEventProcessorObject<T>)
-): (folder: string) => EventProcessorOnJSON<T> {
-	return (folder: string) => {
+): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<T> {
+	return (config?: EventProcessorOnJSONConfig) => {
+		// TODO pass state saver and fetcher
 		return new EventProcessorOnJSON<T>(
 			typeof v === 'function' ? new SingleJSONEventProcessorWrapper(v()) : new SingleJSONEventProcessorWrapper(v)
 		);

@@ -5,6 +5,11 @@ import {JSObject} from './types';
 
 const namedLogger = logs('EventProcessorOnJSON');
 
+export type AllData<T extends JSObject> = {data: T; lastSync?: LastSync; history: HistoryJSObject};
+
+export type ExistingStateFecther<T extends JSObject> = () => Promise<AllData<T>>;
+export type StateSaver<T extends JSObject> = (data: AllData<T>) => Promise<void>;
+
 export interface SingleEventJSONProcessor<T extends JSObject> {
 	setup?(json: T): Promise<void>;
 	processEvent(json: T, event: EventWithId): void;
@@ -15,8 +20,10 @@ export interface SingleEventJSONProcessor<T extends JSObject> {
 
 export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor {
 	public readonly json: T;
-	protected _json: {data: T; lastSync?: LastSync; history: HistoryJSObject};
+	protected _json: AllData<T>;
 	protected history: History;
+	protected existingStateFecther?: ExistingStateFecther<T>;
+	protected stateSaver?: StateSaver<T>;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<T>) {
 		this._json = {
 			data: {} as T,
@@ -27,6 +34,14 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 		};
 		this.history = new History(this._json.history, 12); // TODO finality
 		this.json = proxifyJSON<T>(this._json.data, this.history);
+	}
+
+	setExistingStateFetcher(fetcher: ExistingStateFecther<T>) {
+		this.existingStateFecther = fetcher;
+	}
+
+	setStateSaver(saver: StateSaver<T>) {
+		this.stateSaver = saver;
 	}
 
 	async reset() {
@@ -44,7 +59,23 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 	}
 
 	async load(contractsData: ContractsInfo): Promise<LastSync> {
-		namedLogger.info(`EventProcessorOnJSON LOADING....`);
+		if (this.existingStateFecther) {
+			namedLogger.info(`fetching state...`);
+			const {lastSync: lastSyncFromExistingState, data, history} = await this.existingStateFecther();
+			if (
+				!this._json.lastSync?.lastToBlock ||
+				// TODO configure 100
+				Math.max(0, lastSyncFromExistingState.lastToBlock - this._json.lastSync?.lastToBlock || 0) > 100
+			) {
+				this._json.history = history;
+				this.history.setBlock(0, '0x0000');
+
+				this._json.data = data;
+				this._json.lastSync = lastSyncFromExistingState;
+			}
+		}
+
+		namedLogger.info(`EventProcessorOnJSON SETTING UP....`);
 		await this.singleEventProcessor.setup(this._json.data);
 
 		// TODO check if contractsData matches old sync
@@ -103,6 +134,13 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 				...lastSync,
 			};
 			this._json.lastSync = lastSyncDoc;
+			if (this.stateSaver) {
+				try {
+					await this.stateSaver(this._json);
+				} catch (e) {
+					namedLogger.error(`failed to save ${e}`);
+				}
+			}
 		} finally {
 			namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
 		}

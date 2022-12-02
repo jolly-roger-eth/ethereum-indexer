@@ -55,9 +55,14 @@ export type AllContractData = {eventsABI: any[]; startBlock?: number};
 
 export type ContractsInfo = ContractData[] | AllContractData;
 
+export type ExistingStreamFecther = (nextStreamID: number) => Promise<{lastSync: LastSync; eventStream: EventWithId[]}>;
+export type StreamSaver = (stream: {lastSync: LastSync; eventStream: EventWithId[]}) => Promise<void>;
+
 export type IndexerConfig = LogFetcherConfig & {
 	finality?: number;
 	alwaysFetchTimestamps?: boolean;
 	alwaysFetchTransactions?: boolean;
 	providerSupportsETHBatch?: boolean;
+	fetchExistingStream?: ExistingStreamFecther;
+	saveAppendedStream?: StreamSaver;
 };

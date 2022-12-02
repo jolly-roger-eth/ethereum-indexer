@@ -112,6 +112,7 @@ export class SimpleServer {
 	}
 
 	async start(config: {autoIndex: boolean}) {
+		// TODO allow to pass processor configuration
 		await this.setupIndexing();
 		this.startServer();
 		if (config.autoIndex) {
@@ -121,9 +122,7 @@ export class SimpleServer {
 
 	private async setupIndexing() {
 		const processorModule = await import(this.config.processorPath);
-		const processorFactory = processorModule.processor as
-			| ((folder: string) => QueriableEventProcessor)
-			| QueriableEventProcessor;
+		const processorFactory = processorModule.processor as (config?: any) => QueriableEventProcessor;
 
 		if (!processorFactory) {
 			throw new Error(

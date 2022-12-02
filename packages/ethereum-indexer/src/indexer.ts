@@ -17,6 +17,8 @@ import type {
 	EventBlock,
 	EventProcessor,
 	EventWithId,
+	ExistingStreamFecther,
+	StreamSaver,
 	IndexerConfig,
 	LastSync,
 } from './types';
@@ -27,13 +29,32 @@ const namedLogger = logs('ethereum-indexer');
 // TODO allow finality configuration separated from reorg history length (to allow processing of abi changes for longer time than finality)
 
 export class EthereumIndexer {
+	// ------------------------------------------------------------------------------------------------------------------
+	// PUBLIC VARIABLES
+	// ------------------------------------------------------------------------------------------------------------------
+
+	public readonly defaultFromBlock: number;
+
+	// ------------------------------------------------------------------------------------------------------------------
+	// INTERNAL VARIABLES
+	// ------------------------------------------------------------------------------------------------------------------
 	protected logEventFetcher: LogEventFetcher;
 	protected lastSync: LastSync | undefined;
 	protected finality: number;
-	public readonly defaultFromBlock: number;
 	protected alwaysFetchTimestamps: boolean;
 	protected alwaysFetchTransactions: boolean;
 	protected providerSupportsETHBatch: boolean;
+	protected fetchExistingStream: ExistingStreamFecther | undefined;
+	protected saveAppendedStream: StreamSaver | undefined;
+	protected appendedStreamNotYetSaved: EventWithId[] = [];
+	protected _reseting: Promise<void> | undefined;
+	protected _loading: Promise<LastSync> | undefined;
+	protected _processing: Promise<LastSync> | undefined;
+
+	// ------------------------------------------------------------------------------------------------------------------
+	// CONSTRUCTOR
+	// ------------------------------------------------------------------------------------------------------------------
+
 	constructor(
 		protected provider: EIP1193Provider,
 		protected processor: EventProcessor,
@@ -44,6 +65,8 @@ export class EthereumIndexer {
 		this.logEventFetcher = new LogEventFetcher(provider, contractsData, config);
 		this.alwaysFetchTimestamps = config.alwaysFetchTimestamps ? true : false;
 		this.alwaysFetchTransactions = config.alwaysFetchTransactions ? true : false;
+		this.fetchExistingStream = config.fetchExistingStream;
+		this.saveAppendedStream = config.saveAppendedStream;
 
 		this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
 
@@ -63,18 +86,9 @@ export class EthereumIndexer {
 		}
 	}
 
-	protected _loading: Promise<LastSync> | undefined;
-	async promiseToLoad(): Promise<LastSync> {
-		try {
-			if (!this.lastSync) {
-				this.lastSync = await this.processor.load(this.contractsData);
-			}
-			return this.lastSync;
-		} finally {
-			this._loading = undefined;
-		}
-	}
-
+	// ------------------------------------------------------------------------------------------------------------------
+	// PUBLIC INTERFACE
+	// ------------------------------------------------------------------------------------------------------------------
 	load(): Promise<LastSync> {
 		if (!this._loading) {
 			this._loading = this.promiseToLoad();
@@ -82,7 +96,6 @@ export class EthereumIndexer {
 		return this._loading;
 	}
 
-	protected _reseting: Promise<void> | undefined;
 	async reset() {
 		if (this._reseting) {
 			return this._reseting;
@@ -107,9 +120,76 @@ export class EthereumIndexer {
 		return this._reseting;
 	}
 
-	async promiseToFeed(eventStream: EventWithId[]): Promise<LastSync> {
+	async feed(eventStream: EventWithId[]): Promise<LastSync> {
+		if (this._processing) {
+			throw new Error(`processing... should not feed`);
+		}
+		if (this._reseting) {
+			throw new Error(`reseting... should not feed`);
+		}
+
+		this._processing = this.promiseToFeed(eventStream);
+		return this._processing;
+	}
+
+	indexMore(): Promise<LastSync> {
+		if (this._processing) {
+			namedLogger.info(`still processing...`);
+			return this._processing;
+		}
+
+		if (this._reseting) {
+			namedLogger.info(`reseting...`);
+			this._processing = this._reseting.then(() => this.promiseToIndex());
+		} else {
+			namedLogger.info(`go!`);
+			this._processing = this.promiseToIndex();
+		}
+		return this._processing;
+	}
+
+	// ------------------------------------------------------------------------------------------------------------------
+	// INTERNALS
+	// ------------------------------------------------------------------------------------------------------------------
+
+	protected async promiseToLoad(): Promise<LastSync> {
 		try {
-			const lastSync: LastSync = this.lastSync;
+			let lastSync = this.lastSync;
+			if (!lastSync) {
+				lastSync = await this.processor.load(this.contractsData);
+			}
+
+			if (this.fetchExistingStream) {
+				const {eventStream, lastSync: lastSyncFetched} = await this.fetchExistingStream(lastSync.nextStreamID);
+
+				const eventStreamToFeed = eventStream.filter(
+					(event) =>
+						event.streamID >= lastSync.nextStreamID &&
+						event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
+				);
+
+				namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
+				if (eventStreamToFeed.length > 0) {
+					lastSync = await this.feed(eventStreamToFeed);
+				}
+				namedLogger.info(`${eventStreamToFeed.length} events feeded`);
+			}
+
+			this.lastSync = lastSync;
+			return this.lastSync;
+		} finally {
+			this._loading = undefined;
+		}
+	}
+
+	protected async promiseToFeed(eventStream: EventWithId[]): Promise<LastSync> {
+		try {
+			const lastSync: LastSync = this.lastSync || {
+				lastToBlock: 0,
+				latestBlock: 0,
+				nextStreamID: 1,
+				unconfirmedBlocks: [],
+			};
 
 			const firstEvent = eventStream[0];
 			const lastEvent = eventStream[eventStream.length - 1];
@@ -138,36 +218,22 @@ export class EthereumIndexer {
 		}
 	}
 
-	async feed(eventStream: EventWithId[]): Promise<LastSync> {
-		if (this._processing) {
-			throw new Error(`processing... should not feed`);
+	protected async save(eventStream: EventWithId[], lastSync: LastSync) {
+		if (this.saveAppendedStream) {
+			this.appendedStreamNotYetSaved.push(...eventStream);
+			try {
+				await this.saveAppendedStream({
+					eventStream: this.appendedStreamNotYetSaved,
+					lastSync,
+				});
+				this.appendedStreamNotYetSaved.splice(0, this.appendedStreamNotYetSaved.length);
+			} catch (e) {
+				namedLogger.error(`could not save stream, ${e}`);
+			}
 		}
-		if (this._reseting) {
-			throw new Error(`reseting... should not feed`);
-		}
-
-		this._processing = this.promiseToFeed(eventStream);
-		return this._processing;
 	}
 
-	protected _processing: Promise<LastSync> | undefined;
-	indexMore(): Promise<LastSync> {
-		if (this._processing) {
-			namedLogger.info(`still processing...`);
-			return this._processing;
-		}
-
-		if (this._reseting) {
-			namedLogger.info(`reseting...`);
-			this._processing = this._reseting.then(() => this.promiseToIndex());
-		} else {
-			namedLogger.info(`go!`);
-			this._processing = this.promiseToIndex();
-		}
-		return this._processing;
-	}
-
-	async getBlocks(blockHashes: string[]): Promise<{timestamp: number}[]> {
+	protected async getBlocks(blockHashes: string[]): Promise<{timestamp: number}[]> {
 		if (this.providerSupportsETHBatch) {
 			return getBlocks(this.provider, blockHashes);
 		} else {
@@ -184,7 +250,7 @@ export class EthereumIndexer {
 		}
 	}
 
-	async getTransactions(transactionHashes: string[]): Promise<TransactionData[]> {
+	protected async getTransactions(transactionHashes: string[]): Promise<TransactionData[]> {
 		if (this.providerSupportsETHBatch) {
 			return getTransactionReceipts(this.provider, transactionHashes);
 		} else {
@@ -366,6 +432,8 @@ export class EthereumIndexer {
 				}
 
 				this.lastSync = newLastSync;
+
+				await this.save(eventStream, this.lastSync);
 
 				this._processing = undefined;
 				return resolve(newLastSync);

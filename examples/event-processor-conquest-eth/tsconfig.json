@@ -8,8 +8,6 @@
 		"sourceMap": true,
 		"module": "commonjs",
 		"moduleResolution": "node",
-		"emitDecoratorMetadata": true,
-		"experimentalDecorators": true,
 		"esModuleInterop": true,
 		"resolveJsonModule": true
 	},
