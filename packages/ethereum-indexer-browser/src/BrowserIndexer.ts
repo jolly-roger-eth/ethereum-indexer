@@ -55,6 +55,7 @@ export class BrowserIndexer {
 		protected processor: EventProcessor,
 		protected contractsInfo: ContractsInfo,
 		protected eip1193Provider: EIP1193Provider,
+
 		protected indexerConfig?: IndexerConfig
 	) {
 		this.store = writable({
