@@ -118,7 +118,7 @@ export class LogFetcher {
 	constructor(
 		protected provider: EIP1193Provider,
 		protected contractAddresses: EIP1193Account[] | null,
-		protected eventNameTopics: (DATA | DATA[])[] | null,
+		protected eventNameTopics: DATA[] | null,
 		config: LogFetcherConfig = {}
 	) {
 		this.config = Object.assign(
@@ -400,7 +400,7 @@ export async function getTransactionReceipts(provider: EIP1193Provider, hashes: 
 export async function getLogs(
 	provider: EIP1193Provider,
 	contractAddresses: EIP1193Account[] | null,
-	eventNameTopics: (DATA | DATA[])[] | null,
+	eventNameTopics: DATA[] | null,
 	options: {fromBlock: number; toBlock: number}
 ): Promise<EIP1193Log[]> {
 	const logs: EIP1193Log[] = await provider.request({
@@ -410,7 +410,7 @@ export async function getLogs(
 				address: contractAddresses,
 				fromBlock: ('0x' + options.fromBlock.toString(16)) as DATA,
 				toBlock: ('0x' + options.toBlock.toString(16)) as DATA,
-				topics: eventNameTopics ? eventNameTopics : undefined,
+				topics: eventNameTopics ? [eventNameTopics] : undefined,
 			},
 		],
 	});

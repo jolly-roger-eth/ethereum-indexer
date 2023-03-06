@@ -27,7 +27,7 @@
 
 <p>requests sent: {$numRequests}</p>
 <p>block processed: {$browserIndexer.lastSync?.numBlocksProcessedSoFar.toLocaleString()}</p>
-<p>num events: {$browserIndexer.lastSync?.nextStreamID.toLocaleString()}</p>
+<p>num events: {($browserIndexer.lastSync?.nextStreamID - 1).toLocaleString()}</p>
 
 {#if $state}
 	<JSONTree value={stateDisplayed} />
