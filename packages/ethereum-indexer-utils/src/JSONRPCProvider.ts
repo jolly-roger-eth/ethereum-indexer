@@ -1,5 +1,5 @@
 import fetch from 'isomorphic-unfetch';
-import type {EIP1193Provider, EIP1193RequestArguments} from 'ethereum-indexer';
+import {EIP1193ProviderWithoutEvents, EIP1193Request} from 'eip-1193';
 
 let counter = 0;
 export async function ethereum_send<U extends any, T>(endpoint: string, method: string, params?: U): Promise<T> {
@@ -55,10 +55,10 @@ export async function ethereum_send<U extends any, T>(endpoint: string, method: 
 	}
 }
 
-export class JSONRPCProvider implements EIP1193Provider {
+export class JSONRPCProvider {
 	constructor(protected endpoint: string) {}
 
-	request<T>(args: EIP1193RequestArguments): Promise<T> {
-		return ethereum_send(this.endpoint, args.method, args.params);
+	request<T>(args: EIP1193Request): Promise<T> {
+		return ethereum_send(this.endpoint, args.method, (args as any).params);
 	}
 }

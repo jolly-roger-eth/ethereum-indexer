@@ -1,5 +1,5 @@
 import {
-	EIP1193Provider,
+	DATA,
 	getBlock,
 	getBlockNumber,
 	getBlocks,
@@ -9,6 +9,8 @@ import {
 	LogEventFetcher,
 	TransactionData,
 } from './engine/ethereum';
+
+import {EIP1193Provider} from 'eip-1193';
 
 import {logs} from 'named-logs';
 import type {
@@ -259,7 +261,7 @@ export class EthereumIndexer {
 			const result = [];
 			for (const blockHash of blockHashes) {
 				namedLogger.info(`getting block ${blockHash}...`);
-				const actualBlock = await getBlock(this.provider, blockHash);
+				const actualBlock = await getBlock(this.provider, blockHash as DATA);
 				if (!this._processing) {
 					return;
 				}
@@ -276,7 +278,7 @@ export class EthereumIndexer {
 			const result = [];
 			for (const transactionHash of transactionHashes) {
 				namedLogger.info(`getting block ${transactionHash}...`);
-				const tx = await getTransactionReceipt(this.provider, transactionHash);
+				const tx = await getTransactionReceipt(this.provider, transactionHash as DATA);
 				if (!this._processing) {
 					return;
 				}

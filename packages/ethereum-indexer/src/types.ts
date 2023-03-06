@@ -1,14 +1,6 @@
 import {JSONObject, JSONType, LogEvent, LogFetcherConfig} from './engine/ethereum';
 
-export type {
-	EIP1193Provider,
-	LogEvent,
-	EIP1193RequestArguments,
-	RawLog,
-	LogEventFetcher,
-	LogFetcher,
-	LogFetcherConfig,
-} from './engine/ethereum';
+export type {LogEvent, LogEventFetcher, LogFetcher, LogFetcherConfig} from './engine/ethereum';
 
 export type EventProcessor = {
 	load: (contractsData: ContractsInfo) => Promise<LastSync>;

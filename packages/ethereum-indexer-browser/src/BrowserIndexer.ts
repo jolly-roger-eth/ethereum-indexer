@@ -1,11 +1,5 @@
-import {
-	EthereumIndexer,
-	type EventProcessor,
-	type LastSync,
-	type EIP1193Provider,
-	type ContractsInfo,
-	IndexerConfig,
-} from 'ethereum-indexer';
+import {EthereumIndexer, type EventProcessor, type LastSync, type ContractsInfo, IndexerConfig} from 'ethereum-indexer';
+import {EIP1193Provider} from 'eip-1193';
 
 import {writable, type Writable} from 'sveltore';
 
@@ -61,7 +55,6 @@ export class BrowserIndexer {
 		protected processor: EventProcessor,
 		protected contractsInfo: ContractsInfo,
 		protected eip1193Provider: EIP1193Provider,
-
 		protected indexerConfig?: IndexerConfig
 	) {
 		this.state = {

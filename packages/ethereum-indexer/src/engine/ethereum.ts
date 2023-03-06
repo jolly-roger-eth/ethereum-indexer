@@ -1,25 +1,27 @@
 import {EventFragment, Interface} from '@ethersproject/abi';
 import {getAddress} from '@ethersproject/address';
 import {InterfaceWithLowerCaseAddresses} from './decoding';
+import {
+	EIP1193Account,
+	EIP1193Block,
+	EIP1193GenericRequest,
+	EIP1193Log,
+	EIP1193Provider,
+	EIP1193Transaction,
+	EIP1193TransactionReceipt,
+} from 'eip-1193';
 
-export interface EIP1193RequestArguments {
-	readonly method: string;
-	readonly params?: readonly unknown[] | object;
-}
+export type ExtendedEIP1193Provider = EIP1193Provider &
+	Partial<{
+		request(args: {method: 'eth_batch'; params: EIP1193GenericRequest[]}): Promise<unknown[]>;
+	}>;
 
-export interface EIP1193Provider {
-	request<T>(args: EIP1193RequestArguments): Promise<T>;
-}
+export type DATA = `0x${string}`;
+export type QUANTITY = `0x${string}`;
 
 export type TransactionData = {
 	from: string;
 	gasUsed: number;
-	status: 0 | 1;
-};
-
-export type ETHJSONRPC_TransactionReceipt = {
-	from: string;
-	gasUsed: string;
 	status: 0 | 1;
 };
 
@@ -36,21 +38,6 @@ type LogDescription = {
 	readonly args: Result;
 };
 
-export type RawLog = {
-	blockNumber: string; // 0x
-	blockHash: string;
-	transactionIndex: string; // 0x
-
-	removed: boolean;
-
-	address: string;
-	data: string;
-
-	topics: Array<string>;
-
-	transactionHash: string;
-	logIndex: string; //0x
-};
 interface Log {
 	blockNumber: number;
 	blockHash: string;
@@ -130,8 +117,8 @@ export class LogFetcher {
 	protected numBlocksToFetch: number;
 	constructor(
 		protected provider: EIP1193Provider,
-		protected contractAddresses: string[] | null,
-		protected eventNameTopics: (string | string[])[] | null,
+		protected contractAddresses: EIP1193Account[] | null,
+		protected eventNameTopics: (DATA | DATA[])[] | null,
 		config: LogFetcherConfig = {}
 	) {
 		this.config = Object.assign(
@@ -151,8 +138,8 @@ export class LogFetcher {
 		fromBlock: number;
 		toBlock: number;
 		retry?: number;
-	}): Promise<{logs: RawLog[]; toBlockUsed: number}> {
-		let logs: RawLog[];
+	}): Promise<{logs: EIP1193Log[]; toBlockUsed: number}> {
+		let logs: EIP1193Log[];
 
 		const fromBlock = options.fromBlock;
 		let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
@@ -225,12 +212,12 @@ export class LogEventFetcher extends LogFetcher {
 		contractsData: {address: string; eventsABI: any[]}[] | {eventsABI: any[]},
 		config: LogFetcherConfig = {}
 	) {
-		let contracts: {address: string; interface: Interface}[] | Interface;
-		let contractAddresses: string[] | null = null;
+		let contracts: {address: EIP1193Account; interface: Interface}[] | Interface;
+		let contractAddresses: EIP1193Account[] | null = null;
 		let eventABIS: Interface[];
 		if (Array.isArray(contractsData)) {
 			contracts = contractsData.map((v) => ({
-				address: v.address,
+				address: v.address as EIP1193Account,
 				interface: new InterfaceWithLowerCaseAddresses(v.eventsABI),
 			}));
 			contractAddresses = contracts.map((v) => v.address);
@@ -240,12 +227,12 @@ export class LogEventFetcher extends LogFetcher {
 			eventABIS = [contracts];
 		}
 
-		let eventNameTopics: string[] | null = null;
+		let eventNameTopics: DATA[] | null = null;
 		for (const contract of eventABIS) {
 			for (const fragment of contract.fragments) {
 				if (fragment.type === 'event') {
 					const eventFragment = fragment as EventFragment;
-					const topic = contract.getEventTopic(eventFragment);
+					const topic = contract.getEventTopic(eventFragment) as DATA;
 					if (topic) {
 						eventNameTopics = eventNameTopics || [];
 						eventNameTopics.push(topic);
@@ -268,7 +255,7 @@ export class LogEventFetcher extends LogFetcher {
 		return {events, toBlockUsed};
 	}
 
-	parse(logs: RawLog[]): LogEvent[] {
+	parse(logs: EIP1193Log[]): LogEvent[] {
 		const events: LogEvent[] = [];
 		for (let i = 0; i < logs.length; i++) {
 			const log = logs[i];
@@ -319,13 +306,13 @@ export class LogEventFetcher extends LogFetcher {
 }
 
 export async function getBlockNumber(provider: EIP1193Provider): Promise<number> {
-	const blockAsHexString = await send<any, string>(provider, 'eth_blockNumber', []);
+	const blockAsHexString = await provider.request({method: 'eth_blockNumber'});
 	return parseInt(blockAsHexString.slice(2), 16);
 }
 
 // NOTE: only interested in the timestamp for now
-export async function getBlock(provider: EIP1193Provider, hash: string): Promise<{timestamp: number}> {
-	const blockWithHexStringFields = await send<any, {timestamp: string}>(provider, 'eth_getBlockByHash', [hash, false]);
+export async function getBlock(provider: EIP1193Provider, hash: DATA): Promise<{timestamp: number}> {
+	const blockWithHexStringFields = await provider.request({method: 'eth_getBlockByHash', params: [hash, false]});
 	return {
 		timestamp: parseInt(blockWithHexStringFields.timestamp.slice(2), 16),
 	};
@@ -333,76 +320,101 @@ export async function getBlock(provider: EIP1193Provider, hash: string): Promise
 
 // NOTE: only interested in the timestamp for now
 export async function getBlocks(provider: EIP1193Provider, hashes: string[]): Promise<{timestamp: number}[]> {
-	const requests: {method: string; params: [string, boolean]}[] = [];
+	const requests: EIP1193GenericRequest[] = [];
 	for (const hash of hashes) {
 		requests.push({
 			method: 'eth_getBlockByHash',
 			params: [hash, false],
 		});
 	}
-	const blocksWithHexStringFields = await batch(provider, requests);
+	const blocksWithHexStringFields = await (provider as ExtendedEIP1193Provider).request({
+		method: 'eth_batch',
+		params: requests,
+	});
 
-	return blocksWithHexStringFields.map((block) => ({
+	return (blocksWithHexStringFields as EIP1193Block[]).map((block) => ({
 		timestamp: parseInt(block.timestamp.slice(2), 16),
 	}));
 }
 
-export async function getTransactionReceipt(provider: EIP1193Provider, hash: string): Promise<TransactionData> {
-	const transactionReceiptWithHexStringFields = await send<any, ETHJSONRPC_TransactionReceipt>(
-		provider,
-		'eth_getTransactionReceipt',
-		[hash]
-	);
+export async function getTransactionReceipt(provider: EIP1193Provider, hash: DATA): Promise<TransactionData> {
+	const transactionReceiptWithHexStringFields = await provider.request({
+		method: 'eth_getTransactionReceipt',
+		params: [hash],
+	});
+	let status: number = 1;
+	const statusAsString: string = transactionReceiptWithHexStringFields.status;
+	if (typeof statusAsString === 'string') {
+		if (statusAsString.startsWith('0x')) {
+			status = parseInt(statusAsString.slice(2), 16);
+		} else {
+			status = parseInt(statusAsString);
+		}
+		if (status != 0) {
+			// TOCHECK: isNaN ?
+			status = 1;
+		}
+	}
+
 	return {
 		from: transactionReceiptWithHexStringFields.from,
 		gasUsed: parseInt(transactionReceiptWithHexStringFields.gasUsed.slice(2), 16),
-		status: transactionReceiptWithHexStringFields.status,
+		status: status as 0 | 1,
 	};
 }
 
 export async function getTransactionReceipts(provider: EIP1193Provider, hashes: string[]): Promise<TransactionData[]> {
-	const requests: {method: string; params: [string]}[] = [];
+	const requests: EIP1193GenericRequest[] = [];
 	for (const hash of hashes) {
 		requests.push({
 			method: 'eth_getTransactionReceipt',
 			params: [hash],
 		});
 	}
-	const transactionReceiptsWithHexStringFields = await batch(provider, requests);
+	const transactionReceiptsWithHexStringFields = <EIP1193TransactionReceipt[]>(
+		await (provider as ExtendedEIP1193Provider).request({method: 'eth_batch', params: requests})
+	);
 
-	return transactionReceiptsWithHexStringFields.map((transaction) => ({
-		from: transaction.from,
-		gasUsed: parseInt(transaction.gasUsed.slice(2), 16),
-		status: transaction.status,
-	}));
+	return transactionReceiptsWithHexStringFields.map((transaction) => {
+		let status: number = 1;
+		const statusAsString: string = transaction.status;
+		if (typeof statusAsString === 'string') {
+			if (statusAsString.startsWith('0x')) {
+				status = parseInt(statusAsString.slice(2), 16);
+			} else {
+				status = parseInt(statusAsString);
+			}
+			if (status != 0) {
+				// TOCHECK: isNaN ?
+				status = 1;
+			}
+		}
+		return {
+			from: transaction.from,
+			gasUsed: parseInt(transaction.gasUsed.slice(2), 16),
+			status: status as 0 | 1,
+		};
+	});
 }
 
 export async function getLogs(
 	provider: EIP1193Provider,
-	contractAddresses: string[] | null,
-	eventNameTopics: (string | string[])[] | null,
+	contractAddresses: EIP1193Account[] | null,
+	eventNameTopics: (DATA | DATA[])[] | null,
 	options: {fromBlock: number; toBlock: number}
-): Promise<RawLog[]> {
-	const logs: RawLog[] = await send<any, RawLog[]>(provider, 'eth_getLogs', [
-		{
-			address: contractAddresses,
-			fromBlock: '0x' + options.fromBlock.toString(16),
-			toBlock: '0x' + options.toBlock.toString(16),
-			topics: eventNameTopics ? [eventNameTopics] : undefined,
-		},
-	]);
-	return logs;
-}
-
-export async function send<U extends any[], T>(provider: EIP1193Provider, method: string, params: U): Promise<T> {
-	return await provider.request({
-		method,
-		params,
+): Promise<EIP1193Log[]> {
+	const logs: EIP1193Log[] = await provider.request({
+		method: 'eth_getLogs',
+		params: [
+			{
+				address: contractAddresses,
+				fromBlock: ('0x' + options.fromBlock.toString(16)) as DATA,
+				toBlock: ('0x' + options.toBlock.toString(16)) as DATA,
+				topics: eventNameTopics ? eventNameTopics : undefined,
+			},
+		],
 	});
-}
-
-export async function batch(provider: EIP1193Provider, requests: {method: string; params: any[]}[]): Promise<any[]> {
-	return send<any, any[]>(provider, 'eth_batch', requests);
+	return logs;
 }
 
 const multicallInterface = new InterfaceWithLowerCaseAddresses([
@@ -457,17 +469,20 @@ const multicallInterface = new InterfaceWithLowerCaseAddresses([
 ]);
 
 export function getmMulti165CallData(contractAddresses: string[]): {
-	to: string;
-	data: string;
+	to: EIP1193Account;
+	data: DATA;
 } {
-	const data = multicallInterface.encodeFunctionData('supportsInterface', [contractAddresses, '0x80ac58cd']);
+	const data = multicallInterface.encodeFunctionData('supportsInterface', [contractAddresses, '0x80ac58cd']) as DATA;
 	return {to: '0x9f83e74173A34d59D0DFa951AE22336b835AB196', data};
 }
 
 export async function multi165(provider: EIP1193Provider, contractAddresses: string[]): Promise<boolean[]> {
 	const callData = getmMulti165CallData(contractAddresses);
 	// TODO specify blockHash for event post the deployment of Multi165 ?
-	const response = await send<any, string>(provider, 'eth_call', [{...callData, gas: '0x' + (28000000).toString(16)}]);
+	const response = await provider.request({
+		method: 'eth_call',
+		params: [{...callData, gas: ('0x' + (28000000).toString(16)) as QUANTITY}],
+	});
 	const result: boolean[] = multicallInterface.decodeFunctionResult('supportsInterface', response)[0];
 	return result;
 }
@@ -550,12 +565,12 @@ const tokenURIInterface = new InterfaceWithLowerCaseAddresses([
 
 export async function tokenURI(
 	provider: EIP1193Provider,
-	contract: string,
+	contract: EIP1193Account,
 	tokenID: string,
 	blockHash: string
 ): Promise<string> {
-	const data = tokenURIInterface.encodeFunctionData('tokenURI', [tokenID]);
-	const response = await send<any, string>(provider, 'eth_call', [{to: contract, data}, {blockHash}]);
+	const data = tokenURIInterface.encodeFunctionData('tokenURI', [tokenID]) as DATA;
+	const response = await provider.request({method: 'eth_call', params: [{to: contract, data}, {blockHash}]});
 	const result: string = tokenURIInterface.decodeFunctionResult('tokenURI', response)[0];
 	return result;
 }
@@ -574,7 +589,12 @@ export function createER721TokenURIFetcher(
 		}
 
 		try {
-			const uri = await tokenURI(provider, event.address, event.args['tokenId'] as string, event.blockHash);
+			const uri = await tokenURI(
+				provider,
+				event.address as EIP1193Account,
+				event.args['tokenId'] as string,
+				event.blockHash
+			);
 			if (uri) {
 				return {
 					tokenURIAtMint: uri,
