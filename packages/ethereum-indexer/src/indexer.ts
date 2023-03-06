@@ -91,6 +91,39 @@ export class EthereumIndexer {
 		}
 	}
 
+	// constructor(processor: EventProcessor, config: IndexerConfig = {}) {
+	// 	this.processor = processor;
+	// 	this.finality = config.finality || 12;
+	// 	this.alwaysFetchTimestamps = config.alwaysFetchTimestamps ? true : false;
+	// 	this.alwaysFetchTransactions = config.alwaysFetchTransactions ? true : false;
+	// 	this.fetchExistingStream = config.fetchExistingStream;
+	// 	this.saveAppendedStream = config.saveAppendedStream;
+
+	// 	this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
+	// }
+
+	// setup(provider: EIP1193Provider, contractsData: ContractsInfo, fetcherConfig: LogFetcherConfig) {
+	// 	// TODO reset on chain change, etc...
+	// 	this.provider = provider;
+	// 	this.logEventFetcher = new LogEventFetcher(provider, contractsData, fetcherConfig);
+
+	// 	let defaultFromBlock = 0;
+	// 	if (Array.isArray(this.contractsData)) {
+	// 		for (const contractData of this.contractsData) {
+	// 			if (contractData.startBlock) {
+	// 				if (defaultFromBlock === 0) {
+	// 					defaultFromBlock = contractData.startBlock;
+	// 				} else if (contractData.startBlock < defaultFromBlock) {
+	// 					defaultFromBlock = contractData.startBlock;
+	// 				}
+	// 			}
+	// 		}
+	// 	} else {
+	// 		defaultFromBlock = this.contractsData.startBlock || 0;
+	// 	}
+	// 	(this as any).defaultFromBlock = defaultFromBlock;
+	// }
+
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC INTERFACE
 	// ------------------------------------------------------------------------------------------------------------------

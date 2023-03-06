@@ -51,12 +51,12 @@ export class BrowserIndexer {
 	protected state: BrowserIndexerState;
 	protected store: Writable<BrowserIndexerState>;
 
-	constructor(
-		protected processor: EventProcessor,
-		protected contractsInfo: ContractsInfo,
-		protected eip1193Provider: EIP1193Provider,
-		protected indexerConfig?: IndexerConfig
-	) {
+	protected processor: EventProcessor | undefined;
+	protected contractsInfo: ContractsInfo | undefined;
+	protected eip1193Provider: EIP1193Provider | undefined;
+	protected indexerConfig: IndexerConfig | undefined;
+
+	constructor() {
 		this.state = {
 			loading: false,
 			autoIndexing: false,
@@ -65,6 +65,18 @@ export class BrowserIndexer {
 			processingFetchedLogs: false,
 		};
 		this.store = writable(this.state);
+	}
+
+	init(
+		processor: EventProcessor,
+		contractsInfo: ContractsInfo,
+		eip1193Provider: EIP1193Provider,
+		indexerConfig: IndexerConfig
+	) {
+		this.processor = processor;
+		this.contractsInfo = contractsInfo;
+		this.eip1193Provider = eip1193Provider;
+		this.indexerConfig = indexerConfig;
 	}
 
 	private set(lastSync: LastSync) {
@@ -139,6 +151,15 @@ export class BrowserIndexer {
 
 	private async setupIndexing(): Promise<LastSync> {
 		namedLogger.info(`setting up indexer...`);
+		if (!this.processor) {
+			throw new Error(`no processor provided, did you call init ?`);
+		}
+		if (!this.contractsInfo) {
+			throw new Error(`no contracts info provided, did you call init ?`);
+		}
+		if (!this.indexerConfig) {
+			throw new Error(`no config for indexer provided, did you call init ?`);
+		}
 		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.contractsInfo, this.indexerConfig);
 		this.indexer.onLoad = async (loadingState) => {
 			if (loadingState === 'Loading') {
