@@ -1,5 +1,13 @@
 # ethereum-indexer-json-processor
 
+## 0.3.6
+
+### Patch Changes
+
+- use eip-1193 types
+- Updated dependencies
+  - ethereum-indexer@0.3.5
+
 ## 0.3.5
 
 ### Patch Changes

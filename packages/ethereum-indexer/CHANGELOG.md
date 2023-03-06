@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.3.5
+
+### Patch Changes
+
+- use eip-1193 types
+
 ## 0.3.4
 
 ### Patch Changes
