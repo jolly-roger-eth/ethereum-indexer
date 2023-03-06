@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.3.7
+
+### Patch Changes
+
+- browser indexer can be initialised any time
+
 ## 0.3.6
 
 ### Patch Changes
