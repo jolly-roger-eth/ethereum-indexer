@@ -1,5 +1,13 @@
 # ethereum-indexer-browser
 
+## 0.3.8
+
+### Patch Changes
+
+- types
+- Updated dependencies
+  - ethereum-indexer@0.3.7
+
 ## 0.3.7
 
 ### Patch Changes

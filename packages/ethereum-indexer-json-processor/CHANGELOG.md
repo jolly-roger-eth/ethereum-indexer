@@ -1,5 +1,12 @@
 # ethereum-indexer-json-processor
 
+## 0.3.8
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.3.7
+
 ## 0.3.7
 
 ### Patch Changes
