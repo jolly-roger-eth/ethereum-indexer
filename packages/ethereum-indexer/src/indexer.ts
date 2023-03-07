@@ -11,7 +11,7 @@ import {
 	TransactionData,
 } from './engine/ethereum';
 
-import {EIP1193Provider} from 'eip-1193';
+import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 import {logs} from 'named-logs';
 import type {
@@ -62,7 +62,7 @@ export class EthereumIndexer {
 	// ------------------------------------------------------------------------------------------------------------------
 
 	constructor(
-		protected provider: EIP1193Provider,
+		protected provider: EIP1193ProviderWithoutEvents,
 		protected processor: EventProcessor,
 		protected contractsData: ContractsInfo,
 		config: IndexerConfig = {}

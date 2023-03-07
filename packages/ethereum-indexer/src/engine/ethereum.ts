@@ -6,12 +6,12 @@ import {
 	EIP1193Block,
 	EIP1193GenericRequest,
 	EIP1193Log,
-	EIP1193Provider,
-	EIP1193Transaction,
+	EIP1193ProviderWithoutEvents,
 	EIP1193TransactionReceipt,
 } from 'eip-1193';
+import {GenericABI} from '../types';
 
-export type ExtendedEIP1193Provider = EIP1193Provider &
+export type ExtendedEIP1193Provider = EIP1193ProviderWithoutEvents &
 	Partial<{
 		request(args: {method: 'eth_batch'; params: EIP1193GenericRequest[]}): Promise<unknown[]>;
 	}>;
@@ -119,7 +119,7 @@ export class LogFetcher {
 	protected config: InternalLogFetcherConfig;
 	protected numBlocksToFetch: number;
 	constructor(
-		protected provider: EIP1193Provider,
+		protected provider: EIP1193ProviderWithoutEvents,
 		protected contractAddresses: EIP1193Account[] | null,
 		protected eventNameTopics: DATA[] | null,
 		config: LogFetcherConfig = {}
@@ -220,8 +220,8 @@ export class LogFetcher {
 export class LogEventFetcher extends LogFetcher {
 	protected contracts: {address: string; interface: Interface}[] | Interface;
 	constructor(
-		provider: EIP1193Provider,
-		contractsData: {address: string; eventsABI: any[]}[] | {eventsABI: any[]},
+		provider: EIP1193ProviderWithoutEvents,
+		contractsData: {readonly address: string; readonly eventsABI: GenericABI}[] | {readonly eventsABI: GenericABI},
 		config: LogFetcherConfig = {}
 	) {
 		let contracts: {address: EIP1193Account; interface: Interface}[] | Interface;
@@ -317,18 +317,18 @@ export class LogEventFetcher extends LogFetcher {
 	}
 }
 
-export async function getBlockNumber(provider: EIP1193Provider): Promise<number> {
+export async function getBlockNumber(provider: EIP1193ProviderWithoutEvents): Promise<number> {
 	const blockAsHexString = await provider.request({method: 'eth_blockNumber'});
 	return parseInt(blockAsHexString.slice(2), 16);
 }
 
-export async function getChainId(provider: EIP1193Provider): Promise<string> {
+export async function getChainId(provider: EIP1193ProviderWithoutEvents): Promise<string> {
 	const blockAsHexString = await provider.request({method: 'eth_chainId'});
 	return parseInt(blockAsHexString.slice(2), 16).toString();
 }
 
 // NOTE: only interested in the timestamp for now
-export async function getBlock(provider: EIP1193Provider, hash: DATA): Promise<{timestamp: number}> {
+export async function getBlock(provider: EIP1193ProviderWithoutEvents, hash: DATA): Promise<{timestamp: number}> {
 	const blockWithHexStringFields = await provider.request({method: 'eth_getBlockByHash', params: [hash, false]});
 	return {
 		timestamp: parseInt(blockWithHexStringFields.timestamp.slice(2), 16),
@@ -336,7 +336,10 @@ export async function getBlock(provider: EIP1193Provider, hash: DATA): Promise<{
 }
 
 // NOTE: only interested in the timestamp for now
-export async function getBlocks(provider: EIP1193Provider, hashes: string[]): Promise<{timestamp: number}[]> {
+export async function getBlocks(
+	provider: EIP1193ProviderWithoutEvents,
+	hashes: string[]
+): Promise<{timestamp: number}[]> {
 	const requests: EIP1193GenericRequest[] = [];
 	for (const hash of hashes) {
 		requests.push({
@@ -354,7 +357,10 @@ export async function getBlocks(provider: EIP1193Provider, hashes: string[]): Pr
 	}));
 }
 
-export async function getTransactionReceipt(provider: EIP1193Provider, hash: DATA): Promise<TransactionData> {
+export async function getTransactionReceipt(
+	provider: EIP1193ProviderWithoutEvents,
+	hash: DATA
+): Promise<TransactionData> {
 	const transactionReceiptWithHexStringFields = await provider.request({
 		method: 'eth_getTransactionReceipt',
 		params: [hash],
@@ -380,7 +386,10 @@ export async function getTransactionReceipt(provider: EIP1193Provider, hash: DAT
 	};
 }
 
-export async function getTransactionReceipts(provider: EIP1193Provider, hashes: string[]): Promise<TransactionData[]> {
+export async function getTransactionReceipts(
+	provider: EIP1193ProviderWithoutEvents,
+	hashes: string[]
+): Promise<TransactionData[]> {
 	const requests: EIP1193GenericRequest[] = [];
 	for (const hash of hashes) {
 		requests.push({
@@ -415,7 +424,7 @@ export async function getTransactionReceipts(provider: EIP1193Provider, hashes: 
 }
 
 export async function getLogs(
-	provider: EIP1193Provider,
+	provider: EIP1193ProviderWithoutEvents,
 	contractAddresses: EIP1193Account[] | null,
 	eventNameTopics: DATA[] | null,
 	options: {fromBlock: number; toBlock: number}
@@ -493,7 +502,10 @@ export function getmMulti165CallData(contractAddresses: string[]): {
 	return {to: '0x9f83e74173A34d59D0DFa951AE22336b835AB196', data};
 }
 
-export async function multi165(provider: EIP1193Provider, contractAddresses: string[]): Promise<boolean[]> {
+export async function multi165(
+	provider: EIP1193ProviderWithoutEvents,
+	contractAddresses: string[]
+): Promise<boolean[]> {
 	const callData = getmMulti165CallData(contractAddresses);
 	// TODO specify blockHash for event post the deployment of Multi165 ?
 	const response = await provider.request({
@@ -504,7 +516,7 @@ export async function multi165(provider: EIP1193Provider, contractAddresses: str
 	return result;
 }
 
-export async function splitCallAndJoin(provider: EIP1193Provider, contractAddresses: string[]) {
+export async function splitCallAndJoin(provider: EIP1193ProviderWithoutEvents, contractAddresses: string[]) {
 	let result: boolean[] = [];
 	const len = contractAddresses.length;
 	let start = 0;
@@ -519,7 +531,7 @@ export async function splitCallAndJoin(provider: EIP1193Provider, contractAddres
 }
 
 export function createER721Filter(
-	provider: EIP1193Provider,
+	provider: EIP1193ProviderWithoutEvents,
 	options?: {skipUnParsedEvents?: boolean}
 ): (eventsFetched: LogEvent[]) => Promise<LogEvent[]> {
 	const erc721Contracts: {[address: string]: boolean} = {};
@@ -581,19 +593,19 @@ const tokenURIInterface = new InterfaceWithLowerCaseAddresses([
 ]);
 
 export async function tokenURI(
-	provider: EIP1193Provider,
+	provider: EIP1193ProviderWithoutEvents,
 	contract: EIP1193Account,
 	tokenID: string,
 	blockHash: string
 ): Promise<string> {
 	const data = tokenURIInterface.encodeFunctionData('tokenURI', [tokenID]) as DATA;
-	const response = await provider.request({method: 'eth_call', params: [{to: contract, data}, {blockHash}]});
+	const response = await provider.request({method: 'eth_call', params: [{to: contract, data}, blockHash as DATA]});
 	const result: string = tokenURIInterface.decodeFunctionResult('tokenURI', response)[0];
 	return result;
 }
 
 export function createER721TokenURIFetcher(
-	provider: EIP1193Provider
+	provider: EIP1193ProviderWithoutEvents
 ): (event: LogEvent) => Promise<JSONType | undefined> {
 	return async (event: LogEvent): Promise<JSONType | undefined> => {
 		if (

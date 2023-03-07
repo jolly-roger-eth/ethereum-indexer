@@ -19,6 +19,7 @@ import {logs} from 'named-logs';
 // TODO We should move EventCache, PouchDatabase and QueriableEventProcessor in a separate low-level module so server does not need to import 'ethereum-indexer-db-processors';
 import {EventCache, PouchDatabase, QueriableEventProcessor, Query} from 'ethereum-indexer-db-processors';
 import {adminPage} from '../pages';
+import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -149,7 +150,7 @@ export class SimpleServer {
 			if (processorModule.contractsDataPerChain) {
 				let chainIDAsHex;
 				try {
-					chainIDAsHex = await eip1193Provider.request<string>({method: 'eth_chainId', params: []});
+					chainIDAsHex = await eip1193Provider.request<string>({method: 'eth_chainId'});
 				} catch (err) {
 					console.error(`could not fetch chainID`);
 					throw err;
@@ -190,9 +191,14 @@ export class SimpleServer {
 			rootProcessor = new ProcessorFilesystemCache(rootProcessor, this.config.folder);
 		}
 
-		this.indexer = new EthereumIndexer(eip1193Provider, rootProcessor, this.contractsData, {
-			providerSupportsETHBatch: true,
-		});
+		this.indexer = new EthereumIndexer(
+			eip1193Provider as unknown as EIP1193ProviderWithoutEvents,
+			rootProcessor,
+			this.contractsData,
+			{
+				providerSupportsETHBatch: true,
+			}
+		);
 
 		namedLogger.info(`LOADING....`);
 		this.lastSync = await this.indexer.load();

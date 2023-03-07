@@ -37,13 +37,14 @@ export type EventWithId<
 
 export type BlockEvents = {hash: string; number: number; events: LogEvent[]};
 
+export type GenericABI = readonly any[];
 export type ContractData = {
-	eventsABI: any[];
-	address: string;
-	startBlock?: number;
+	readonly eventsABI: GenericABI;
+	readonly address: string;
+	readonly startBlock?: number;
 };
 
-export type AllContractData = {eventsABI: any[]; startBlock?: number};
+export type AllContractData = {readonly eventsABI: GenericABI; readonly startBlock?: number};
 
 export type ContractsInfo = ContractData[] | AllContractData;
 
