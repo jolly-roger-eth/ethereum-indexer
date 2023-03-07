@@ -85,6 +85,9 @@ export type LogFetcherConfig = {
 	numRetry?: number;
 };
 
+export type LogsResult = {logs: EIP1193Log[]; toBlockUsed: number};
+export type LogsPromise = Promise<LogsResult> & {stopRetrying(): void};
+
 type InternalLogFetcherConfig = {
 	numBlocksToFetchAtStart: number;
 	maxBlocksPerFetch: number;
@@ -134,74 +137,83 @@ export class LogFetcher {
 		this.numBlocksToFetch = Math.min(this.config.numBlocksToFetchAtStart, this.config.maxBlocksPerFetch);
 	}
 
-	async getLogs(options: {
-		fromBlock: number;
-		toBlock: number;
-		retry?: number;
-	}): Promise<{logs: EIP1193Log[]; toBlockUsed: number}> {
-		let logs: EIP1193Log[];
-
-		const fromBlock = options.fromBlock;
-		let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
-
-		const retry = options.retry !== undefined ? options.retry : this.config.numRetry;
-
-		try {
-			logs = await getLogs(this.provider, this.contractAddresses, this.eventNameTopics, {
-				fromBlock,
-				toBlock,
-			});
-		} catch (err: any) {
-			if (retry <= 0) {
-				throw err;
+	getLogs(options: {fromBlock: number; toBlock: number; retry?: number}): LogsPromise {
+		let retry = options.retry !== undefined ? options.retry : this.config.numRetry;
+		let _stopRetrying: () => void | undefined;
+		const stopRetrying = () => {
+			if (_stopRetrying) {
+				_stopRetrying();
 			}
-			let numBlocksToFetchThisTime = this.numBlocksToFetch;
-			// ----------------------------------------------------------------------
-			// compute the new number of block to fetch this time:
-			// ----------------------------------------------------------------------
-			const toBlockClue = getNewToBlockFromError(err);
-			if (toBlockClue) {
-				const totalNumOfBlocksToFetch = toBlockClue - fromBlock + 1;
-				if (totalNumOfBlocksToFetch > 1) {
-					numBlocksToFetchThisTime = Math.floor((totalNumOfBlocksToFetch * this.config.percentageToReach) / 100);
+			retry = 0;
+		};
+		const promise = new Promise<LogsResult>(async (resolve, reject) => {
+			let logs: EIP1193Log[];
+
+			const fromBlock = options.fromBlock;
+			let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
+
+			try {
+				logs = await getLogs(this.provider, this.contractAddresses, this.eventNameTopics, {
+					fromBlock,
+					toBlock,
+				});
+			} catch (err: any) {
+				if (retry <= 0) {
+					return reject(err);
 				}
-			} else {
-				const totalNumOfBlocksThatWasFetched = toBlock - fromBlock;
-				if (totalNumOfBlocksThatWasFetched > 1) {
-					numBlocksToFetchThisTime = Math.floor(totalNumOfBlocksThatWasFetched / 2);
+				let numBlocksToFetchThisTime = this.numBlocksToFetch;
+				// ----------------------------------------------------------------------
+				// compute the new number of block to fetch this time:
+				// ----------------------------------------------------------------------
+				const toBlockClue = getNewToBlockFromError(err);
+				if (toBlockClue) {
+					const totalNumOfBlocksToFetch = toBlockClue - fromBlock + 1;
+					if (totalNumOfBlocksToFetch > 1) {
+						numBlocksToFetchThisTime = Math.floor((totalNumOfBlocksToFetch * this.config.percentageToReach) / 100);
+					}
 				} else {
-					numBlocksToFetchThisTime = 1;
+					const totalNumOfBlocksThatWasFetched = toBlock - fromBlock;
+					if (totalNumOfBlocksThatWasFetched > 1) {
+						numBlocksToFetchThisTime = Math.floor(totalNumOfBlocksThatWasFetched / 2);
+					} else {
+						numBlocksToFetchThisTime = 1;
+					}
 				}
+				// ----------------------------------------------------------------------
+
+				this.numBlocksToFetch = numBlocksToFetchThisTime;
+
+				toBlock = fromBlock + this.numBlocksToFetch - 1;
+				const retryPromise = this.getLogs({
+					fromBlock,
+					toBlock,
+					retry: retry - 1,
+				});
+				_stopRetrying = retryPromise.stopRetrying;
+				const result = await retryPromise;
+				logs = result.logs;
+				toBlock = result.toBlockUsed;
 			}
-			// ----------------------------------------------------------------------
 
-			this.numBlocksToFetch = numBlocksToFetchThisTime;
-
-			toBlock = fromBlock + this.numBlocksToFetch - 1;
-			const result = await this.getLogs({
-				fromBlock,
-				toBlock,
-				retry: retry - 1,
-			});
-			logs = result.logs;
-			toBlock = result.toBlockUsed;
-		}
-
-		const targetNumberOfLog = Math.max(
-			1,
-			Math.floor((this.config.maxEventsPerFetch * this.config.percentageToReach) / 100)
-		);
-		const totalNumOfBlocksThatWasFetched = toBlock - fromBlock + 1;
-		if (logs.length === 0) {
-			this.numBlocksToFetch = this.config.maxBlocksPerFetch;
-		} else {
-			this.numBlocksToFetch = Math.min(
-				this.config.maxBlocksPerFetch,
-				Math.max(1, Math.floor((targetNumberOfLog * totalNumOfBlocksThatWasFetched) / logs.length))
+			const targetNumberOfLog = Math.max(
+				1,
+				Math.floor((this.config.maxEventsPerFetch * this.config.percentageToReach) / 100)
 			);
-		}
+			const totalNumOfBlocksThatWasFetched = toBlock - fromBlock + 1;
+			if (logs.length === 0) {
+				this.numBlocksToFetch = this.config.maxBlocksPerFetch;
+			} else {
+				this.numBlocksToFetch = Math.min(
+					this.config.maxBlocksPerFetch,
+					Math.max(1, Math.floor((targetNumberOfLog * totalNumOfBlocksThatWasFetched) / logs.length))
+				);
+			}
 
-		return {logs, toBlockUsed: toBlock};
+			resolve({logs, toBlockUsed: toBlock});
+		});
+
+		(promise as LogsPromise).stopRetrying = stopRetrying;
+		return promise as LogsPromise;
 	}
 }
 
@@ -308,6 +320,11 @@ export class LogEventFetcher extends LogFetcher {
 export async function getBlockNumber(provider: EIP1193Provider): Promise<number> {
 	const blockAsHexString = await provider.request({method: 'eth_blockNumber'});
 	return parseInt(blockAsHexString.slice(2), 16);
+}
+
+export async function getChainId(provider: EIP1193Provider): Promise<string> {
+	const blockAsHexString = await provider.request({method: 'eth_chainId'});
+	return parseInt(blockAsHexString.slice(2), 16).toString();
 }
 
 // NOTE: only interested in the timestamp for now

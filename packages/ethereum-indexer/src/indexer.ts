@@ -3,6 +3,7 @@ import {
 	getBlock,
 	getBlockNumber,
 	getBlocks,
+	getChainId,
 	getTransactionReceipt,
 	getTransactionReceipts,
 	LogEvent,
@@ -132,6 +133,27 @@ export class EthereumIndexer {
 			this._loading = this.promiseToLoad();
 		}
 		return this._loading;
+	}
+
+	protected invalidatePendingRequest: boolean;
+	// This is to be called when the underling network change.
+	// This is especially important in browsers
+	// where user amd app can request the provider to point to a new network
+	// And when this happen, the provider instance remain the same.
+	// So if no care is taken a request could be executed in the wrong network context
+	//
+	// TODO if option is enabled => do it yourself?
+	// FORNOW It is the responsibility of ethereum-indexer-browser to detect such change and call this method
+	//
+	// On the other hand, the Indexer will take care of cases where the network is syncing or its syncing status go backward
+	// TODO wait when the network is back on ?
+	invalidate() {
+		this.invalidatePendingRequest = true;
+		// TODO
+		// if (this.pendingLogRequest) {
+		// 	// ensure the log that fail will not retry on the new chain
+		// 	this.pendingLogRequest.stopRetrying();
+		// }
 	}
 
 	async reset() {
@@ -474,6 +496,8 @@ export class EthereumIndexer {
 					reject('aborted');
 					return;
 				}
+
+				// TODO const chainId = await getChainId(this.provider);
 
 				namedLogger.info(`PROCESSING`);
 				await this.processor.process(eventStream, newLastSync);
