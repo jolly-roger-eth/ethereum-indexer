@@ -1,5 +1,11 @@
 # ethereum-indexer-json-processor
 
+## 0.4.2
+
+### Patch Changes
+
+- EventProcessorOnJSON export state
+
 ## 0.4.1
 
 ### Patch Changes
