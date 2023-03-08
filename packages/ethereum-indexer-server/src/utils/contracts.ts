@@ -38,10 +38,13 @@ export function loadContracts(folder: string): ContractData[] {
 					!contractsData[added.index].startBlock ||
 					contractsData[added.index].startBlock > deployment.receipt?.blockNumber
 				) {
-					contractsData[added.index].startBlock = deployment.receipt?.blockNumber;
+					(contractsData[added.index] as any).startBlock = deployment.receipt?.blockNumber;
 				}
 			}
-			contractsData[added.index].eventsABI = mergeABIs(contractsData[added.index].eventsABI, deployment.abi);
+			(contractsData[added.index] as any).eventsABI = mergeABIs(
+				(contractsData[added.index] as any).eventsABI,
+				deployment.abi
+			);
 		} else {
 			contractsData.push({
 				address: deployment.address,
