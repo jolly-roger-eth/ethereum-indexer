@@ -9,7 +9,7 @@ import {
 	EIP1193ProviderWithoutEvents,
 	EIP1193TransactionReceipt,
 } from 'eip-1193';
-import {GenericABI} from '../types';
+import {AllContractData, GenericABI} from '../types';
 
 export type ExtendedEIP1193Provider = EIP1193ProviderWithoutEvents &
 	Partial<{
@@ -228,7 +228,7 @@ export class LogEventFetcher extends LogFetcher {
 	protected contracts: {address: string; interface: Interface}[] | Interface;
 	constructor(
 		provider: EIP1193ProviderWithoutEvents,
-		contractsData: {readonly address: string; readonly eventsABI: GenericABI}[] | {readonly eventsABI: GenericABI},
+		contractsData: readonly {readonly address: string; readonly abi: GenericABI}[] | {readonly abi: GenericABI},
 		config: LogFetcherConfig = {}
 	) {
 		let contracts: {address: EIP1193Account; interface: Interface}[] | Interface;
@@ -237,12 +237,12 @@ export class LogEventFetcher extends LogFetcher {
 		if (Array.isArray(contractsData)) {
 			contracts = contractsData.map((v) => ({
 				address: v.address as EIP1193Account,
-				interface: new InterfaceWithLowerCaseAddresses(v.eventsABI),
+				interface: new InterfaceWithLowerCaseAddresses(v.abi),
 			}));
 			contractAddresses = contracts.map((v) => v.address);
 			eventABIS = contracts.map((v) => v.interface);
 		} else {
-			contracts = new InterfaceWithLowerCaseAddresses(contractsData.eventsABI);
+			contracts = new InterfaceWithLowerCaseAddresses((contractsData as {readonly abi: GenericABI}).abi);
 			eventABIS = [contracts];
 		}
 

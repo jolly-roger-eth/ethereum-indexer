@@ -3,7 +3,7 @@ import {JSONObject, JSONType, LogEvent, LogFetcherConfig} from './engine/ethereu
 export type {LogEvent, LogEventFetcher, LogFetcher, LogFetcherConfig} from './engine/ethereum';
 
 export type EventProcessor = {
-	load: (contractsData: ContractsInfo) => Promise<LastSync>;
+	load: (source: IndexingSource) => Promise<LastSync>;
 	process: (eventStream: EventWithId[], lastSync: LastSync) => Promise<void>;
 	reset: () => Promise<void>;
 	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
@@ -39,14 +39,18 @@ export type BlockEvents = {hash: string; number: number; events: LogEvent[]};
 
 export type GenericABI = readonly any[];
 export type ContractData = {
-	readonly eventsABI: GenericABI;
+	readonly abi: GenericABI;
 	readonly address: string;
+	readonly startBlock?: number;
+	readonly history?: readonly {readonly abi: GenericABI; readonly startBlock?: number}[];
+};
+
+export type AllContractData = {
+	readonly abi: GenericABI;
 	readonly startBlock?: number;
 };
 
-export type AllContractData = {readonly eventsABI: GenericABI; readonly startBlock?: number};
-
-export type ContractsInfo = ContractData[] | AllContractData;
+export type IndexingSource = {readonly contracts: readonly ContractData[] | AllContractData; readonly chainId: string};
 
 export type ExistingStreamFecther = (nextStreamID: number) => Promise<{lastSync: LastSync; eventStream: EventWithId[]}>;
 export type StreamSaver = (stream: {lastSync: LastSync; eventStream: EventWithId[]}) => Promise<void>;

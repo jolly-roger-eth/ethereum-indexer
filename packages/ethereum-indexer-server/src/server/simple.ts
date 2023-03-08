@@ -10,7 +10,14 @@ import logger from 'koa-logger';
 import json from 'koa-json';
 import bodyParser from 'koa-bodyparser';
 
-import {ContractsInfo, EthereumIndexer, EventProcessor, LastSync} from 'ethereum-indexer';
+import {
+	IndexingSource,
+	EthereumIndexer,
+	EventProcessor,
+	LastSync,
+	AllContractData,
+	ContractData,
+} from 'ethereum-indexer';
 import {JSONRPCProvider} from 'ethereum-indexer-utils';
 import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
 
@@ -48,7 +55,7 @@ export type UserConfig = {
 	nodeURL: string;
 	folder: string;
 	processorPath: string;
-	contractsData?: ContractsInfo;
+	source?: IndexingSource;
 	useCache?: boolean;
 	disableSecurity?: boolean;
 	useFSCache?: boolean;
@@ -105,11 +112,11 @@ export class SimpleServer {
 	protected indexing: boolean = false;
 	protected indexingTimeout: NodeJS.Timeout | undefined;
 
-	protected contractsData: ContractsInfo;
+	protected source: IndexingSource;
 
 	constructor(config: UserConfig) {
 		this.config = Object.assign({useCache: false, disableSecurity: false, useFSCache: false}, config);
-		this.contractsData = config.contractsData;
+		this.source = config.source;
 	}
 
 	async start(config: {autoIndex: boolean}) {
@@ -145,8 +152,10 @@ export class SimpleServer {
 
 		const eip1193Provider = new JSONRPCProvider(this.config.nodeURL);
 
-		if (!this.contractsData) {
+		let contractsData: AllContractData | ContractData[];
+		if (!this.source) {
 			let chainIDAsDecimal: string | undefined;
+
 			if (processorModule.contractsDataPerChain) {
 				let chainIDAsHex;
 				try {
@@ -157,13 +166,14 @@ export class SimpleServer {
 				}
 				chainIDAsDecimal = '' + parseInt(chainIDAsHex.slice(2), 16);
 				namedLogger.info({chainIDAsHex, chainIDAsDecimal});
-				this.contractsData = processorModule.contractsDataPerChain[chainIDAsDecimal];
+				contractsData = processorModule.contractsDataPerChain[chainIDAsDecimal];
 			}
-			if (!this.contractsData) {
-				this.contractsData = processorModule.contractsData;
+			if (contractsData) {
+				contractsData = processorModule.contractsData;
+				// TODO chainID should be specified or it should be of type AllContractsData
 			}
 
-			if (processorModule.contractsDataPerChain && !this.contractsData) {
+			if (processorModule.contractsDataPerChain && !contractsData) {
 				console.error(
 					`field "contractsDataPerChain" found but no contracts data found for chainID: ${chainIDAsDecimal}`
 				);
@@ -172,9 +182,14 @@ export class SimpleServer {
 			// if (!this.contractsData && processorModule.getContractData) {
 			//   this.contractsData = await processorModule.getContractData();
 			// }
+
+			this.source = {
+				chainId: chainIDAsDecimal,
+				contracts: contractsData,
+			};
 		}
 
-		if (!this.contractsData) {
+		if (!this.source || !this.source.contracts) {
 			throw new Error(
 				`contracts data not found in the processor module, it needs to be provided either as exported field named "contractsData" or as field "contractsDataPerChain" indexed by chainID`
 			);
@@ -194,7 +209,7 @@ export class SimpleServer {
 		this.indexer = new EthereumIndexer(
 			eip1193Provider as unknown as EIP1193ProviderWithoutEvents,
 			rootProcessor,
-			this.contractsData,
+			this.source,
 			{
 				providerSupportsETHBatch: true,
 			}

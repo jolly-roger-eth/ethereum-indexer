@@ -1,4 +1,4 @@
-import {ContractsInfo, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, FromDB, JSONObject, PutAndGetDatabase, Query, Result} from './Database';
@@ -39,8 +39,8 @@ export class EventProcessorOnDatabase implements QueriableEventProcessor {
 		await this.init();
 	}
 
-	async load(contractsData: ContractsInfo): Promise<LastSync> {
-		// TODO check if contractsData matches old sync
+	async load(source: IndexingSource): Promise<LastSync> {
+		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
 			return lastSync as unknown as LastSync;

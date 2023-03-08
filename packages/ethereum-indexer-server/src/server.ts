@@ -1,4 +1,4 @@
-import {ContractsInfo} from 'ethereum-indexer';
+import {IndexingSource} from 'ethereum-indexer';
 import path from 'path';
 import fs from 'fs';
 import {SimpleServer} from './server/simple';
@@ -14,9 +14,9 @@ export function runServer(args: {
 	disableSecurity: boolean;
 	useFSCache: boolean;
 }) {
-	let contractsData: ContractsInfo | undefined;
+	let source: IndexingSource | undefined;
 	if (args.deployments) {
-		contractsData = loadContracts(args.deployments);
+		source = loadContracts(args.deployments);
 	}
 
 	const folder = args.folder ? args.folder : 'ethereum-indexer-data';
@@ -29,7 +29,7 @@ export function runServer(args: {
 	const processorPath = args.processor.startsWith('.') ? path.resolve(args.processor) : args.processor;
 
 	const server = new SimpleServer({
-		contractsData,
+		source,
 		folder,
 		processorPath,
 		useCache: !args.disableCache,

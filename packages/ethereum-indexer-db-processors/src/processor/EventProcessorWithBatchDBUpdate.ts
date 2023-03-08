@@ -1,4 +1,4 @@
-import {ContractsInfo, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {JSONObject, Database, FromDB, Query, Result} from './Database';
 import {RevertableDatabase} from './RevertableDatabase';
@@ -69,8 +69,8 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 		await this.init();
 	}
 
-	async load(contractsData: ContractsInfo): Promise<LastSync> {
-		// TODO check if contractsData matches old sync
+	async load(source: IndexingSource): Promise<LastSync> {
+		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
 			return lastSync as unknown as LastSync;

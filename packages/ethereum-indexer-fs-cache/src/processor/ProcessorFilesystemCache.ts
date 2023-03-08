@@ -1,4 +1,4 @@
-import {ContractsInfo, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
 import fs from 'fs';
 import path from 'path';
 import {logs} from 'named-logs';
@@ -29,7 +29,7 @@ export class ProcessorFilesystemCache implements EventProcessor {
 		}
 	}
 
-	async load(contractsData: ContractsInfo): Promise<LastSync> {
+	async load(source: IndexingSource): Promise<LastSync> {
 		let lastSync: LastSync;
 		try {
 			const content = fs.readFileSync(this.folder + `/lastSync.json`, 'utf8');
@@ -43,8 +43,8 @@ export class ProcessorFilesystemCache implements EventProcessor {
 			};
 		}
 
-		// TODO check if contractsData matches old sync
-		let lastSyncFromProcessor: LastSync = await this.processor.load(contractsData);
+		// TODO check if source matches old sync
+		let lastSyncFromProcessor: LastSync = await this.processor.load(source);
 
 		const files = fs.readdirSync(this.folder);
 		namedLogger.info(`loading ${files} files of events...`);

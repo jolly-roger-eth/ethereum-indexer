@@ -1,4 +1,4 @@
-import type {ContractData} from 'ethereum-indexer';
+import type {ContractData, IndexingSource} from 'ethereum-indexer';
 import fs from 'fs';
 import path from 'path';
 
@@ -18,11 +18,16 @@ function mergeABIs(abi1: any[], abi2: any[]): any[] {
 	return newABI;
 }
 
-export function loadContracts(folder: string): ContractData[] {
+export function loadContracts(folder: string): IndexingSource {
 	const contractsAdded: {[address: string]: {index: number}} = {};
 	const contractsData: ContractData[] = [];
 	const files = fs.readdirSync(folder);
+	let chainId = undefined;
 	for (const file of files) {
+		if (file === '.chainId') {
+			chainId = fs.readFileSync(path.join(folder, file), 'utf8');
+			continue;
+		}
 		if (!file.endsWith('.json')) {
 			continue;
 		}
@@ -41,18 +46,22 @@ export function loadContracts(folder: string): ContractData[] {
 					(contractsData[added.index] as any).startBlock = deployment.receipt?.blockNumber;
 				}
 			}
-			(contractsData[added.index] as any).eventsABI = mergeABIs(
-				(contractsData[added.index] as any).eventsABI,
-				deployment.abi
-			);
+			(contractsData[added.index] as any).abi = mergeABIs((contractsData[added.index] as any).abi, deployment.abi);
 		} else {
 			contractsData.push({
 				address: deployment.address,
-				eventsABI: deployment.abi,
+				abi: deployment.abi,
 				startBlock: deployment.receipt?.blockNumber,
 			});
 			contractsAdded[deployment.address] = {index: contractsData.length - 1};
 		}
 	}
-	return contractsData;
+
+	if (!chainId || isNaN(chainId)) {
+		throw new Error(`invalid chainId: ${chainId}`);
+	}
+	return {
+		chainId,
+		contracts: contractsData,
+	};
 }

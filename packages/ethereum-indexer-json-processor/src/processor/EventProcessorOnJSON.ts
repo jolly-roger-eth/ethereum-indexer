@@ -1,4 +1,4 @@
-import {ContractsInfo, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
 import {JSObject} from './types';
@@ -58,7 +58,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 		await this.singleEventProcessor.setup(this._json.data);
 	}
 
-	async load(contractsData: ContractsInfo): Promise<LastSync> {
+	async load(source: IndexingSource): Promise<LastSync> {
 		if (this.existingStateFecther) {
 			namedLogger.info(`fetching state...`);
 			const {lastSync: lastSyncFromExistingState, data, history} = await this.existingStateFecther();

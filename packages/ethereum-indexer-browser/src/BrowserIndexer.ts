@@ -1,4 +1,10 @@
-import {EthereumIndexer, type EventProcessor, type LastSync, type ContractsInfo, IndexerConfig} from 'ethereum-indexer';
+import {
+	EthereumIndexer,
+	type EventProcessor,
+	type LastSync,
+	type IndexingSource,
+	IndexerConfig,
+} from 'ethereum-indexer';
 import {EIP1193Provider} from 'eip-1193';
 
 import {writable, type Writable} from 'sveltore';
@@ -52,7 +58,7 @@ export class BrowserIndexer {
 	protected store: Writable<BrowserIndexerState>;
 
 	protected processor: EventProcessor | undefined;
-	protected contractsInfo: ContractsInfo | undefined;
+	protected source: IndexingSource | undefined;
 	protected eip1193Provider: EIP1193Provider | undefined;
 	protected indexerConfig: IndexerConfig | undefined;
 
@@ -69,12 +75,12 @@ export class BrowserIndexer {
 
 	init(
 		processor: EventProcessor,
-		contractsInfo: ContractsInfo,
+		source: IndexingSource,
 		eip1193Provider: EIP1193Provider,
 		indexerConfig: IndexerConfig
 	) {
 		this.processor = processor;
-		this.contractsInfo = contractsInfo;
+		this.source = source;
 		this.eip1193Provider = eip1193Provider;
 		this.indexerConfig = indexerConfig;
 	}
@@ -154,13 +160,13 @@ export class BrowserIndexer {
 		if (!this.processor) {
 			throw new Error(`no processor provided, did you call init ?`);
 		}
-		if (!this.contractsInfo) {
-			throw new Error(`no contracts info provided, did you call init ?`);
+		if (!this.source) {
+			throw new Error(`no indexing source provided, did you call init ?`);
 		}
 		if (!this.indexerConfig) {
 			throw new Error(`no config for indexer provided, did you call init ?`);
 		}
-		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.contractsInfo, this.indexerConfig);
+		this.indexer = new EthereumIndexer(this.eip1193Provider, this.processor, this.source, this.indexerConfig);
 		this.indexer.onLoad = async (loadingState) => {
 			if (loadingState === 'Loading') {
 				namedLogger.info('indexer Loading');

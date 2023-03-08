@@ -17,7 +17,7 @@ import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {logs} from 'named-logs';
 import type {
 	BlockEvents,
-	ContractsInfo,
+	IndexingSource,
 	EventBlock,
 	EventProcessor,
 	EventWithId,
@@ -26,10 +26,11 @@ import type {
 	IndexerConfig,
 	LastSync,
 } from './types';
+import {AllContractData} from '../dist';
 const namedLogger = logs('ethereum-indexer');
 
 // TODO document public var
-// TODO document contractsInfo type, including startBlock (refers to hardhat-deploy ?)
+// TODO document source type, including startBlock (refers to hardhat-deploy ?)
 // TODO allow finality configuration separated from reorg history length (to allow processing of abi changes for longer time than finality)
 
 export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
@@ -68,11 +69,11 @@ export class EthereumIndexer {
 	constructor(
 		protected provider: EIP1193ProviderWithoutEvents,
 		protected processor: EventProcessor,
-		protected contractsData: ContractsInfo,
+		protected source: IndexingSource,
 		config: IndexerConfig = {}
 	) {
 		this.finality = config.finality || 12;
-		this.logEventFetcher = new LogEventFetcher(provider, contractsData, config);
+		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config);
 		this.alwaysFetchTimestamps = config.alwaysFetchTimestamps ? true : false;
 		this.alwaysFetchTransactions = config.alwaysFetchTransactions ? true : false;
 		this.fetchExistingStream = config.fetchExistingStream;
@@ -81,8 +82,8 @@ export class EthereumIndexer {
 		this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
 
 		this.defaultFromBlock = 0;
-		if (Array.isArray(this.contractsData)) {
-			for (const contractData of this.contractsData) {
+		if (Array.isArray(this.source.contracts)) {
+			for (const contractData of this.source.contracts) {
 				if (contractData.startBlock) {
 					if (this.defaultFromBlock === 0) {
 						this.defaultFromBlock = contractData.startBlock;
@@ -92,7 +93,7 @@ export class EthereumIndexer {
 				}
 			}
 		} else {
-			this.defaultFromBlock = this.contractsData.startBlock || 0;
+			this.defaultFromBlock = (this.source.contracts as unknown as AllContractData).startBlock || 0;
 		}
 	}
 
@@ -200,10 +201,17 @@ export class EthereumIndexer {
 
 	protected async promiseToLoad(): Promise<LastSync> {
 		try {
+			const chainId = await this.provider.request({method: 'eth_chainId'});
+			if (parseInt(chainId.slice(2), 16).toString() !== this.source.chainId) {
+				throw new Error(
+					`Connected to a different chain (chainId : ${chainId}). Expected chainId === ${this.source.chainId}`
+				);
+			}
+
 			let lastSync = this.lastSync;
 			if (!lastSync) {
 				await this.signal('Loading');
-				lastSync = await this.processor.load(this.contractsData);
+				lastSync = await this.processor.load(this.source);
 			}
 
 			if (this.fetchExistingStream) {

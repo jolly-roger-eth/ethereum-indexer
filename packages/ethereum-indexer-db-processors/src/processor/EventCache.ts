@@ -1,4 +1,4 @@
-import {ContractsInfo, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {Database, FromDB, JSONObject, Query, Result} from './Database';
 const console = logs('EventCache');
@@ -30,8 +30,8 @@ export class EventCache implements EventProcessor {
 		await this.init();
 	}
 
-	async load(contractsData: ContractsInfo): Promise<LastSync> {
-		// TODO check if contractsData matches old sync
+	async load(source: IndexingSource): Promise<LastSync> {
+		// TODO check if source matches old sync
 		try {
 			const lastSync = await this.eventDB.get<LastSync & {batch: number}>('lastSync');
 			this.batchCounter = lastSync.batch;
