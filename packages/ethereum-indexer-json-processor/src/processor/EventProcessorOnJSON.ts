@@ -18,8 +18,8 @@ export interface SingleEventJSONProcessor<T extends JSObject> {
 	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
 }
 
-export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor {
-	public readonly json: T;
+export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor<T> {
+	public readonly state: T;
 	protected _json: AllData<T>;
 	protected history: History;
 	protected existingStateFecther?: ExistingStateFecther<T>;
@@ -33,7 +33,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 			},
 		};
 		this.history = new History(this._json.history, 12); // TODO finality
-		this.json = proxifyJSON<T>(this._json.data, this.history);
+		this.state = proxifyJSON<T>(this._json.data, this.history);
 	}
 
 	setExistingStateFetcher(fetcher: ExistingStateFecther<T>) {
@@ -79,7 +79,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 		await this.singleEventProcessor.setup(this._json.data);
 
 		// TODO check if contractsData matches old sync
-		const lastSync = this.json.lastSync;
+		const lastSync = this.state.lastSync;
 		if (lastSync) {
 			return lastSync as unknown as LastSync;
 		} else {
@@ -93,7 +93,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 	}
 
 	private lastEventID: number;
-	async process(eventStream: EventWithId[], lastSync: LastSync): Promise<void> {
+	async process(eventStream: EventWithId[], lastSync: LastSync): Promise<T> {
 		// namedLogger.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 
 		try {
@@ -119,7 +119,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 						lastBlockHash = event.blockHash;
 					}
 
-					this.singleEventProcessor.processEvent(this.json, event);
+					this.singleEventProcessor.processEvent(this.state, event);
 					// namedLogger.info(`EventProcessorOnJSON DONE`);
 				}
 				this.lastEventID = event.streamID;
@@ -144,6 +144,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor 
 		} finally {
 			namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
 		}
+		return this.state;
 	}
 
 	shouldFetchTimestamp(event: LogEvent): boolean {
