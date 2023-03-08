@@ -235,10 +235,12 @@ export class EthereumIndexer {
 
 	protected async promiseToFeed(eventStream: EventWithId[], lastSyncFetched?: LastSync): Promise<LastSync> {
 		try {
-			if (!this.lastSync) {
-				namedLogger.info(`load lastSync...`);
-				await this.load();
-			}
+			// this create an infinite loop as load call promise
+			// TODO if we need to call promise first, we could add an option to load (and load will not use that option)
+			// if (!this.lastSync) {
+			// 	namedLogger.info(`load lastSync...`);
+			// 	await this.load();
+			// }
 			const lastSync: LastSync = this.lastSync || {
 				lastToBlock: 0,
 				latestBlock: 0,
