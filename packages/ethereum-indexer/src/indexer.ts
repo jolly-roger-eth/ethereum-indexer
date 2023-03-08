@@ -35,7 +35,7 @@ const namedLogger = logs('ethereum-indexer');
 
 export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
 
-export class EthereumIndexer {
+export class EthereumIndexer<T = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC VARIABLES
 	// ------------------------------------------------------------------------------------------------------------------
@@ -68,7 +68,7 @@ export class EthereumIndexer {
 
 	constructor(
 		protected provider: EIP1193ProviderWithoutEvents,
-		protected processor: EventProcessor,
+		protected processor: EventProcessor<T>,
 		protected source: IndexingSource,
 		config: IndexerConfig = {}
 	) {

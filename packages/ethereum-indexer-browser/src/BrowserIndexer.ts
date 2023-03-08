@@ -40,24 +40,26 @@ export type ExtendedLastSync = LastSync & {
 	totalPercentage: number;
 };
 
-export type BrowserIndexerState = {
+export type BrowserIndexerState<T = void> = {
 	lastSync?: ExtendedLastSync;
 	autoIndexing: boolean;
 	loading: boolean;
 	processingFetchedLogs: boolean;
 	fetchingLogs: boolean;
 	catchingUp: boolean;
+	error?: {message: string; code: number};
+	state?: T;
 };
 
-export class BrowserIndexer {
-	protected indexer: EthereumIndexer;
+export class BrowserIndexer<T = void> {
+	protected indexer: EthereumIndexer<T>;
 
 	protected indexingTimeout: number | undefined;
 
-	protected state: BrowserIndexerState;
-	protected store: Writable<BrowserIndexerState>;
+	protected state: BrowserIndexerState<T>;
+	protected store: Writable<BrowserIndexerState<T>>;
 
-	protected processor: EventProcessor | undefined;
+	protected processor: EventProcessor<T> | undefined;
 	protected source: IndexingSource | undefined;
 	protected eip1193Provider: EIP1193Provider | undefined;
 	protected indexerConfig: IndexerConfig | undefined;
@@ -69,12 +71,13 @@ export class BrowserIndexer {
 			catchingUp: false,
 			fetchingLogs: false,
 			processingFetchedLogs: false,
+			state: void 0,
 		};
 		this.store = writable(this.state);
 	}
 
 	init(
-		processor: EventProcessor,
+		processor: EventProcessor<T>,
 		source: IndexingSource,
 		eip1193Provider: EIP1193Provider,
 		indexerConfig: IndexerConfig
@@ -85,7 +88,7 @@ export class BrowserIndexer {
 		this.indexerConfig = indexerConfig;
 	}
 
-	private set(lastSync: LastSync) {
+	private set(lastSync: LastSync, state: T) {
 		const startingBlock = this.indexer.defaultFromBlock;
 		const latestBlock = lastSync.latestBlock;
 		const lastToBlock = lastSync.lastToBlock;
@@ -99,6 +102,7 @@ export class BrowserIndexer {
 		lastSyncObject.totalPercentage = Math.floor((lastToBlock * 1000000) / latestBlock) / 10000;
 
 		this.state.lastSync = lastSyncObject;
+		this.state.state = state;
 		this.store.set(this.state);
 	}
 
@@ -109,7 +113,7 @@ export class BrowserIndexer {
 			namedLogger.info('...setup done');
 		}
 		const lastSync = await this.indexer.indexMore();
-		this.set(lastSync);
+		this.set(lastSync, this.processor.state);
 		return lastSync;
 	}
 
@@ -117,7 +121,7 @@ export class BrowserIndexer {
 		let lastSync: LastSync | undefined;
 		if (!this.indexer) {
 			lastSync = await this.setupIndexing();
-			this.set(lastSync);
+			this.set(lastSync, this.processor.state);
 		}
 
 		namedLogger.info(`indexing...`);
@@ -125,7 +129,7 @@ export class BrowserIndexer {
 		this.store.set(this.state);
 		try {
 			lastSync = await this.indexer.indexMore();
-			this.set(lastSync);
+			this.set(lastSync, this.processor.state);
 		} catch (err) {
 			namedLogger.error('ERROR, retry indexToLatest in 1 second', err);
 			lastSync = await new Promise((resolve) => {
@@ -141,7 +145,7 @@ export class BrowserIndexer {
 			namedLogger.info(`indexing...`);
 			try {
 				lastSync = await this.indexer.indexMore();
-				this.set(lastSync);
+				this.set(lastSync, this.processor.state);
 			} catch (err) {
 				namedLogger.error('ERROR, retry indexing in 1 second', err);
 				await new Promise((resolve) => {
@@ -195,12 +199,23 @@ export class BrowserIndexer {
 		namedLogger.info(`loading...`);
 		this.state.loading = true;
 		this.store.set(this.state);
-		const lastSync = await this.indexer.load();
-		namedLogger.info('...done loading');
-		this.state.loading = false;
-		this.store.set(this.state);
+		try {
+			const lastSync = await this.indexer.load();
+			namedLogger.info('...done loading');
+			this.state.loading = false;
+			this.store.set(this.state);
 
-		return lastSync;
+			return lastSync;
+		} finally {
+			this.state.loading = false;
+			this.state.error = {message: 'Failed to load', code: 1}; // TODO code
+			this.store.set(this.state);
+		}
+	}
+
+	acknowledgeError() {
+		this.state.error = undefined;
+		this.store.set(this.state);
 	}
 
 	async startAutoIndexing(): Promise<boolean> {
@@ -233,7 +248,7 @@ export class BrowserIndexer {
 		}
 	}
 
-	subscribe(subscription: (value: BrowserIndexerState) => void): () => void {
+	subscribe(subscription: (value: BrowserIndexerState<T>) => void): () => void {
 		return this.store.subscribe(subscription);
 	}
 

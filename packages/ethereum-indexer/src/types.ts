@@ -2,9 +2,11 @@ import {JSONObject, JSONType, LogEvent, LogFetcherConfig} from './engine/ethereu
 
 export type {LogEvent, LogEventFetcher, LogFetcher, LogFetcherConfig} from './engine/ethereum';
 
-export type EventProcessor = {
+// when state can be serialised and fit in memory (especialy useful in browser context), we can have it returned
+export type EventProcessor<T = void> = {
+	state?: T;
 	load: (source: IndexingSource) => Promise<LastSync>;
-	process: (eventStream: EventWithId[], lastSync: LastSync) => Promise<void>;
+	process: (eventStream: EventWithId[], lastSync: LastSync) => Promise<T>;
 	reset: () => Promise<void>;
 	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
 	shouldFetchTimestamp?: (event: LogEvent) => boolean;
