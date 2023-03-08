@@ -88,6 +88,9 @@ export type LogFetcherConfig = {
 export type LogsResult = {logs: EIP1193Log[]; toBlockUsed: number};
 export type LogsPromise = Promise<LogsResult> & {stopRetrying(): void};
 
+export type ParsedLogsResult = {events: LogEvent[]; toBlockUsed: number};
+export type ParsedLogsPromise = Promise<ParsedLogsResult> & {stopRetrying(): void};
+
 type InternalLogFetcherConfig = {
 	numBlocksToFetchAtStart: number;
 	maxBlocksPerFetch: number;
@@ -257,14 +260,15 @@ export class LogEventFetcher extends LogFetcher {
 		this.contracts = contracts;
 	}
 
-	async getLogEvents(options: {
-		fromBlock: number;
-		toBlock: number;
-		retry?: number;
-	}): Promise<{events: LogEvent[]; toBlockUsed: number}> {
-		const {logs, toBlockUsed} = await this.getLogs(options);
-		const events = this.parse(logs);
-		return {events, toBlockUsed};
+	getLogEvents(options: {fromBlock: number; toBlock: number; retry?: number}): ParsedLogsPromise {
+		const logsPromise = this.getLogs(options);
+		const promise = logsPromise.then(({logs, toBlockUsed}) => {
+			const events = this.parse(logs);
+			return {events, toBlockUsed};
+		});
+
+		(promise as ParsedLogsPromise).stopRetrying = logsPromise.stopRetrying;
+		return promise as ParsedLogsPromise;
 	}
 
 	parse(logs: EIP1193Log[]): LogEvent[] {

@@ -3,11 +3,12 @@ import {
 	getBlock,
 	getBlockNumber,
 	getBlocks,
-	getChainId,
 	getTransactionReceipt,
 	getTransactionReceipts,
 	LogEvent,
 	LogEventFetcher,
+	ParsedLogsPromise,
+	ParsedLogsResult,
 	TransactionData,
 } from './engine/ethereum';
 
@@ -55,7 +56,10 @@ export class EthereumIndexer {
 	protected appendedStreamNotYetSaved: EventWithId[] = [];
 	protected _reseting: Promise<void> | undefined;
 	protected _loading: Promise<LastSync> | undefined;
-	protected _processing: Promise<LastSync> | undefined;
+	protected _indexingMore: Promise<LastSync> | undefined;
+	protected _feeding: Promise<LastSync> | undefined;
+	protected _saving: Promise<void> | undefined;
+	protected _logEventPromise: ParsedLogsPromise;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// CONSTRUCTOR
@@ -92,39 +96,6 @@ export class EthereumIndexer {
 		}
 	}
 
-	// constructor(processor: EventProcessor, config: IndexerConfig = {}) {
-	// 	this.processor = processor;
-	// 	this.finality = config.finality || 12;
-	// 	this.alwaysFetchTimestamps = config.alwaysFetchTimestamps ? true : false;
-	// 	this.alwaysFetchTransactions = config.alwaysFetchTransactions ? true : false;
-	// 	this.fetchExistingStream = config.fetchExistingStream;
-	// 	this.saveAppendedStream = config.saveAppendedStream;
-
-	// 	this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
-	// }
-
-	// setup(provider: EIP1193Provider, contractsData: ContractsInfo, fetcherConfig: LogFetcherConfig) {
-	// 	// TODO reset on chain change, etc...
-	// 	this.provider = provider;
-	// 	this.logEventFetcher = new LogEventFetcher(provider, contractsData, fetcherConfig);
-
-	// 	let defaultFromBlock = 0;
-	// 	if (Array.isArray(this.contractsData)) {
-	// 		for (const contractData of this.contractsData) {
-	// 			if (contractData.startBlock) {
-	// 				if (defaultFromBlock === 0) {
-	// 					defaultFromBlock = contractData.startBlock;
-	// 				} else if (contractData.startBlock < defaultFromBlock) {
-	// 					defaultFromBlock = contractData.startBlock;
-	// 				}
-	// 			}
-	// 		}
-	// 	} else {
-	// 		defaultFromBlock = this.contractsData.startBlock || 0;
-	// 	}
-	// 	(this as any).defaultFromBlock = defaultFromBlock;
-	// }
-
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC INTERFACE
 	// ------------------------------------------------------------------------------------------------------------------
@@ -135,33 +106,32 @@ export class EthereumIndexer {
 		return this._loading;
 	}
 
-	protected invalidatePendingRequest: boolean;
-	// This is to be called when the underling network change.
-	// This is especially important in browsers
-	// where user amd app can request the provider to point to a new network
-	// And when this happen, the provider instance remain the same.
-	// So if no care is taken a request could be executed in the wrong network context
-	//
-	// TODO if option is enabled => do it yourself?
-	// FORNOW It is the responsibility of ethereum-indexer-browser to detect such change and call this method
-	//
-	// On the other hand, the Indexer will take care of cases where the network is syncing or its syncing status go backward
-	// TODO wait when the network is back on ?
-	invalidate() {
-		this.invalidatePendingRequest = true;
-		// TODO
-		// if (this.pendingLogRequest) {
-		// 	// ensure the log that fail will not retry on the new chain
-		// 	this.pendingLogRequest.stopRetrying();
-		// }
+	stopProcessing() {
+		this._indexingMore = undefined;
+		if (this._logEventPromise) {
+			// we stop pending log fetch
+			this._logEventPromise.stopRetrying();
+		}
 	}
 
 	async reset() {
 		if (this._reseting) {
 			return this._reseting;
 		}
+		if (this._loading) {
+			try {
+				// finish loading if any
+				await this._loading;
+			} catch (err) {
+				// but ignore failures
+			}
+		}
 		this._reseting = new Promise(async (resolve, reject) => {
-			this._processing = undefined; // abort processing if any, see `indexMore`
+			this._indexingMore = undefined; // abort indexing if any, see `indexMore`
+			if (this._logEventPromise) {
+				this._logEventPromise.stopRetrying();
+			}
+			this._feeding = undefined; // abort feeding if any, see `feed`
 			this.lastSync = {
 				lastToBlock: 0,
 				latestBlock: 0,
@@ -181,31 +151,39 @@ export class EthereumIndexer {
 	}
 
 	async feed(eventStream: EventWithId[], lastSyncFetched?: LastSync): Promise<LastSync> {
-		if (this._processing) {
-			throw new Error(`processing... should not feed`);
+		if (this._indexingMore) {
+			throw new Error(`indexing... should not feed`);
 		}
 		if (this._reseting) {
 			throw new Error(`reseting... should not feed`);
 		}
 
-		this._processing = this.promiseToFeed(eventStream, lastSyncFetched);
-		return this._processing;
+		if (this._feeding) {
+			throw new Error(`already feeding... should not feed`);
+		}
+
+		this._feeding = this.promiseToFeed(eventStream, lastSyncFetched);
+		return this._feeding;
 	}
 
 	indexMore(): Promise<LastSync> {
-		if (this._processing) {
-			namedLogger.info(`still processing...`);
-			return this._processing;
+		if (this._feeding) {
+			throw new Error(`feeding... cannot index until feeding is complete`);
+		}
+
+		if (this._indexingMore) {
+			namedLogger.info(`still indexing...`);
+			return this._indexingMore;
 		}
 
 		if (this._reseting) {
 			namedLogger.info(`reseting...`);
-			this._processing = this._reseting.then(() => this.promiseToIndex());
+			this._indexingMore = this._reseting.then(() => this.promiseToIndex());
 		} else {
 			namedLogger.info(`go!`);
-			this._processing = this.promiseToIndex();
+			this._indexingMore = this.promiseToIndex();
 		}
-		return this._processing;
+		return this._indexingMore;
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -257,6 +235,10 @@ export class EthereumIndexer {
 
 	protected async promiseToFeed(eventStream: EventWithId[], lastSyncFetched?: LastSync): Promise<LastSync> {
 		try {
+			if (!this.lastSync) {
+				namedLogger.info(`load lastSync...`);
+				await this.load();
+			}
 			const lastSync: LastSync = this.lastSync || {
 				lastToBlock: 0,
 				latestBlock: 0,
@@ -272,6 +254,11 @@ export class EthereumIndexer {
 			if (!newLastSync) {
 				const latestBlock = await getBlockNumber(this.provider);
 
+				if (!this._feeding) {
+					namedLogger.info(`not feeding anymore...`);
+					throw new Error('aborted');
+				}
+
 				if (latestBlock - lastEvent.blockNumber < this.finality) {
 					throw new Error('do not accept unconfirmed blocks');
 				}
@@ -284,28 +271,45 @@ export class EthereumIndexer {
 			}
 			if (firstEvent.streamID === lastSync.nextStreamID) {
 				await this.processor.process(eventStream, newLastSync);
+				if (!this._feeding) {
+					namedLogger.info(`not feeding anymore...`);
+					throw new Error('aborted');
+				}
 				this.lastSync = newLastSync;
 			} else {
 				throw new Error(`invalid nextStreamID, ${firstEvent.streamID} === ${lastSync.nextStreamID}`);
 			}
 			return this.lastSync;
 		} finally {
-			this._processing = undefined;
+			this._feeding = undefined;
 		}
 	}
 
 	protected async save(eventStream: EventWithId[], lastSync: LastSync) {
-		if (this.saveAppendedStream) {
-			this.appendedStreamNotYetSaved.push(...eventStream);
-			try {
-				await this.saveAppendedStream({
-					eventStream: this.appendedStreamNotYetSaved,
-					lastSync,
-				});
-				this.appendedStreamNotYetSaved.splice(0, this.appendedStreamNotYetSaved.length);
-			} catch (e) {
-				namedLogger.error(`could not save stream, ${e}`);
+		if (!this._saving) {
+			if (this.saveAppendedStream) {
+				this._saving = this.promiseToSave(eventStream, lastSync);
+			} else {
+				return Promise.resolve();
 			}
+		}
+		// we keep previous attempt
+		// if fails we still fail though
+		return this._saving.then(() => this.promiseToSave(eventStream, lastSync));
+	}
+
+	protected async promiseToSave(eventStream: EventWithId[], lastSync: LastSync) {
+		this.appendedStreamNotYetSaved.push(...eventStream);
+		try {
+			await this.saveAppendedStream({
+				eventStream: this.appendedStreamNotYetSaved,
+				lastSync,
+			});
+			this.appendedStreamNotYetSaved.splice(0, this.appendedStreamNotYetSaved.length);
+		} catch (e) {
+			namedLogger.error(`could not save stream, ${e}`);
+		} finally {
+			this._saving = undefined;
 		}
 	}
 
@@ -317,7 +321,7 @@ export class EthereumIndexer {
 			for (const blockHash of blockHashes) {
 				namedLogger.info(`getting block ${blockHash}...`);
 				const actualBlock = await getBlock(this.provider, blockHash as DATA);
-				if (!this._processing) {
+				if (!this._indexingMore) {
 					return;
 				}
 				result.push(actualBlock);
@@ -334,7 +338,7 @@ export class EthereumIndexer {
 			for (const transactionHash of transactionHashes) {
 				namedLogger.info(`getting block ${transactionHash}...`);
 				const tx = await getTransactionReceipt(this.provider, transactionHash as DATA);
-				if (!this._processing) {
+				if (!this._indexingMore) {
 					return;
 				}
 				result.push(tx);
@@ -367,8 +371,8 @@ export class EthereumIndexer {
 				namedLogger.info(`getting latest block...`);
 				const latestBlock = await getBlockNumber(this.provider);
 
-				if (!this._processing) {
-					namedLogger.info(`not processing anymore...`);
+				if (!this._indexingMore) {
+					namedLogger.info(`not indexing anymore...`);
 					reject('aborted');
 					return;
 				}
@@ -377,18 +381,30 @@ export class EthereumIndexer {
 
 				if (fromBlock > toBlock) {
 					namedLogger.info(`no new block`);
-					this._processing = undefined;
+					this._indexingMore = undefined;
 					return resolve(lastSync);
 				}
 
-				const {events: eventsFetched, toBlockUsed: newToBlock} = await this.logEventFetcher.getLogEvents({
+				if (this._logEventPromise) {
+					throw new Error(`duplicate _logEventPromise`);
+				}
+				this._logEventPromise = this.logEventFetcher.getLogEvents({
 					fromBlock,
 					toBlock: toBlock,
 				});
+
+				let logResult: ParsedLogsResult;
+				try {
+					logResult = await this._logEventPromise;
+				} finally {
+					this._logEventPromise = undefined;
+				}
+
+				const {events: eventsFetched, toBlockUsed: newToBlock} = logResult;
 				toBlock = newToBlock;
 
-				if (!this._processing) {
-					namedLogger.info(`not processing anymore...`);
+				if (!this._indexingMore) {
+					namedLogger.info(`not indexing anymore...`);
 					reject('aborted');
 					return;
 				}
@@ -436,8 +452,8 @@ export class EthereumIndexer {
 					namedLogger.info(`fetching a batch of  ${blockHashes.length} blocks...`);
 					const blocks = await this.getBlocks(blockHashes);
 					namedLogger.info(`...got  ${blocks.length} blocks back`);
-					if (!this._processing) {
-						namedLogger.info(`not processing anymore...`);
+					if (!this._indexingMore) {
+						namedLogger.info(`not indexing anymore...`);
 						reject('aborted');
 						return;
 					}
@@ -452,8 +468,8 @@ export class EthereumIndexer {
 					namedLogger.info(`fetching a batch of ${transactionHashes.length} transactions...`);
 					const transactionReceipts = await this.getTransactions(transactionHashes);
 					namedLogger.info(`...got ${transactionReceipts.length} transactions back`);
-					if (!this._processing) {
-						namedLogger.info(`not processing anymore...`);
+					if (!this._indexingMore) {
+						namedLogger.info(`not indexing anymore...`);
 						reject('aborted');
 						return;
 					}
@@ -477,34 +493,29 @@ export class EthereumIndexer {
 					newEvents = await this.processor.filter(eventsFetched);
 				}
 
-				if (!this._processing) {
-					namedLogger.info(`not processing anymore...`);
+				if (!this._indexingMore) {
+					namedLogger.info(`not indexing anymore...`);
 					reject('aborted');
 					return;
 				}
 
 				namedLogger.info(`populating stream...`);
-				const {eventStream, newLastSync} = await this._generateStreamToAppend(newEvents, {
+				const {eventStream, newLastSync} = this._generateStreamToAppend(newEvents, {
 					latestBlock,
 					lastToBlock: toBlock,
 					nextStreamID: streamID,
 					unconfirmedBlocks,
 				});
-
-				if (!this._processing) {
-					namedLogger.info(`not processing anymore...`);
-					reject('aborted');
-					return;
-				}
-
 				// TODO const chainId = await getChainId(this.provider);
 
 				namedLogger.info(`PROCESSING`);
 				await this.processor.process(eventStream, newLastSync);
 				namedLogger.info(`DONE`);
 
-				if (!this._processing) {
-					namedLogger.info(`not processing anymore...`);
+				if (this._reseting && !this._indexingMore) {
+					// we only skip here if reseting has been started
+					// if the indexing was aborted because of a call to stopProcessing, then we should proceed to finish it
+					namedLogger.info(`reseting has started, not indexing anymore...`);
 					reject('aborted');
 					return;
 				}
@@ -513,20 +524,20 @@ export class EthereumIndexer {
 
 				await this.save(eventStream, this.lastSync);
 
-				this._processing = undefined;
+				this._indexingMore = undefined;
 				return resolve(newLastSync);
 			} catch (e: any) {
 				globalThis.console.error(`error`, e);
-				this._processing = undefined;
+				this._indexingMore = undefined;
 				return reject(e);
 			}
 		});
 	}
 
-	protected async _generateStreamToAppend(
+	protected _generateStreamToAppend(
 		newEvents: LogEvent[],
 		{latestBlock, lastToBlock, unconfirmedBlocks, nextStreamID}: LastSync
-	): Promise<{eventStream: EventWithId[]; newLastSync: LastSync}> {
+	): {eventStream: EventWithId[]; newLastSync: LastSync} {
 		// grouping per block...
 		const groups: {[hash: string]: BlockEvents} = {};
 		const eventsGroupedPerBlock: BlockEvents[] = [];
