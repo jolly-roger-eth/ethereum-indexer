@@ -198,7 +198,7 @@ export class LogFetcher {
 					logs = result.logs;
 					toBlock = result.toBlockUsed;
 				} catch (err) {
-					reject(err);
+					return reject(err);
 				}
 			}
 
