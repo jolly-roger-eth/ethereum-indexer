@@ -193,9 +193,13 @@ export class LogFetcher {
 					retry: retry - 1,
 				});
 				_stopRetrying = retryPromise.stopRetrying;
-				const result = await retryPromise;
-				logs = result.logs;
-				toBlock = result.toBlockUsed;
+				try {
+					const result = await retryPromise;
+					logs = result.logs;
+					toBlock = result.toBlockUsed;
+				} catch (err) {
+					reject(err);
+				}
 			}
 
 			const targetNumberOfLog = Math.max(
