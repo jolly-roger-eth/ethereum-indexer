@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.4.1
+
+### Patch Changes
+
+- allow access to state from processors that declare it
+
 ## 0.4.0
 
 ### Minor Changes

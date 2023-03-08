@@ -1,5 +1,13 @@
 # ethereum-indexer-browser
 
+## 0.4.1
+
+### Patch Changes
+
+- allow access to state from processors that declare it
+- Updated dependencies
+  - ethereum-indexer@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
