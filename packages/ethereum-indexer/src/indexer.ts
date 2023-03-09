@@ -274,10 +274,15 @@ export class EthereumIndexer<T = void> {
 				};
 			}
 			if (firstEvent.streamID === lastSync.nextStreamID) {
-				await this.processor.process(eventStream, newLastSync);
+				const outcome = await this.processor.process(eventStream, newLastSync);
 				if (!this._feeding) {
 					namedLogger.info(`not feeding anymore...`);
 					throw new Error('aborted');
+				}
+				if (this.onProcessed) {
+					try {
+						this.onProcessed(outcome);
+					} catch (err) {}
 				}
 				this.lastSync = newLastSync;
 			} else {
