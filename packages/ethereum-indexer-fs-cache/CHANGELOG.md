@@ -1,5 +1,12 @@
 # ethereum-indexer-fs-event-store
 
+## 0.4.2
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes
