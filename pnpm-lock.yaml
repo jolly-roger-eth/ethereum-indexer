@@ -90,7 +90,7 @@ importers:
       '@ethersproject/abi': ^5.6.4
       '@ethersproject/address': ^5.6.1
       '@ethersproject/bytes': ^5.6.1
-      eip-1193: ^0.2.1
+      eip-1193: ^0.2.2
       named-logs: ^0.2.0
       tsup: ^6.2.1
       typescript: ^4.6.4
@@ -100,13 +100,13 @@ importers:
       '@ethersproject/bytes': 5.7.0
       named-logs: 0.2.0
     devDependencies:
-      eip-1193: 0.2.1
+      eip-1193: 0.2.2
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
 
   packages/ethereum-indexer-browser:
     specifiers:
-      eip-1193: ^0.2.1
+      eip-1193: ^0.2.2
       ethereum-indexer: workspace:*
       named-logs: ^0.2.0
       sveltore: ^0.0.1
@@ -117,7 +117,7 @@ importers:
       named-logs: 0.2.0
       sveltore: 0.0.1
     devDependencies:
-      eip-1193: 0.2.1
+      eip-1193: 0.2.2
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
 
@@ -191,7 +191,7 @@ importers:
       '@types/node': 15.6.1
       '@types/pouchdb': ^6.4.0
       dotenv: ^16.0.1
-      eip-1193: ^0.2.1
+      eip-1193: ^0.2.2
       ethereum-indexer: workspace:*
       ethereum-indexer-db-processors: workspace:*
       ethereum-indexer-fs-cache: workspace:*
@@ -236,7 +236,7 @@ importers:
       '@types/koa-router': 7.4.4
       '@types/node': 15.6.1
       '@types/pouchdb': 6.4.0
-      eip-1193: 0.2.1
+      eip-1193: 0.2.2
       nodemon: 2.0.19
       shx: 0.3.4
       tslib: 2.4.0
@@ -277,7 +277,7 @@ importers:
       '@ethersproject/abi': ^5.6.4
       '@ethersproject/address': ^5.6.1
       '@ethersproject/bytes': ^5.6.1
-      eip-1193: ^0.2.1
+      eip-1193: ^0.2.2
       ethereum-indexer: workspace:*
       isomorphic-unfetch: ^3.1.0
       named-logs: ^0.2.0
@@ -291,7 +291,7 @@ importers:
       isomorphic-unfetch: 3.1.0
       named-logs: 0.2.0
     devDependencies:
-      eip-1193: 0.2.1
+      eip-1193: 0.2.2
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
 
@@ -1744,8 +1744,8 @@ packages:
     resolution: {integrity: sha1-WQxhFWsK4vTwJVcyoViyZrxWsh0=}
     dev: false
 
-  /eip-1193/0.2.1:
-    resolution: {integrity: sha512-KGolhq6Z+r2myG7cHlcsRwdMGRjl7cQMzjOyQSCOlyUWNyaQ93IiV0XgTBzdXBLB+rE76N4glnMCS/fFK8lH+Q==}
+  /eip-1193/0.2.2:
+    resolution: {integrity: sha512-2ToWdPSVw7clAMtuXOWMBgISJYcRJDYuFbRLloDkgZqIdF1kOgVCKogNWf+wywxSuNaLxyExxAihm8ad14IgGQ==}
     dev: true
 
   /ejs/3.1.8:

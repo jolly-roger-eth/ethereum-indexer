@@ -1,18 +1,13 @@
 import {
-	DATA,
-	getBlock,
+	getBlockData,
 	getBlockNumber,
-	getBlocks,
-	getTransactionReceipt,
-	getTransactionReceipts,
-	LogEvent,
-	LogEventFetcher,
-	ParsedLogsPromise,
-	ParsedLogsResult,
-	TransactionData,
+	getBlockDataFromMultipleHashes,
+	getTransactionData,
+	getTransactionDataFromMultipleHashes,
+	LogTransactionData,
 } from './engine/ethereum';
 
-import {EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 import {logs} from 'named-logs';
 import type {
@@ -25,13 +20,11 @@ import type {
 	StreamSaver,
 	IndexerConfig,
 	LastSync,
+	AllContractData,
 } from './types';
-import {AllContractData} from '../dist';
-const namedLogger = logs('ethereum-indexer');
+import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 
-// TODO document public var
-// TODO document source type, including startBlock (refers to hardhat-deploy ?)
-// TODO allow finality configuration separated from reorg history length (to allow processing of abi changes for longer time than finality)
+const namedLogger = logs('ethereum-indexer');
 
 export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
 
@@ -42,6 +35,7 @@ export class EthereumIndexer<T = void> {
 
 	public readonly defaultFromBlock: number;
 	public onLoad: ((state: LoadingState) => Promise<void>) | undefined;
+	public onProcessed: ((state: T) => void) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
@@ -318,6 +312,7 @@ export class EthereumIndexer<T = void> {
 			this.appendedStreamNotYetSaved.splice(0, this.appendedStreamNotYetSaved.length);
 		} catch (e) {
 			namedLogger.error(`could not save stream, ${e}`);
+			// ignore error
 		} finally {
 			this._saving = undefined;
 		}
@@ -325,12 +320,12 @@ export class EthereumIndexer<T = void> {
 
 	protected async getBlocks(blockHashes: string[]): Promise<{timestamp: number}[]> {
 		if (this.providerSupportsETHBatch) {
-			return getBlocks(this.provider, blockHashes);
+			return getBlockDataFromMultipleHashes(this.provider, blockHashes);
 		} else {
 			const result = [];
 			for (const blockHash of blockHashes) {
 				namedLogger.info(`getting block ${blockHash}...`);
-				const actualBlock = await getBlock(this.provider, blockHash as DATA);
+				const actualBlock = await getBlockData(this.provider, blockHash as EIP1193DATA);
 				if (!this._indexingMore) {
 					return;
 				}
@@ -340,14 +335,14 @@ export class EthereumIndexer<T = void> {
 		}
 	}
 
-	protected async getTransactions(transactionHashes: string[]): Promise<TransactionData[]> {
+	protected async getTransactions(transactionHashes: string[]): Promise<LogTransactionData[]> {
 		if (this.providerSupportsETHBatch) {
-			return getTransactionReceipts(this.provider, transactionHashes);
+			return getTransactionDataFromMultipleHashes(this.provider, transactionHashes);
 		} else {
 			const result = [];
 			for (const transactionHash of transactionHashes) {
 				namedLogger.info(`getting block ${transactionHash}...`);
-				const tx = await getTransactionReceipt(this.provider, transactionHash as DATA);
+				const tx = await getTransactionData(this.provider, transactionHash as EIP1193DATA);
 				if (!this._indexingMore) {
 					return;
 				}
@@ -420,7 +415,7 @@ export class EthereumIndexer<T = void> {
 				}
 
 				const blockTimestamps: {[hash: string]: number} = {};
-				const transactions: {[hash: string]: TransactionData} = {};
+				const transactions: {[hash: string]: LogTransactionData} = {};
 				let anyFetch = false;
 
 				const blockHashes: string[] = [];
@@ -518,8 +513,10 @@ export class EthereumIndexer<T = void> {
 				});
 				// TODO const chainId = await getChainId(this.provider);
 
+				// Note: we do not skip if  (eventStream.length > 0)
+				//  Because the process might want to use that info to keep track of the syncinf status
 				namedLogger.info(`PROCESSING`);
-				await this.processor.process(eventStream, newLastSync);
+				const outcome = await this.processor.process(eventStream, newLastSync);
 				namedLogger.info(`DONE`);
 
 				if (this._reseting && !this._indexingMore) {
@@ -532,7 +529,15 @@ export class EthereumIndexer<T = void> {
 
 				this.lastSync = newLastSync;
 
+				// this does not throw, but we could be stuck here ?
+				// TODO timeout ?
 				await this.save(eventStream, this.lastSync);
+
+				if (this.onProcessed) {
+					try {
+						this.onProcessed(outcome);
+					} catch (err) {}
+				}
 
 				this._indexingMore = undefined;
 				return resolve(newLastSync);

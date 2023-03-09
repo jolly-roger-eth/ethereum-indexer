@@ -1,25 +1,25 @@
 {
-  "name": "ethereum-indexer",
-  "version": "0.4.1",
-  "publishConfig": {
-    "access": "public"
-  },
-  "type": "module",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsup-node src/index.ts --dts --format esm,cjs"
-  },
-  "devDependencies": {
-    "eip-1193": "^0.2.1",
-    "tsup": "^6.2.1",
-    "typescript": "^4.6.4"
-  },
-  "dependencies": {
-    "@ethersproject/abi": "^5.6.4",
-    "@ethersproject/address": "^5.6.1",
-    "@ethersproject/bytes": "^5.6.1",
-    "named-logs": "^0.2.0"
-  }
+	"name": "ethereum-indexer",
+	"version": "0.4.1",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"main": "dist/index.cjs",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsup-node src/index.ts --dts --format esm,cjs"
+	},
+	"devDependencies": {
+		"eip-1193": "^0.2.2",
+		"tsup": "^6.2.1",
+		"typescript": "^4.6.4"
+	},
+	"dependencies": {
+		"@ethersproject/abi": "^5.6.4",
+		"@ethersproject/address": "^5.6.1",
+		"@ethersproject/bytes": "^5.6.1",
+		"named-logs": "^0.2.0"
+	}
 }

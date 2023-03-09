@@ -1,71 +1,71 @@
 {
-  "name": "ethereum-indexer-server",
-  "version": "0.4.1",
-  "description": "",
-  "publishConfig": {
-    "access": "public"
-  },
-  "main": "index.js",
-  "bin": {
-    "eis": "./bin/run"
-  },
-  "types": "dist/",
-  "files": [
-    "/bin",
-    "/dist",
-    "/npm-shrinkwrap.json",
-    "/oclif.manifest.json"
-  ],
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "volta": {
-    "node": "18.7.0"
-  },
-  "dependencies": {
-    "@ethersproject/bignumber": "^5.7.0",
-    "@oclif/core": "^1.16.0",
-    "@oclif/plugin-help": "^5.1.12",
-    "dotenv": "^16.0.1",
-    "ethereum-indexer": "workspace:*",
-    "ethereum-indexer-db-processors": "workspace:*",
-    "ethereum-indexer-fs-cache": "workspace:*",
-    "ethereum-indexer-utils": "workspace:*",
-    "koa": "^2.13.4",
-    "koa-bodyparser": "^4.3.0",
-    "koa-json": "^2.0.2",
-    "koa-logger": "^3.2.1",
-    "koa-router": "^12.0.0",
-    "named-logs": "^0.2.0",
-    "named-logs-console": "^0.2.1",
-    "pouchdb": "^7.3.0",
-    "pouchdb-find": "^7.3.0"
-  },
-  "devDependencies": {
-    "@types/koa": "^2.13.5",
-    "@types/koa-bodyparser": "^4.3.7",
-    "@types/koa-json": "^2.0.20",
-    "@types/koa-logger": "^3.1.2",
-    "@types/koa-router": "^7.4.4",
-    "@types/node": "15.6.1",
-    "@types/pouchdb": "^6.4.0",
-    "eip-1193": "^0.2.1",
-    "nodemon": "^2.0.19",
-    "shx": "^0.3.4",
-    "tslib": "^2.4.0",
-    "tsup": "^6.2.1",
-    "typescript": "^4.7.4"
-  },
-  "oclif": {
-    "bin": "eis",
-    "dirname": "eis",
-    "commands": "./dist/commands",
-    "plugins": [
-      "@oclif/plugin-help"
-    ]
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc -b && shx cp -R templates/ dist/"
-  }
+	"name": "ethereum-indexer-server",
+	"version": "0.4.1",
+	"description": "",
+	"publishConfig": {
+		"access": "public"
+	},
+	"main": "index.js",
+	"bin": {
+		"eis": "./bin/run"
+	},
+	"types": "dist/",
+	"files": [
+		"/bin",
+		"/dist",
+		"/npm-shrinkwrap.json",
+		"/oclif.manifest.json"
+	],
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"volta": {
+		"node": "18.7.0"
+	},
+	"dependencies": {
+		"@ethersproject/bignumber": "^5.7.0",
+		"@oclif/core": "^1.16.0",
+		"@oclif/plugin-help": "^5.1.12",
+		"dotenv": "^16.0.1",
+		"ethereum-indexer": "workspace:*",
+		"ethereum-indexer-db-processors": "workspace:*",
+		"ethereum-indexer-fs-cache": "workspace:*",
+		"ethereum-indexer-utils": "workspace:*",
+		"koa": "^2.13.4",
+		"koa-bodyparser": "^4.3.0",
+		"koa-json": "^2.0.2",
+		"koa-logger": "^3.2.1",
+		"koa-router": "^12.0.0",
+		"named-logs": "^0.2.0",
+		"named-logs-console": "^0.2.1",
+		"pouchdb": "^7.3.0",
+		"pouchdb-find": "^7.3.0"
+	},
+	"devDependencies": {
+		"@types/koa": "^2.13.5",
+		"@types/koa-bodyparser": "^4.3.7",
+		"@types/koa-json": "^2.0.20",
+		"@types/koa-logger": "^3.1.2",
+		"@types/koa-router": "^7.4.4",
+		"@types/node": "15.6.1",
+		"@types/pouchdb": "^6.4.0",
+		"eip-1193": "^0.2.2",
+		"nodemon": "^2.0.19",
+		"shx": "^0.3.4",
+		"tslib": "^2.4.0",
+		"tsup": "^6.2.1",
+		"typescript": "^4.7.4"
+	},
+	"oclif": {
+		"bin": "eis",
+		"dirname": "eis",
+		"commands": "./dist/commands",
+		"plugins": [
+			"@oclif/plugin-help"
+		]
+	},
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"build": "tsc -b && shx cp -R templates/ dist/"
+	}
 }

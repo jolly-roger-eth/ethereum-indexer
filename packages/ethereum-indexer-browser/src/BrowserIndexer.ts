@@ -40,7 +40,7 @@ export type ExtendedLastSync = LastSync & {
 	totalPercentage: number;
 };
 
-export type BrowserIndexerState<T = void> = {
+export type BrowserIndexerState = {
 	lastSync?: ExtendedLastSync;
 	autoIndexing: boolean;
 	loading: boolean;
@@ -48,7 +48,6 @@ export type BrowserIndexerState<T = void> = {
 	fetchingLogs: boolean;
 	catchingUp: boolean;
 	error?: {message: string; code: number};
-	state?: T;
 };
 
 export class BrowserIndexer<T = void> {
@@ -56,8 +55,8 @@ export class BrowserIndexer<T = void> {
 
 	protected indexingTimeout: number | undefined;
 
-	protected state: BrowserIndexerState<T>;
-	protected store: Writable<BrowserIndexerState<T>>;
+	protected state: BrowserIndexerState;
+	protected store: Writable<BrowserIndexerState>;
 
 	protected processor: EventProcessor<T> | undefined;
 	protected source: IndexingSource | undefined;
@@ -71,7 +70,6 @@ export class BrowserIndexer<T = void> {
 			catchingUp: false,
 			fetchingLogs: false,
 			processingFetchedLogs: false,
-			state: void 0,
 		};
 		this.store = writable(this.state);
 	}
@@ -88,7 +86,7 @@ export class BrowserIndexer<T = void> {
 		this.indexerConfig = indexerConfig;
 	}
 
-	private set(lastSync: LastSync, state: T) {
+	private set(lastSync: LastSync) {
 		const startingBlock = this.indexer.defaultFromBlock;
 		const latestBlock = lastSync.latestBlock;
 		const lastToBlock = lastSync.lastToBlock;
@@ -102,7 +100,6 @@ export class BrowserIndexer<T = void> {
 		lastSyncObject.totalPercentage = Math.floor((lastToBlock * 1000000) / latestBlock) / 10000;
 
 		this.state.lastSync = lastSyncObject;
-		this.state.state = state;
 		this.store.set(this.state);
 	}
 
@@ -113,7 +110,7 @@ export class BrowserIndexer<T = void> {
 			namedLogger.info('...setup done');
 		}
 		const lastSync = await this.indexer.indexMore();
-		this.set(lastSync, this.processor.state);
+		this.set(lastSync);
 		return lastSync;
 	}
 
@@ -121,7 +118,7 @@ export class BrowserIndexer<T = void> {
 		let lastSync: LastSync | undefined;
 		if (!this.indexer) {
 			lastSync = await this.setupIndexing();
-			this.set(lastSync, this.processor.state);
+			this.set(lastSync);
 		}
 
 		namedLogger.info(`indexing...`);
@@ -129,7 +126,7 @@ export class BrowserIndexer<T = void> {
 		this.store.set(this.state);
 		try {
 			lastSync = await this.indexer.indexMore();
-			this.set(lastSync, this.processor.state);
+			this.set(lastSync);
 		} catch (err) {
 			namedLogger.error('ERROR, retry indexToLatest in 1 second', err);
 			lastSync = await new Promise((resolve) => {
@@ -145,7 +142,7 @@ export class BrowserIndexer<T = void> {
 			namedLogger.info(`indexing...`);
 			try {
 				lastSync = await this.indexer.indexMore();
-				this.set(lastSync, this.processor.state);
+				this.set(lastSync);
 			} catch (err) {
 				namedLogger.error('ERROR, retry indexing in 1 second', err);
 				await new Promise((resolve) => {
@@ -248,7 +245,7 @@ export class BrowserIndexer<T = void> {
 		}
 	}
 
-	subscribe(subscription: (value: BrowserIndexerState<T>) => void): () => void {
+	subscribe(subscription: (value: BrowserIndexerState) => void): () => void {
 		return this.store.subscribe(subscription);
 	}
 
