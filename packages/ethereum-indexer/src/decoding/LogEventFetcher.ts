@@ -59,10 +59,10 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		if (Array.isArray(contractsData)) {
 			const addressesSeen = new Map<`0x${string}`, boolean>();
 			contractAddresses = contractAddresses || [];
-			for (const v of contractsData) {
-				if (!addressesSeen[v]) {
-					addressesSeen[v] = true;
-					contractAddresses.push(v);
+			for (const contract of contractsData) {
+				if (!addressesSeen[contract.address]) {
+					addressesSeen[contract.address] = true;
+					contractAddresses.push(contract.address);
 				}
 			}
 			eventABIS = (contractsData as readonly {readonly address: string; readonly abi: ABI}[]).map((v) =>
