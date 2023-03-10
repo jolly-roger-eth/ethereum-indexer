@@ -6,6 +6,13 @@ export abstract class GenericSingleEventProcessor<ABI extends Abi> implements Si
 	protected db: PutAndGetDatabase;
 	async processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void> {
 		this.db = db;
+		if ('decodeError' in event) {
+			if (this['handleUnparsedEvent']) {
+				return this['handleUnparsedEvent'](event);
+			}
+			return;
+		}
+
 		const functionName = `on${event.eventName}`;
 		if (this[functionName]) {
 			await this[functionName](event);

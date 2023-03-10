@@ -30,17 +30,20 @@ interface NumberifiedLog {
 	logIndex: number;
 }
 
-// type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
-// type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-type PartialBy<T, K extends keyof T> = T; // TODO ?
 export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
-export type LogEvent<ABI extends Abi, Extra extends JSONObject = JSONObject> = NumberifiedLog &
-	PartialBy<LogParsedData<ABI>, 'args' | 'eventName'> & {
-		decodeError?: Error;
-		extra?: Extra;
-		blockTimestamp?: number;
-		transaction?: LogTransactionData;
-	};
+export type BaseLogEvent<Extra extends JSONObject = undefined> = NumberifiedLog & {
+	extra: Extra;
+	blockTimestamp?: number;
+	transaction?: LogTransactionData;
+};
+export type ParsedLogEvent<ABI extends Abi, Extra extends JSONObject = undefined> = BaseLogEvent<Extra> &
+	LogParsedData<ABI>;
+export type LogEventWithParsingFailure<Extra extends JSONObject = undefined> = BaseLogEvent<Extra> & {
+	decodeError: string;
+};
+export type LogEvent<ABI extends Abi, Extra extends JSONObject = undefined> =
+	| ParsedLogEvent<ABI, Extra>
+	| LogEventWithParsingFailure<Extra>;
 
 export type ParsedLogsResult<ABI extends Abi> = {events: LogEvent<ABI>[]; toBlockUsed: number};
 export type ParsedLogsPromise<ABI extends Abi> = Promise<ParsedLogsResult<ABI>> & {stopRetrying(): void};
@@ -118,12 +121,14 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 						topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
 					});
 				} catch (err) {
-					(event as LogEvent<ABI>).decodeError = err;
+					(event as LogEventWithParsingFailure).decodeError = `decoding error: ${err.toString()}`;
 				}
 
 				if (parsed) {
-					(event as LogEvent<ABI>).args = parsed.args;
-					(event as LogEvent<ABI>).eventName = parsed.eventName;
+					(event as ParsedLogEvent<ABI>).args = parsed.args;
+					(event as ParsedLogEvent<ABI>).eventName = parsed.eventName;
+				} else {
+					(event as LogEventWithParsingFailure).decodeError = `parsing did not return any results`;
 				}
 
 				events.push(event as LogEvent<ABI>);

@@ -1,5 +1,5 @@
 import {Abi} from 'abitype';
-import {JSONObject, LogEvent} from './decoding/LogEventFetcher';
+import {JSONObject, LogEvent, LogEventWithParsingFailure, ParsedLogEvent} from './decoding/LogEventFetcher';
 import {LogFetcherConfig} from './engine/LogFetcher';
 
 export type {LogFetcher, LogFetcherConfig} from './engine/LogFetcher';
@@ -28,7 +28,15 @@ export type LastSync<ABI extends Abi> = {
 	nextStreamID: number;
 };
 
-export type EventWithId<ABI extends Abi, Extra extends JSONObject = JSONObject> = LogEvent<ABI, Extra> & {
+export type EventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = LogEvent<ABI, Extra> & {
+	streamID: number;
+};
+
+export type ParsedEventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = ParsedLogEvent<ABI, Extra> & {
+	streamID: number;
+};
+
+export type UnparsedEventWithId<Extra extends JSONObject = undefined> = LogEventWithParsingFailure<Extra> & {
 	streamID: number;
 };
 

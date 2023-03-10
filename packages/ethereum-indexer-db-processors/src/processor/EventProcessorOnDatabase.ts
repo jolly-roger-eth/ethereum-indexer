@@ -1,4 +1,4 @@
-import {IndexingSource, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
+import {IndexingSource, EventWithId, LastSync, LogEvent, Abi, UnparsedEventWithId} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, FromDB, JSONObject, PutAndGetDatabase, Query, Result} from './Database';
@@ -12,6 +12,7 @@ export interface SingleEventProcessor<ABI extends Abi> {
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
 	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
 	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
+	handleUnparsedEvent?(event: UnparsedEventWithId);
 }
 
 export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEventProcessor<ABI> {

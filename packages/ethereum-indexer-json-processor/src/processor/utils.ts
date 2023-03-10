@@ -1,5 +1,5 @@
 import {SingleEventJSONProcessor, EventProcessorOnJSON} from './EventProcessorOnJSON';
-import {Abi, EventWithId, LogEvent} from 'ethereum-indexer';
+import {Abi, EventWithId, LogEvent, UnparsedEventWithId} from 'ethereum-indexer';
 import {EventFunctions, JSObject, MergedAbis} from './types';
 
 export type EventProcessorOnJSONConfig = {
@@ -23,12 +23,19 @@ export type SingleJSONEventProcessorObject<ABI extends Abi, ProcessResultType ex
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
 	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
 	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
+	handleUnparsedEvent?(json: ProcessResultType, event: UnparsedEventWithId);
 };
 
 class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject> {
 	constructor(protected obj: SingleJSONEventProcessorObject<ABI, ProcessResultType>) {}
 
 	processEvent(json: ProcessResultType, event: EventWithId<ABI>) {
+		if ('decodeError' in event) {
+			if (this.obj.handleUnparsedEvent) {
+				return this.obj.handleUnparsedEvent(json, event);
+			}
+			return;
+		}
 		const functionName = `on${event.eventName}`;
 		if (this.obj[functionName]) {
 			return this.obj[functionName](json, event);

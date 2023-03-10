@@ -120,9 +120,9 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 					topics: event.topics,
 					removed: event.removed,
 					address: event.address,
-					eventName: event.eventName,
+					eventName: (event as any).eventName,
 					data: event.data,
-					args: event.args,
+					args: (event as any).args,
 					extra: event.extra,
 					batch: this.batchCounter,
 				});

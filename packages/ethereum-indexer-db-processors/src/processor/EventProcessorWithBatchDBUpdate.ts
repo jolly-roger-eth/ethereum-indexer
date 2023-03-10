@@ -1,4 +1,12 @@
-import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
+import {
+	IndexingSource,
+	EventProcessor,
+	EventWithId,
+	LastSync,
+	LogEvent,
+	Abi,
+	UnparsedEventWithId,
+} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {JSONObject, Database, FromDB, Query, Result} from './Database';
 import {RevertableDatabase} from './RevertableDatabase';
@@ -41,6 +49,7 @@ export type SingleEventProcessorWithBatchSupport<ABI extends Abi> = {
 		dependencies(event: EventWithId<ABI>): Dependency[];
 		processEvent(db: SyncDB, event: EventWithId<ABI>);
 	};
+	handleUnparsedEvent?(event: UnparsedEventWithId);
 };
 
 export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventProcessor<ABI, void> {
@@ -147,6 +156,9 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 				// ----------------------------------------------------------------------------------------------------------------
 				const dependencies: Dependency[] = [];
 				for (const event of eventStream) {
+					if ('decodeError' in event) {
+						continue;
+					}
 					const functionName = `on${event.eventName}`;
 					if (this.singleEventProcessor[functionName] && this.singleEventProcessor[functionName].dependencies) {
 						const deps = this.singleEventProcessor[functionName].dependencies(event);
@@ -163,10 +175,16 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 				// Compute new State
 				// ----------------------------------------------------------------------------------------------------------------
 				for (const event of eventStream) {
-					const functionName = `on${event.eventName}`;
 					syncDB.prepareEvent(event);
-					if (this.singleEventProcessor[functionName] && this.singleEventProcessor[functionName].processEvent) {
-						this.singleEventProcessor[functionName].processEvent(syncDB, event);
+					if ('decodeError' in event) {
+						if ('handleUnparsedEvent' in this.singleEventProcessor) {
+							this.singleEventProcessor.handleUnparsedEvent(event);
+						}
+					} else {
+						const functionName = `on${event.eventName}`;
+						if (this.singleEventProcessor[functionName] && this.singleEventProcessor[functionName].processEvent) {
+							this.singleEventProcessor[functionName].processEvent(syncDB, event);
+						}
 					}
 				}
 				// ----------------------------------------------------------------------------------------------------------------
@@ -211,15 +229,22 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 
 						syncDB.prepareEvent(event);
 
-						// could optimize per block
-						const functionName = `on${event.eventName}`;
-						if (this.singleEventProcessor[functionName]) {
-							if (this.singleEventProcessor[functionName].dependencies) {
-								const dependencies: Dependency[] = this.singleEventProcessor[functionName].dependencies(event);
-								await syncDB.fetch(dependencies);
+						if ('decodeError' in event) {
+							if ('handleUnparsedEvent' in this.singleEventProcessor) {
+								this.singleEventProcessor.handleUnparsedEvent(event);
+								await syncDB.syncUp();
 							}
-							this.singleEventProcessor[functionName].processEvent(syncDB, event);
-							await syncDB.syncUp();
+						} else {
+							// could optimize per block
+							const functionName = `on${event.eventName}`;
+							if (this.singleEventProcessor[functionName]) {
+								if (this.singleEventProcessor[functionName].dependencies) {
+									const dependencies: Dependency[] = this.singleEventProcessor[functionName].dependencies(event);
+									await syncDB.fetch(dependencies);
+								}
+								this.singleEventProcessor[functionName].processEvent(syncDB, event);
+								await syncDB.syncUp();
+							}
 						}
 						console.info(`EventProcessorOnDatabase DONE`);
 					}

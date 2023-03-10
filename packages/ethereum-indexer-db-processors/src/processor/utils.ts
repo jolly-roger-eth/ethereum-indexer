@@ -2,7 +2,7 @@ import {PouchDatabase} from './PouchDatabase';
 import {SingleEventProcessor, EventProcessorOnDatabase} from './EventProcessorOnDatabase';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, PutAndGetDatabase} from './Database';
-import {Abi, EventWithId, LogEvent} from 'ethereum-indexer';
+import {Abi, EventWithId, LogEvent, UnparsedEventWithId} from 'ethereum-indexer';
 import {EventProcessorWithBatchDBUpdate, SingleEventProcessorWithBatchSupport} from './EventProcessorWithBatchDBUpdate';
 
 export function fromSingleEventProcessor<ABI extends Abi>(
@@ -21,15 +21,22 @@ export type SingleEventProcessorObject<ABI extends Abi> = {
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
 	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
 	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
+	handleUnparsedEvent?(event: UnparsedEventWithId);
 };
 
 export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEventProcessor<ABI> {
 	constructor(protected obj: SingleEventProcessorObject<ABI>) {}
 
 	async processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void> {
-		const functionName = `on${event.eventName}`;
-		if (this.obj[functionName]) {
-			return this.obj[functionName](db, event);
+		if ('decodeError' in event) {
+			if ('handleUnparsedEvent' in this.obj) {
+				return this.obj.handleUnparsedEvent(event);
+			}
+		} else {
+			const functionName = `on${event.eventName}`;
+			if (this.obj[functionName]) {
+				return this.obj[functionName](db, event);
+			}
 		}
 	}
 	async setup(db: Database): Promise<void> {
