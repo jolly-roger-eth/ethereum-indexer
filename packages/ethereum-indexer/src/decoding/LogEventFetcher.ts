@@ -57,7 +57,14 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		let contractAddresses: EIP1193Account[] | null = null;
 		let eventABIS: readonly AbiEvent[][];
 		if (Array.isArray(contractsData)) {
-			contractAddresses = contractsData.map((v) => v.address);
+			const addressesSeen = new Map<`0x${string}`, boolean>();
+			contractAddresses = contractAddresses || [];
+			for (const v of contractsData) {
+				if (!addressesSeen[v]) {
+					addressesSeen[v] = true;
+					contractAddresses.push(v);
+				}
+			}
 			eventABIS = (contractsData as readonly {readonly address: string; readonly abi: ABI}[]).map((v) =>
 				v.abi.filter((item) => item.type === 'event')
 			) as unknown as AbiEvent[][];
@@ -68,6 +75,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		}
 
 		let eventNameTopics: EIP1193DATA[] | null = null;
+		const topicsSeen = new Map<`0x${string}`, boolean>();
 		for (const abi of eventABIS) {
 			for (const item of abi) {
 				const topics = encodeEventTopics({
@@ -75,7 +83,12 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 					eventName: item.name as ExtractAbiEventNames<ABI>,
 				});
 				eventNameTopics = eventNameTopics || [];
-				eventNameTopics.push(...topics);
+				for (const v of topics) {
+					if (!topicsSeen[v]) {
+						topicsSeen[v] = true;
+						eventNameTopics.push(v);
+					}
+				}
 			}
 		}
 
