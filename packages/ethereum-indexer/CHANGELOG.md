@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.5.0
+
+### Minor Changes
+
+- use viem + aitype for type-safe experience
+
 ## 0.4.3
 
 ### Patch Changes

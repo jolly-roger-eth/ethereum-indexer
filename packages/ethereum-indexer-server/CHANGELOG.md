@@ -1,5 +1,19 @@
 # ethereum-indexer-server
 
+## 0.5.0
+
+### Minor Changes
+
+- use viem + aitype for type-safe experience
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.5.0
+  - ethereum-indexer-db-processors@0.5.0
+  - ethereum-indexer-fs-cache@0.5.0
+  - ethereum-indexer-utils@0.5.0
+
 ## 0.4.3
 
 ### Patch Changes
