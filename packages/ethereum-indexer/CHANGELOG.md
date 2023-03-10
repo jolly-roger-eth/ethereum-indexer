@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.5.1
+
+### Patch Changes
+
+- remove duplicate contract addresses and topics for log fetching
+
 ## 0.5.0
 
 ### Minor Changes
