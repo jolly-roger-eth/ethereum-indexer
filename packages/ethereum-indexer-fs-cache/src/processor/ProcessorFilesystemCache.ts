@@ -1,4 +1,4 @@
-import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
 import fs from 'fs';
 import path from 'path';
 import {logs} from 'named-logs';
@@ -9,9 +9,9 @@ function identity(arg: any): any {
 	return arg;
 }
 
-export class ProcessorFilesystemCache implements EventProcessor {
+export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 	protected folder: string;
-	constructor(protected processor: EventProcessor, folder: string) {
+	constructor(protected processor: EventProcessor<ABI, void>, folder: string) {
 		this.folder = path.join(folder, 'logs');
 		try {
 			fs.mkdirSync(this.folder, {recursive: true});
@@ -29,8 +29,8 @@ export class ProcessorFilesystemCache implements EventProcessor {
 		}
 	}
 
-	async load(source: IndexingSource): Promise<LastSync> {
-		let lastSync: LastSync;
+	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
+		let lastSync: LastSync<ABI>;
 		try {
 			const content = fs.readFileSync(this.folder + `/lastSync.json`, 'utf8');
 			lastSync = JSON.parse(content);
@@ -44,20 +44,20 @@ export class ProcessorFilesystemCache implements EventProcessor {
 		}
 
 		// TODO check if source matches old sync
-		let lastSyncFromProcessor: LastSync = await this.processor.load(source);
+		let lastSyncFromProcessor: LastSync<ABI> = await this.processor.load(source);
 
 		const files = fs.readdirSync(this.folder);
 		namedLogger.info(`loading ${files} files of events...`);
 		const eventFiles = files.filter((v: string) => v.startsWith('events_'));
 		if (eventFiles.length > 0) {
 			for (const file of eventFiles) {
-				const eventStream: EventWithId[] = JSON.parse(fs.readFileSync(`${this.folder}/${file}`).toString());
+				const eventStream: EventWithId<ABI>[] = JSON.parse(fs.readFileSync(`${this.folder}/${file}`).toString());
 				const maxBatchSize = 128;
 
 				if (eventStream.length > maxBatchSize) {
 					namedLogger.info(`eventStream size bigger than ${maxBatchSize} : ${eventStream.length}`);
 					for (let i = 0; i < eventStream.length; i += maxBatchSize) {
-						const subStream: EventWithId[] = eventStream.slice(i, i + maxBatchSize);
+						const subStream: EventWithId<ABI>[] = eventStream.slice(i, i + maxBatchSize);
 						namedLogger.info(`sending ${subStream.length} (from ${i} to ${i + maxBatchSize - 1})`);
 						if (lastSyncFromProcessor.nextStreamID === subStream[0].streamID) {
 							lastSyncFromProcessor = {
@@ -106,7 +106,7 @@ ${JSON.stringify(lastSyncFromProcessor, null, 2)}
 		return lastSync;
 	}
 
-	async process(eventStream: EventWithId[], lastSync: LastSync): Promise<void> {
+	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
 		await this.processor.process(eventStream, lastSync);
 		if (eventStream.length > 0) {
 			const filename = `events_${lexicographicNumber15(eventStream[0].streamID)}_${lexicographicNumber15(
@@ -119,13 +119,13 @@ ${JSON.stringify(lastSyncFromProcessor, null, 2)}
 		namedLogger.info(`EventListFSStore streamID: ${lastSync.nextStreamID}`);
 	}
 
-	filter(eventsFetched: LogEvent[]): Promise<LogEvent[]> {
+	filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
 		return this.processor.filter ? this.processor.filter(eventsFetched) : identity(eventsFetched);
 	}
-	shouldFetchTimestamp(event: LogEvent): boolean {
+	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
 		return this.processor.shouldFetchTimestamp ? this.processor.shouldFetchTimestamp(event) : false;
 	}
-	shouldFetchTransaction(event: LogEvent): boolean {
+	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
 		return this.processor.shouldFetchTransaction ? this.processor.shouldFetchTransaction(event) : false;
 	}
 }

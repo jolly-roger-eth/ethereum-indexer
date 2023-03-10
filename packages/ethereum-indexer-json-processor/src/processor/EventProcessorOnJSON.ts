@@ -1,46 +1,59 @@
-import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
-import {JSObject} from './types';
+import {EventFunctions, JSObject} from './types';
 
 const namedLogger = logs('EventProcessorOnJSON');
 
-export type AllData<T extends JSObject> = {data: T; lastSync?: LastSync; history: HistoryJSObject};
+export type AllData<ABI extends Abi, ProcessResultType extends JSObject> = {
+	data: ProcessResultType;
+	lastSync?: LastSync<ABI>;
+	history: HistoryJSObject;
+};
 
-export type ExistingStateFecther<T extends JSObject> = () => Promise<AllData<T>>;
-export type StateSaver<T extends JSObject> = (data: AllData<T>) => Promise<void>;
+export type ExistingStateFecther<ABI extends Abi, ProcessResultType extends JSObject> = () => Promise<
+	AllData<ABI, ProcessResultType>
+>;
+export type StateSaver<ABI extends Abi, ProcessResultType extends JSObject> = (
+	data: AllData<ABI, ProcessResultType>
+) => Promise<void>;
 
-export interface SingleEventJSONProcessor<T extends JSObject> {
-	setup?(json: T): Promise<void>;
-	processEvent(json: T, event: EventWithId): void;
-	shouldFetchTimestamp?(event: LogEvent): boolean;
-	shouldFetchTransaction?(event: LogEvent): boolean;
-	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
-}
+export type SingleEventJSONProcessor<ABI extends Abi, ProcessResultType extends JSObject> = EventFunctions<
+	ABI,
+	ProcessResultType
+> & {
+	setup?(json: ProcessResultType): Promise<void>;
+	processEvent(json: ProcessResultType, event: EventWithId<ABI>): void;
+	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
+	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
+	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
+};
 
-export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor<T> {
-	public readonly state: T;
-	protected _json: AllData<T>;
+export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject>
+	implements EventProcessor<ABI, ProcessResultType>
+{
+	public readonly state: ProcessResultType;
+	protected _json: AllData<ABI, ProcessResultType>;
 	protected history: History;
-	protected existingStateFecther?: ExistingStateFecther<T>;
-	protected stateSaver?: StateSaver<T>;
-	constructor(private singleEventProcessor: SingleEventJSONProcessor<T>) {
+	protected existingStateFecther?: ExistingStateFecther<ABI, ProcessResultType>;
+	protected stateSaver?: StateSaver<ABI, ProcessResultType>;
+	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType>) {
 		this._json = {
-			data: {} as T,
+			data: {} as ProcessResultType,
 			history: {
 				blockHashes: {},
 				reversals: {},
 			},
 		};
 		this.history = new History(this._json.history, 12); // TODO finality
-		this.state = proxifyJSON<T>(this._json.data, this.history);
+		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
 	}
 
-	setExistingStateFetcher(fetcher: ExistingStateFecther<T>) {
+	setExistingStateFetcher(fetcher: ExistingStateFecther<ABI, ProcessResultType>) {
 		this.existingStateFecther = fetcher;
 	}
 
-	setStateSaver(saver: StateSaver<T>) {
+	setStateSaver(saver: StateSaver<ABI, ProcessResultType>) {
 		this.stateSaver = saver;
 	}
 
@@ -58,7 +71,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor<
 		await this.singleEventProcessor.setup(this._json.data);
 	}
 
-	async load(source: IndexingSource): Promise<LastSync> {
+	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
 		if (this.existingStateFecther) {
 			namedLogger.info(`fetching state...`);
 			const {lastSync: lastSyncFromExistingState, data, history} = await this.existingStateFecther();
@@ -81,7 +94,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor<
 		// TODO check if contractsData matches old sync
 		const lastSync = this.state.lastSync;
 		if (lastSync) {
-			return lastSync as unknown as LastSync;
+			return lastSync as unknown as LastSync<ABI>;
 		} else {
 			return {
 				lastToBlock: 0,
@@ -93,7 +106,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor<
 	}
 
 	private lastEventID: number;
-	async process(eventStream: EventWithId[], lastSync: LastSync): Promise<T> {
+	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
 		// namedLogger.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 
 		try {
@@ -119,7 +132,7 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor<
 						lastBlockHash = event.blockHash;
 					}
 
-					this.singleEventProcessor.processEvent(this.state, event);
+					this.singleEventProcessor.processEvent(this.state, event); // TODO check
 					// namedLogger.info(`EventProcessorOnJSON DONE`);
 				}
 				this.lastEventID = event.streamID;
@@ -147,11 +160,11 @@ export class EventProcessorOnJSON<T extends JSObject> implements EventProcessor<
 		return this.state;
 	}
 
-	shouldFetchTimestamp(event: LogEvent): boolean {
+	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
 		return this.singleEventProcessor.shouldFetchTimestamp && this.singleEventProcessor.shouldFetchTimestamp(event);
 	}
 
-	shouldFetchTransaction(event: LogEvent): boolean {
+	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
 		return this.singleEventProcessor.shouldFetchTransaction && this.singleEventProcessor.shouldFetchTransaction(event);
 	}
 }

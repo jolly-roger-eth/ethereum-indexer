@@ -1,4 +1,4 @@
-import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {Database, FromDB, JSONObject, Query, Result} from './Database';
 const console = logs('EventCache');
@@ -7,10 +7,10 @@ function lexicographicNumber15(num: number): string {
 	return num.toString().padStart(15, '0');
 }
 
-export class EventCache implements EventProcessor {
+export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 	protected eventDB: Database;
 	protected initialization: Promise<void> | undefined;
-	constructor(protected processor: EventProcessor, database: Database) {
+	constructor(protected processor: EventProcessor<ABI, void>, database: Database) {
 		this.eventDB = database;
 		this.initialization = this.init();
 	}
@@ -30,12 +30,12 @@ export class EventCache implements EventProcessor {
 		await this.init();
 	}
 
-	async load(source: IndexingSource): Promise<LastSync> {
+	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
 		// TODO check if source matches old sync
 		try {
-			const lastSync = await this.eventDB.get<LastSync & {batch: number}>('lastSync');
+			const lastSync = await this.eventDB.get<LastSync<ABI> & {batch: number}>('lastSync');
 			this.batchCounter = lastSync.batch;
-			return lastSync as unknown as LastSync;
+			return lastSync as unknown as LastSync<ABI>;
 		} catch (err) {
 			return {
 				lastToBlock: 0,
@@ -57,7 +57,7 @@ export class EventCache implements EventProcessor {
 			await this.processor.reset();
 			console.info('EventChache ...done');
 
-			const lastSync = (await this.eventDB.get('lastSync')) as LastSync & {batch: number};
+			const lastSync = (await this.eventDB.get('lastSync')) as LastSync<ABI> & {batch: number};
 			console.info(`EventCache lastSync`, JSON.stringify(lastSync, null, 2));
 			for (let i = 0; i < lastSync.batch; i++) {
 				const events = (
@@ -67,7 +67,7 @@ export class EventCache implements EventProcessor {
 						},
 						sort: ['_id'],
 					})
-				).docs.filter((v) => v._id !== 'lastSync') as unknown as EventWithId[];
+				).docs.filter((v) => v._id !== 'lastSync') as unknown as EventWithId<ABI>[];
 				if (events.length > 0) {
 					// TODO allow replay to fetch timestamp if missing
 					for (const event of events) {
@@ -98,7 +98,7 @@ export class EventCache implements EventProcessor {
 	}
 
 	protected batchCounter = 0;
-	async process(eventStream: EventWithId[], lastSync: LastSync): Promise<void> {
+	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
 		console.info(`EventCache enter processing.`);
 		await this.initialization;
 
@@ -120,10 +120,8 @@ export class EventCache implements EventProcessor {
 					topics: event.topics,
 					removed: event.removed,
 					address: event.address,
-					name: event.name,
+					eventName: event.eventName,
 					data: event.data,
-					topic: event.topic,
-					signature: event.signature,
 					args: event.args,
 					extra: event.extra,
 					batch: this.batchCounter,
@@ -152,15 +150,15 @@ export class EventCache implements EventProcessor {
 		await this.eventDB.put(lastSyncDoc);
 	}
 
-	shouldFetchTimestamp(event: LogEvent): boolean {
+	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
 		return this.processor.shouldFetchTimestamp && this.processor.shouldFetchTimestamp(event);
 	}
 
-	shouldFetchTransaction(event: LogEvent): boolean {
+	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
 		return this.processor.shouldFetchTransaction && this.processor.shouldFetchTransaction(event);
 	}
 
-	async filter(eventsFetched: LogEvent[]): Promise<LogEvent[]> {
+	async filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
 		return this.processor.filter ? this.processor.filter(eventsFetched) : eventsFetched;
 	}
 

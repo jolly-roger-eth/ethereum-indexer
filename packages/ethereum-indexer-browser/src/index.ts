@@ -13,7 +13,6 @@ export type {
 	EventProcessor,
 	EventWithId,
 	ExistingStreamFecther,
-	GenericABI,
 	IndexerConfig,
 	LastSync,
 	LoadingState,

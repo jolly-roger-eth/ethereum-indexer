@@ -14,12 +14,11 @@
 	"devDependencies": {
 		"eip-1193": "^0.2.2",
 		"tsup": "^6.2.1",
-		"typescript": "^4.6.4"
+		"typescript": "^4.9.5",
+		"abitype": "^0.7.0"
 	},
 	"dependencies": {
-		"@ethersproject/abi": "^5.6.4",
-		"@ethersproject/address": "^5.6.1",
-		"@ethersproject/bytes": "^5.6.1",
-		"named-logs": "^0.2.0"
+		"named-logs": "^0.2.0",
+		"viem": "^0.1.9"
 	}
 }

@@ -23,38 +23,39 @@ import type {
 	AllContractData,
 } from './types';
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
+import type {Abi} from 'abitype';
 
 const namedLogger = logs('ethereum-indexer');
 
 export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
 
-export class EthereumIndexer<T = void> {
+export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC VARIABLES
 	// ------------------------------------------------------------------------------------------------------------------
 
 	public readonly defaultFromBlock: number;
 	public onLoad: ((state: LoadingState) => Promise<void>) | undefined;
-	public onProcessed: ((state: T) => void) | undefined;
+	public onProcessed: ((state: ProcessResultType) => void) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
 	// ------------------------------------------------------------------------------------------------------------------
-	protected logEventFetcher: LogEventFetcher;
-	protected lastSync: LastSync | undefined;
+	protected logEventFetcher: LogEventFetcher<ABI>;
+	protected lastSync: LastSync<ABI> | undefined;
 	protected finality: number;
 	protected alwaysFetchTimestamps: boolean;
 	protected alwaysFetchTransactions: boolean;
 	protected providerSupportsETHBatch: boolean;
-	protected fetchExistingStream: ExistingStreamFecther | undefined;
-	protected saveAppendedStream: StreamSaver | undefined;
-	protected appendedStreamNotYetSaved: EventWithId[] = [];
+	protected fetchExistingStream: ExistingStreamFecther<ABI> | undefined;
+	protected saveAppendedStream: StreamSaver<ABI> | undefined;
+	protected appendedStreamNotYetSaved: EventWithId<ABI>[] = [];
 	protected _reseting: Promise<void> | undefined;
-	protected _loading: Promise<LastSync> | undefined;
-	protected _indexingMore: Promise<LastSync> | undefined;
-	protected _feeding: Promise<LastSync> | undefined;
+	protected _loading: Promise<LastSync<ABI>> | undefined;
+	protected _indexingMore: Promise<LastSync<ABI>> | undefined;
+	protected _feeding: Promise<LastSync<ABI>> | undefined;
 	protected _saving: Promise<void> | undefined;
-	protected _logEventPromise: ParsedLogsPromise;
+	protected _logEventPromise: ParsedLogsPromise<ABI>;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// CONSTRUCTOR
@@ -62,9 +63,9 @@ export class EthereumIndexer<T = void> {
 
 	constructor(
 		protected provider: EIP1193ProviderWithoutEvents,
-		protected processor: EventProcessor<T>,
-		protected source: IndexingSource,
-		config: IndexerConfig = {}
+		protected processor: EventProcessor<ABI, ProcessResultType>,
+		protected source: IndexingSource<ABI>,
+		config: IndexerConfig<ABI> = {}
 	) {
 		this.finality = config.finality || 12;
 		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config);
@@ -87,14 +88,14 @@ export class EthereumIndexer<T = void> {
 				}
 			}
 		} else {
-			this.defaultFromBlock = (this.source.contracts as unknown as AllContractData).startBlock || 0;
+			this.defaultFromBlock = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
 		}
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC INTERFACE
 	// ------------------------------------------------------------------------------------------------------------------
-	load(): Promise<LastSync> {
+	load(): Promise<LastSync<ABI>> {
 		if (!this._loading) {
 			this._loading = this.promiseToLoad();
 		}
@@ -145,7 +146,7 @@ export class EthereumIndexer<T = void> {
 		return this._reseting;
 	}
 
-	async feed(eventStream: EventWithId[], lastSyncFetched?: LastSync): Promise<LastSync> {
+	async feed(eventStream: EventWithId<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
 		if (this._indexingMore) {
 			throw new Error(`indexing... should not feed`);
 		}
@@ -161,7 +162,7 @@ export class EthereumIndexer<T = void> {
 		return this._feeding;
 	}
 
-	indexMore(): Promise<LastSync> {
+	indexMore(): Promise<LastSync<ABI>> {
 		if (this._feeding) {
 			throw new Error(`feeding... cannot index until feeding is complete`);
 		}
@@ -193,7 +194,7 @@ export class EthereumIndexer<T = void> {
 		}
 	}
 
-	protected async promiseToLoad(): Promise<LastSync> {
+	protected async promiseToLoad(): Promise<LastSync<ABI>> {
 		try {
 			const chainId = await this.provider.request({method: 'eth_chainId'});
 			if (parseInt(chainId.slice(2), 16).toString() !== this.source.chainId) {
@@ -235,7 +236,10 @@ export class EthereumIndexer<T = void> {
 		}
 	}
 
-	protected async promiseToFeed(eventStream: EventWithId[], lastSyncFetched?: LastSync): Promise<LastSync> {
+	protected async promiseToFeed(
+		eventStream: EventWithId<ABI>[],
+		lastSyncFetched?: LastSync<ABI>
+	): Promise<LastSync<ABI>> {
 		try {
 			// this create an infinite loop as load call promise
 			// TODO if we need to call promise first, we could add an option to load (and load will not use that option)
@@ -243,7 +247,7 @@ export class EthereumIndexer<T = void> {
 			// 	namedLogger.info(`load lastSync...`);
 			// 	await this.load();
 			// }
-			const lastSync: LastSync = this.lastSync || {
+			const lastSync: LastSync<ABI> = this.lastSync || {
 				lastToBlock: 0,
 				latestBlock: 0,
 				nextStreamID: 1,
@@ -294,7 +298,7 @@ export class EthereumIndexer<T = void> {
 		}
 	}
 
-	protected async save(eventStream: EventWithId[], lastSync: LastSync) {
+	protected async save(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
 		if (!this._saving) {
 			if (this.saveAppendedStream) {
 				this._saving = this.promiseToSave(eventStream, lastSync);
@@ -307,7 +311,7 @@ export class EthereumIndexer<T = void> {
 		return this._saving.then(() => this.promiseToSave(eventStream, lastSync));
 	}
 
-	protected async promiseToSave(eventStream: EventWithId[], lastSync: LastSync) {
+	protected async promiseToSave(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
 		this.appendedStreamNotYetSaved.push(...eventStream);
 		try {
 			await this.saveAppendedStream({
@@ -357,14 +361,14 @@ export class EthereumIndexer<T = void> {
 		}
 	}
 
-	protected promiseToIndex(): Promise<LastSync> {
+	protected promiseToIndex(): Promise<LastSync<ABI>> {
 		return new Promise(async (resolve, reject) => {
 			try {
 				if (!this.lastSync) {
 					namedLogger.info(`load lastSync...`);
 					await this.load();
 				}
-				const lastSync = this.lastSync as LastSync;
+				const lastSync = this.lastSync as LastSync<ABI>;
 
 				const unconfirmedBlocks = lastSync.unconfirmedBlocks;
 				let streamID = lastSync.nextStreamID;
@@ -403,7 +407,7 @@ export class EthereumIndexer<T = void> {
 					toBlock: toBlock,
 				});
 
-				let logResult: ParsedLogsResult;
+				let logResult: ParsedLogsResult<ABI>;
 				try {
 					logResult = await this._logEventPromise;
 				} finally {
@@ -555,12 +559,12 @@ export class EthereumIndexer<T = void> {
 	}
 
 	protected _generateStreamToAppend(
-		newEvents: LogEvent[],
-		{latestBlock, lastToBlock, unconfirmedBlocks, nextStreamID}: LastSync
-	): {eventStream: EventWithId[]; newLastSync: LastSync} {
+		newEvents: LogEvent<ABI>[],
+		{latestBlock, lastToBlock, unconfirmedBlocks, nextStreamID}: LastSync<ABI>
+	): {eventStream: EventWithId<ABI>[]; newLastSync: LastSync<ABI>} {
 		// grouping per block...
-		const groups: {[hash: string]: BlockEvents} = {};
-		const eventsGroupedPerBlock: BlockEvents[] = [];
+		const groups: {[hash: string]: BlockEvents<ABI>} = {};
+		const eventsGroupedPerBlock: BlockEvents<ABI>[] = [];
 		for (const event of newEvents) {
 			let group = groups[event.blockHash];
 			if (!group) {
@@ -576,10 +580,10 @@ export class EthereumIndexer<T = void> {
 
 		// set up the new entries to be added to the stream
 		// const newEventEntries: DurableObjectEntries<LogEvent> = {};
-		const eventStream: EventWithId[] = [];
+		const eventStream: EventWithId<ABI>[] = [];
 
 		// find reorgs
-		let reorgBlock: EventBlock | undefined;
+		let reorgBlock: EventBlock<ABI> | undefined;
 		let reorgedBlockIndex = 0;
 		for (const block of eventsGroupedPerBlock) {
 			if (reorgedBlockIndex < unconfirmedBlocks.length) {
@@ -615,8 +619,8 @@ export class EthereumIndexer<T = void> {
 		// the case for 0 is a void case as none of the loop below will be triggered
 
 		// new events and new unconfirmed blocks
-		const newUnconfirmedBlocks: EventBlock[] = [];
-		const newUnconfirmedStream: LogEvent[] = [];
+		const newUnconfirmedBlocks: EventBlock<ABI>[] = [];
+		const newUnconfirmedStream: LogEvent<ABI>[] = [];
 
 		// re-add unconfirmed blocks that might get reorg later still
 		for (const unconfirmedBlock of unconfirmedBlocks) {

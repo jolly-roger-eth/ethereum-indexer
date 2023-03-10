@@ -6,7 +6,7 @@ import {
 
 import {logs} from 'named-logs';
 
-import OuterSpace from './abis/OuterSpace.json';
+import OuterSpace from './abis/OuterSpace';
 import {Data, Planet, Player} from './types/db';
 import {ExitComplete, FleetArrived, FleetSent, PlanetExit, PlanetStake, PlanetTransfer} from './types/events';
 
@@ -104,7 +104,7 @@ function getPlayer(data: Data, address: string): Player {
 	return player;
 }
 
-const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
+const ConquestEventProcessor: SingleJSONEventProcessorObject<typeof OuterSpace, Data> = {
 	async setup(json: Data): Promise<void> {
 		json.space = {
 			address: '', // TODO
@@ -119,50 +119,50 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<Data> = {
 		json.fleets = {};
 		// namedLogger.info(`setup complete!`);
 	},
-	onPlanetStake(data: Data, event: PlanetStake) {
+	onPlanetStake(data, event) {
 		getOrCreatePlayer(data, event.args.acquirer);
-		const planet = getOrCreatePlanet(data, event.args.location);
+		const planet = getOrCreatePlanet(data, event.args.location.toString());
 		planet.owner = event.args.acquirer;
 	},
-	onPlanetTransfer(data: Data, event: PlanetTransfer) {
+	onPlanetTransfer(data, event) {
 		// getPlayer(data, event.args.previousOwner);
 		getOrCreatePlayer(data, event.args.newOwner);
-		const planet = getPlanet(data, event.args.location);
+		const planet = getPlanet(data, event.args.location.toString());
 		planet.owner = event.args.newOwner;
 	},
-	onPlanetExit(data: Data, event: PlanetExit) {
+	onPlanetExit(data, event) {
 		// getPlayer(data, event.args.owner);
-		const planet = getPlanet(data, event.args.location);
+		const planet = getPlanet(data, event.args.location.toString());
 		planet.exitTime = event.blockNumber; // TODO block timestamp
 	},
 	// TODO
 	// onTravelingUpkeepRefund(data: Data, event: TravelingUpkeepRefund) {
 
 	// },
-	onExitComplete(data: Data, event: ExitComplete) {
-		const planet = getPlanet(data, event.args.location);
+	onExitComplete(data, event) {
+		const planet = getPlanet(data, event.args.location.toString());
 		planet.exitTime = 0;
 		planet.owner = undefined;
 	},
-	onFleetSent(data: Data, event: FleetSent) {
-		data.fleets[event.args.fleet] = {
-			id: event.args.fleet,
+	onFleetSent(data, event) {
+		data.fleets[event.args.fleet.toString()] = {
+			id: event.args.fleet.toString(),
 			owner: event.args.fleetOwner,
 			sender: event.args.fleetSender,
 			operator: event.args.fleetSender, // TODO fix using tx data
 			launchTime: event.blockNumber, // TODO fix using block timestamp
-			from: event.args.from,
+			from: event.args.from.toString(),
 			quantity: event.args.quantity,
 			resolved: false,
 			sendTransaction: event.transactionHash,
 		};
 	},
-	onFleetArrived(data: Data, event: FleetArrived) {
-		const planet = getOrCreatePlanet(data, event.args.destination);
+	onFleetArrived(data, event) {
+		const planet = getOrCreatePlanet(data, event.args.destination.toString());
 
 		// namedLogger.info(event.args.data);
 
-		const fleet = data.fleets[event.args.fleet];
+		const fleet = data.fleets[event.args.fleet.toString()];
 		fleet.resolveTransaction = event.transactionHash;
 		// TODO result
 		if (event.args.won) {

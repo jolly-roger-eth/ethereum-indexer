@@ -1,4 +1,4 @@
-import {EventProcessor} from 'ethereum-indexer';
+import {Abi, EventProcessor} from 'ethereum-indexer';
 import {FromDB, JSONObject, Query, Result} from './Database';
 
 export type Queriable = {
@@ -7,4 +7,4 @@ export type Queriable = {
 	get<T extends JSONObject>(id: string): Promise<FromDB<T> | null>;
 };
 
-export type QueriableEventProcessor = EventProcessor & Queriable;
+export type QueriableEventProcessor<ABI extends Abi> = EventProcessor<ABI> & Queriable;

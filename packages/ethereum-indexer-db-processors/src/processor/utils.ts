@@ -2,32 +2,32 @@ import {PouchDatabase} from './PouchDatabase';
 import {SingleEventProcessor, EventProcessorOnDatabase} from './EventProcessorOnDatabase';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, PutAndGetDatabase} from './Database';
-import {EventWithId, LogEvent} from 'ethereum-indexer';
+import {Abi, EventWithId, LogEvent} from 'ethereum-indexer';
 import {EventProcessorWithBatchDBUpdate, SingleEventProcessorWithBatchSupport} from './EventProcessorWithBatchDBUpdate';
 
-export function fromSingleEventProcessor(
-	v: SingleEventProcessor | (() => SingleEventProcessor)
-): (config?: {folder: string}) => QueriableEventProcessor {
+export function fromSingleEventProcessor<ABI extends Abi>(
+	v: SingleEventProcessor<ABI> | (() => SingleEventProcessor<ABI>)
+): (config?: {folder: string}) => QueriableEventProcessor<ABI> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorOnDatabase(typeof v === 'function' ? v() : v, db);
 	};
 }
 
-export type SingleEventProcessorObject = {
-	[func: string]: (db: PutAndGetDatabase, event: EventWithId) => Promise<void>;
+export type SingleEventProcessorObject<ABI extends Abi> = {
+	[func: string]: (db: PutAndGetDatabase, event: EventWithId<ABI>) => Promise<void>;
 } & {
 	setup?(db: Database): Promise<void>;
-	shouldFetchTimestamp?(event: LogEvent): boolean;
-	shouldFetchTransaction?(event: LogEvent): boolean;
-	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
+	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
+	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
+	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 };
 
-export class SingleEventProcessorWrapper implements SingleEventProcessor {
-	constructor(protected obj: SingleEventProcessorObject) {}
+export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEventProcessor<ABI> {
+	constructor(protected obj: SingleEventProcessorObject<ABI>) {}
 
-	async processEvent(db: PutAndGetDatabase, event: EventWithId): Promise<void> {
-		const functionName = `on${event.name}`;
+	async processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void> {
+		const functionName = `on${event.eventName}`;
 		if (this.obj[functionName]) {
 			return this.obj[functionName](db, event);
 		}
@@ -37,19 +37,19 @@ export class SingleEventProcessorWrapper implements SingleEventProcessor {
 			return this.obj.setup(db);
 		}
 	}
-	shouldFetchTimestamp?(event: LogEvent): boolean {
+	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean {
 		if (this.obj.shouldFetchTimestamp) {
 			return this.obj.shouldFetchTimestamp(event);
 		}
 		return false;
 	}
-	shouldFetchTransaction?(event: LogEvent): boolean {
+	shouldFetchTransaction?(event: LogEvent<ABI>): boolean {
 		if (this.obj.shouldFetchTransaction) {
 			return this.obj.shouldFetchTransaction(event);
 		}
 		return false;
 	}
-	async filter(eventsFetched: LogEvent[]): Promise<LogEvent[]> {
+	async filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
 		if (this.obj.filter) {
 			return this.obj.filter(eventsFetched);
 		}
@@ -57,9 +57,9 @@ export class SingleEventProcessorWrapper implements SingleEventProcessor {
 	}
 }
 
-export function fromSingleEventProcessorObject(
-	v: SingleEventProcessorObject | (() => SingleEventProcessorObject)
-): (config?: {folder: string}) => QueriableEventProcessor {
+export function fromSingleEventProcessorObject<ABI extends Abi>(
+	v: SingleEventProcessorObject<ABI> | (() => SingleEventProcessorObject<ABI>)
+): (config?: {folder: string}) => QueriableEventProcessor<ABI> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorOnDatabase(
@@ -69,9 +69,9 @@ export function fromSingleEventProcessorObject(
 	};
 }
 
-export function fromSingleEventProcessorWithBatchSupportObject(
-	v: SingleEventProcessorWithBatchSupport | (() => SingleEventProcessorWithBatchSupport)
-): (config?: {folder: string}) => QueriableEventProcessor {
+export function fromSingleEventProcessorWithBatchSupportObject<ABI extends Abi>(
+	v: SingleEventProcessorWithBatchSupport<ABI> | (() => SingleEventProcessorWithBatchSupport<ABI>)
+): (config?: {folder: string}) => QueriableEventProcessor<ABI> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorWithBatchDBUpdate(typeof v === 'function' ? v() : v, db);
@@ -82,6 +82,6 @@ export function computeArchiveID(id: string, endBlock: number): string {
 	return `archive_${endBlock}_${id}`;
 }
 
-export function computeEventID(event: EventWithId): string {
+export function computeEventID<ABI extends Abi>(event: EventWithId<ABI>): string {
 	return `${event.transactionHash}_${event.logIndex}`;
 }

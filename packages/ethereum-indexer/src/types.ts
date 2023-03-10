@@ -1,68 +1,69 @@
-import {JSONObject, JSONType, LogEvent} from './decoding/LogEventFetcher';
+import {Abi} from 'abitype';
+import {JSONObject, LogEvent} from './decoding/LogEventFetcher';
 import {LogFetcherConfig} from './engine/LogFetcher';
 
 export type {LogFetcher, LogFetcherConfig} from './engine/LogFetcher';
 export type {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
 
 // when state can be serialised and fit in memory (especialy useful in browser context), we can have it returned
-export type EventProcessor<T = void> = {
-	load: (source: IndexingSource) => Promise<LastSync>;
-	process: (eventStream: EventWithId[], lastSync: LastSync) => Promise<T>;
+export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
+	load: (source: IndexingSource<ABI>) => Promise<LastSync<ABI>>;
+	process: (eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
-	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
-	shouldFetchTimestamp?: (event: LogEvent) => boolean;
-	shouldFetchTransaction?: (event: LogEvent) => boolean;
+	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
+	shouldFetchTimestamp?: (event: LogEvent<ABI>) => boolean;
+	shouldFetchTransaction?: (event: LogEvent<ABI>) => boolean;
 };
 
-export type EventBlock = {
+export type EventBlock<ABI extends Abi> = {
 	number: number;
 	hash: string;
-	events: LogEvent[];
+	events: LogEvent<ABI>[];
 };
 
-export type LastSync = {
+export type LastSync<ABI extends Abi> = {
 	latestBlock: number;
 	lastToBlock: number;
-	unconfirmedBlocks: EventBlock[];
+	unconfirmedBlocks: EventBlock<ABI>[];
 	nextStreamID: number;
 };
 
-export type EventWithId<
-	Args extends {
-		[key: string]: JSONType;
-	} = {
-		[key: string]: JSONType;
-	},
-	Extra extends JSONObject = JSONObject
-> = LogEvent<Args, Extra> & {
+export type EventWithId<ABI extends Abi, Extra extends JSONObject = JSONObject> = LogEvent<ABI, Extra> & {
 	streamID: number;
 };
 
-export type BlockEvents = {hash: string; number: number; events: LogEvent[]};
+export type BlockEvents<ABI extends Abi> = {hash: string; number: number; events: LogEvent<ABI>[]};
 
-export type GenericABI = readonly any[];
-export type ContractData = {
-	readonly abi: GenericABI;
+export type ContractData<ABI extends Abi> = {
+	readonly abi: ABI;
 	readonly address: string;
 	readonly startBlock?: number;
-	readonly history?: readonly {readonly abi: GenericABI; readonly startBlock?: number}[];
+	readonly history?: readonly {readonly abi: ABI; readonly startBlock?: number}[];
 };
 
-export type AllContractData = {
-	readonly abi: GenericABI;
+export type AllContractData<ABI extends Abi> = {
+	readonly abi: ABI;
 	readonly startBlock?: number;
 };
 
-export type IndexingSource = {readonly contracts: readonly ContractData[] | AllContractData; readonly chainId: string};
+export type IndexingSource<ABI extends Abi> = {
+	readonly contracts: readonly ContractData<ABI>[] | AllContractData<ABI>;
+	readonly chainId: string;
+};
 
-export type ExistingStreamFecther = (nextStreamID: number) => Promise<{lastSync: LastSync; eventStream: EventWithId[]}>;
-export type StreamSaver = (stream: {lastSync: LastSync; eventStream: EventWithId[]}) => Promise<void>;
+export type ExistingStreamFecther<ABI extends Abi> = (
+	nextStreamID: number
+) => Promise<{lastSync: LastSync<ABI>; eventStream: EventWithId<ABI>[]}>;
+export type StreamSaver<ABI extends Abi> = (stream: {
+	lastSync: LastSync<ABI>;
+	eventStream: EventWithId<ABI>[];
+}) => Promise<void>;
 
-export type IndexerConfig = LogFetcherConfig & {
+export type IndexerConfig<ABI extends Abi> = LogFetcherConfig & {
 	finality?: number;
 	alwaysFetchTimestamps?: boolean;
 	alwaysFetchTransactions?: boolean;
 	providerSupportsETHBatch?: boolean;
-	fetchExistingStream?: ExistingStreamFecther;
-	saveAppendedStream?: StreamSaver;
+	fetchExistingStream?: ExistingStreamFecther<ABI>;
+	saveAppendedStream?: StreamSaver<ABI>;
 };

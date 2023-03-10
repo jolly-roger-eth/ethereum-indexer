@@ -1,4 +1,4 @@
-import {IndexingSource, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, FromDB, JSONObject, PutAndGetDatabase, Query, Result} from './Database';
@@ -6,18 +6,18 @@ import {RevertableDatabase} from './RevertableDatabase';
 
 const console = logs('EventProcessorOnDatabase');
 
-export interface SingleEventProcessor {
-	processEvent(db: PutAndGetDatabase, event: EventWithId): Promise<void>;
+export interface SingleEventProcessor<ABI extends Abi> {
+	processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void>;
 	setup?(db: Database): Promise<void>;
-	shouldFetchTimestamp?(event: LogEvent): boolean;
-	shouldFetchTransaction?(event: LogEvent): boolean;
-	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
+	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
+	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
+	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 }
 
-export class EventProcessorOnDatabase implements QueriableEventProcessor {
+export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEventProcessor<ABI> {
 	private initialization: Promise<void> | undefined;
-	private revertableDatabase: RevertableDatabase;
-	constructor(private singleEventProcessor: SingleEventProcessor, protected db: Database) {
+	private revertableDatabase: RevertableDatabase<ABI>;
+	constructor(private singleEventProcessor: SingleEventProcessor<ABI>, protected db: Database) {
 		this.initialization = this.init();
 		// this.revertableDatabase = new RevertableDatabase(db, true); // this allow time-travel queries but requires processing and will not scale
 		this.revertableDatabase = new RevertableDatabase(db);
@@ -39,11 +39,11 @@ export class EventProcessorOnDatabase implements QueriableEventProcessor {
 		await this.init();
 	}
 
-	async load(source: IndexingSource): Promise<LastSync> {
+	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
 		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
-			return lastSync as unknown as LastSync;
+			return lastSync as unknown as LastSync<ABI>;
 		} else {
 			return {
 				lastToBlock: 0,
@@ -56,7 +56,7 @@ export class EventProcessorOnDatabase implements QueriableEventProcessor {
 
 	private lastEventID: number;
 	private processing: boolean;
-	async process(eventStream: EventWithId[], lastSync: LastSync): Promise<void> {
+	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
 		if (this.processing) {
 			throw new Error(`processing...`);
 		}
@@ -126,11 +126,11 @@ export class EventProcessorOnDatabase implements QueriableEventProcessor {
 		}
 	}
 
-	shouldFetchTimestamp(event: LogEvent): boolean {
+	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
 		return this.singleEventProcessor.shouldFetchTimestamp && this.singleEventProcessor.shouldFetchTimestamp(event);
 	}
 
-	shouldFetchTransaction(event: LogEvent): boolean {
+	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
 		return this.singleEventProcessor.shouldFetchTransaction && this.singleEventProcessor.shouldFetchTransaction(event);
 	}
 

@@ -1,4 +1,4 @@
-import {EventWithId} from 'ethereum-indexer';
+import {Abi, EventWithId} from 'ethereum-indexer';
 import {exportEvents, loadAll} from '.';
 import fs from 'fs-extra';
 
@@ -12,18 +12,18 @@ function randomAddress(): string {
 	return '0x4200000000000000' + (addressCounter++).toString().padStart(24, '0');
 }
 
-function mutateViaTmpRandomEvent(events: EventWithId[], index: number): EventWithId[] {
+function mutateViaTmpRandomEvent<ABI extends Abi>(events: EventWithId<ABI>[], index: number): EventWithId<ABI>[] {
 	const event = events[index];
 	const mutated = {...event};
 	mutated.blockHash = randomHash();
 	mutated.transactionHash = randomHash();
 	mutated.args = {...event.args};
-	mutated.args.to = randomAddress();
+	(mutated.args as any).to = randomAddress(); // TODO test types: this need to be typed
 	events.splice(index, 1, ...[mutated, {...mutated, removed: true}, event]);
 	return events;
 }
 
-function mutateViaTmpReversal(events: EventWithId[], index: number): EventWithId[] {
+function mutateViaTmpReversal<ABI extends Abi>(events: EventWithId<ABI>[], index: number): EventWithId<ABI>[] {
 	const event = events[index];
 	const sameInANewBlock = {...event};
 	sameInANewBlock.blockHash = randomHash();

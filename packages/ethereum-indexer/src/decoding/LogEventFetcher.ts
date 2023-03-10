@@ -1,10 +1,8 @@
-import {EventFragment, Interface} from '@ethersproject/abi';
-import {getAddress} from '@ethersproject/address';
 import {EIP1193Account, EIP1193DATA, EIP1193Log, EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {GenericABI} from '../types';
-import {InterfaceWithLowerCaseAddresses} from './address';
 import {LogTransactionData} from '../engine/ethereum';
 import {LogFetcher, LogFetcherConfig} from '../engine/LogFetcher';
+import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
+import {decodeEventLog, DecodeEventLogReturnType, encodeEventTopics} from 'viem';
 
 export type JSONObject = {
 	[key: string]: JSONType;
@@ -15,13 +13,6 @@ export type JSONType = string | number | boolean | JSONType[] | JSONObject;
 interface Result extends ReadonlyArray<any> {
 	readonly [key: string]: any;
 }
-
-type EthersInterfaceLogDescription = {
-	readonly name: string;
-	readonly signature: string;
-	readonly topic: string;
-	readonly args: Result;
-};
 
 interface NumberifiedLog {
 	blockNumber: number;
@@ -39,89 +30,76 @@ interface NumberifiedLog {
 	logIndex: number;
 }
 
-export interface LogEvent<
-	Args extends {
-		[key: string]: JSONType;
-	} = {
-		[key: string]: JSONType;
-	},
-	Extra extends JSONObject = JSONObject
-> extends NumberifiedLog {
-	name?: string;
-	topic?: string;
-	signature?: string;
-	args?: Args;
-	// If parsing the arguments failed, this is the error
-	decodeError?: Error;
-	extra?: Extra;
-	blockTimestamp?: number;
-	transaction?: LogTransactionData;
-}
+// type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+// type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+type PartialBy<T, K extends keyof T> = T; // TODO ?
+export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
+export type LogEvent<ABI extends Abi, Extra extends JSONObject = JSONObject> = NumberifiedLog &
+	PartialBy<LogParsedData<ABI>, 'args' | 'eventName'> & {
+		decodeError?: Error;
+		extra?: Extra;
+		blockTimestamp?: number;
+		transaction?: LogTransactionData;
+	};
 
-export type ParsedLogsResult = {events: LogEvent[]; toBlockUsed: number};
-export type ParsedLogsPromise = Promise<ParsedLogsResult> & {stopRetrying(): void};
+export type ParsedLogsResult<ABI extends Abi> = {events: LogEvent<ABI>[]; toBlockUsed: number};
+export type ParsedLogsPromise<ABI extends Abi> = Promise<ParsedLogsResult<ABI>> & {stopRetrying(): void};
 
-export class LogEventFetcher extends LogFetcher {
-	protected contracts: {address: string; interface: Interface}[] | Interface;
+export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 	constructor(
-		provider: EIP1193ProviderWithoutEvents,
-		contractsData: readonly {readonly address: string; readonly abi: GenericABI}[] | {readonly abi: GenericABI},
-		config: LogFetcherConfig = {}
+		readonly provider: EIP1193ProviderWithoutEvents,
+		readonly contractsData: readonly {readonly address: string; readonly abi: ABI}[] | {readonly abi: ABI},
+		readonly conf: LogFetcherConfig = {}
 	) {
-		let contracts: {address: EIP1193Account; interface: Interface}[] | Interface;
 		let contractAddresses: EIP1193Account[] | null = null;
-		let eventABIS: Interface[];
+		let eventABIS: readonly AbiEvent[][];
 		if (Array.isArray(contractsData)) {
-			contracts = contractsData.map((v) => ({
-				address: v.address as EIP1193Account,
-				interface: new InterfaceWithLowerCaseAddresses(v.abi),
-			}));
-			contractAddresses = contracts.map((v) => v.address);
-			eventABIS = contracts.map((v) => v.interface);
+			contractAddresses = contractsData.map((v) => v.address);
+			eventABIS = (contractsData as readonly {readonly address: string; readonly abi: ABI}[]).map((v) =>
+				v.abi.filter((item) => item.type === 'event')
+			) as unknown as AbiEvent[][];
 		} else {
-			contracts = new InterfaceWithLowerCaseAddresses((contractsData as {readonly abi: GenericABI}).abi);
-			eventABIS = [contracts];
+			// contracts = new InterfaceWithLowerCaseAddresses((contractsData as {readonly abi: T}).abi);
+			const allContractsData = contractsData as {readonly abi: ABI};
+			eventABIS = [allContractsData.abi.filter((item) => item.type === 'event')] as unknown as AbiEvent[][];
 		}
 
 		let eventNameTopics: EIP1193DATA[] | null = null;
-		for (const contract of eventABIS) {
-			for (const fragment of contract.fragments) {
-				if (fragment.type === 'event') {
-					const eventFragment = fragment as EventFragment;
-					const topic = contract.getEventTopic(eventFragment) as EIP1193DATA;
-					if (topic) {
-						eventNameTopics = eventNameTopics || [];
-						eventNameTopics.push(topic);
-					}
-				}
+		for (const abi of eventABIS) {
+			for (const item of abi) {
+				const topics = encodeEventTopics({
+					abi,
+					eventName: item.name as ExtractAbiEventNames<ABI>,
+				});
+				eventNameTopics = eventNameTopics || [];
+				eventNameTopics.push(...topics);
 			}
 		}
 
-		super(provider, contractAddresses, eventNameTopics, config);
-		this.contracts = contracts;
+		super(provider, contractAddresses, eventNameTopics, conf);
 	}
 
-	getLogEvents(options: {fromBlock: number; toBlock: number; retry?: number}): ParsedLogsPromise {
+	getLogEvents(options: {fromBlock: number; toBlock: number; retry?: number}): ParsedLogsPromise<ABI> {
 		const logsPromise = this.getLogs(options);
 		const promise = logsPromise.then(({logs, toBlockUsed}) => {
 			const events = this.parse(logs);
 			return {events, toBlockUsed};
 		});
 
-		(promise as ParsedLogsPromise).stopRetrying = logsPromise.stopRetrying;
-		return promise as ParsedLogsPromise;
+		(promise as ParsedLogsPromise<ABI>).stopRetrying = logsPromise.stopRetrying;
+		return promise as ParsedLogsPromise<ABI>;
 	}
 
-	parse(logs: EIP1193Log[]): LogEvent[] {
-		const events: LogEvent[] = [];
+	parse(logs: EIP1193Log[]): LogEvent<ABI>[] {
+		const events: LogEvent<ABI>[] = [];
 		for (let i = 0; i < logs.length; i++) {
 			const log = logs[i];
-			const eventAddress = getAddress(log.address);
-			const correspondingContract = !Array.isArray(this.contracts)
-				? this.contracts
-				: this.contracts.find((v) => v.address.toLowerCase() === eventAddress.toLowerCase())?.interface;
-			if (correspondingContract) {
-				const event: LogEvent = {
+			const eventAddress = log.address.toLowerCase();
+			const correspondingABI: ABI = !Array.isArray(this.contractsData)
+				? this.contractsData
+				: this.contractsData.find((v) => v.address.toLowerCase() === eventAddress.toLowerCase())?.abi;
+			if (correspondingABI) {
+				const event: NumberifiedLog = {
 					blockNumber: parseInt(log.blockNumber.slice(2), 16),
 					blockHash: log.blockHash,
 					transactionIndex: parseInt(log.transactionIndex.slice(2), 16),
@@ -132,30 +110,23 @@ export class LogEventFetcher extends LogFetcher {
 					transactionHash: log.transactionHash,
 					logIndex: parseInt(log.logIndex.slice(2), 16),
 				};
-				let parsed: EthersInterfaceLogDescription | null = null;
+				let parsed: DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`> | null = null;
 				try {
-					parsed = correspondingContract.parseLog(log);
-				} catch (e) {}
-
-				if (parsed) {
-					// Successfully parsed the event log; include it
-					const args: {[key: string | number]: string | number} = {};
-					const parsedArgsKeys = Object.keys(parsed.args);
-					for (const key of parsedArgsKeys) {
-						// BigNumber to be represented as decimal string
-						let value = parsed.args[key];
-						if ((value as {_isBigNumber?: boolean; toString(): string})._isBigNumber) {
-							value = value.toString();
-						}
-						args[key] = value;
-					}
-					event.args = args;
-					event.name = parsed.name;
-					event.signature = parsed.signature;
-					event.topic = parsed.topic;
+					parsed = decodeEventLog({
+						abi: correspondingABI,
+						data: log.data,
+						topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
+					});
+				} catch (err) {
+					(event as LogEvent<ABI>).decodeError = err;
 				}
 
-				events.push(event);
+				if (parsed) {
+					(event as LogEvent<ABI>).args = parsed.args;
+					(event as LogEvent<ABI>).eventName = parsed.eventName;
+				}
+
+				events.push(event as LogEvent<ABI>);
 			}
 		}
 		return events;

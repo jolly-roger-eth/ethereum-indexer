@@ -1,4 +1,5 @@
 import {
+	EventFunctions,
 	EventWithId,
 	fromSingleJSONEventProcessorObject,
 	SingleJSONEventProcessorObject,
@@ -6,25 +7,39 @@ import {
 
 import {logs} from 'named-logs';
 
-import eip721 from './eip721.json';
+import eip721 from './eip721';
 import {Data, Spaceship} from './types';
 
 const namedLogger = logs('VoidrunnerEventProcessor');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-const VoidrunnerEventProcessor: SingleJSONEventProcessorObject<Data> = {
+// ----------------------
+// TESTING
+// ----------------------
+
+// type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
+// type LogEvent<ABI extends Abi, Extra extends JSONObject = JSONObject> = NumberifiedLog &
+// 	PartialBy<LogParsedData<ABI>, 'args' | 'eventName'> & {
+// 		decodeError?: Error;
+// 		extra?: Extra;
+// 		blockTimestamp?: number;
+// 		transaction?: LogTransactionData;
+// 	};
+// ----------------------
+
+const VoidrunnerEventProcessor: SingleJSONEventProcessorObject<typeof eip721, Data> = {
 	async setup(json: Data): Promise<void> {
 		json.voidrunners = [];
 		json.spaceships = [];
 		// namedLogger.info(`setup complete!`);
 	},
-	onTransfer(data: Data, event: EventWithId) {
+	onTransfer(data, event) {
 		// namedLogger.info(`onTransfer...`);
 
-		const to = event.args.to as string;
+		const to = event.args.to;
 
-		const tokenID = event.args.id as string;
+		const tokenID = event.args.id.toString();
 
 		let spaceship: Spaceship;
 		let spaceshipIndex = data.spaceships.findIndex((v) => v.tokenID === tokenID);

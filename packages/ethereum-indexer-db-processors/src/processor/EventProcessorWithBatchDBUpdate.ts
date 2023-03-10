@@ -1,4 +1,4 @@
-import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {JSONObject, Database, FromDB, Query, Result} from './Database';
 import {RevertableDatabase} from './RevertableDatabase';
@@ -31,23 +31,23 @@ function mergeDependenciesIn(dependencies: Dependency[], deps: Dependency[]) {
 // is this something like taht possible ?
 export type OnFunction = `on${string}`;
 
-export type SingleEventProcessorWithBatchSupport = {
+export type SingleEventProcessorWithBatchSupport<ABI extends Abi> = {
 	setup?(db: Database): Promise<void>;
-	shouldFetchTimestamp?(event: LogEvent): boolean;
-	shouldFetchTransaction?(event: LogEvent): boolean;
-	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
+	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
+	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
+	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 } & {
 	[name: OnFunction]: {
-		dependencies(event: EventWithId): Dependency[];
-		processEvent(db: SyncDB, event: EventWithId);
+		dependencies(event: EventWithId<ABI>): Dependency[];
+		processEvent(db: SyncDB, event: EventWithId<ABI>);
 	};
 };
 
-export class EventProcessorWithBatchDBUpdate implements EventProcessor {
+export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventProcessor<ABI, void> {
 	private initialization: Promise<void> | undefined;
-	private revertableDatabase: RevertableDatabase;
+	private revertableDatabase: RevertableDatabase<ABI>;
 	private keepAllHistory: boolean;
-	constructor(private singleEventProcessor: SingleEventProcessorWithBatchSupport, protected db: Database) {
+	constructor(private singleEventProcessor: SingleEventProcessorWithBatchSupport<ABI>, protected db: Database) {
 		this.initialization = this.init();
 		this.keepAllHistory = false; // this allow time-travel queries but requires processing and will not scale
 		this.revertableDatabase = new RevertableDatabase(db, this.keepAllHistory);
@@ -69,11 +69,11 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 		await this.init();
 	}
 
-	async load(source: IndexingSource): Promise<LastSync> {
+	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
 		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
-			return lastSync as unknown as LastSync;
+			return lastSync as unknown as LastSync<ABI>;
 		} else {
 			return {
 				lastToBlock: 0,
@@ -86,7 +86,7 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 
 	private lastEventID: number;
 	private processing: boolean;
-	async process(eventStream: EventWithId[], lastSync: LastSync): Promise<void> {
+	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
 		if (this.processing) {
 			throw new Error(`processing...`);
 		}
@@ -141,13 +141,13 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 			}
 
 			if (!revertable) {
-				const syncDB = new BasicSyncDB(this.db);
+				const syncDB = new BasicSyncDB<ABI>(this.db);
 				// ----------------------------------------------------------------------------------------------------------------
 				// Compute dependencies (Entities required to compute next state)
 				// ----------------------------------------------------------------------------------------------------------------
 				const dependencies: Dependency[] = [];
 				for (const event of eventStream) {
-					const functionName = `on${event.name}`;
+					const functionName = `on${event.eventName}`;
 					if (this.singleEventProcessor[functionName] && this.singleEventProcessor[functionName].dependencies) {
 						const deps = this.singleEventProcessor[functionName].dependencies(event);
 						mergeDependenciesIn(dependencies, deps);
@@ -163,7 +163,7 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 				// Compute new State
 				// ----------------------------------------------------------------------------------------------------------------
 				for (const event of eventStream) {
-					const functionName = `on${event.name}`;
+					const functionName = `on${event.eventName}`;
 					syncDB.prepareEvent(event);
 					if (this.singleEventProcessor[functionName] && this.singleEventProcessor[functionName].processEvent) {
 						this.singleEventProcessor[functionName].processEvent(syncDB, event);
@@ -174,7 +174,7 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 				// ----------------------------------------------------------------------------------------------------------------
 				await syncDB.syncUp();
 			} else {
-				const syncDB = new BasicSyncDB(this.revertableDatabase);
+				const syncDB = new BasicSyncDB<ABI>(this.revertableDatabase);
 				let lastBlock: number | undefined;
 				let lastBlockDeleted: string | undefined;
 				for (const event of eventStream) {
@@ -212,7 +212,7 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 						syncDB.prepareEvent(event);
 
 						// could optimize per block
-						const functionName = `on${event.name}`;
+						const functionName = `on${event.eventName}`;
 						if (this.singleEventProcessor[functionName]) {
 							if (this.singleEventProcessor[functionName].dependencies) {
 								const dependencies: Dependency[] = this.singleEventProcessor[functionName].dependencies(event);
@@ -250,11 +250,11 @@ export class EventProcessorWithBatchDBUpdate implements EventProcessor {
 		}
 	}
 
-	shouldFetchTimestamp(event: LogEvent): boolean {
+	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
 		return this.singleEventProcessor.shouldFetchTimestamp && this.singleEventProcessor.shouldFetchTimestamp(event);
 	}
 
-	shouldFetchTransaction(event: LogEvent): boolean {
+	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
 		return this.singleEventProcessor.shouldFetchTransaction && this.singleEventProcessor.shouldFetchTransaction(event);
 	}
 

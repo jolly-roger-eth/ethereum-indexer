@@ -1,4 +1,4 @@
-import {EventWithId} from 'ethereum-indexer';
+import {Abi, EventWithId} from 'ethereum-indexer';
 import {
 	getID,
 	ID,
@@ -21,8 +21,8 @@ export type ReversibleDoc = {_id: string; startBlock: number; endBlock: number};
 export type BlockWithOnlyNumber = {number: number};
 export type Block = BlockWithOnlyNumber & {hash: string};
 
-export class RevertableDatabase implements PutAndGetDatabaseWithBatchSupport {
-	protected currentEvent: EventWithId;
+export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWithBatchSupport {
+	protected currentEvent: EventWithId<ABI>;
 	constructor(protected db: Database, protected keepAllHistory?: boolean) {}
 
 	async deleteBlock(block: {number: number; hash: string}) {
@@ -52,11 +52,11 @@ export class RevertableDatabase implements PutAndGetDatabaseWithBatchSupport {
 		}
 	}
 
-	async prepareEvent(event: EventWithId) {
+	async prepareEvent(event: EventWithId<ABI>) {
 		this.currentEvent = event;
 	}
 
-	async remove(event: EventWithId) {
+	async remove(event: EventWithId<ABI>) {
 		const eventID = computeEventID(event);
 
 		console.info(`RevertableDatabase Removing / and reverting: ${eventID}...`);

@@ -40,13 +40,13 @@ export function getNewToBlockFromError(error: any): number | undefined {
 }
 
 export class LogFetcher {
-	protected config: InternalLogFetcherConfig;
+	protected readonly config: InternalLogFetcherConfig;
 	protected numBlocksToFetch: number;
 	constructor(
 		protected provider: EIP1193ProviderWithoutEvents,
 		protected contractAddresses: EIP1193Account[] | null,
 		protected eventNameTopics: EIP1193DATA[] | null,
-		config: LogFetcherConfig = {}
+		readonly conf: LogFetcherConfig = {}
 	) {
 		this.config = Object.assign(
 			{
@@ -56,7 +56,7 @@ export class LogFetcher {
 				maxBlocksPerFetch: 100000,
 				numRetry: 3,
 			},
-			config
+			conf
 		);
 		this.numBlocksToFetch = Math.min(this.config.numBlocksToFetchAtStart, this.config.maxBlocksPerFetch);
 	}

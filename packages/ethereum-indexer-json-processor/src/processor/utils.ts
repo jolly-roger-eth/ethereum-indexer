@@ -1,69 +1,72 @@
 import {SingleEventJSONProcessor, EventProcessorOnJSON} from './EventProcessorOnJSON';
-import {EventWithId, LogEvent} from 'ethereum-indexer';
-import {JSObject} from './types';
+import {Abi, EventWithId, LogEvent} from 'ethereum-indexer';
+import {EventFunctions, JSObject, MergedAbis} from './types';
 
 export type EventProcessorOnJSONConfig = {
 	// TODO state saver and fetcher
 };
 
-export function fromSingleJSONEventProcessor<T extends JSObject>(
-	v: SingleEventJSONProcessor<T> | (() => SingleEventJSONProcessor<T>)
-): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<T> {
+export function fromSingleJSONEventProcessor<ABI extends Abi, ProcessResultType extends JSObject>(
+	v: SingleEventJSONProcessor<ABI, ProcessResultType> | (() => SingleEventJSONProcessor<ABI, ProcessResultType>)
+): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
 	return (config?: EventProcessorOnJSONConfig) => {
 		// TODO pass state saver and fetcher
-		return new EventProcessorOnJSON<T>(typeof v === 'function' ? v() : v);
+		return new EventProcessorOnJSON<ABI, ProcessResultType>(typeof v === 'function' ? v() : v);
 	};
 }
 
-export type SingleJSONEventProcessorObject<T extends JSObject> = {
-	[func: string]: (json: T, event: EventWithId) => void;
-} & {
-	setup?(json: T): Promise<void>;
-	shouldFetchTimestamp?(event: LogEvent): boolean;
-	shouldFetchTransaction?(event: LogEvent): boolean;
-	filter?: (eventsFetched: LogEvent[]) => Promise<LogEvent[]>;
+export type SingleJSONEventProcessorObject<ABI extends Abi, ProcessResultType extends JSObject> = EventFunctions<
+	ABI,
+	ProcessResultType
+> & {
+	setup?(json: ProcessResultType): Promise<void>;
+	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
+	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
+	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 };
 
-export class SingleJSONEventProcessorWrapper<T extends JSObject> implements SingleEventJSONProcessor<T> {
-	constructor(protected obj: SingleJSONEventProcessorObject<T>) {}
+class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject> {
+	constructor(protected obj: SingleJSONEventProcessorObject<ABI, ProcessResultType>) {}
 
-	processEvent(json: T, event: EventWithId) {
-		const functionName = `on${event.name}`;
+	processEvent(json: ProcessResultType, event: EventWithId<ABI>) {
+		const functionName = `on${event.eventName}`;
 		if (this.obj[functionName]) {
 			return this.obj[functionName](json, event);
 		}
 	}
-	async setup(json: T): Promise<void> {
+	async setup(json: ProcessResultType): Promise<void> {
 		if (this.obj.setup) {
 			return this.obj.setup(json);
 		}
 	}
-	shouldFetchTimestamp?(event: LogEvent): boolean {
+	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean {
 		if (this.obj.shouldFetchTimestamp) {
 			return this.obj.shouldFetchTimestamp(event);
 		}
 		return false;
 	}
-	shouldFetchTransaction?(event: LogEvent): boolean {
+	shouldFetchTransaction?(event: LogEvent<ABI>): boolean {
 		if (this.obj.shouldFetchTransaction) {
 			return this.obj.shouldFetchTransaction(event);
 		}
 		return false;
 	}
-	async filter(eventsFetched: LogEvent[]): Promise<LogEvent[]> {
+	async filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
 		if (this.obj.filter) {
-			return this.obj.filter(eventsFetched);
+			return this.obj.filter(eventsFetched) as unknown as LogEvent<ABI>[]; // TODO why unknow casting needed here ?
 		}
 		return eventsFetched;
 	}
 }
 
-export function fromSingleJSONEventProcessorObject<T extends JSObject>(
-	v: SingleJSONEventProcessorObject<T> | (() => SingleJSONEventProcessorObject<T>)
-): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<T> {
+export function fromSingleJSONEventProcessorObject<ABI extends Abi, ProcessResultType extends JSObject>(
+	v:
+		| SingleJSONEventProcessorObject<ABI, ProcessResultType>
+		| (() => SingleJSONEventProcessorObject<ABI, ProcessResultType>)
+): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
 	return (config?: EventProcessorOnJSONConfig) => {
 		// TODO pass state saver and fetcher
-		return new EventProcessorOnJSON<T>(
+		return new EventProcessorOnJSON<ABI, ProcessResultType>(
 			typeof v === 'function' ? new SingleJSONEventProcessorWrapper(v()) : new SingleJSONEventProcessorWrapper(v)
 		);
 	};
@@ -73,6 +76,6 @@ export function computeArchiveID(id: string, endBlock: number): string {
 	return `archive_${endBlock}_${id}`;
 }
 
-export function computeEventID(event: EventWithId): string {
+export function computeEventID<ABI extends Abi>(event: EventWithId<ABI>): string {
 	return `${event.transactionHash}_${event.logIndex}`;
 }

@@ -4,6 +4,7 @@ import {
 	type LastSync,
 	type IndexingSource,
 	IndexerConfig,
+	Abi,
 } from 'ethereum-indexer';
 import {EIP1193Provider} from 'eip-1193';
 
@@ -12,7 +13,7 @@ import {writable, type Writable} from 'sveltore';
 import {logs} from 'named-logs';
 const namedLogger = logs('ethereum-indexer-browser');
 
-function formatLastSync(lastSync: LastSync): any {
+function formatLastSync<ABI extends Abi>(lastSync: LastSync<ABI>): any {
 	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);
 }
 
@@ -34,14 +35,14 @@ function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: strin
 	return newObj;
 }
 
-export type ExtendedLastSync = LastSync & {
+export type ExtendedLastSync<ABI extends Abi> = LastSync<ABI> & {
 	numBlocksProcessedSoFar: number;
 	syncPercentage: number;
 	totalPercentage: number;
 };
 
-export type BrowserIndexerState = {
-	lastSync?: ExtendedLastSync;
+export type BrowserIndexerState<ABI extends Abi> = {
+	lastSync?: ExtendedLastSync<ABI>;
 	autoIndexing: boolean;
 	loading: boolean;
 	processingFetchedLogs: boolean;
@@ -50,18 +51,18 @@ export type BrowserIndexerState = {
 	error?: {message: string; code: number};
 };
 
-export class BrowserIndexer<T = void> {
-	protected indexer: EthereumIndexer<T>;
+export class BrowserIndexer<ABI extends Abi, ProcessResultType = void> {
+	protected indexer: EthereumIndexer<ABI, ProcessResultType>;
 
 	protected indexingTimeout: number | undefined;
 
-	protected state: BrowserIndexerState;
-	protected store: Writable<BrowserIndexerState>;
+	protected state: BrowserIndexerState<ABI>;
+	protected store: Writable<BrowserIndexerState<ABI>>;
 
-	protected processor: EventProcessor<T> | undefined;
-	protected source: IndexingSource | undefined;
+	protected processor: EventProcessor<ABI, ProcessResultType> | undefined;
+	protected source: IndexingSource<ABI> | undefined;
 	protected eip1193Provider: EIP1193Provider | undefined;
-	protected indexerConfig: IndexerConfig | undefined;
+	protected indexerConfig: IndexerConfig<ABI> | undefined;
 
 	constructor() {
 		this.state = {
@@ -75,10 +76,10 @@ export class BrowserIndexer<T = void> {
 	}
 
 	init(
-		processor: EventProcessor<T>,
-		source: IndexingSource,
+		processor: EventProcessor<ABI, ProcessResultType>,
+		source: IndexingSource<ABI>,
 		eip1193Provider: EIP1193Provider,
-		indexerConfig: IndexerConfig
+		indexerConfig: IndexerConfig<ABI>
 	) {
 		this.processor = processor;
 		this.source = source;
@@ -86,7 +87,7 @@ export class BrowserIndexer<T = void> {
 		this.indexerConfig = indexerConfig;
 	}
 
-	private set(lastSync: LastSync) {
+	private set(lastSync: LastSync<ABI>) {
 		const startingBlock = this.indexer.defaultFromBlock;
 		const latestBlock = lastSync.latestBlock;
 		const lastToBlock = lastSync.lastToBlock;
@@ -103,7 +104,7 @@ export class BrowserIndexer<T = void> {
 		this.store.set(this.state);
 	}
 
-	async indexMore(): Promise<LastSync> {
+	async indexMore(): Promise<LastSync<ABI>> {
 		if (!this.indexer) {
 			namedLogger.info('setting up...');
 			await this.setupIndexing();
@@ -114,8 +115,8 @@ export class BrowserIndexer<T = void> {
 		return lastSync;
 	}
 
-	async indexToLatest(): Promise<LastSync> {
-		let lastSync: LastSync | undefined;
+	async indexToLatest(): Promise<LastSync<ABI>> {
+		let lastSync: LastSync<ABI> | undefined;
 		if (!this.indexer) {
 			lastSync = await this.setupIndexing();
 			this.set(lastSync);
@@ -156,7 +157,7 @@ export class BrowserIndexer<T = void> {
 		return lastSync;
 	}
 
-	private async setupIndexing(): Promise<LastSync> {
+	private async setupIndexing(): Promise<LastSync<ABI>> {
 		namedLogger.info(`setting up indexer...`);
 		if (!this.processor) {
 			throw new Error(`no processor provided, did you call init ?`);
@@ -245,7 +246,7 @@ export class BrowserIndexer<T = void> {
 		}
 	}
 
-	subscribe(subscription: (value: BrowserIndexerState) => void): () => void {
+	subscribe(subscription: (value: BrowserIndexerState<ABI>) => void): () => void {
 		return this.store.subscribe(subscription);
 	}
 
