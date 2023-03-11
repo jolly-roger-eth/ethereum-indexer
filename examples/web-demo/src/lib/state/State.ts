@@ -12,7 +12,7 @@ export const {state, syncing, status, setup, indexToLatest, indexMore, startAuto
 	{trackNumRequests: true}
 );
 
-function initialize(provider: EIP1193Provider) {
+export function initialize(provider: EIP1193Provider) {
 	setup(provider, {
 		chainId: '100',
 		contracts: contractsDataPerChain['100'],
@@ -41,59 +41,6 @@ function initialize(provider: EIP1193Provider) {
 				startAutoIndexing();
 			});
 	});
-}
-
-export type IndexerLoading = {state: 'Idle' | 'Loading' | 'SwithingChain' | 'Ready'; error?: string};
-const store = writable<IndexerLoading>({
-	state: 'Idle',
-});
-export const indexer = {
-	subscribe: store.subscribe,
-	start,
-};
-
-async function start() {
-	store.set({state: 'Loading'});
-	const ethereum: EIP1193Provider = (window as any).ethereum;
-	if (ethereum) {
-		const chainIdAsHex = await ethereum.request({method: 'eth_chainId'});
-		const chainId = parseInt(chainIdAsHex.slice(2), 16).toString();
-		if (chainId !== '100') {
-			store.set({state: 'SwithingChain'});
-			try {
-				await ethereum.request({method: 'wallet_switchEthereumChain', params: [{chainId: `0x64`}]});
-			} catch (err) {
-				try {
-					await ethereum.request({
-						method: 'wallet_addEthereumChain',
-						params: [
-							{
-								chainId: `0x64`,
-								rpcUrls: ['https://rpc.gnosischain.com/'],
-								blockExplorerUrls: ['https://blockscout.com/xdai/mainnet/'],
-								chainName: 'Gnosis',
-								nativeCurrency: {
-									decimals: 18,
-									name: 'Gnosis',
-									symbol: 'xDAI',
-								},
-							},
-						],
-					});
-				} catch (err) {
-					store.set({state: 'Idle', error: 'Failed to change to chain '});
-				}
-			}
-		}
-		const newCainIdAsHex = await ethereum.request({method: 'eth_chainId'});
-		const newChainId = parseInt(newCainIdAsHex.slice(2), 16).toString();
-		if (newChainId !== '100') {
-			store.set({state: 'Idle', error: 'Failed to change to chain '});
-		} else {
-			store.set({state: 'Ready'});
-			initialize(ethereum);
-		}
-	}
 }
 
 export function stringify(v: any) {

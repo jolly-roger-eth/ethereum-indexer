@@ -1,24 +1,18 @@
 <script lang="ts">
-	import {status, state, syncing, indexer} from './lib/state/State';
-	import JSONTree from 'svelte-json-tree';
-
-	function addLengthToFields(v: any): any {
-		const keys = Object.keys(v);
-		const n = {};
-		for (const key of keys) {
-			if (typeof v[key] === 'object') {
-				n[key + ` (${Object.keys(v[key]).length})`] = v[key];
-			} else {
-				n[key] = v[key];
-			}
-		}
-		return n;
-	}
-	$: stateDisplayed = $state ? addLengthToFields($state) : undefined;
+	import {status, state, syncing, initialize} from './lib/state/State';
+	import {web3} from './lib/blockchain/connection';
+	import Json from './lib/components/JSON.svelte';
 </script>
 
-{#if $indexer.state === 'Idle'}
-	<button on:click={() => indexer.start()}>Start</button>
+{#if $web3.error}
+	<h1>{$web3.error}</h1>
+{/if}
+{#if $web3.state === 'Idle'}
+	<button on:click={() => web3.start().then(initialize)}>Start</button>
+{:else if $web3.state === 'Loading'}
+	Loading...
+{:else if $web3.state === 'SwithingChain'}
+	Switching chain...
 {/if}
 
 <progress value={($syncing.lastSync?.syncPercentage || 0) / 100} style="width:100%;" />
@@ -37,10 +31,7 @@
 <p>num events: {(($syncing.lastSync?.nextStreamID || 1) - 1).toLocaleString()}</p>
 
 {#if $state}
-	{JSON.stringify(
-		stateDisplayed,
-		(key, value) => (typeof value === 'bigint' ? value.toString() : value) // return everything else unchanged
-	)}
+	<Json data={$state} />
 {:else}
-	{JSON.stringify($syncing)}
+	<Json data={$syncing} />
 {/if}
