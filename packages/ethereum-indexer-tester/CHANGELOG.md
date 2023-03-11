@@ -1,5 +1,14 @@
 # ethereum-indexer-tester
 
+## 0.5.4
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.5.4
+  - ethereum-indexer-fs-cache@0.5.4
+  - ethereum-indexer-utils@0.5.4
+
 ## 0.5.3
 
 ### Patch Changes
