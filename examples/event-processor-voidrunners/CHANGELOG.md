@@ -1,5 +1,11 @@
 # event-processor-voidrunners
 
+## 0.0.22
+
+### Patch Changes
+
+- ethereum-indexer-json-processor@0.5.3
+
 ## 0.0.21
 
 ### Patch Changes
