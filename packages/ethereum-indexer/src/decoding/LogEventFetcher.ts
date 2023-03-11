@@ -109,6 +109,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 					abiAtThatAddress.push(...contractEventsABI);
 					deleteDuplicateEvents(abiAtThatAddress);
 				}
+				_allABIEvents.push(...contractEventsABI);
 
 				for (const event of contractEventsABI) {
 					const list = _eventNameToContractAddresses[event.name] || [];
