@@ -44,7 +44,7 @@ export type BlockEvents<ABI extends Abi> = {hash: string; number: number; events
 
 export type ContractData<ABI extends Abi> = {
 	readonly abi: ABI;
-	readonly address: string;
+	readonly address: `0x${string}`;
 	readonly startBlock?: number;
 	readonly history?: readonly {readonly abi: ABI; readonly startBlock?: number}[];
 };

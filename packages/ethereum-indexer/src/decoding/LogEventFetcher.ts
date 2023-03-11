@@ -1,8 +1,30 @@
 import {EIP1193Account, EIP1193DATA, EIP1193Log, EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {LogTransactionData} from '../engine/ethereum';
+import {ExtraFilters, LogTransactionData} from '../engine/ethereum';
 import {LogFetcher, LogFetcherConfig} from '../engine/LogFetcher';
 import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
 import {decodeEventLog, DecodeEventLogReturnType, encodeEventTopics} from 'viem';
+import {deepEqual} from '../utils/compae';
+
+function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
+	if (!map) {
+		map = new Map();
+	}
+	for (let i = 0; i < events.length; i++) {
+		const event = events[i];
+		const namedEvent = map[event.name];
+		if (!namedEvent) {
+			map[event.name] = event;
+		} else {
+			if (!deepEqual(event.inputs, namedEvent.inputs)) {
+				// {a: event, b: namedEvent}
+				throw new Error(`two events with same name but different inputs`);
+			}
+			// delete
+			events.splice(i, 1);
+			i--;
+		}
+	}
+}
 
 export type JSONObject = {
 	[key: string]: JSONType;
@@ -48,51 +70,98 @@ export type LogEvent<ABI extends Abi, Extra extends JSONObject = undefined> =
 export type ParsedLogsResult<ABI extends Abi> = {events: LogEvent<ABI>[]; toBlockUsed: number};
 export type ParsedLogsPromise<ABI extends Abi> = Promise<ParsedLogsResult<ABI>> & {stopRetrying(): void};
 
+type OneABI<ABI extends Abi> = {readonly abi: ABI};
+type ContractList<ABI extends Abi> = readonly {readonly address: `0x${string}`; readonly abi: ABI}[];
+
 export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
+	private abiPerAddress: Map<`0x${string}`, AbiEvent[]>;
+	private allABIEvents: AbiEvent[];
+
 	constructor(
 		readonly provider: EIP1193ProviderWithoutEvents,
-		readonly contractsData: readonly {readonly address: string; readonly abi: ABI}[] | {readonly abi: ABI},
-		readonly conf: LogFetcherConfig = {}
-	) {
-		let contractAddresses: EIP1193Account[] | null = null;
-		let eventABIS: readonly AbiEvent[][];
-		if (Array.isArray(contractsData)) {
-			const addressesSeen = new Map<`0x${string}`, boolean>();
-			contractAddresses = contractAddresses || [];
-			for (const contract of contractsData) {
-				if (!addressesSeen[contract.address]) {
-					addressesSeen[contract.address] = true;
-					contractAddresses.push(contract.address);
-				}
-			}
-			eventABIS = (contractsData as readonly {readonly address: string; readonly abi: ABI}[]).map((v) =>
-				v.abi.filter((item) => item.type === 'event')
-			) as unknown as AbiEvent[][];
-		} else {
-			// contracts = new InterfaceWithLowerCaseAddresses((contractsData as {readonly abi: T}).abi);
-			const allContractsData = contractsData as {readonly abi: ABI};
-			eventABIS = [allContractsData.abi.filter((item) => item.type === 'event')] as unknown as AbiEvent[][];
+		readonly contractsData: ContractList<ABI> | OneABI<ABI>,
+		readonly fetcherConfig: LogFetcherConfig = {},
+		private readonly parseConfig?: {
+			globalABI?: boolean;
+			filters?: {
+				// for each event name we can specify a list of filter
+				// each filter is an array of (topic or topic[])
+				// so this is an array of array of (topic | topic[])
+				[eventName: string]: (`0x${string}` | `0x${string}`[])[][];
+			};
 		}
+	) {
+		const _abiEventPerTopic: Map<`0x${string}`, AbiEvent> = new Map();
+		const _nameToTopic: Map<string, `0x${string}`> = new Map();
+		const _abiPerAddress: Map<`0x${string}`, AbiEvent[]> = new Map();
+		const _eventNameToContractAddresses: Map<string, `0x${string}`[]> = new Map();
+		const _allABIEvents: AbiEvent[] = [];
+		let contractAddresses: EIP1193Account[] | null = null;
+		if (Array.isArray(contractsData)) {
+			contractAddresses = [];
+			for (const contract of contractsData as ContractList<ABI>) {
+				const contractEventsABI: AbiEvent[] = contract.abi.filter((item) => item.type === 'event') as AbiEvent[];
+				const abiAtThatAddress = _abiPerAddress[contract.address];
+				if (!abiAtThatAddress) {
+					_abiPerAddress[contract.address] = contractEventsABI;
+					contractAddresses.push(contract.address);
+				} else {
+					abiAtThatAddress.push(...contractEventsABI);
+					deleteDuplicateEvents(abiAtThatAddress);
+				}
 
-		let eventNameTopics: EIP1193DATA[] | null = null;
-		const topicsSeen = new Map<`0x${string}`, boolean>();
-		for (const abi of eventABIS) {
-			for (const item of abi) {
-				const topics = encodeEventTopics({
-					abi,
-					eventName: item.name as ExtractAbiEventNames<ABI>,
-				});
-				eventNameTopics = eventNameTopics || [];
-				for (const v of topics) {
-					if (!topicsSeen[v]) {
-						topicsSeen[v] = true;
-						eventNameTopics.push(v);
+				for (const event of contractEventsABI) {
+					const list = _eventNameToContractAddresses[event.name] || [];
+					if (list.length === 0) {
+						_eventNameToContractAddresses[event.name] = list;
+					}
+					if (list.indexOf(contract.address) === -1) {
+						list.push(contract.address);
 					}
 				}
 			}
+		} else {
+			const allContractsData = contractsData as {readonly abi: ABI};
+			_allABIEvents.push(...(allContractsData.abi.filter((item) => item.type === 'event') as AbiEvent[]));
 		}
 
-		super(provider, contractAddresses, eventNameTopics, conf);
+		const _abiEventPerName: Map<string, AbiEvent> = new Map();
+		deleteDuplicateEvents(_allABIEvents, _abiEventPerName);
+
+		const eventNameTopics: EIP1193DATA[] = [];
+		for (const item of _allABIEvents) {
+			const topics = encodeEventTopics({
+				abi: _allABIEvents,
+				eventName: item.name as ExtractAbiEventNames<ABI>,
+			});
+			if (topics.length > 0) {
+				_nameToTopic[item.name] = topics[0];
+			}
+			for (const v of topics) {
+				if (!_abiEventPerTopic[v]) {
+					_abiEventPerTopic[v] = item;
+					eventNameTopics.push(v);
+				} else {
+					throw new Error(`duplicate topics found`);
+				}
+			}
+		}
+
+		if (parseConfig.filters) {
+			const filters: ExtraFilters = {};
+			for (const eventName of Object.keys(parseConfig.filters)) {
+				const filterList = parseConfig.filters[eventName];
+				filters[_nameToTopic[eventName]] = {
+					list: filterList,
+					contractAddresses: _eventNameToContractAddresses[eventName],
+				};
+			}
+			fetcherConfig = {...fetcherConfig, filters};
+		}
+
+		super(provider, contractAddresses, eventNameTopics, fetcherConfig);
+		this.allABIEvents = _allABIEvents;
+		this.abiPerAddress = _abiPerAddress;
 	}
 
 	getLogEvents(options: {fromBlock: number; toBlock: number; retry?: number}): ParsedLogsPromise<ABI> {
@@ -111,21 +180,22 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		for (let i = 0; i < logs.length; i++) {
 			const log = logs[i];
 			const eventAddress = log.address.toLowerCase();
-			const correspondingABI: ABI = !Array.isArray(this.contractsData)
-				? this.contractsData
-				: this.contractsData.find((v) => v.address.toLowerCase() === eventAddress.toLowerCase())?.abi;
+			const event: NumberifiedLog = {
+				blockNumber: parseInt(log.blockNumber.slice(2), 16),
+				blockHash: log.blockHash,
+				transactionIndex: parseInt(log.transactionIndex.slice(2), 16),
+				removed: log.removed ? true : false,
+				address: log.address,
+				data: log.data,
+				topics: log.topics,
+				transactionHash: log.transactionHash,
+				logIndex: parseInt(log.logIndex.slice(2), 16),
+			};
+			const correspondingABI: AbiEvent[] =
+				this.abiPerAddress.size == 0 || this.parseConfig?.globalABI
+					? this.allABIEvents
+					: this.abiPerAddress[eventAddress];
 			if (correspondingABI) {
-				const event: NumberifiedLog = {
-					blockNumber: parseInt(log.blockNumber.slice(2), 16),
-					blockHash: log.blockHash,
-					transactionIndex: parseInt(log.transactionIndex.slice(2), 16),
-					removed: log.removed ? true : false,
-					address: log.address,
-					data: log.data,
-					topics: log.topics,
-					transactionHash: log.transactionHash,
-					logIndex: parseInt(log.logIndex.slice(2), 16),
-				};
 				let parsed: DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`> | null = null;
 				try {
 					parsed = decodeEventLog({
@@ -143,9 +213,10 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				} else {
 					(event as LogEventWithParsingFailure).decodeError = `parsing did not return any results`;
 				}
-
-				events.push(event as LogEvent<ABI>);
+			} else {
+				(event as LogEventWithParsingFailure).decodeError = `event triggered at a different address`;
 			}
+			events.push(event as LogEvent<ABI>);
 		}
 		return events;
 	}

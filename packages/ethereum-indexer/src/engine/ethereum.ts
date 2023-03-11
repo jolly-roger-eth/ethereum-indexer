@@ -117,10 +117,87 @@ export async function getTransactionDataFromMultipleHashes(
 	});
 }
 
-export async function getLogs(
+type LogRequest = {topics: (`0x${string}` | `0x${string}`[])[]; contractAddresses: `0x${string}`[] | null};
+export function generateLogRequestForTopicsAndFiltersCombinations(
+	contractAddresses: `0x${string}`[] | null,
+	eventNameTopics: EIP1193DATA[],
+	filters?: {
+		[topicSignature: `0x${string}`]: {contractAddresses?: `0x${string}`[]; list: (`0x${string}` | `0x${string}`[])[][]};
+	}
+): LogRequest[] {
+	if (!filters) {
+		return [{topics: [eventNameTopics], contractAddresses}];
+	} else {
+		const sharedRequest = {topics: [], contractAddresses};
+		const moreRequests: LogRequest[] = [];
+		for (const eventNameTopic of eventNameTopics) {
+			const filtersPerEventTopic = filters[eventNameTopic];
+			if (filtersPerEventTopic) {
+				for (const filter of filtersPerEventTopic.list) {
+					moreRequests.push({
+						topics: [eventNameTopic, ...filter],
+						contractAddresses: filtersPerEventTopic.contractAddresses || contractAddresses,
+					});
+				}
+			} else {
+				sharedRequest.topics.push(eventNameTopic);
+			}
+		}
+		// TODO optimise further and combine eventNameTopic's filters who share the same filter
+		if (sharedRequest.topics.length > 0) {
+			return [sharedRequest, ...moreRequests];
+		} else {
+			return moreRequests;
+		}
+	}
+}
+
+export type ExtraFilters = {
+	[topicSignature: `0x${string}`]: {contractAddresses?: `0x${string}`[]; list: (`0x${string}` | `0x${string}`[])[][]};
+};
+export async function getLogsWithVariousFilters(
 	provider: EIP1193ProviderWithoutEvents,
 	contractAddresses: EIP1193Account[] | null,
 	eventNameTopics: EIP1193DATA[] | null,
+	filters: ExtraFilters | null,
+	options: {fromBlock: number; toBlock: number}
+): Promise<EIP1193Log[]> {
+	if (!eventNameTopics) {
+		return getLogs(provider, contractAddresses, [eventNameTopics], options);
+	}
+	const requestList = generateLogRequestForTopicsAndFiltersCombinations(contractAddresses, eventNameTopics, filters);
+
+	const logs: EIP1193Log[] = [];
+	for (const request of requestList) {
+		const tmpLogs = await getLogs(provider, request.contractAddresses, request.topics, options);
+		logs.push(...tmpLogs);
+	}
+
+	return logs.sort((a, b) => {
+		const aT = parseInt(a.transactionIndex.slice(2), 16);
+		const bT = parseInt(b.transactionIndex.slice(2), 16);
+		if (aT > bT) {
+			return 1;
+		} else if (aT < bT) {
+			return -1;
+		} else {
+			const aL = parseInt(a.logIndex.slice(2), 16);
+			const bL = parseInt(b.logIndex.slice(2), 16);
+			if (aL > bL) {
+				return 1;
+			} else if (aL < bL) {
+				return -1;
+			} else {
+				return 0;
+			}
+		}
+	});
+}
+
+export async function getLogs(
+	provider: EIP1193ProviderWithoutEvents,
+	contractAddresses: EIP1193Account[] | null,
+	topics: (EIP1193DATA | EIP1193DATA[])[] | null,
 	options: {fromBlock: number; toBlock: number}
 ): Promise<EIP1193Log[]> {
 	const logs: EIP1193Log[] = await provider.request({
@@ -130,7 +207,7 @@ export async function getLogs(
 				address: contractAddresses,
 				fromBlock: ('0x' + options.fromBlock.toString(16)) as EIP1193DATA,
 				toBlock: ('0x' + options.toBlock.toString(16)) as EIP1193DATA,
-				topics: eventNameTopics ? [eventNameTopics] : undefined,
+				topics: topics ? topics : undefined,
 			},
 		],
 	});

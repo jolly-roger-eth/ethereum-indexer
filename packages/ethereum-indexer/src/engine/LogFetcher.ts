@@ -1,5 +1,5 @@
 import {EIP1193Account, EIP1193DATA, EIP1193Log, EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {getLogs} from './ethereum';
+import {ExtraFilters, getLogs, getLogsWithVariousFilters} from './ethereum';
 
 type InternalLogFetcherConfig = {
 	numBlocksToFetchAtStart: number;
@@ -18,6 +18,7 @@ export type LogFetcherConfig = {
 	percentageToReach?: number;
 	maxEventsPerFetch?: number;
 	numRetry?: number;
+	filters?: ExtraFilters;
 };
 
 export function getNewToBlockFromError(error: any): number | undefined {
@@ -64,6 +65,7 @@ export class LogFetcher {
 	getLogs(options: {fromBlock: number; toBlock: number; retry?: number}): LogsPromise {
 		let retry = options.retry !== undefined ? options.retry : this.config.numRetry;
 		let _stopRetrying: () => void | undefined;
+		// TODO stop fetching let logsProm: Promise<any>
 		const stopRetrying = () => {
 			if (_stopRetrying) {
 				_stopRetrying();
@@ -77,10 +79,25 @@ export class LogFetcher {
 			let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
 
 			try {
-				logs = await getLogs(this.provider, this.contractAddresses, this.eventNameTopics, {
-					fromBlock,
-					toBlock,
-				});
+				if (this.conf.filters) {
+					// TODO cancel on stopRetrying and make it throw
+					const logsProm = getLogsWithVariousFilters(
+						this.provider,
+						this.contractAddresses,
+						this.eventNameTopics,
+						this.conf.filters,
+						{
+							fromBlock,
+							toBlock,
+						}
+					);
+					logs = await logsProm;
+				} else {
+					logs = await getLogs(this.provider, this.contractAddresses, [this.eventNameTopics], {
+						fromBlock,
+						toBlock,
+					});
+				}
 			} catch (err: any) {
 				if (retry <= 0) {
 					return reject(err);
