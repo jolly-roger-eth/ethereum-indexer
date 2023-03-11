@@ -9,7 +9,7 @@
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"scripts": {
-		"build": "tsup-node src/index.ts --dts --format esm,cjs"
+		"build": "tsup src/index.ts --dts --format esm,cjs"
 	},
 	"devDependencies": {
 		"eip-1193": "^0.2.2",

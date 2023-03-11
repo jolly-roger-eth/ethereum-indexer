@@ -1,9 +1,9 @@
 {
-  "compilerOptions": {
-    "moduleResolution": "node",
-    "lib": ["ES2015"],
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true
-  }
+	"compilerOptions": {
+		"moduleResolution": "node",
+		"target": "ES6",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true
+	}
 }

@@ -1,14 +1,11 @@
 {
 	"compilerOptions": {
-		"outDir": "./dist",
-		"lib": ["es5", "es6", "es2017"],
-		"target": "es6",
+		"moduleResolution": "node",
+		"lib": ["ES6", "ES2017.String", "ES2017.Object"],
+		"target": "ES6",
 		"declaration": true,
 		"declarationMap": true,
 		"sourceMap": true,
-		"module": "commonjs",
-		"moduleResolution": "node",
-		"esModuleInterop": true
-	},
-	"include": ["./src/**/*"]
+		"allowSyntheticDefaultImports": true
+	}
 }

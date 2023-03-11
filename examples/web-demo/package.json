@@ -10,16 +10,17 @@
 		"check": "svelte-check --tsconfig ./tsconfig.json"
 	},
 	"devDependencies": {
-		"@sveltejs/vite-plugin-svelte": "^1.0.2",
+		"@sveltejs/vite-plugin-svelte": "^2.0.2",
 		"@tsconfig/svelte": "^3.0.0",
+		"svelte": "^3.55.1",
+		"svelte-check": "^2.10.3",
+		"tslib": "^2.5.0",
+		"typescript": "^4.9.3",
+		"vite": "^4.1.0",
+		"eip-1193": "^0.2.2",
 		"prettier": "^2.7.1",
 		"prettier-plugin-svelte": "^2.7.1",
-		"svelte": "^3.49.0",
-		"svelte-check": "^2.8.1",
 		"svelte-preprocess": "^4.10.7",
-		"tslib": "^2.4.0",
-		"typescript": "^4.6.4",
-		"vite": "^3.1.0",
 		"vite-tsconfig-paths": "^3.5.1"
 	},
 	"dependencies": {

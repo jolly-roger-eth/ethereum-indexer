@@ -1,4 +1,4 @@
-import type {ContractData, IndexingSource} from 'ethereum-indexer';
+import type {Abi, ContractData, IndexingSource} from 'ethereum-indexer';
 import fs from 'fs';
 import path from 'path';
 
@@ -18,9 +18,9 @@ function mergeABIs(abi1: any[], abi2: any[]): any[] {
 	return newABI;
 }
 
-export function loadContracts(folder: string): IndexingSource {
+export function loadContracts<ABI extends Abi>(folder: string): IndexingSource<ABI> {
 	const contractsAdded: {[address: string]: {index: number}} = {};
-	const contractsData: ContractData[] = [];
+	const contractsData: ContractData<ABI>[] = [];
 	const files = fs.readdirSync(folder);
 	let chainId = undefined;
 	for (const file of files) {

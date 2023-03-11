@@ -1,5 +1,5 @@
 <script lang="ts">
-	import {browserIndexer, state, numRequests} from '$lib/state/State';
+	import {status, state, syncing, indexer} from './lib/state/State';
 	import JSONTree from 'svelte-json-tree';
 
 	function addLengthToFields(v: any): any {
@@ -14,23 +14,33 @@
 		}
 		return n;
 	}
-	$: stateDisplayed = addLengthToFields($state);
+	$: stateDisplayed = $state ? addLengthToFields($state) : undefined;
 </script>
 
-<progress value={($browserIndexer.lastSync?.syncPercentage || 0) / 100} style="width:100%;" />
+{#if $indexer.state === 'Idle'}
+	<button on:click={() => indexer.start()}>Start</button>
+{/if}
 
-<p>loading: {$browserIndexer && $browserIndexer.loading}</p>
-<p>catchingUp: {$browserIndexer && $browserIndexer.catchingUp}</p>
-<p>autoIndexing: {$browserIndexer.autoIndexing}</p>
-<p>fetchingLogs: {$browserIndexer.fetchingLogs}</p>
-<p>processingFetchedLogs: {$browserIndexer.processingFetchedLogs}</p>
+<progress value={($syncing.lastSync?.syncPercentage || 0) / 100} style="width:100%;" />
 
-<p>requests sent: {$numRequests}</p>
-<p>block processed: {$browserIndexer.lastSync?.numBlocksProcessedSoFar.toLocaleString()}</p>
-<p>num events: {($browserIndexer.lastSync?.nextStreamID - 1).toLocaleString()}</p>
+<p>status: {$status.state}</p>
+<p>loading: {$syncing.loading}</p>
+<p>catchingUp: {$syncing.catchingUp}</p>
+<p>autoIndexing: {$syncing.autoIndexing}</p>
+<p>fetchingLogs: {$syncing.fetchingLogs}</p>
+<p>processingFetchedLogs: {$syncing.processingFetchedLogs}</p>
+
+{#if $syncing.numRequests !== undefined}
+	<p>requests sent: {$syncing.numRequests}</p>
+{/if}
+<p>block processed: {$syncing.lastSync?.numBlocksProcessedSoFar?.toLocaleString() || 0}</p>
+<p>num events: {(($syncing.lastSync?.nextStreamID || 1) - 1).toLocaleString()}</p>
 
 {#if $state}
-	<JSONTree value={stateDisplayed} />
-{:else if $browserIndexer}
-	<JSONTree value={$browserIndexer} />
+	{JSON.stringify(
+		stateDisplayed,
+		(key, value) => (typeof value === 'bigint' ? value.toString() : value) // return everything else unchanged
+	)}
+{:else}
+	{JSON.stringify($syncing)}
 {/if}

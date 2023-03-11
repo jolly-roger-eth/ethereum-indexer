@@ -176,10 +176,10 @@ export const processor = fromSingleJSONEventProcessorObject(() => ConquestEventP
 
 const contractsDataonGnosis = [
 	{
-		eventsABI: OuterSpace,
+		abi: OuterSpace,
 		address: '0x7ed5118E042F22DA546C9aaA9540D515A6F776E9',
 		startBlock: 21704746,
 	},
-];
+] as const;
 
-export const contractsDataPerChain = {100: contractsDataonGnosis};
+export const contractsDataPerChain = {100: contractsDataonGnosis} as const;

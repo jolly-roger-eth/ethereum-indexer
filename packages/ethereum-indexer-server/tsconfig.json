@@ -1,15 +1,12 @@
 {
-  "compilerOptions": {
-    "importHelpers": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "lib": ["es5", "es6", "es2017"],
-    "outDir": "dist",
-    "rootDir": "src",
-    "target": "ES2019",
-    "module": "commonjs",
-    "esModuleInterop": true
-  },
-  "include": ["./src/**/*"]
+	"compilerOptions": {
+		"outDir": "dist",
+		"moduleResolution": "node",
+		"target": "ES6",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"allowSyntheticDefaultImports": true,
+		"module": "Node16"
+	}
 }

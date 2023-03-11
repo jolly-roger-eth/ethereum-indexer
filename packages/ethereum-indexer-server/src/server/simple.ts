@@ -17,6 +17,7 @@ import {
 	LastSync,
 	AllContractData,
 	ContractData,
+	Abi,
 } from 'ethereum-indexer';
 import {JSONRPCProvider} from 'ethereum-indexer-utils';
 import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
@@ -51,11 +52,11 @@ function bnReplacer(v: any): any {
 	}
 }
 
-export type UserConfig = {
+export type UserConfig<ABI extends Abi> = {
 	nodeURL: string;
 	folder: string;
 	processorPath: string;
-	source?: IndexingSource;
+	source?: IndexingSource<ABI>;
 	useCache?: boolean;
 	disableSecurity?: boolean;
 	useFSCache?: boolean;
@@ -82,7 +83,7 @@ function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: strin
 	return newObj;
 }
 
-function formatLastSync(lastSync: LastSync): any {
+function formatLastSync<ABI extends Abi>(lastSync: LastSync<ABI>): any {
 	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);
 }
 
@@ -102,19 +103,19 @@ function clean(obj: Object) {
 	return filterOutUnderscoreFieldsFromObject(obj);
 }
 
-export class SimpleServer {
-	protected indexer: EthereumIndexer;
+export class SimpleServer<ABI extends Abi> {
+	protected indexer: EthereumIndexer<ABI>;
 	protected app: Koa;
-	protected lastSync: LastSync;
+	protected lastSync: LastSync<ABI>;
 	protected config: Config;
-	protected cache: EventCache;
-	protected processor: QueriableEventProcessor;
+	protected cache: EventCache<ABI>;
+	protected processor: QueriableEventProcessor<ABI>;
 	protected indexing: boolean = false;
 	protected indexingTimeout: NodeJS.Timeout | undefined;
 
-	protected source: IndexingSource;
+	protected source: IndexingSource<ABI>;
 
-	constructor(config: UserConfig) {
+	constructor(config: UserConfig<ABI>) {
 		this.config = Object.assign({useCache: false, disableSecurity: false, useFSCache: false}, config);
 		this.source = config.source;
 	}
@@ -130,7 +131,7 @@ export class SimpleServer {
 
 	private async setupIndexing() {
 		const processorModule = await import(this.config.processorPath);
-		const processorFactory = processorModule.processor as (config?: any) => QueriableEventProcessor;
+		const processorFactory = processorModule.processor as (config?: any) => QueriableEventProcessor<ABI>;
 
 		if (!processorFactory) {
 			throw new Error(
@@ -152,7 +153,7 @@ export class SimpleServer {
 
 		const eip1193Provider = new JSONRPCProvider(this.config.nodeURL);
 
-		let contractsData: AllContractData | ContractData[];
+		let contractsData: AllContractData<ABI> | ContractData<ABI>[];
 		if (!this.source) {
 			let chainIDAsDecimal: string | undefined;
 
@@ -195,7 +196,7 @@ export class SimpleServer {
 			);
 		}
 
-		let rootProcessor: EventProcessor = this.processor;
+		let rootProcessor: EventProcessor<ABI> = this.processor;
 		if (this.config.useCache) {
 			const eventCacheDB = new PouchDatabase(`${this.config.folder}/event-stream.db`);
 			this.cache = new EventCache(this.processor, eventCacheDB);
