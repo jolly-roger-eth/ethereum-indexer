@@ -1,5 +1,14 @@
 # web-demo
 
+## 0.1.21
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.5.5
+  - ethereum-indexer-browser@0.5.5
+  - event-processor-conquest-eth@0.0.24
+
 ## 0.1.20
 
 ### Patch Changes
