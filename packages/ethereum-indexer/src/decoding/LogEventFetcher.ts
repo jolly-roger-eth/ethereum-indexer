@@ -147,7 +147,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 			}
 		}
 
-		if (parseConfig.filters) {
+		if (parseConfig?.filters) {
 			const filters: ExtraFilters = {};
 			for (const eventName of Object.keys(parseConfig.filters)) {
 				const filterList = parseConfig.filters[eventName];
