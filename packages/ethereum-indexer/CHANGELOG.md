@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.5.6
+
+### Patch Changes
+
+- fixes
+
 ## 0.5.5
 
 ### Patch Changes
