@@ -68,7 +68,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		config: IndexerConfig<ABI> = {}
 	) {
 		this.finality = config.finality || 12;
-		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config);
+		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config, config?.parseConfig);
 		this.alwaysFetchTimestamps = config.alwaysFetchTimestamps ? true : false;
 		this.alwaysFetchTransactions = config.alwaysFetchTransactions ? true : false;
 		this.fetchExistingStream = config.fetchExistingStream;

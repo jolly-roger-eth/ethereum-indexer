@@ -5,6 +5,7 @@ import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
 import {decodeEventLog, encodeEventTopics} from 'viem';
 import {deepEqual} from '../utils/compae';
+import {LogParseConfig} from '../types';
 
 function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
 	if (!map) {
@@ -75,6 +76,7 @@ type OneABI<ABI extends Abi> = {readonly abi: ABI};
 type ContractList<ABI extends Abi> = readonly {readonly address: `0x${string}`; readonly abi: ABI}[];
 
 export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
+	private abiEventPerTopic: Map<`0x${string}`, AbiEvent>;
 	private abiPerAddress: Map<`0x${string}`, AbiEvent[]>;
 	private allABIEvents: AbiEvent[];
 
@@ -82,15 +84,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		readonly provider: EIP1193ProviderWithoutEvents,
 		readonly contractsData: ContractList<ABI> | OneABI<ABI>,
 		readonly fetcherConfig: LogFetcherConfig = {},
-		private readonly parseConfig?: {
-			globalABI?: boolean;
-			filters?: {
-				// for each event name we can specify a list of filter
-				// each filter is an array of (topic or topic[])
-				// so this is an array of array of (topic | topic[])
-				[eventName: string]: (`0x${string}` | `0x${string}`[])[][];
-			};
-		}
+		private readonly parseConfig?: LogParseConfig
 	) {
 		const _abiEventPerTopic: Map<`0x${string}`, AbiEvent> = new Map();
 		const _nameToTopic: Map<string, `0x${string}`> = new Map();
@@ -164,6 +158,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		super(provider, contractAddresses, eventNameTopics, fetcherConfig);
 		this.allABIEvents = _allABIEvents;
 		this.abiPerAddress = _abiPerAddress;
+		this.abiEventPerTopic = _abiEventPerTopic;
 	}
 
 	getLogEvents(options: {fromBlock: number; toBlock: number; retry?: number}): ParsedLogsPromise<ABI> {
@@ -205,7 +200,12 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 						data: log.data,
 						topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
 					});
+					if (Object.keys(parsed.args).length !== this.abiEventPerTopic[log.topics[0]].inputs.length) {
+						// needed because of this : https://github.com/wagmi-dev/viem/issues/197
+						throw new Error(`did not parse all inputs`);
+					}
 				} catch (err) {
+					parsed = null;
 					(event as LogEventWithParsingFailure).decodeError = `decoding error: ${err.toString()}`;
 				}
 

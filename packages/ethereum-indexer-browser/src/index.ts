@@ -20,6 +20,7 @@ export type {
 	LogEventFetcher,
 	LogFetcher,
 	LogFetcherConfig,
+	LogParseConfig,
 } from 'ethereum-indexer';
 
 export type {

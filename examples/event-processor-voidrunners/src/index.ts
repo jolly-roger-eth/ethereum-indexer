@@ -78,11 +78,12 @@ export const processor = fromSingleJSONEventProcessorObject(() => VoidrunnerEven
 // we expose contractsData as generic to be used on any chain
 export const contractsData = [
 	{
-		eventsABI: eip721,
+		chainId: '1',
+		abi: eip721,
 		address: '0x4658e9c5e1e05280e3708741aba63b7ff4e81055',
 		startBlock: 14953977,
 	},
-];
+] as const;
 
 // we also expose a object keyed by chainId
 // export const contractsDataPerChain = { 1: contractsData };

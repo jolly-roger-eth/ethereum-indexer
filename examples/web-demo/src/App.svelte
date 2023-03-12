@@ -1,37 +1,39 @@
-<script lang="ts">
-	import {status, state, syncing, initialize} from './lib/state/State';
-	import {web3} from './lib/blockchain/connection';
-	import Json from './lib/components/JSON.svelte';
+<script>
+	import Conquest from './pages/Conquest.svelte';
+	import Home from './pages/Home.svelte';
+	import MyNfts from './pages/MyNFTS.svelte';
+	import Voidrunners from './pages/Voidrunners.svelte';
+
+	function getPage() {
+		const page = document.location.hash;
+		if (page === '' || page === '#') {
+			console.log(`HOME`);
+			document.location.assign(document.location.toString().split('#')[0] + '#home');
+		}
+		return page;
+	}
+	let page = getPage();
+	window.onpopstate = function (event) {
+		page = getPage();
+	};
 </script>
 
-{#if $web3.error}
-	<h1>{$web3.error}</h1>
-{/if}
-{#if $web3.state === 'Idle'}
-	<button on:click={() => web3.start().then(initialize)}>Start</button>
-{:else if $web3.state === 'Loading'}
-	Loading...
-{:else if $web3.state === 'SwithingChain'}
-	Switching chain...
-{/if}
-
-<progress value={($syncing.lastSync?.syncPercentage || 0) / 100} style="width:100%;" />
-
-<p>status: {$status.state}</p>
-<p>loading: {$syncing.loading}</p>
-<p>catchingUp: {$syncing.catchingUp}</p>
-<p>autoIndexing: {$syncing.autoIndexing}</p>
-<p>fetchingLogs: {$syncing.fetchingLogs}</p>
-<p>processingFetchedLogs: {$syncing.processingFetchedLogs}</p>
-
-{#if $syncing.numRequests !== undefined}
-	<p>requests sent: {$syncing.numRequests}</p>
-{/if}
-<p>block processed: {$syncing.lastSync?.numBlocksProcessedSoFar?.toLocaleString() || 0}</p>
-<p>num events: {(($syncing.lastSync?.nextStreamID || 1) - 1).toLocaleString()}</p>
-
-{#if $state}
-	<Json data={$state} />
+<nav class="container-fluid">
+	<ul>
+		<li><a href="#home">Home</a></li>
+		<li><a href="#conquest">Conquest</a></li>
+		<li><a href="#voidrunners">Voidrunners</a></li>
+		<li><a href="#mynfts">My NFTS</a></li>
+	</ul>
+</nav>
+{#if page === '#' || page === '' || page === '#home'}
+	<Home />
+{:else if page === '#conquest'}
+	<Conquest />>
+{:else if page === '#voidrunners'}
+	<Voidrunners />>
+{:else if page === '#mynfts'}
+	<MyNfts />>
 {:else}
-	<Json data={$syncing} />
+	404: Page not Found
 {/if}
