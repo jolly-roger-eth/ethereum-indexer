@@ -2,7 +2,8 @@ import {EIP1193Account, EIP1193DATA, EIP1193Log, EIP1193ProviderWithoutEvents} f
 import {ExtraFilters, LogTransactionData} from '../engine/ethereum';
 import {LogFetcher, LogFetcherConfig} from '../engine/LogFetcher';
 import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
-import {decodeEventLog, DecodeEventLogReturnType, encodeEventTopics} from 'viem';
+import type {DecodeEventLogReturnType} from 'viem';
+import {decodeEventLog, encodeEventTopics} from 'viem';
 import {deepEqual} from '../utils/compae';
 
 function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
