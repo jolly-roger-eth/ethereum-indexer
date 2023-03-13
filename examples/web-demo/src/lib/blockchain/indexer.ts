@@ -8,22 +8,22 @@ import {
 	type LogParseConfig,
 } from 'ethereum-indexer-browser';
 
-export function createIndexerFromFactory(
-	factory: (params: any) => EventProcessor<Abi, any>,
+export function createIndexerFromFactory<ProcessorConfig = void>(
+	factory: (config: ProcessorConfig) => EventProcessor<Abi, any>,
 	contracts: ContractData<Abi>[] | AllContractData<Abi>,
 	chainId: string
 ) {
-	const processor = factory({
-		TODO: '//TODO', // TODO
-	});
-	const stores = createIndexerState(processor, {
+	const stores = createIndexerState(factory, {
 		trackNumRequests: true,
 	});
 
 	const {setup, indexToLatest, indexMore, startAutoIndexing} = stores;
 	function initialize(
 		connection: {ethereum: EIP1193Provider; accounts: `0x${string}`[]},
-		parseConfig?: LogParseConfig
+		config?: {
+			parseConfig?: LogParseConfig;
+			processorConfig?: ProcessorConfig;
+		}
 	) {
 		const provider = connection.ethereum;
 		setup(
@@ -33,7 +33,12 @@ export function createIndexerFromFactory(
 				contracts,
 			},
 			{
-				parseConfig,
+				indexer: config?.parseConfig
+					? {
+							parseConfig: config?.parseConfig,
+					  }
+					: undefined,
+				processor: config?.processorConfig,
 			}
 		);
 		indexToLatest().then(() => {

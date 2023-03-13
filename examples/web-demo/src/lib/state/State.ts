@@ -1,14 +1,9 @@
 import {processor as processorFactory, contractsDataPerChain} from 'event-processor-conquest-eth';
 import type {EIP1193Provider} from 'eip-1193';
 import {createIndexerState} from 'ethereum-indexer-browser';
-import {writable} from 'svelte/store';
-
-export const processor = processorFactory({
-	TODO: '//TODO', // TODO
-});
 
 export const {state, syncing, status, setup, indexToLatest, indexMore, startAutoIndexing} = createIndexerState(
-	processor,
+	processorFactory,
 	{trackNumRequests: true}
 );
 

@@ -204,7 +204,7 @@ export async function getLogs(
 		method: 'eth_getLogs',
 		params: [
 			{
-				address: contractAddresses,
+				address: contractAddresses ? contractAddresses : undefined,
 				fromBlock: ('0x' + options.fromBlock.toString(16)) as EIP1193DATA,
 				toBlock: ('0x' + options.toBlock.toString(16)) as EIP1193DATA,
 				topics: topics ? topics : undefined,

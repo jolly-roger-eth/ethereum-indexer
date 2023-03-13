@@ -40,17 +40,17 @@ interface Result extends ReadonlyArray<any> {
 
 interface NumberifiedLog {
 	blockNumber: number;
-	blockHash: string;
+	blockHash: `0x${string}`;
 	transactionIndex: number;
 
 	removed: boolean;
 
-	address: string;
-	data: string;
+	address: `0x${string}`;
+	data: `0x${string}`;
 
-	topics: Array<string>;
+	topics: Array<`0x${string}`>;
 
-	transactionHash: string;
+	transactionHash: `0x${string}`;
 	logIndex: number;
 }
 

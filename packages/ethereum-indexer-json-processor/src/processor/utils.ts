@@ -1,17 +1,16 @@
 import {SingleEventJSONProcessor, EventProcessorOnJSON} from './EventProcessorOnJSON';
 import {Abi, EventWithId, LogEvent, UnparsedEventWithId} from 'ethereum-indexer';
-import {EventFunctions, JSObject, MergedAbis} from './types';
+import {EventFunctions, JSObject} from './types';
 
-export type EventProcessorOnJSONConfig = {
-	// TODO state saver and fetcher
-};
-
-export function fromSingleJSONEventProcessor<ABI extends Abi, ProcessResultType extends JSObject>(
-	v: SingleEventJSONProcessor<ABI, ProcessResultType> | (() => SingleEventJSONProcessor<ABI, ProcessResultType>)
-): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
-	return (config?: EventProcessorOnJSONConfig) => {
-		// TODO pass state saver and fetcher
-		return new EventProcessorOnJSON<ABI, ProcessResultType>(typeof v === 'function' ? v() : v);
+export function fromSingleJSONEventProcessor<
+	ABI extends Abi,
+	ProcessResultType extends JSObject,
+	EventProcessorOnJSONConfig = void
+>(
+	v: (config: EventProcessorOnJSONConfig) => SingleEventJSONProcessor<ABI, ProcessResultType>
+): (config: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
+	return (config: EventProcessorOnJSONConfig) => {
+		return new EventProcessorOnJSON<ABI, ProcessResultType>(v(config));
 	};
 }
 
@@ -66,16 +65,15 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 	}
 }
 
-export function fromSingleJSONEventProcessorObject<ABI extends Abi, ProcessResultType extends JSObject>(
-	v:
-		| SingleJSONEventProcessorObject<ABI, ProcessResultType>
-		| (() => SingleJSONEventProcessorObject<ABI, ProcessResultType>)
-): (config?: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
-	return (config?: EventProcessorOnJSONConfig) => {
-		// TODO pass state saver and fetcher
-		return new EventProcessorOnJSON<ABI, ProcessResultType>(
-			typeof v === 'function' ? new SingleJSONEventProcessorWrapper(v()) : new SingleJSONEventProcessorWrapper(v)
-		);
+export function fromSingleJSONEventProcessorObject<
+	ABI extends Abi,
+	ProcessResultType extends JSObject,
+	EventProcessorOnJSONConfig = void
+>(
+	v: (config: EventProcessorOnJSONConfig) => SingleJSONEventProcessorObject<ABI, ProcessResultType>
+): (config: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
+	return (config: EventProcessorOnJSONConfig) => {
+		return new EventProcessorOnJSON<ABI, ProcessResultType>(new SingleJSONEventProcessorWrapper(v(config)));
 	};
 }
 

@@ -26,8 +26,8 @@ export type StatusState = {
 	state: 'Idle' | 'Loading' | 'Fetching' | 'Processing' | 'Done';
 };
 
-export function createIndexerState<ABI extends Abi, ProcessResultType>(
-	processor: EventProcessor<ABI, ProcessResultType>,
+export function createIndexerState<ABI extends Abi, ProcessResultType, EventProcessorConfig = void>(
+	factory: (config?: EventProcessorConfig) => EventProcessor<ABI, ProcessResultType>,
 	options?: {
 		trackNumRequests?: boolean;
 	}
@@ -53,8 +53,15 @@ export function createIndexerState<ABI extends Abi, ProcessResultType>(
 	let indexingTimeout: number | undefined;
 	let autoIndexingInterval: number = 4;
 
-	function setup(provider: EIP1193ProviderWithoutEvents, source: IndexingSource<ABI>, config?: IndexerConfig<ABI>) {
-		config = config || {};
+	function setup(
+		provider: EIP1193ProviderWithoutEvents,
+		source: IndexingSource<ABI>,
+		config?: {
+			processor?: EventProcessorConfig;
+			indexer?: IndexerConfig<ABI>;
+		}
+	) {
+		const indexerConfig = config?.indexer || {};
 		if (options?.trackNumRequests) {
 			provider = new Proxy(provider, {
 				get(target, p, receiver) {
@@ -68,7 +75,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType>(
 				},
 			});
 		}
-		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, config);
+		const processor = factory(config?.processor);
+		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, indexerConfig);
 		setSyncing({waitingForProvider: false});
 	}
 

@@ -22,7 +22,11 @@ export type LogFetcherConfig = {
 };
 
 export function getNewToBlockFromError(error: any): number | undefined {
-	if (error.code === -32602 && error.message) {
+	if (error.code === -32005 || (error.code === -32602 && error.message)) {
+		if (error.message.startsWith('query returned more than 10000 results.')) {
+			// query returned more than 10000 results. Try with this block range [0xEC23E8, 0xEC23F5].
+			console.error(error.message);
+		}
 		const regex = /\[.*\]/gm;
 		const result = regex.exec(error.message);
 		let values: number[] | undefined;
@@ -77,7 +81,6 @@ export class LogFetcher {
 
 			const fromBlock = options.fromBlock;
 			let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
-
 			try {
 				if (this.conf.filters) {
 					// TODO cancel on stopRetrying and make it throw
@@ -123,6 +126,7 @@ export class LogFetcher {
 				// ----------------------------------------------------------------------
 
 				this.numBlocksToFetch = numBlocksToFetchThisTime;
+				console.log({numBlocksToFetch: this.numBlocksToFetch});
 
 				toBlock = fromBlock + this.numBlocksToFetch - 1;
 				const retryPromise = this.getLogs({

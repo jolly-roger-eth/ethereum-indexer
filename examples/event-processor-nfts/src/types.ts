@@ -1,6 +1,6 @@
 export type NFT = {
+	tokenAddress: `0x${string}`;
 	tokenID: string;
-	owner: string;
 };
 
 export type Data = {
