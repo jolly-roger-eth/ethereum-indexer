@@ -1,12 +1,11 @@
 <script lang="ts">
-	export let chainId: string;
+	export let chainId: string | undefined = undefined;
 	export let accountsToUse: boolean | `0x${string}`;
 
-	export let initialize: (connection: {ethereum: EIP1193Provider; accounts: `0x${string}`[]}) => void;
+	export let initialize: (connection: ActiveConnection) => void;
 
-	import {web3} from '../blockchain/connection';
+	import {web3, type ActiveConnection} from '../blockchain/connection';
 	import {onMount} from 'svelte';
-	import type {EIP1193Provider} from 'eip-1193';
 
 	onMount(() => {
 		web3.reset();

@@ -23,8 +23,12 @@ function setError(message: string) {
 	throw new Error(message);
 }
 
-async function start(expectedChainId: string, accountsToUse: boolean | `0x${string}`) {
-	const expectedChainIdAsHex = `0x${parseInt(expectedChainId).toString(16)}` as `0x${string}`;
+export type ActiveConnection = {ethereum: EIP1193Provider; chainId: string; accounts: `0x${string}`[]};
+
+async function start(
+	expectedChainId: string | undefined,
+	accountsToUse: boolean | `0x${string}`
+): Promise<ActiveConnection> {
 	store.set({state: 'Loading'});
 	try {
 		const ethereum: EIP1193Provider = (window as any).ethereum;
@@ -32,35 +36,42 @@ async function start(expectedChainId: string, accountsToUse: boolean | `0x${stri
 		if (ethereum) {
 			const chainIdAsHex = await ethereum.request({method: 'eth_chainId'});
 			const chainId = parseInt(chainIdAsHex.slice(2), 16).toString();
-			if (chainId !== expectedChainId) {
-				store.set({state: 'SwithingChain'});
-				try {
-					await ethereum.request({
-						method: 'wallet_switchEthereumChain',
-						params: [{chainId: expectedChainIdAsHex}],
-					});
-				} catch (err) {
-					const chainConfig = getConfigFromChainId(expectedChainId);
+			if (expectedChainId) {
+				const expectedChainIdAsHex = `0x${parseInt(expectedChainId).toString(16)}` as `0x${string}`;
+				if (chainId !== expectedChainId) {
+					store.set({state: 'SwithingChain'});
 					try {
 						await ethereum.request({
-							method: 'wallet_addEthereumChain',
-							params: [
-								{
-									chainId: expectedChainIdAsHex,
-									rpcUrls: chainConfig.rpcUrls.default.http as any, // TODO readonly for request (eip-1993)
-									blockExplorerUrls: [chainConfig.blockExplorers.default.url],
-									chainName: chainConfig.name,
-									nativeCurrency: chainConfig.nativeCurrency,
-								},
-							],
+							method: 'wallet_switchEthereumChain',
+							params: [{chainId: expectedChainIdAsHex}],
 						});
 					} catch (err) {
-						setError('Failed to change to chain ');
+						const chainConfig = getConfigFromChainId(expectedChainId);
+						try {
+							await ethereum.request({
+								method: 'wallet_addEthereumChain',
+								params: [
+									{
+										chainId: expectedChainIdAsHex,
+										rpcUrls: chainConfig.rpcUrls.default.http as any, // TODO readonly for request (eip-1993)
+										blockExplorerUrls: [chainConfig.blockExplorers.default.url],
+										chainName: chainConfig.name,
+										nativeCurrency: chainConfig.nativeCurrency,
+									},
+								],
+							});
+						} catch (err) {
+							setError('Failed to change to chain ');
+						}
 					}
 				}
+				const newCainIdAsHex = await ethereum.request({method: 'eth_chainId'});
+				const newChainId = parseInt(newCainIdAsHex.slice(2), 16).toString();
+
+				if (newChainId !== expectedChainId) {
+					setError('Failed to change to chain ');
+				}
 			}
-			const newCainIdAsHex = await ethereum.request({method: 'eth_chainId'});
-			const newChainId = parseInt(newCainIdAsHex.slice(2), 16).toString();
 
 			let accounts = [];
 			if (accountsToUse) {
@@ -77,12 +88,8 @@ async function start(expectedChainId: string, accountsToUse: boolean | `0x${stri
 				}
 			}
 
-			if (newChainId !== expectedChainId) {
-				setError('Failed to change to chain ');
-			} else {
-				store.set({state: 'Ready'});
-				return {ethereum, accounts};
-			}
+			store.set({state: 'Ready'});
+			return {ethereum, accounts, chainId};
 		}
 		setError('no web3 wallet found');
 	} catch (err) {

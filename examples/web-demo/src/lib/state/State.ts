@@ -17,7 +17,7 @@ export function initialize(provider: EIP1193Provider) {
 			.request({method: 'eth_subscribe', params: ['newHeads']})
 			.then((subscriptionId: unknown) => {
 				if ((provider as any).on) {
-					(provider as any).on('message', (message: {type: string; data: any}) => {
+					(provider as any).on('message', (message: {type: string; data: {subscription?: `0x${string}`}}) => {
 						if (message.type === 'eth_subscription') {
 							if (message?.data?.subscription === subscriptionId) {
 								indexMore();
@@ -26,7 +26,7 @@ export function initialize(provider: EIP1193Provider) {
 					});
 				}
 			})
-			.catch((err: any) => {
+			.catch((err) => {
 				console.error(
 					`Error making newHeads subscription: ${err.message}.
 			 Code: ${err.code}. Data: ${err.data}

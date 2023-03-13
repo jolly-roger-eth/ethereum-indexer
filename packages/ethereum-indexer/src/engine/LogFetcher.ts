@@ -126,7 +126,6 @@ export class LogFetcher {
 				// ----------------------------------------------------------------------
 
 				this.numBlocksToFetch = numBlocksToFetchThisTime;
-				console.log({numBlocksToFetch: this.numBlocksToFetch});
 
 				toBlock = fromBlock + this.numBlocksToFetch - 1;
 				const retryPromise = this.getLogs({

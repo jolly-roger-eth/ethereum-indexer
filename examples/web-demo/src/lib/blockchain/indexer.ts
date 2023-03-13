@@ -8,10 +8,10 @@ import {
 	type LogParseConfig,
 } from 'ethereum-indexer-browser';
 
-export function createIndexerFromFactory<ProcessResultType, ProcessorConfig = void>(
-	factory: (config: ProcessorConfig) => EventProcessor<Abi, ProcessResultType>,
-	contracts: ContractData<Abi>[] | AllContractData<Abi>,
-	chainId: string
+export function createIndexerFromFactory<ABI extends Abi, ProcessResultType, ProcessorConfig = void>(
+	factory: (config: ProcessorConfig) => EventProcessor<ABI, ProcessResultType>,
+	contracts: ContractData<ABI>[] | AllContractData<ABI>,
+	chainId: string | undefined
 ) {
 	const stores = createIndexerState(factory, {
 		trackNumRequests: true,
@@ -19,7 +19,7 @@ export function createIndexerFromFactory<ProcessResultType, ProcessorConfig = vo
 
 	const {setup, indexToLatest, indexMore, startAutoIndexing} = stores;
 	function initialize(
-		connection: {ethereum: EIP1193Provider; accounts: `0x${string}`[]},
+		connection: {ethereum: EIP1193Provider; accounts: `0x${string}`[]; chainId: string},
 		config?: {
 			parseConfig?: LogParseConfig;
 			processorConfig?: ProcessorConfig;
@@ -29,7 +29,7 @@ export function createIndexerFromFactory<ProcessResultType, ProcessorConfig = vo
 		setup(
 			provider,
 			{
-				chainId,
+				chainId: chainId || connection.chainId,
 				contracts,
 			},
 			{
@@ -46,7 +46,7 @@ export function createIndexerFromFactory<ProcessResultType, ProcessorConfig = vo
 				.request({method: 'eth_subscribe', params: ['newHeads']})
 				.then((subscriptionId: unknown) => {
 					if ((provider as any).on) {
-						(provider as any).on('message', (message: {type: string; data: any}) => {
+						(provider as any).on('message', (message: {type: string; data: {subscription: `0x${string}`}}) => {
 							if (message.type === 'eth_subscription') {
 								if (message?.data?.subscription === subscriptionId) {
 									indexMore();
@@ -55,7 +55,7 @@ export function createIndexerFromFactory<ProcessResultType, ProcessorConfig = vo
 						});
 					}
 				})
-				.catch((err: any) => {
+				.catch((err) => {
 					console.error(
 						`Error making newHeads subscription: ${err.message}.
          Code: ${err.code}. Data: ${err.data}

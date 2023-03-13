@@ -1,4 +1,4 @@
-export {createIndexerState} from './IndexerState';
+export * from './IndexerState';
 
 // convenience : export type from ethereum-indexer and incidently from abitype
 

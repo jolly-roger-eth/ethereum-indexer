@@ -4,6 +4,7 @@
 	import Nft from './NFT.svelte';
 
 	export let provider: EIP1193Provider;
+	export let etherscanURL: string | undefined = undefined;
 	export let tokenID: string | bigint;
 	export let tokenAddress: `0x${string}`;
 
@@ -15,17 +16,18 @@
 {#await objects}
 	<li><div style="height: 350px;"><span>Please Wait</span></div></li>
 {:then result}
-	<Nft value={result} {tokenAddress} {tokenID} />
+	<Nft value={result} {tokenAddress} {tokenID} {etherscanURL} />
 {:catch error}
 	<li>
 		<div style="height: 350px;">
 			<span style="color: red;"
 				>{error.message || error.toString()}
-				<a
-					style="text-decoration: underline; color: blue;"
-					href={`https://etherscan.io/nft/${tokenAddress}/${tokenIDAsString}`}>See on Etherscan</a
-				></span
-			>
+				{#if etherscanURL}<a
+						style="text-decoration: underline; color: blue;"
+						href={`${etherscanURL}/nft/${tokenAddress}/${tokenIDAsString}`}>See on Etherscan</a
+					>
+				{/if}
+			</span>
 		</div>
 	</li>
 {/await}

@@ -1,18 +1,21 @@
 <script lang="ts">
-	export let state: Readable<any>;
+	export let state: Readable<Data>;
+
+	import type {Data} from 'event-processor-nfts';
 	import type {EIP1193Provider} from 'eip-1193';
 	import type {Readable} from 'svelte/store';
 	import LoadingNft from './LoadingNFT.svelte';
 
 	export let provider: EIP1193Provider | undefined;
+	export let etherscanURL: string | undefined = undefined;
 </script>
 
 {#if provider && $state}
 	<div class="container">
 		<h2 class="heading-text">Your <span>NFTs</span></h2>
 		<ul class="image-gallery">
-			{#each $state.nfts as nft (nft.id)}
-				<LoadingNft {provider} tokenAddress={nft.tokenAddress} tokenID={nft.tokenID} />
+			{#each $state.nfts as nft (nft.tokenAddress + '_' + nft.tokenID)}
+				<LoadingNft {etherscanURL} {provider} tokenAddress={nft.tokenAddress} tokenID={nft.tokenID} />
 			{/each}
 		</ul>
 	</div>

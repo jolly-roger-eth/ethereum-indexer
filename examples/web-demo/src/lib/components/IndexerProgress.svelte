@@ -1,5 +1,6 @@
 <script lang="ts">
-	export let syncing: Readable<any>;
+	import type {Abi, SyncingState} from 'ethereum-indexer-browser';
+	export let syncing: Readable<SyncingState<Abi>>;
 	import type {Readable} from 'svelte/store';
 </script>
 
