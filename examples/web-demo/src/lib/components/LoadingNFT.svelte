@@ -24,7 +24,9 @@
 				>{error.message || error.toString()}
 				{#if etherscanURL}<a
 						style="text-decoration: underline; color: blue;"
-						href={`${etherscanURL}/nft/${tokenAddress}/${tokenIDAsString}`}>See on Etherscan</a
+						href={`${etherscanURL}/nft/${tokenAddress}/${tokenIDAsString}`}
+						target="_blank"
+						rel="noreferrer">See on Etherscan</a
 					>
 				{/if}
 			</span>
