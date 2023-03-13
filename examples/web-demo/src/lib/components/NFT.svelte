@@ -11,12 +11,6 @@
 </script>
 
 <li>
-	<!-- {#if value.name}
-		<p>{value.name}</p>
-	{/if} -->
-	<!-- {#if value.description}
-		<p>{value.description}</p>
-	{/if} -->
 	{#if value.visuals}
 		{#if value.visuals[0].type === 'image'}
 			<img src={value.visuals[0].url} alt={value.name || 'unnamed NFT'} />
