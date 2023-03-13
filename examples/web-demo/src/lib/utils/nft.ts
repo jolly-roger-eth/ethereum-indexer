@@ -40,6 +40,9 @@ export async function fetchDisplayedObjects(
 export async function getTokenURI(provider: EIP1193Provider, tokenAddress: `0x${string}`, tokenID: bigint | string) {
 	let tokenIDAsHex = typeof tokenID === 'bigint' ? tokenID.toString(16) : BigInt(tokenID).toString(16);
 
+	if (tokenAddress.toLowerCase() === '0x57f1887a8bf19b14fc0df6fd9b2acc9af147ea85') {
+		throw new Error(`ENS names do not have metadata.`);
+	}
 	const tokenURIData = await provider.request({
 		method: 'eth_call',
 		params: [{to: tokenAddress, data: `0xc87b56dd${tokenIDAsHex.padStart(64, '0')}`}],
@@ -51,12 +54,26 @@ export async function getTokenURI(provider: EIP1193Provider, tokenAddress: `0x${
 	const size = parseInt(len, 16);
 	const hexData = hex2.slice(64, 64 + size * 2);
 	const tokenURI = hex_to_ascii(hexData);
+
+	// if (
+	// 	tokenURI.startsWith('http') &&
+	// 	!(
+	// 		tokenURI.startsWith('https://ipfs.io/') ||
+	// 		tokenURI.startsWith('https://dweb.link/') ||
+	// 		tokenURI.startsWith('https://nftstorage.link/') ||
+	// 		tokenURI.startsWith('https://arweave.dev/')
+	// 	)
+	// ) {
+	// 	throw new Error(`no support for HTTP, only IPFS and Arweave supported`);
+	// }
 	return tokenURI;
 }
 
 function normalizeURL(url: string) {
 	if (url.startsWith('ipfs://')) {
 		return 'https://ipfs.io/ipfs/' + url.slice(7);
+	} else if (url.startsWith('ar://')) {
+		return 'https://arweave.dev/' + url.slice(5);
 	} else {
 		return url;
 	}
