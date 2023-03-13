@@ -23,7 +23,7 @@ function setError(message: string) {
 	throw new Error(message);
 }
 
-async function start(expectedChainId: string, requireAccounts: boolean) {
+async function start(expectedChainId: string, accountsToUse: boolean | `0x${string}`) {
 	const expectedChainIdAsHex = `0x${parseInt(expectedChainId).toString(16)}` as `0x${string}`;
 	store.set({state: 'Loading'});
 	try {
@@ -63,13 +63,17 @@ async function start(expectedChainId: string, requireAccounts: boolean) {
 			const newChainId = parseInt(newCainIdAsHex.slice(2), 16).toString();
 
 			let accounts = [];
-			if (requireAccounts) {
-				accounts = await ethereum.request({method: 'eth_accounts'});
-				if (accounts.length === 0) {
-					accounts = await ethereum.request({method: 'eth_requestAccounts'});
-				}
-				if (accounts.length === 0) {
-					setError('Failed to get accounts');
+			if (accountsToUse) {
+				if (typeof accountsToUse === 'string') {
+					accounts = [accountsToUse];
+				} else {
+					accounts = await ethereum.request({method: 'eth_accounts'});
+					if (accounts.length === 0) {
+						accounts = await ethereum.request({method: 'eth_requestAccounts'});
+					}
+					if (accounts.length === 0) {
+						setError('Failed to get accounts');
+					}
 				}
 			}
 

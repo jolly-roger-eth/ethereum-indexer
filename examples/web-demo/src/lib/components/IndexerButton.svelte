@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let chainId: string;
-	export let requireAccounts: boolean;
+	export let accountsToUse: boolean | `0x${string}`;
 
 	export let initialize: (connection: {ethereum: EIP1193Provider; accounts: `0x${string}`[]}) => void;
 
@@ -17,7 +17,7 @@
 	<h1>{$web3.error}</h1>
 {/if}
 {#if $web3.state === 'Idle'}
-	<button on:click={() => web3.start(chainId, requireAccounts).then(initialize)}>Start</button>
+	<button on:click={() => web3.start(chainId, accountsToUse).then(initialize)}>Start</button>
 {:else if $web3.state === 'Loading'}
 	Loading...
 {:else if $web3.state === 'SwithingChain'}

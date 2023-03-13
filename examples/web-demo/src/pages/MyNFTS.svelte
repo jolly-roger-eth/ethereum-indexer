@@ -4,13 +4,8 @@
 	import {createIndexerFromFactory} from '../lib/blockchain/indexer';
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
-	import IndexerStatus from '../lib/components/IndexerStatus.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
-	const {status, state, syncing, initialize} = createIndexerFromFactory(
-		processorFactory,
-		contractsData,
-		contractsData.chainId
-	);
+	const {state, syncing, initialize} = createIndexerFromFactory(processorFactory, contractsData, contractsData.chainId);
 	let provider: EIP1193Provider | undefined;
 	function initalizeWithAccount(connection) {
 		provider = connection.ethereum;
@@ -27,7 +22,7 @@
 	}
 </script>
 
-<IndexerButton initialize={initalizeWithAccount} chainId={contractsData.chainId} requireAccounts={true} />
+<IndexerButton initialize={initalizeWithAccount} chainId={contractsData.chainId} accountsToUse={true} />
 <IndexerProgress {syncing} />
 <!-- <IndexerStatus {status} {syncing} /> -->
 

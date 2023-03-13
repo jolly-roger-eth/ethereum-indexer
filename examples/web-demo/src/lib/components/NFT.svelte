@@ -16,10 +16,10 @@
 			<img src={value.visuals[0].url} alt={value.name || 'unnamed NFT'} />
 			<div class="overlay"><span>{value.name || 'unnamed NFT'}</span></div>
 		{:else if value.visuals[0].type === 'iframe'}
-			<div><span>Iframe not implemented yet</span></div>
+			<div style="height: 350px;"><span>Iframe not implemented yet</span></div>
 		{/if}
 	{:else}
-		<div><span>No Image</span></div>
+		<div style="height: 350px;"><span>No Image</span></div>
 	{/if}
 </li>
 
