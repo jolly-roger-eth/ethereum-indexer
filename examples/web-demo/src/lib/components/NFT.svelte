@@ -1,6 +1,11 @@
 <script lang="ts">
 	import type {NFTValue} from '../utils/nft';
 
+	export let tokenID: string | bigint;
+	export let tokenAddress: `0x${string}`;
+
+	$: tokenIDAsString = typeof tokenID === 'bigint' ? tokenID.toString() : BigInt(tokenID).toString();
+
 	export let value: NFTValue;
 </script>
 
@@ -16,10 +21,24 @@
 			<img src={value.visuals[0].url} alt={value.name || 'unnamed NFT'} />
 			<div class="overlay"><span>{value.name || 'unnamed NFT'}</span></div>
 		{:else if value.visuals[0].type === 'iframe'}
-			<div style="height: 350px;"><span>Iframe not implemented yet</span></div>
+			<div style="height: 350px;">
+				<span
+					>Iframe not implemented yet <a
+						style="text-decoration: underline; color: blue;"
+						href={`https://etherscan.io/nft/${tokenAddress}/${tokenIDAsString}`}>See on Etherscan</a
+					></span
+				>
+			</div>
 		{/if}
 	{:else}
-		<div style="height: 350px;"><span>No Image</span></div>
+		<div style="height: 350px;">
+			<span
+				>No Image <a
+					style="text-decoration: underline; color: blue;"
+					href={`https://etherscan.io/nft/${tokenAddress}/${tokenIDAsString}`}>See on Etherscan</a
+				></span
+			>
+		</div>
 	{/if}
 </li>
 

@@ -5,7 +5,15 @@
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
-	const {state, syncing, initialize} = createIndexerFromFactory(processorFactory, contractsData, contractsData.chainId);
+	const latestContractsData = {
+		...contractsData,
+		// startBlock: 14432000,
+	};
+	const {state, syncing, initialize} = createIndexerFromFactory(
+		processorFactory,
+		latestContractsData,
+		contractsData.chainId
+	);
 	let provider: EIP1193Provider | undefined;
 	function initalizeWithAccount(connection) {
 		provider = connection.ethereum;

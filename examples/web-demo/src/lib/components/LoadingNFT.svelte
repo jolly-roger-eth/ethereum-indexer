@@ -7,15 +7,27 @@
 	export let tokenID: string | bigint;
 	export let tokenAddress: `0x${string}`;
 
+	$: tokenIDAsString = typeof tokenID === 'bigint' ? tokenID.toString() : BigInt(tokenID).toString();
+
 	$: objects = fetchDisplayedObjects(provider, tokenAddress, tokenID);
 </script>
 
 {#await objects}
 	<li><div style="height: 350px;"><span>Please Wait</span></div></li>
 {:then result}
-	<Nft value={result} />
+	<Nft value={result} {tokenAddress} {tokenID} />
 {:catch error}
-	<li><div style="height: 350px;"><span style="color: red;">{error.message || error.toString()}</span></div></li>
+	<li>
+		<div style="height: 350px;">
+			<span style="color: red;"
+				>{error.message || error.toString()}
+				<a
+					style="text-decoration: underline; color: blue;"
+					href={`https://etherscan.io/nft/${tokenAddress}/${tokenIDAsString}`}>See on Etherscan</a
+				></span
+			>
+		</div>
+	</li>
 {/await}
 
 <style>
