@@ -168,18 +168,28 @@ function arrayGetter(
 						__action__: 'ArraySet',
 						actions: [{index: target.length, deleteCount: values.length}],
 					});
-					target.push(...values);
+					return target.push(...values);
+				};
+			} else if (property === 'pop') {
+				return () => {
+					const value = target.pop();
+					history.setReversal(fieldPath, {
+						__action__: 'ArraySet',
+						actions: [{index: target.length, values: [value]}],
+					});
+					return value;
 				};
 			} else if (property === 'splice') {
 				return (start: number, deleteCount?: number, ...items: JSType[]) => {
-					if (items) {
+					if (items && items.length > 0) {
 						throw new Error(`splice in proxy do not support items to add yet...`);
 					}
+					const values = target.slice(start, deleteCount);
 					history.setReversal(fieldPath, {
 						__action__: 'ArraySet',
-						actions: [{index: target.length, values: target.slice(start, deleteCount)}], // TODO deepCopy
+						actions: [{index: target.length, values}], // TODO deepCopy
 					});
-					target.splice(start, deleteCount, items);
+					return values;
 				};
 			}
 

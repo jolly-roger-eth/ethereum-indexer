@@ -25,8 +25,10 @@ export const processor = fromSingleJSONEventProcessorObject((config: {account: `
 
 			const tokenID = event.args.id.toString();
 
+			const id = (event.address + '_' + tokenID) as `0x${string}`;
+
 			let nft: NFT;
-			let nftIndex = data.nfts.findIndex((v) => v.tokenID === tokenID);
+			let nftIndex = data.nfts.findIndex((v) => v.id === id);
 			if (nftIndex !== -1) {
 				nft = data.nfts[nftIndex];
 			}
@@ -36,6 +38,7 @@ export const processor = fromSingleJSONEventProcessorObject((config: {account: `
 				if (to.toLowerCase() === config.account.toLowerCase()) {
 					// namedLogger.info(`new token ${tokenID}: with owner: ${to}`);
 					nft = {
+						id,
 						tokenID,
 						tokenAddress: event.address,
 					};
@@ -45,12 +48,7 @@ export const processor = fromSingleJSONEventProcessorObject((config: {account: `
 				// namedLogger.info(`token ${tokenID} already exists`);
 				if (to.toLowerCase() !== config.account.toLowerCase()) {
 					// namedLogger.info(`deleting it...`);
-					// data.nfts.splice(nftIndex, 1);
-					if (data.nfts.length > 1) {
-						data.nfts[nftIndex] = data.nfts[data.nfts.length - 1];
-					} else {
-						delete data.nfts[nftIndex];
-					}
+					data.nfts.splice(nftIndex, 1);
 					return;
 				}
 			}

@@ -4,7 +4,7 @@
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	import IndexerStatus from '../lib/components/IndexerStatus.svelte';
-	import IndexerVisuals from '../lib/components/IndexerStatus.svelte';
+	import StateValues from '../lib/components/StateValues.svelte';
 	const chainId = '100';
 	const {status, state, syncing, initialize} = createIndexerFromFactory(
 		processorFactory,
@@ -15,4 +15,5 @@
 
 <IndexerButton {initialize} {chainId} requireAccounts={false} />
 <IndexerProgress {syncing} />
-<IndexerStatus {status} {state} {syncing} />
+<IndexerStatus {status} {syncing} />
+<StateValues {state} {syncing} />

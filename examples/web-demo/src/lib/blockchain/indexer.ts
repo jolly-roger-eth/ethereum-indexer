@@ -8,8 +8,8 @@ import {
 	type LogParseConfig,
 } from 'ethereum-indexer-browser';
 
-export function createIndexerFromFactory<ProcessorConfig = void>(
-	factory: (config: ProcessorConfig) => EventProcessor<Abi, any>,
+export function createIndexerFromFactory<ProcessResultType, ProcessorConfig = void>(
+	factory: (config: ProcessorConfig) => EventProcessor<Abi, ProcessResultType>,
 	contracts: ContractData<Abi>[] | AllContractData<Abi>,
 	chainId: string
 ) {

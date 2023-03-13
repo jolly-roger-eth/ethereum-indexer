@@ -1,9 +1,7 @@
 <script lang="ts">
 	export let status: Readable<any>;
-	export let state: Readable<any>;
 	export let syncing: Readable<any>;
 
-	import Json from './JSON.svelte';
 	import type {Readable} from 'svelte/store';
 </script>
 
@@ -19,9 +17,3 @@
 {/if}
 <p>block processed: {$syncing.lastSync?.numBlocksProcessedSoFar?.toLocaleString() || 0}</p>
 <p>num events: {(($syncing.lastSync?.nextStreamID || 1) - 1).toLocaleString()}</p>
-
-{#if $state}
-	<Json data={$state} />
-{:else}
-	<Json data={$syncing} />
-{/if}

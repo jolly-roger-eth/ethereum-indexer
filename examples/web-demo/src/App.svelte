@@ -18,7 +18,7 @@
 	};
 </script>
 
-<nav class="container-fluid">
+<nav class="container-fluid" style="margin-bottom: 1em;">
 	<ul>
 		<li><a href="#home">Home</a></li>
 		<li><a href="#conquest">Conquest</a></li>
@@ -29,11 +29,11 @@
 {#if page === '#' || page === '' || page === '#home'}
 	<Home />
 {:else if page === '#conquest'}
-	<Conquest />>
+	<Conquest />
 {:else if page === '#voidrunners'}
-	<Voidrunners />>
+	<Voidrunners />
 {:else if page === '#mynfts'}
-	<MyNfts />>
+	<MyNfts />
 {:else}
 	404: Page not Found
 {/if}
