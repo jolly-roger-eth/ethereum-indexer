@@ -72,8 +72,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config, config?.parseConfig);
 		this.alwaysFetchTimestamps = config.alwaysFetchTimestamps ? true : false;
 		this.alwaysFetchTransactions = config.alwaysFetchTransactions ? true : false;
-		this.fetchExistingStream = config.fetchExistingStream;
-		this.saveAppendedStream = config.saveAppendedStream;
+		this.fetchExistingStream = config.keepStream?.fetcher;
+		this.saveAppendedStream = config.keepStream?.saver;
 
 		this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
 
@@ -177,7 +177,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			namedLogger.info(`reseting...`);
 			this._indexingMore = this._reseting.then(() => this.promiseToIndex());
 		} else {
-			namedLogger.info(`go!`);
 			this._indexingMore = this.promiseToIndex();
 		}
 		return this._indexingMore;
@@ -326,8 +325,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected async promiseToSave(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
 		this.appendedStreamNotYetSaved.push(...eventStream);
 		try {
-			await this.saveAppendedStream({
-				source,
+			await this.saveAppendedStream(source, {
 				eventStream: this.appendedStreamNotYetSaved,
 				lastSync,
 			});

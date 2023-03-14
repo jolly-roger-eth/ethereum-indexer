@@ -26,6 +26,7 @@ export type {
 	ExistingStateFecther,
 	StateSaver,
 	ProcessorContext,
+	KeepStream,
 } from 'ethereum-indexer';
 
 export type {

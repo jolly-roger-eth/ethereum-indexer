@@ -6,6 +6,7 @@ import type {
 	IndexingSource,
 	LastSync,
 	StateSaver,
+	KeepStream,
 } from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
 import {createRootStore, createStore} from './utils/stores';
@@ -60,6 +61,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			fetcher: ExistingStateFecther<ABI, ProcessResultType, unknown, ProcessorConfig>;
 			saver: StateSaver<ABI, ProcessResultType, unknown, ProcessorConfig>;
 		};
+		keepStream?: KeepStream<ABI>;
 	}
 ) {
 	const {
@@ -99,7 +101,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		},
 		processorConfig?: ProcessorConfig
 	) {
-		const config = indexerSetup.config || {};
+		const config = {...{}, keepStream: options?.keepStream, ...(indexerSetup.config || {})};
 		const source = indexerSetup.source;
 
 		const provider = options?.trackNumRequests

@@ -195,7 +195,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 				}
 			}
 		} finally {
-			namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
+			// namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
 		}
 		return this.state;
 	}

@@ -68,6 +68,80 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				);
 			},
 		},
+		keepStream: {
+			fetcher: async (source, nextStreamId) => {
+				const empty = {
+					lastSync: {
+						lastToBlock: 0,
+						latestBlock: 0,
+						nextStreamID: 1,
+						unconfirmedBlocks: [],
+					},
+					eventStream: [],
+				};
+
+				const storageID = `stream_${name}_${source.chainId}`;
+				const fromStorage = localStorage.getItem(storageID);
+				const stream = fromStorage
+					? JSON.parse(fromStorage, (key, value) => {
+							if (typeof value === 'string' && value.endsWith('n')) {
+								try {
+									const bn = BigInt(value.slice(0, -1));
+									return bn;
+								} catch (err) {
+									return value;
+								}
+							} else {
+								return value;
+							}
+					  })
+					: undefined;
+				return stream
+					? {
+							eventStream: stream.eventStream.filter((v: any) => v.streamID >= nextStreamId),
+							lastSync: stream.lastSync,
+					  }
+					: empty;
+			},
+			saver: async (source, stream) => {
+				const storageID = `stream_${name}_${source.chainId}`;
+				const fromStorage = localStorage.getItem(storageID);
+				if (fromStorage) {
+					const existingStream = JSON.parse(fromStorage, (key, value) => {
+						if (typeof value === 'string' && value.endsWith('n')) {
+							try {
+								const bn = BigInt(value.slice(0, -1));
+								return bn;
+							} catch (err) {
+								return value;
+							}
+						} else {
+							return value;
+						}
+					});
+					// TODO check streamID is exactly +1 next
+					const eventStreamToSave = existingStream.eventStream.concat(stream.eventStream);
+					// console.log(`saving nextStreamID: ${stream.lastSync.nextStreamID}, events : ${eventStreamToSave.length}`);
+					localStorage.setItem(
+						storageID,
+						JSON.stringify(
+							{lastSync: stream.lastSync, eventStream: eventStreamToSave},
+							(key, value) => (typeof value === 'bigint' ? value.toString() + `n` : value) // return everything else unchanged
+						)
+					);
+				} else if (stream.eventStream.length > 0 && stream.eventStream[0].streamID !== 1) {
+					throw new Error(`did not save previous events`);
+				} else {
+					localStorage.setItem(
+						storageID,
+						JSON.stringify(
+							stream,
+							(key, value) => (typeof value === 'bigint' ? value.toString() + `n` : value) // return everything else unchanged
+						)
+					);
+				}
+			},
+		},
 	});
 
 	const {init, indexToLatest, indexMore, startAutoIndexing} = indexer;

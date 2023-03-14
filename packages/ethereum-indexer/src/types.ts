@@ -71,20 +71,26 @@ export type ExistingStreamFecther<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	nextStreamID: number
 ) => Promise<{lastSync: LastSync<ABI>; eventStream: EventWithId<ABI>[]}>;
-export type StreamSaver<ABI extends Abi> = (stream: {
-	source: IndexingSource<ABI>;
-	lastSync: LastSync<ABI>;
-	eventStream: EventWithId<ABI>[];
-}) => Promise<void>;
+export type StreamSaver<ABI extends Abi> = (
+	source: IndexingSource<ABI>,
+	stream: {
+		lastSync: LastSync<ABI>;
+		eventStream: EventWithId<ABI>[];
+	}
+) => Promise<void>;
 
 export type IndexerConfig<ABI extends Abi> = LogFetcherConfig & {
 	finality?: number;
 	alwaysFetchTimestamps?: boolean;
 	alwaysFetchTransactions?: boolean;
 	providerSupportsETHBatch?: boolean;
-	fetchExistingStream?: ExistingStreamFecther<ABI>;
-	saveAppendedStream?: StreamSaver<ABI>;
+	keepStream?: KeepStream<ABI>;
 	parseConfig?: LogParseConfig;
+};
+
+export type KeepStream<ABI extends Abi> = {
+	fetcher: ExistingStreamFecther<ABI>;
+	saver: StreamSaver<ABI>;
 };
 
 export type LogParseConfig = {
