@@ -45,7 +45,7 @@ export async function getTokenURI(provider: EIP1193Provider, tokenAddress: `0x${
 	}
 	const tokenURIData = await provider.request({
 		method: 'eth_call',
-		params: [{to: tokenAddress, data: `0xc87b56dd${tokenIDAsHex.padStart(64, '0')}`}],
+		params: [{to: tokenAddress, data: `0xc87b56dd${tokenIDAsHex.padStart(64, '0')}`}, 'latest'],
 	});
 
 	const hex = tokenURIData.slice(2);

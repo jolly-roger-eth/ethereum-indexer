@@ -189,5 +189,6 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				});
 		});
 	}
+	(window as any).indexer = indexer;
 	return {...indexer, initialize};
 }

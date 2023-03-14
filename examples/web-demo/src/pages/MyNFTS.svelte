@@ -1,11 +1,19 @@
 <script lang="ts">
 	import type {EIP1193Provider} from 'eip-1193';
 	import {createProcessor, contractsData} from 'event-processor-nfts';
+	import {onMount} from 'svelte';
+	import {params} from '../config';
 	import type {ActiveConnection} from '../lib/blockchain/connection';
 	import {createIndexeInitializer} from '../lib/blockchain/indexer';
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
+
+	let accountsToUse: `0x${string}` | boolean = true;
+	onMount(() => {
+		accountsToUse = params['account'] as `0x${string}`;
+		console.log({accountsToUse});
+	});
 	const latestContractsData = {
 		...contractsData,
 		// startBlock: 14432000,
@@ -34,7 +42,7 @@
 	}
 </script>
 
-<IndexerButton initialize={initalizeWithAccount} accountsToUse={true} />
+<IndexerButton initialize={initalizeWithAccount} {accountsToUse} />
 <IndexerProgress {syncing} />
 <!-- <IndexerStatus {status} {syncing} /> -->
 
