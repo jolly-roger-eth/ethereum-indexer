@@ -207,18 +207,14 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			let lastSync = this.lastSync;
 			if (!lastSync) {
 				await this.signal('Loading');
-				namedLogger.log('this.processor.load()...');
 				const {lastSync: loadedLastSync, state} = await this.processor.load(this.source);
-				namedLogger.log('this.processor.load() DONE');
 				lastSync = loadedLastSync;
 				this._onStateUpdated(state);
 			}
 
 			if (this.fetchExistingStream) {
 				await this.signal('Fetching');
-				namedLogger.log('this.fetchExistingStream()...');
 				const existingStreamData = await this.fetchExistingStream(this.source, lastSync.nextStreamID);
-				namedLogger.log('this.fetchExistingStream() DONE');
 
 				if (existingStreamData) {
 					const {eventStream, lastSync: lastSyncFetched} = existingStreamData;

@@ -1,6 +1,5 @@
 import {
 	IndexingSource,
-	EventProcessor,
 	EventWithId,
 	LastSync,
 	LogEvent,
@@ -91,11 +90,8 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType}> {
 		this.source = source;
 		if (this.existingStateFecther) {
-			namedLogger.info(`this.existingStateFecther()...`);
 			const existingStateData = await this.existingStateFecther(source);
-			namedLogger.info(`this.existingStateFecther() DONE`);
 			if (existingStateData) {
-				console.log(`existingStateData`, existingStateData.lastSync.lastToBlock);
 				const {lastSync: lastSyncFromExistingState, data, history} = existingStateData;
 				if (
 					!this._json.lastSync?.lastToBlock ||
