@@ -21,8 +21,8 @@ export type InputValues<T extends AbiEvent> = {
 
 export type InputValueArray<T extends AbiEvent> = AbiParametersToPrimitiveTypes<T['inputs']>;
 
-export type EventFunctions<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = void> = {
-	[Property in ExtractAbiEventNames<ABI> as `on${Property}`]?: [ProcessorConfig] extends [void]
+export type EventFunctions<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined> = {
+	[Property in ExtractAbiEventNames<ABI> as `on${Property}`]?: ProcessorConfig extends undefined
 		? (json: ProcessResultType, event: EventWithId<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>}) => void
 		: (
 				json: ProcessResultType,
@@ -34,7 +34,7 @@ export type EventFunctions<ABI extends Abi, ProcessResultType extends JSObject, 
 export type MergedEventFunctions<
 	T extends {[name: string]: {abi: Abi}},
 	ProcessResultType extends JSObject,
-	ProcessorConfig = void
+	ProcessorConfig = undefined
 > = EventFunctions<MergedAbis<T>, ProcessResultType, ProcessorConfig>;
 
 export type MergedAbis<T extends {[name: string]: {abi: Abi}}> = [...T[keyof T]['abi']];

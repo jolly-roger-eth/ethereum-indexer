@@ -29,7 +29,7 @@ export type StateSaver<ABI extends Abi, ProcessResultType extends JSObject> = (
 export type SingleEventJSONProcessor<
 	ABI extends Abi,
 	ProcessResultType extends JSObject,
-	ProcessorConfig = void
+	ProcessorConfig = undefined
 > = EventFunctions<ABI, ProcessResultType> & {
 	createInitialState(): ProcessResultType;
 	configure(config: ProcessorConfig): void;
@@ -39,7 +39,7 @@ export type SingleEventJSONProcessor<
 	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 };
 
-export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = void>
+export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
 	implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
 {
 	public readonly state: ProcessResultType;

@@ -2,11 +2,11 @@ import {EventProcessorOnJSON} from './EventProcessorOnJSON';
 import {Abi, EventWithId, LogEvent, UnparsedEventWithId} from 'ethereum-indexer';
 import {EventFunctions, JSObject} from './types';
 
-export type JSProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = void> = EventFunctions<
-	ABI,
-	ProcessResultType,
-	ProcessorConfig
-> & {
+export type JSProcessor<
+	ABI extends Abi,
+	ProcessResultType extends JSObject,
+	ProcessorConfig = undefined
+> = EventFunctions<ABI, ProcessResultType, ProcessorConfig> & {
 	construct(): ProcessResultType;
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
 	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;

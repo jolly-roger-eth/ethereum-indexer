@@ -9,18 +9,18 @@ import {
 	type EventProcessorWithInitialState,
 } from 'ethereum-indexer-browser';
 
-export function createIndexeInitializer<ABI extends Abi, ProcessResultType, ProcessorConfig = void>(
+export function createIndexeInitializer<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	factoryOrProcessor:
 		| (() => EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>)
 		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	contracts: readonly ContractData<ABI>[] | AllContractData<ABI>,
 	chainId: string | undefined
 ) {
-	const stores = createIndexerState(factoryOrProcessor, {
+	const indexer = createIndexerState(factoryOrProcessor, {
 		trackNumRequests: true,
 	});
 
-	const {setup, indexToLatest, indexMore, startAutoIndexing} = stores;
+	const {init, indexToLatest, indexMore, startAutoIndexing} = indexer;
 	function initialize(
 		connection: {ethereum: EIP1193Provider; accounts: readonly `0x${string}`[]; chainId: string},
 		config?: {
@@ -29,20 +29,16 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 		}
 	) {
 		const provider = connection.ethereum;
-		setup(
-			provider,
+		init(
 			{
-				chainId: chainId || connection.chainId,
-				contracts,
+				provider,
+				source: {
+					chainId: chainId || connection.chainId,
+					contracts,
+				},
+				config: config?.parseConfig ? {parseConfig: config.parseConfig} : undefined,
 			},
-			{
-				indexer: config?.parseConfig
-					? {
-							parseConfig: config?.parseConfig,
-					  }
-					: undefined,
-				processor: config?.processorConfig,
-			}
+			config?.processorConfig
 		);
 		indexToLatest().then(() => {
 			provider
@@ -69,5 +65,5 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				});
 		});
 	}
-	return {...stores, initialize};
+	return {...indexer, initialize};
 }

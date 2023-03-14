@@ -33,7 +33,22 @@ export type StatusState = {
 	state: 'Idle' | 'Loading' | 'Fetching' | 'Processing' | 'Done';
 };
 
-export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig>(
+type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfig extends undefined
+	? (
+			indexerSetup: {
+				provider: EIP1193ProviderWithoutEvents;
+				source: IndexingSource<ABI>;
+				config?: IndexerConfig<ABI>;
+			},
+			processorConfig: ProcessorConfig
+	  ) => void
+	: (indexerSetup: {
+			provider: EIP1193ProviderWithoutEvents;
+			source: IndexingSource<ABI>;
+			config?: IndexerConfig<ABI>;
+	  }) => void;
+
+export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	factoryOrProcessor:
 		| (() => EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>)
 		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
@@ -65,32 +80,34 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	let indexingTimeout: number | undefined;
 	let autoIndexingInterval: number = 4;
 
-	function setup(
-		provider: EIP1193ProviderWithoutEvents,
-		source: IndexingSource<ABI>,
-		config?: {
-			processor?: ProcessorConfig;
-			indexer?: IndexerConfig<ABI>;
-		}
+	function init(
+		indexerSetup: {
+			provider: EIP1193ProviderWithoutEvents;
+			source: IndexingSource<ABI>;
+			config?: IndexerConfig<ABI>;
+		},
+		processorConfig?: ProcessorConfig
 	) {
-		const indexerConfig = config?.indexer || {};
-		if (options?.trackNumRequests) {
-			provider = new Proxy(provider, {
-				get(target, p, receiver) {
-					if (p === 'request') {
-						return (args: {method: string; params?: readonly unknown[]}) => {
-							setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
-							return target[p](args as any);
-						};
-					}
-					return (target as any)[p];
-				},
-			});
+		const config = indexerSetup.config || {};
+		const source = indexerSetup.source;
+
+		const provider = options?.trackNumRequests
+			? new Proxy(indexerSetup.provider, {
+					get(target, p, receiver) {
+						if (p === 'request') {
+							return (args: {method: string; params?: readonly unknown[]}) => {
+								setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
+								return target[p](args as any);
+							};
+						}
+						return (target as any)[p];
+					},
+			  })
+			: indexerSetup.provider;
+		if (processor.configure && processorConfig) {
+			processor.configure(processorConfig);
 		}
-		if (processor.configure) {
-			processor.configure(config?.processor);
-		}
-		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, indexerConfig);
+		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, config);
 		setSyncing({waitingForProvider: false});
 	}
 
@@ -267,7 +284,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		status: {
 			...readableStatus,
 		},
-		setup,
+		init: init as InitFunction<ABI, ProcessorConfig>,
 		indexToLatest,
 		indexMore,
 		startAutoIndexing,
