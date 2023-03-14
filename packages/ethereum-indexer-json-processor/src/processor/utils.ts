@@ -1,32 +1,30 @@
-import {SingleEventJSONProcessor, EventProcessorOnJSON} from './EventProcessorOnJSON';
+import {EventProcessorOnJSON} from './EventProcessorOnJSON';
 import {Abi, EventWithId, LogEvent, UnparsedEventWithId} from 'ethereum-indexer';
 import {EventFunctions, JSObject} from './types';
 
-export function fromSingleJSONEventProcessor<
-	ABI extends Abi,
-	ProcessResultType extends JSObject,
-	EventProcessorOnJSONConfig = void
->(
-	v: (config: EventProcessorOnJSONConfig) => SingleEventJSONProcessor<ABI, ProcessResultType>
-): (config: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
-	return (config: EventProcessorOnJSONConfig) => {
-		return new EventProcessorOnJSON<ABI, ProcessResultType>(v(config));
-	};
-}
-
-export type SingleJSONEventProcessorObject<ABI extends Abi, ProcessResultType extends JSObject> = EventFunctions<
+export type JSProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = void> = EventFunctions<
 	ABI,
-	ProcessResultType
+	ProcessResultType,
+	ProcessorConfig
 > & {
-	setup?(json: ProcessResultType): Promise<void>;
+	construct(): ProcessResultType;
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
 	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
 	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 	handleUnparsedEvent?(json: ProcessResultType, event: UnparsedEventWithId);
 };
 
-class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject> {
-	constructor(protected obj: SingleJSONEventProcessorObject<ABI, ProcessResultType>) {}
+class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig> {
+	constructor(protected obj: JSProcessor<ABI, ProcessResultType, ProcessorConfig>) {}
+
+	createInitialState(): ProcessResultType {
+		return this.obj.construct();
+	}
+
+	protected config: ProcessorConfig;
+	configure(config: ProcessorConfig): void {
+		this.config = config;
+	}
 
 	processEvent(json: ProcessResultType, event: EventWithId<ABI>) {
 		if ('decodeError' in event) {
@@ -37,12 +35,12 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 		}
 		const functionName = `on${event.eventName}`;
 		if (this.obj[functionName]) {
-			return this.obj[functionName](json, event);
+			return this.obj[functionName](json, event, this.config);
 		}
 	}
-	async setup(json: ProcessResultType): Promise<void> {
-		if (this.obj.setup) {
-			return this.obj.setup(json);
+	construct(): ProcessResultType {
+		if (this.obj.construct) {
+			return this.obj.construct();
 		}
 	}
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean {
@@ -65,15 +63,13 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 	}
 }
 
-export function fromSingleJSONEventProcessorObject<
-	ABI extends Abi,
-	ProcessResultType extends JSObject,
-	EventProcessorOnJSONConfig = void
->(
-	v: (config: EventProcessorOnJSONConfig) => SingleJSONEventProcessorObject<ABI, ProcessResultType>
-): (config: EventProcessorOnJSONConfig) => EventProcessorOnJSON<ABI, ProcessResultType> {
-	return (config: EventProcessorOnJSONConfig) => {
-		return new EventProcessorOnJSON<ABI, ProcessResultType>(new SingleJSONEventProcessorWrapper(v(config)));
+export function fromJSProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig>(
+	v: (() => JSProcessor<ABI, ProcessResultType, ProcessorConfig>) | JSProcessor<ABI, ProcessResultType, ProcessorConfig>
+): () => EventProcessorOnJSON<ABI, ProcessResultType, ProcessorConfig> {
+	return () => {
+		return new EventProcessorOnJSON<ABI, ProcessResultType, ProcessorConfig>(
+			new SingleJSONEventProcessorWrapper(typeof v === 'function' ? v() : v)
+		);
 	};
 }
 

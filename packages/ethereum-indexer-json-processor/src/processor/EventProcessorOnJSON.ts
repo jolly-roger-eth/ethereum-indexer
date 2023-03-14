@@ -1,4 +1,12 @@
-import {IndexingSource, EventProcessor, EventWithId, LastSync, LogEvent, Abi} from 'ethereum-indexer';
+import {
+	IndexingSource,
+	EventProcessor,
+	EventWithId,
+	LastSync,
+	LogEvent,
+	Abi,
+	EventProcessorWithInitialState,
+} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
 import {EventFunctions, JSObject} from './types';
@@ -18,28 +26,31 @@ export type StateSaver<ABI extends Abi, ProcessResultType extends JSObject> = (
 	data: AllData<ABI, ProcessResultType>
 ) => Promise<void>;
 
-export type SingleEventJSONProcessor<ABI extends Abi, ProcessResultType extends JSObject> = EventFunctions<
-	ABI,
-	ProcessResultType
-> & {
-	setup?(json: ProcessResultType): Promise<void>;
+export type SingleEventJSONProcessor<
+	ABI extends Abi,
+	ProcessResultType extends JSObject,
+	ProcessorConfig = void
+> = EventFunctions<ABI, ProcessResultType> & {
+	createInitialState(): ProcessResultType;
+	configure(config: ProcessorConfig): void;
 	processEvent(json: ProcessResultType, event: EventWithId<ABI>): void;
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
 	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
 	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 };
 
-export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject>
-	implements EventProcessor<ABI, ProcessResultType>
+export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = void>
+	implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
 {
 	public readonly state: ProcessResultType;
 	protected _json: AllData<ABI, ProcessResultType>;
 	protected history: History;
 	protected existingStateFecther?: ExistingStateFecther<ABI, ProcessResultType>;
 	protected stateSaver?: StateSaver<ABI, ProcessResultType>;
-	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType>) {
+	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
+		const data = singleEventProcessor.createInitialState();
 		this._json = {
-			data: {} as ProcessResultType,
+			data,
 			history: {
 				blockHashes: {},
 				reversals: {},
@@ -47,6 +58,14 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		};
 		this.history = new History(this._json.history, 12); // TODO finality
 		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
+	}
+
+	createInitialState(): ProcessResultType {
+		return this.singleEventProcessor.createInitialState();
+	}
+
+	configure(config: ProcessorConfig) {
+		this.singleEventProcessor.configure(config);
 	}
 
 	setExistingStateFetcher(fetcher: ExistingStateFecther<ABI, ProcessResultType>) {
@@ -68,10 +87,10 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			reversals: {},
 		};
 		this.history.setBlock(0, '0x0000');
-		await this.singleEventProcessor.setup(this._json.data);
+		this._json.data = this.singleEventProcessor.createInitialState();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType}> {
 		if (this.existingStateFecther) {
 			namedLogger.info(`fetching state...`);
 			const {lastSync: lastSyncFromExistingState, data, history} = await this.existingStateFecther();
@@ -83,26 +102,24 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 				this._json.history = history;
 				this.history.setBlock(0, '0x0000');
 
+				const keys = Object.keys(this._json.data);
+				for (const key of keys) {
+					delete this._json.data[key];
+				}
 				this._json.data = data;
 				this._json.lastSync = lastSyncFromExistingState;
 			}
 		}
 
-		namedLogger.info(`EventProcessorOnJSON SETTING UP....`);
-		await this.singleEventProcessor.setup(this._json.data);
-
 		// TODO check if contractsData matches old sync
-		const lastSync = this.state.lastSync;
-		if (lastSync) {
-			return lastSync as unknown as LastSync<ABI>;
-		} else {
-			return {
-				lastToBlock: 0,
-				latestBlock: 0,
-				nextStreamID: 1,
-				unconfirmedBlocks: [],
-			};
-		}
+		const lastSync = this._json.lastSync || {
+			lastToBlock: 0,
+			latestBlock: 0,
+			nextStreamID: 1,
+			unconfirmedBlocks: [],
+		};
+
+		return {lastSync, state: this.state};
 	}
 
 	private lastEventID: number;

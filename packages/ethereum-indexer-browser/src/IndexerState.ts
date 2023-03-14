@@ -1,4 +1,11 @@
-import type {Abi, EventProcessor, IndexerConfig, IndexingSource, LastSync} from 'ethereum-indexer';
+import type {
+	Abi,
+	EventProcessor,
+	EventProcessorWithInitialState,
+	IndexerConfig,
+	IndexingSource,
+	LastSync,
+} from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
 import {createRootStore, createStore} from './utils/stores';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
@@ -26,8 +33,10 @@ export type StatusState = {
 	state: 'Idle' | 'Loading' | 'Fetching' | 'Processing' | 'Done';
 };
 
-export function createIndexerState<ABI extends Abi, ProcessResultType, EventProcessorConfig = void>(
-	factory: (config?: EventProcessorConfig) => EventProcessor<ABI, ProcessResultType>,
+export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig>(
+	factoryOrProcessor: () =>
+		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
+		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
 		trackNumRequests?: boolean;
 	}
@@ -46,8 +55,11 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, EventProc
 		numRequests: options?.trackNumRequests ? 0 : undefined,
 	});
 
+	const processor = typeof factoryOrProcessor == 'function' ? factoryOrProcessor() : factoryOrProcessor;
+	const initialState = processor.createInitialState();
+
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
-	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>();
+	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(initialState);
 
 	let indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;
 	let indexingTimeout: number | undefined;
@@ -57,7 +69,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, EventProc
 		provider: EIP1193ProviderWithoutEvents,
 		source: IndexingSource<ABI>,
 		config?: {
-			processor?: EventProcessorConfig;
+			processor?: ProcessorConfig;
 			indexer?: IndexerConfig<ABI>;
 		}
 	) {
@@ -75,7 +87,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, EventProc
 				},
 			});
 		}
-		const processor = factory(config?.processor);
+		if (processor.configure) {
+			processor.configure(config?.processor);
+		}
 		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, indexerConfig);
 		setSyncing({waitingForProvider: false});
 	}

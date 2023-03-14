@@ -29,7 +29,7 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 		}
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void}> {
 		let lastSync: LastSync<ABI>;
 		try {
 			const content = fs.readFileSync(this.folder + `/lastSync.json`, 'utf8');
@@ -44,7 +44,8 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 		}
 
 		// TODO check if source matches old sync
-		let lastSyncFromProcessor: LastSync<ABI> = await this.processor.load(source);
+		const fromProcessor = await this.processor.load(source);
+		let lastSyncFromProcessor = fromProcessor.lastSync;
 
 		const files = fs.readdirSync(this.folder);
 		namedLogger.info(`loading ${files} files of events...`);
@@ -103,7 +104,7 @@ PROCESSOR:
 ${JSON.stringify(lastSyncFromProcessor, null, 2)}
 `);
 		}
-		return lastSync;
+		return {lastSync, state: undefined};
 	}
 
 	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<void> {

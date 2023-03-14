@@ -1,8 +1,4 @@
-import {
-	EventWithId,
-	fromSingleJSONEventProcessorObject,
-	SingleJSONEventProcessorObject,
-} from 'ethereum-indexer-json-processor';
+import {JSProcessor, fromJSProcessor} from 'ethereum-indexer-json-processor';
 
 import {logs} from 'named-logs';
 
@@ -104,20 +100,21 @@ function getPlayer(data: Data, address: string): Player {
 	return player;
 }
 
-const ConquestEventProcessor: SingleJSONEventProcessorObject<typeof OuterSpace, Data> = {
-	async setup(json: Data): Promise<void> {
-		json.space = {
-			address: '', // TODO
-			expansionDelta: 0,
-			maxX: 0,
-			maxY: 0,
-			minX: 0,
-			minY: 0,
+const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
+	construct(): Data {
+		return {
+			space: {
+				address: '', // TODO
+				expansionDelta: 0,
+				maxX: 0,
+				maxY: 0,
+				minX: 0,
+				minY: 0,
+			},
+			players: {},
+			planets: {},
+			fleets: {},
 		};
-		json.players = {};
-		json.planets = {};
-		json.fleets = {};
-		// namedLogger.info(`setup complete!`);
 	},
 	onPlanetStake(data, event) {
 		getOrCreatePlayer(data, event.args.acquirer);
@@ -172,7 +169,7 @@ const ConquestEventProcessor: SingleJSONEventProcessorObject<typeof OuterSpace, 
 	},
 };
 
-export const processor = fromSingleJSONEventProcessorObject(() => ConquestEventProcessor);
+export const processor = fromJSProcessor(ConquestEventProcessor);
 
 const contractsDataonGnosis = [
 	{

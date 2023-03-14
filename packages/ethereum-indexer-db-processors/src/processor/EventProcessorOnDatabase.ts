@@ -40,17 +40,20 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 		await this.init();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void}> {
 		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
-			return lastSync as unknown as LastSync<ABI>;
+			return {lastSync: lastSync as unknown as LastSync<ABI>, state: undefined};
 		} else {
 			return {
-				lastToBlock: 0,
-				latestBlock: 0,
-				nextStreamID: 1,
-				unconfirmedBlocks: [],
+				lastSync: {
+					lastToBlock: 0,
+					latestBlock: 0,
+					nextStreamID: 1,
+					unconfirmedBlocks: [],
+				},
+				state: undefined,
 			};
 		}
 	}

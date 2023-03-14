@@ -30,8 +30,8 @@ export function createStore<T extends {[field: string]: unknown}>(
 	};
 }
 
-export function createRootStore<T>() {
-	let $state: T | undefined = undefined;
+export function createRootStore<T>(initialState: T) {
+	let $state = initialState;
 	const store = writable<T>($state);
 	function set(newState: T) {
 		$state = newState;

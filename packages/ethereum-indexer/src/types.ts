@@ -7,12 +7,20 @@ export type {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
 
 // when state can be serialised and fit in memory (especialy useful in browser context), we can have it returned
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
-	load: (source: IndexingSource<ABI>) => Promise<LastSync<ABI>>;
+	load: (source: IndexingSource<ABI>) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>}>;
 	process: (eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
 	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 	shouldFetchTimestamp?: (event: LogEvent<ABI>) => boolean;
 	shouldFetchTransaction?: (event: LogEvent<ABI>) => boolean;
+};
+
+export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, ProcessorConfig> = EventProcessor<
+	ABI,
+	ProcessResultType
+> & {
+	createInitialState(): ProcessResultType;
+	configure(config: ProcessorConfig): void;
 };
 
 export type EventBlock<ABI extends Abi> = {

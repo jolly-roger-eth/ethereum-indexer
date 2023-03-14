@@ -30,18 +30,24 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 		await this.init();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<LastSync<ABI>> {
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void}> {
 		// TODO check if source matches old sync
 		try {
 			const lastSync = await this.eventDB.get<LastSync<ABI> & {batch: number}>('lastSync');
 			this.batchCounter = lastSync.batch;
-			return lastSync as unknown as LastSync<ABI>;
+			return {
+				lastSync: lastSync as unknown as LastSync<ABI>,
+				state: undefined,
+			};
 		} catch (err) {
 			return {
-				lastToBlock: 0,
-				latestBlock: 0,
-				nextStreamID: 1,
-				unconfirmedBlocks: [],
+				lastSync: {
+					lastToBlock: 0,
+					latestBlock: 0,
+					nextStreamID: 1,
+					unconfirmedBlocks: [],
+				},
+				state: undefined,
 			};
 		}
 	}

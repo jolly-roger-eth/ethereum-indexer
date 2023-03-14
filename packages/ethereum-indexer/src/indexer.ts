@@ -206,7 +206,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			let lastSync = this.lastSync;
 			if (!lastSync) {
 				await this.signal('Loading');
-				lastSync = await this.processor.load(this.source);
+				const {lastSync: loadedLastSync, state} = await this.processor.load(this.source);
+				lastSync = loadedLastSync;
+				this._onProcessed(state); // TODO rename to onStateUpdated?
 			}
 
 			if (this.fetchExistingStream) {
@@ -233,6 +235,14 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			return this.lastSync;
 		} finally {
 			this._loading = undefined;
+		}
+	}
+
+	_onProcessed(outcome: ProcessResultType) {
+		if (this.onProcessed) {
+			try {
+				this.onProcessed(outcome);
+			} catch (err) {}
 		}
 	}
 
@@ -283,11 +293,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					namedLogger.info(`not feeding anymore...`);
 					throw new Error('aborted');
 				}
-				if (this.onProcessed) {
-					try {
-						this.onProcessed(outcome);
-					} catch (err) {}
-				}
+				this._onProcessed(outcome);
 				this.lastSync = newLastSync;
 			} else {
 				throw new Error(`invalid nextStreamID, ${firstEvent.streamID} === ${lastSync.nextStreamID}`);
@@ -542,11 +548,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				// TODO timeout ?
 				await this.save(eventStream, this.lastSync);
 
-				if (this.onProcessed) {
-					try {
-						this.onProcessed(outcome);
-					} catch (err) {}
-				}
+				this._onProcessed(outcome);
 
 				this._indexingMore = undefined;
 				return resolve(newLastSync);
