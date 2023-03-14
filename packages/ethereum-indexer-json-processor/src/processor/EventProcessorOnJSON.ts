@@ -137,7 +137,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 
 		namedLogger.info(`nextStreamID: ${lastSync.nextStreamID}`);
 
-		return {lastSync, state: this.state};
+		return {lastSync, state: this._json.data};
 	}
 
 	private lastEventID: number;
@@ -197,7 +197,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		} finally {
 			// namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
 		}
-		return this.state;
+		return this._json.data;
 	}
 
 	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {

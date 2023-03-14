@@ -2,6 +2,7 @@ import type {EIP1193Provider} from 'eip-1193';
 import {writable} from 'svelte/store';
 import type {Chain} from 'viem';
 import * as chains from 'viem/chains';
+import {queuedProvider} from './utils';
 
 function getConfigFromChainId(chainId: string): Chain {
 	const chainIdAsNumber = parseInt(chainId);
@@ -31,7 +32,9 @@ async function start(
 ): Promise<ActiveConnection> {
 	store.set({state: 'Loading'});
 	try {
-		const ethereum: EIP1193Provider = (window as any).ethereum;
+		const windowEthereum: EIP1193Provider = (window as any).ethereum;
+
+		const ethereum = queuedProvider(windowEthereum);
 
 		if (ethereum) {
 			const chainIdAsHex = await ethereum.request({method: 'eth_chainId'});

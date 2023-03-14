@@ -5,16 +5,30 @@
 	import type {EIP1193Provider} from 'eip-1193';
 	import type {Readable} from 'svelte/store';
 	import LoadingNft from './LoadingNFT.svelte';
+	import {paginate} from '../utils/pagination';
+	import PaginationNav from './paginations/PaginationNav.svelte';
 
 	export let provider: EIP1193Provider | undefined;
 	export let etherscanURL: string | undefined = undefined;
+
+	let currentPage = 1;
+	const pageSize = 9;
+	$: items = paginate({items: $state.nfts, pageSize, currentPage});
 </script>
 
-{#if provider && $state}
+{#if provider}
 	<div class="container">
+		<PaginationNav
+			{currentPage}
+			{pageSize}
+			totalItems={$state.nfts.length}
+			limit={1}
+			showStepOptions={true}
+			on:setPage={(e) => (currentPage = e.detail.page)}
+		/>
 		<h2 class="heading-text">Your <span>NFTs</span></h2>
 		<ul class="image-gallery">
-			{#each $state.nfts as nft (nft.tokenAddress + '_' + nft.tokenID)}
+			{#each items as nft (nft.tokenAddress + '_' + nft.tokenID)}
 				<LoadingNft {etherscanURL} {provider} tokenAddress={nft.tokenAddress} tokenID={nft.tokenID} />
 			{/each}
 		</ul>
