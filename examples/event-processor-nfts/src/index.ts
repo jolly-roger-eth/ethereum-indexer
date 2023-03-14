@@ -3,6 +3,7 @@ import eip721 from './eip721';
 import {Data, NFT} from './types';
 
 const NFTEventProcessor: JSProcessor<typeof eip721, Data, {account: `0x${string}`}> = {
+	version: 'NEW',
 	construct(): Data {
 		return {nfts: []};
 	},

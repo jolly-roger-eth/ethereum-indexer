@@ -46,6 +46,11 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 							return value;
 						}
 					});
+					if ((context.version || parsed.__VERSION__) && parsed.__VERSION__ !== context.version) {
+						console.log(`NEW VERSION DETECTED, GET RID OF STATE`);
+						localStorage.removeItem(storageID);
+						return undefined;
+					}
 					return parsed;
 				}
 			},
@@ -57,7 +62,9 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				);
 				localStorage.setItem(
 					storageID,
-					JSON.stringify(all, (_, value) => (typeof value === 'bigint' ? value.toString() + 'n' : value))
+					JSON.stringify({...all, __VERSION__: context.version}, (_, value) =>
+						typeof value === 'bigint' ? value.toString() + 'n' : value
+					)
 				);
 			},
 		},

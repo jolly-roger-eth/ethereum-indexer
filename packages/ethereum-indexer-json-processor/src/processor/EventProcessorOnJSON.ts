@@ -21,6 +21,7 @@ export type SingleEventJSONProcessor<
 	ProcessResultType extends JSObject,
 	ProcessorConfig = undefined
 > = EventFunctions<ABI, ProcessResultType> & {
+	version?: string;
 	createInitialState(): ProcessResultType;
 	configure(config: ProcessorConfig): void;
 	processEvent(json: ProcessResultType, event: EventWithId<ABI>): void;
@@ -44,7 +45,9 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	protected stateSaver?: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
 	protected source: IndexingSource<ABI> | undefined;
 	protected config: ProcessorConfig | undefined;
+	protected version: string | undefined;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
+		this.version = singleEventProcessor.version;
 		const data = singleEventProcessor.createInitialState();
 		this._json = {
 			data,
@@ -99,8 +102,9 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		this.source = source;
 		if (this.existingStateFecther) {
 			const config = this.config as ProcessorConfig;
+			const version = this.version;
 			// TODO why do we need the `as` ?
-			const context = {source, config} as ProcessorContext<ABI, ProcessorConfig>;
+			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
 			const existingStateData = await this.existingStateFecther(context);
 			if (existingStateData) {
 				const {lastSync: lastSyncFromExistingState, data, history} = existingStateData;
@@ -182,8 +186,9 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 				try {
 					const config = this.config as ProcessorConfig;
 					const source = this.source as IndexingSource<ABI>;
+					const version = this.version;
 					// TODO why do we need the `as` ?
-					const context = {source, config} as ProcessorContext<ABI, ProcessorConfig>;
+					const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
 					await this.stateSaver(context, this._json);
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);

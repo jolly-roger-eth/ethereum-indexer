@@ -100,10 +100,12 @@ export type LogParseConfig = {
 export type ProcessorContext<ABI extends Abi, ProcessorConfig> = ProcessorConfig extends undefined
 	? {
 			readonly source: IndexingSource<ABI>;
+			version?: string;
 	  }
 	: {
 			readonly source: IndexingSource<ABI>;
 			readonly config: ProcessorConfig;
+			version?: string;
 	  };
 
 export type AllData<ABI extends Abi, ProcessResultType, Extra> = {

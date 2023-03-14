@@ -7,6 +7,7 @@ export type JSProcessor<
 	ProcessResultType extends JSObject,
 	ProcessorConfig = undefined
 > = EventFunctions<ABI, ProcessResultType, ProcessorConfig> & {
+	version?: string;
 	construct(): ProcessResultType;
 	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
 	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
@@ -15,7 +16,10 @@ export type JSProcessor<
 };
 
 class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig> {
-	constructor(protected obj: JSProcessor<ABI, ProcessResultType, ProcessorConfig>) {}
+	version: string | undefined;
+	constructor(protected obj: JSProcessor<ABI, ProcessResultType, ProcessorConfig>) {
+		this.version = obj.version;
+	}
 
 	createInitialState(): ProcessResultType {
 		return this.obj.construct();
