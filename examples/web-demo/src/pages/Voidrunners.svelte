@@ -4,6 +4,7 @@
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	const {state, syncing, initialize} = createIndexeInitializer(
+		'voidrunners',
 		createProcessor(),
 		contractsData,
 		contractsData[0].chainId

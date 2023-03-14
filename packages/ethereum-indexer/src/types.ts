@@ -97,15 +97,24 @@ export type LogParseConfig = {
 	};
 };
 
+export type ProcessorContext<ABI extends Abi, ProcessorConfig> = ProcessorConfig extends undefined
+	? {
+			readonly source: IndexingSource<ABI>;
+	  }
+	: {
+			readonly source: IndexingSource<ABI>;
+			readonly config: ProcessorConfig;
+	  };
+
 export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
 	data: ProcessResultType;
 	lastSync: LastSync<ABI>;
 } & Extra;
 
-export type ExistingStateFecther<ABI extends Abi, ProcessResultType, Extra> = (
-	source: IndexingSource<ABI>
+export type ExistingStateFecther<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
+	context: ProcessorContext<ABI, ProcessorConfig>
 ) => Promise<AllData<ABI, ProcessResultType, Extra>>;
-export type StateSaver<ABI extends Abi, ProcessResultType, Extra> = (
-	source: IndexingSource<ABI>,
+export type StateSaver<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
+	context: ProcessorContext<ABI, ProcessorConfig>,
 	all: AllData<ABI, ProcessResultType, Extra>
 ) => Promise<void>;

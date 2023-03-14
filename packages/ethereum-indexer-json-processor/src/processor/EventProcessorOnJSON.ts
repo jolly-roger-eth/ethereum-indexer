@@ -8,6 +8,7 @@ import {
 	AllData,
 	ExistingStateFecther,
 	StateSaver,
+	ProcessorContext,
 } from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
@@ -34,9 +35,15 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	protected state: ProcessResultType;
 	protected _json: AllData<ABI, ProcessResultType, {history: HistoryJSObject}>;
 	protected history: History;
-	protected existingStateFecther?: ExistingStateFecther<ABI, ProcessResultType, {history: HistoryJSObject}>;
-	protected stateSaver?: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}>;
+	protected existingStateFecther?: ExistingStateFecther<
+		ABI,
+		ProcessResultType,
+		{history: HistoryJSObject},
+		ProcessorConfig
+	>;
+	protected stateSaver?: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
 	protected source: IndexingSource<ABI> | undefined;
+	protected config: ProcessorConfig | undefined;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
 		const data = singleEventProcessor.createInitialState();
 		this._json = {
@@ -61,12 +68,13 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	}
 
 	configure(config: ProcessorConfig) {
+		this.config = config;
 		this.singleEventProcessor.configure(config);
 	}
 
 	keepState(config: {
-		fetcher: ExistingStateFecther<ABI, ProcessResultType, {history: HistoryJSObject}>;
-		saver: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}>;
+		fetcher: ExistingStateFecther<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
+		saver: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
 	}) {
 		this.existingStateFecther = config.fetcher;
 		this.stateSaver = config.saver;
@@ -90,7 +98,10 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType}> {
 		this.source = source;
 		if (this.existingStateFecther) {
-			const existingStateData = await this.existingStateFecther(source);
+			const config = this.config as ProcessorConfig;
+			// TODO why do we need the `as` ?
+			const context = {source, config} as ProcessorContext<ABI, ProcessorConfig>;
+			const existingStateData = await this.existingStateFecther(context);
 			if (existingStateData) {
 				const {lastSync: lastSyncFromExistingState, data, history} = existingStateData;
 				if (
@@ -169,7 +180,11 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			this._json.lastSync = lastSyncDoc;
 			if (this.stateSaver) {
 				try {
-					await this.stateSaver(this.source, this._json);
+					const config = this.config as ProcessorConfig;
+					const source = this.source as IndexingSource<ABI>;
+					// TODO why do we need the `as` ?
+					const context = {source, config} as ProcessorContext<ABI, ProcessorConfig>;
+					await this.stateSaver(context, this._json);
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);
 				}

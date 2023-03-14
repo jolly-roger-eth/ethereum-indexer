@@ -25,6 +25,7 @@ export type {
 	AllData,
 	ExistingStateFecther,
 	StateSaver,
+	ProcessorContext,
 } from 'ethereum-indexer';
 
 export type {

@@ -9,6 +9,7 @@
 
 	const processor = createProcessor();
 	const {status, state, syncing, initialize} = createIndexeInitializer(
+		'conquest',
 		processor,
 		contractsDataPerChain[chainId],
 		chainId

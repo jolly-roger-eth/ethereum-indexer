@@ -57,8 +57,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	options?: {
 		trackNumRequests?: boolean;
 		keepState?: {
-			fetcher: ExistingStateFecther<ABI, ProcessResultType, unknown>;
-			saver: StateSaver<ABI, ProcessResultType, unknown>;
+			fetcher: ExistingStateFecther<ABI, ProcessResultType, unknown, ProcessorConfig>;
+			saver: StateSaver<ABI, ProcessResultType, unknown, ProcessorConfig>;
 		};
 	}
 ) {

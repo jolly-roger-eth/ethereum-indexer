@@ -10,7 +10,12 @@
 		...contractsData,
 		// startBlock: 14432000,
 	};
-	const {state, syncing, initialize} = createIndexeInitializer(createProcessor(), latestContractsData, undefined);
+	const {state, syncing, initialize} = createIndexeInitializer(
+		'mynfts',
+		createProcessor(),
+		latestContractsData,
+		undefined
+	);
 	let provider: EIP1193Provider | undefined;
 	let etherscanURL: string | undefined = undefined;
 	function initalizeWithAccount(connection: ActiveConnection) {

@@ -7,10 +7,16 @@ import {
 	type ContractData,
 	type LogParseConfig,
 	type EventProcessorWithInitialState,
-	type AllData,
 } from 'ethereum-indexer-browser';
+import {hash} from '../utils/hash';
+
+async function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
+	const configHash = config ? await hash(config) : undefined;
+	return `${name}_${chainId}${configHash ? `_${configHash}` : ''}`;
+}
 
 export function createIndexeInitializer<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
+	name: string,
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	contracts: readonly ContractData<ABI>[] | AllContractData<ABI>,
 	chainId: string | undefined
@@ -18,8 +24,13 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 	const indexer = createIndexerState(processor, {
 		trackNumRequests: true,
 		keepState: {
-			fetcher: async (source) => {
-				const fromStorage = localStorage.getItem(`${source.chainId}`);
+			fetcher: async (context) => {
+				const storageID = await getStorageID(
+					name,
+					context.source.chainId,
+					'config' in context ? context.config : undefined
+				);
+				const fromStorage = localStorage.getItem(storageID);
 				if (!fromStorage) {
 					return undefined;
 				} else {
@@ -38,9 +49,14 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 					return parsed;
 				}
 			},
-			saver: async (source, all: AllData<ABI, ProcessResultType, unknown>) => {
+			saver: async (context, all) => {
+				const storageID = await getStorageID(
+					name,
+					context.source.chainId,
+					'config' in context ? context.config : undefined
+				);
 				localStorage.setItem(
-					`${source.chainId}`,
+					storageID,
 					JSON.stringify(all, (_, value) => (typeof value === 'bigint' ? value.toString() + 'n' : value))
 				);
 			},
