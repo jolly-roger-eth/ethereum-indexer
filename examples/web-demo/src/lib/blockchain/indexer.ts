@@ -1,25 +1,28 @@
 import type {EIP1193Provider} from 'eip-1193';
+
 import {
 	createIndexerState,
 	type Abi,
 	type AllContractData,
 	type ContractData,
-	type EventProcessor,
 	type LogParseConfig,
+	type EventProcessorWithInitialState,
 } from 'ethereum-indexer-browser';
 
-export function createIndexerFromFactory<ABI extends Abi, ProcessResultType, ProcessorConfig = void>(
-	factory: (config: ProcessorConfig) => EventProcessor<ABI, ProcessResultType>,
-	contracts: ContractData<ABI>[] | AllContractData<ABI>,
+export function createIndexeInitializer<ABI extends Abi, ProcessResultType, ProcessorConfig = void>(
+	factoryOrProcessor:
+		| (() => EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>)
+		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+	contracts: readonly ContractData<ABI>[] | AllContractData<ABI>,
 	chainId: string | undefined
 ) {
-	const stores = createIndexerState(factory, {
+	const stores = createIndexerState(factoryOrProcessor, {
 		trackNumRequests: true,
 	});
 
 	const {setup, indexToLatest, indexMore, startAutoIndexing} = stores;
 	function initialize(
-		connection: {ethereum: EIP1193Provider; accounts: `0x${string}`[]; chainId: string},
+		connection: {ethereum: EIP1193Provider; accounts: readonly `0x${string}`[]; chainId: string},
 		config?: {
 			parseConfig?: LogParseConfig;
 			processorConfig?: ProcessorConfig;

@@ -34,8 +34,8 @@ export type StatusState = {
 };
 
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig>(
-	factoryOrProcessor: () =>
-		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
+	factoryOrProcessor:
+		| (() => EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>)
 		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
 		trackNumRequests?: boolean;

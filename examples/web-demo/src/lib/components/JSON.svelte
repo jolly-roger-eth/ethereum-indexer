@@ -9,5 +9,5 @@
 
 {JSON.stringify(
 	dataDisplayed,
-	(key, value) => (typeof value === 'bigint' ? value.toString() : value) // return everything else unchanged)}
+	(_, value) => (typeof value === 'bigint' ? value.toString() : value) // return everything else unchanged)}
 )}

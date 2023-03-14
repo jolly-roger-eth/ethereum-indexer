@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type {EIP1193Provider} from 'eip-1193';
-	import {processor as processorFactory, contractsData} from 'event-processor-nfts';
+	import {processor, contractsData} from 'event-processor-nfts';
 	import type {ActiveConnection} from '../lib/blockchain/connection';
-	import {createIndexerFromFactory} from '../lib/blockchain/indexer';
+	import {createIndexeInitializer} from '../lib/blockchain/indexer';
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
@@ -10,7 +10,7 @@
 		...contractsData,
 		// startBlock: 14432000,
 	};
-	const {state, syncing, initialize} = createIndexerFromFactory(processorFactory, latestContractsData, undefined);
+	const {state, syncing, initialize} = createIndexeInitializer(processor, latestContractsData, undefined);
 	let provider: EIP1193Provider | undefined;
 	let etherscanURL: string | undefined = undefined;
 	function initalizeWithAccount(connection: ActiveConnection) {

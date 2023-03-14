@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import Conquest from './pages/Conquest.svelte';
 	import Home from './pages/Home.svelte';
 	import MyNfts from './pages/MyNFTS.svelte';
@@ -13,7 +13,7 @@
 		return page;
 	}
 	let page = getPage();
-	window.onpopstate = function (event) {
+	window.onpopstate = function () {
 		page = getPage();
 	};
 </script>
