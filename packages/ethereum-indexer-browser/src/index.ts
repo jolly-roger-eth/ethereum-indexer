@@ -22,6 +22,9 @@ export type {
 	LogFetcherConfig,
 	LogParseConfig,
 	EventProcessorWithInitialState,
+	AllData,
+	ExistingStateFecther,
+	StateSaver,
 } from 'ethereum-indexer';
 
 export type {

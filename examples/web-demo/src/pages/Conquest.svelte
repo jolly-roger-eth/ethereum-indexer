@@ -1,11 +1,13 @@
 <script lang="ts">
-	import {processor, contractsDataPerChain} from 'event-processor-conquest-eth';
+	import {createProcessor, contractsDataPerChain} from 'event-processor-conquest-eth';
 	import {createIndexeInitializer} from '../lib/blockchain/indexer';
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	import IndexerStatus from '../lib/components/IndexerStatus.svelte';
 	import StateValues from '../lib/components/StateValues.svelte';
 	const chainId = '100';
+
+	const processor = createProcessor();
 	const {status, state, syncing, initialize} = createIndexeInitializer(
 		processor,
 		contractsDataPerChain[chainId],

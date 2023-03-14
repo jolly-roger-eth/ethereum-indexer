@@ -68,9 +68,11 @@ export type IndexingSource<ABI extends Abi> = {
 };
 
 export type ExistingStreamFecther<ABI extends Abi> = (
+	source: IndexingSource<ABI>,
 	nextStreamID: number
 ) => Promise<{lastSync: LastSync<ABI>; eventStream: EventWithId<ABI>[]}>;
 export type StreamSaver<ABI extends Abi> = (stream: {
+	source: IndexingSource<ABI>;
 	lastSync: LastSync<ABI>;
 	eventStream: EventWithId<ABI>[];
 }) => Promise<void>;
@@ -94,3 +96,16 @@ export type LogParseConfig = {
 		[eventName: string]: (`0x${string}` | `0x${string}`[])[][]; // TODO use abitype to construct named arguments ? (but note that diff name with same type would not work)
 	};
 };
+
+export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
+	data: ProcessResultType;
+	lastSync: LastSync<ABI>;
+} & Extra;
+
+export type ExistingStateFecther<ABI extends Abi, ProcessResultType, Extra> = (
+	source: IndexingSource<ABI>
+) => Promise<AllData<ABI, ProcessResultType, Extra>>;
+export type StateSaver<ABI extends Abi, ProcessResultType, Extra> = (
+	source: IndexingSource<ABI>,
+	all: AllData<ABI, ProcessResultType, Extra>
+) => Promise<void>;

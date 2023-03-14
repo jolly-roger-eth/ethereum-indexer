@@ -36,7 +36,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	public readonly defaultFromBlock: number;
 	public onLoad: ((state: LoadingState) => Promise<void>) | undefined;
-	public onProcessed: ((state: ProcessResultType) => void) | undefined;
+	public onStateUpdated: ((state: ProcessResultType) => void) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
@@ -55,6 +55,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected _indexingMore: Promise<LastSync<ABI>> | undefined;
 	protected _feeding: Promise<LastSync<ABI>> | undefined;
 	protected _saving: Promise<void> | undefined;
+	protected _savingProcessor: Promise<void> | undefined;
 	protected _logEventPromise: ParsedLogsPromise<ABI>;
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -206,27 +207,36 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			let lastSync = this.lastSync;
 			if (!lastSync) {
 				await this.signal('Loading');
+				namedLogger.log('this.processor.load()...');
 				const {lastSync: loadedLastSync, state} = await this.processor.load(this.source);
+				namedLogger.log('this.processor.load() DONE');
 				lastSync = loadedLastSync;
-				this._onProcessed(state); // TODO rename to onStateUpdated?
+				this._onStateUpdated(state);
 			}
 
 			if (this.fetchExistingStream) {
 				await this.signal('Fetching');
-				const {eventStream, lastSync: lastSyncFetched} = await this.fetchExistingStream(lastSync.nextStreamID);
+				namedLogger.log('this.fetchExistingStream()...');
+				const existingStreamData = await this.fetchExistingStream(this.source, lastSync.nextStreamID);
+				namedLogger.log('this.fetchExistingStream() DONE');
 
-				const eventStreamToFeed = eventStream.filter(
-					(event) =>
-						event.streamID >= lastSync.nextStreamID &&
-						event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
-				);
+				if (existingStreamData) {
+					const {eventStream, lastSync: lastSyncFetched} = existingStreamData;
 
-				namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
-				if (eventStreamToFeed.length > 0) {
-					await this.signal('Processing');
-					lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
+					const eventStreamToFeed = eventStream.filter(
+						(event) =>
+							event.streamID >= lastSync.nextStreamID &&
+							event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
+					);
+
+					namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
+					if (eventStreamToFeed.length > 0) {
+						await this.signal('Processing');
+						// TODO in batch ?
+						lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
+					}
+					namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 				}
-				namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 			}
 
 			await this.signal('Done');
@@ -238,10 +248,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 	}
 
-	_onProcessed(outcome: ProcessResultType) {
-		if (this.onProcessed) {
+	_onStateUpdated(outcome: ProcessResultType) {
+		if (this.onStateUpdated) {
 			try {
-				this.onProcessed(outcome);
+				this.onStateUpdated(outcome);
 			} catch (err) {}
 		}
 	}
@@ -293,8 +303,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					namedLogger.info(`not feeding anymore...`);
 					throw new Error('aborted');
 				}
-				this._onProcessed(outcome);
 				this.lastSync = newLastSync;
+				this._onStateUpdated(outcome);
 			} else {
 				throw new Error(`invalid nextStreamID, ${firstEvent.streamID} === ${lastSync.nextStreamID}`);
 			}
@@ -304,23 +314,24 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 	}
 
-	protected async save(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
+	protected async save(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
 		if (!this._saving) {
 			if (this.saveAppendedStream) {
-				this._saving = this.promiseToSave(eventStream, lastSync);
+				this._saving = this.promiseToSave(source, eventStream, lastSync);
 			} else {
 				return Promise.resolve();
 			}
 		}
 		// we keep previous attempt
 		// if fails we still fail though
-		return this._saving.then(() => this.promiseToSave(eventStream, lastSync));
+		return this._saving.then(() => this.promiseToSave(source, eventStream, lastSync));
 	}
 
-	protected async promiseToSave(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
+	protected async promiseToSave(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
 		this.appendedStreamNotYetSaved.push(...eventStream);
 		try {
 			await this.saveAppendedStream({
+				source,
 				eventStream: this.appendedStreamNotYetSaved,
 				lastSync,
 			});
@@ -388,7 +399,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					}
 				}
 
-				namedLogger.info(`getting latest block...`);
 				const latestBlock = await getBlockNumber(this.provider);
 
 				if (!this._indexingMore) {
@@ -519,7 +529,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					return;
 				}
 
-				namedLogger.info(`populating stream...`);
 				const {eventStream, newLastSync} = this._generateStreamToAppend(newEvents, {
 					latestBlock,
 					lastToBlock: toBlock,
@@ -530,9 +539,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 				// Note: we do not skip if  (eventStream.length > 0)
 				//  Because the process might want to use that info to keep track of the syncinf status
-				namedLogger.info(`PROCESSING`);
+
 				const outcome = await this.processor.process(eventStream, newLastSync);
-				namedLogger.info(`DONE`);
 
 				if (this._reseting && !this._indexingMore) {
 					// we only skip here if reseting has been started
@@ -546,9 +554,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 				// this does not throw, but we could be stuck here ?
 				// TODO timeout ?
-				await this.save(eventStream, this.lastSync);
+				await this.save(this.source, eventStream, this.lastSync);
 
-				this._onProcessed(outcome);
+				this._onStateUpdated(outcome);
 
 				this._indexingMore = undefined;
 				return resolve(newLastSync);

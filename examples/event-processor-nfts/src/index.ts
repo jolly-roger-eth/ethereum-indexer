@@ -35,7 +35,7 @@ const NFTEventProcessor: JSProcessor<typeof eip721, Data, {account: `0x${string}
 };
 
 // we export the processor as factory function
-export const processor = fromJSProcessor(NFTEventProcessor);
+export const createProcessor = fromJSProcessor(NFTEventProcessor);
 
 // we expose contractsData as generic to be used on any chain
 export const contractsData = {

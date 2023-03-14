@@ -7,17 +7,44 @@ import {
 	type ContractData,
 	type LogParseConfig,
 	type EventProcessorWithInitialState,
+	type AllData,
 } from 'ethereum-indexer-browser';
 
 export function createIndexeInitializer<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
-	factoryOrProcessor:
-		| (() => EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>)
-		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	contracts: readonly ContractData<ABI>[] | AllContractData<ABI>,
 	chainId: string | undefined
 ) {
-	const indexer = createIndexerState(factoryOrProcessor, {
+	const indexer = createIndexerState(processor, {
 		trackNumRequests: true,
+		keepState: {
+			fetcher: async (source) => {
+				const fromStorage = localStorage.getItem(`${source.chainId}`);
+				if (!fromStorage) {
+					return undefined;
+				} else {
+					const parsed = JSON.parse(fromStorage, (_, value) => {
+						if (typeof value === 'string' && value.endsWith('n')) {
+							try {
+								const bn = BigInt(value.slice(0, -1));
+								return bn;
+							} catch (err) {
+								return value;
+							}
+						} else {
+							return value;
+						}
+					});
+					return parsed;
+				}
+			},
+			saver: async (source, all: AllData<ABI, ProcessResultType, unknown>) => {
+				localStorage.setItem(
+					`${source.chainId}`,
+					JSON.stringify(all, (_, value) => (typeof value === 'bigint' ? value.toString() + 'n' : value))
+				);
+			},
+		},
 	});
 
 	const {init, indexToLatest, indexMore, startAutoIndexing} = indexer;

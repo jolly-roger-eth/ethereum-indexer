@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type {EIP1193Provider} from 'eip-1193';
-	import {processor, contractsData} from 'event-processor-nfts';
+	import {createProcessor, contractsData} from 'event-processor-nfts';
 	import type {ActiveConnection} from '../lib/blockchain/connection';
 	import {createIndexeInitializer} from '../lib/blockchain/indexer';
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
@@ -10,7 +10,7 @@
 		...contractsData,
 		// startBlock: 14432000,
 	};
-	const {state, syncing, initialize} = createIndexeInitializer(processor, latestContractsData, undefined);
+	const {state, syncing, initialize} = createIndexeInitializer(createProcessor(), latestContractsData, undefined);
 	let provider: EIP1193Provider | undefined;
 	let etherscanURL: string | undefined = undefined;
 	function initalizeWithAccount(connection: ActiveConnection) {

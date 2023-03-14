@@ -169,7 +169,7 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 	},
 };
 
-export const processor = fromJSProcessor(ConquestEventProcessor);
+export const createProcessor = fromJSProcessor(ConquestEventProcessor);
 
 const contractsDataonGnosis = [
 	{

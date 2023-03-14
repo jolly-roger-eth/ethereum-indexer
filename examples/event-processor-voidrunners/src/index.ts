@@ -40,7 +40,7 @@ const VoidrunnerEventProcessor: JSProcessor<typeof eip721, Data> = {
 	},
 };
 
-export const processor = fromJSProcessor(VoidrunnerEventProcessor);
+export const createProcessor = fromJSProcessor(VoidrunnerEventProcessor);
 
 // we expose contractsData as generic to be used on any chain
 export const contractsData = [

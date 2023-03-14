@@ -1,15 +1,19 @@
 import type {
 	Abi,
-	EventProcessor,
 	EventProcessorWithInitialState,
+	ExistingStateFecther,
 	IndexerConfig,
 	IndexingSource,
 	LastSync,
+	StateSaver,
 } from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
 import {createRootStore, createStore} from './utils/stores';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {formatLastSync} from './utils/format';
+import {logs} from 'named-logs';
+import {wait} from './utils/time';
+const namedLogger = logs('ethereum-indexer-browser');
 
 export type ExtendedLastSync<ABI extends Abi> = LastSync<ABI> & {
 	numBlocksProcessedSoFar: number;
@@ -49,11 +53,13 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
 	  }) => void;
 
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
-	factoryOrProcessor:
-		| (() => EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>)
-		| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
 		trackNumRequests?: boolean;
+		keepState?: {
+			fetcher: ExistingStateFecther<ABI, ProcessResultType, unknown>;
+			saver: StateSaver<ABI, ProcessResultType, unknown>;
+		};
 	}
 ) {
 	const {
@@ -70,7 +76,12 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		numRequests: options?.trackNumRequests ? 0 : undefined,
 	});
 
-	const processor = typeof factoryOrProcessor == 'function' ? factoryOrProcessor() : factoryOrProcessor;
+	if (options?.keepState) {
+		if (!(processor as any).keepState) {
+			throw new Error(`this processor do not support "keepState" config`);
+		}
+		(processor as any).keepState(options.keepState);
+	}
 	const initialState = processor.createInitialState();
 
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
@@ -140,33 +151,22 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		indexer.onLoad = async (loadingState) => {
 			setStatus({state: loadingState});
 			if (loadingState === 'Loading') {
-				// namedLogger.info('indexer Loading');
-				// this.store.update((state) => {
-				// 	state.loading = true;
-				// 	this.loading = true;
-				// 	return state;
-				// });
 			} else if (loadingState === 'Fetching') {
-				// namedLogger.info('indexer Fetching');
 				setSyncing({fetchingLogs: true});
 			} else if (loadingState === 'Processing') {
-				// namedLogger.info('indexer Processing');
 				setSyncing({fetchingLogs: false, processingFetchedLogs: true});
 			} else if (loadingState === 'Done') {
-				// namedLogger.info('indexer Init DOne');
 				setSyncing({processingFetchedLogs: false});
 			}
-			// await wait(0.001); // allow svelte to capture it
+			await wait(0.001); // allow propagation if the whole proces is synchronous
 		};
-		indexer.onProcessed = (state) => {
+		indexer.onStateUpdated = (state) => {
 			setState(state);
 		};
 
-		// namedLogger.info(`loading...`);
 		setSyncing({loading: true});
 		try {
 			const lastSync = await indexer.load();
-			// namedLogger.info('...done loading');
 			setSyncing({loading: false});
 			return lastSync;
 		} finally {
@@ -191,13 +191,11 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no indexer`);
 		}
 
-		// namedLogger.info(`indexing...`);
 		setSyncing({catchingUp: true});
 		try {
 			lastSync = await indexer.indexMore();
 			setLastSync(lastSync);
 		} catch (err) {
-			// namedLogger.error('ERROR, retry indexToLatest in 1 second', err);
 			lastSync = await new Promise((resolve) => {
 				setTimeout(async () => {
 					const result = await indexToLatest();
@@ -210,14 +208,11 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no lastSync`);
 		}
 
-		// const latestBlock = await this.eip1193Provider.request({method: 'eth_blockNumber', params:[]});
 		while (lastSync.lastToBlock !== lastSync.latestBlock) {
-			// namedLogger.info(`indexing...`);
 			try {
 				lastSync = await indexer.indexMore();
 				setLastSync(lastSync);
 			} catch (err) {
-				// namedLogger.error('ERROR, retry indexing in 1 second', err);
 				await new Promise((resolve) => {
 					setTimeout(resolve, 1000);
 				});
@@ -226,7 +221,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		setSyncing({
 			catchingUp: false,
 		});
-		// namedLogger.info(`... done.`);
 		return lastSync;
 	}
 
@@ -268,7 +262,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				indexingTimeout = setTimeout(_auto_index, 1);
 			}
 		} catch (err) {
-			// namedLogger.error('ERROR, retry in 1 seconds', err);
+			namedLogger.error('ERROR, retry in 1 seconds', err);
 			indexingTimeout = setTimeout(_auto_index, autoIndexingInterval * 1000);
 			return;
 		}

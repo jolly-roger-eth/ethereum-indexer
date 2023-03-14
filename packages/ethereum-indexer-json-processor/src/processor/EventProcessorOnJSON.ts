@@ -6,25 +6,15 @@ import {
 	LogEvent,
 	Abi,
 	EventProcessorWithInitialState,
+	AllData,
+	ExistingStateFecther,
+	StateSaver,
 } from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
 import {EventFunctions, JSObject} from './types';
 
 const namedLogger = logs('EventProcessorOnJSON');
-
-export type AllData<ABI extends Abi, ProcessResultType extends JSObject> = {
-	data: ProcessResultType;
-	lastSync?: LastSync<ABI>;
-	history: HistoryJSObject;
-};
-
-export type ExistingStateFecther<ABI extends Abi, ProcessResultType extends JSObject> = () => Promise<
-	AllData<ABI, ProcessResultType>
->;
-export type StateSaver<ABI extends Abi, ProcessResultType extends JSObject> = (
-	data: AllData<ABI, ProcessResultType>
-) => Promise<void>;
 
 export type SingleEventJSONProcessor<
 	ABI extends Abi,
@@ -42,15 +32,22 @@ export type SingleEventJSONProcessor<
 export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
 	implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
 {
-	public readonly state: ProcessResultType;
-	protected _json: AllData<ABI, ProcessResultType>;
+	protected state: ProcessResultType;
+	protected _json: AllData<ABI, ProcessResultType, {history: HistoryJSObject}>;
 	protected history: History;
-	protected existingStateFecther?: ExistingStateFecther<ABI, ProcessResultType>;
-	protected stateSaver?: StateSaver<ABI, ProcessResultType>;
+	protected existingStateFecther?: ExistingStateFecther<ABI, ProcessResultType, {history: HistoryJSObject}>;
+	protected stateSaver?: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}>;
+	protected source: IndexingSource<ABI> | undefined;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
 		const data = singleEventProcessor.createInitialState();
 		this._json = {
 			data,
+			lastSync: {
+				lastToBlock: 0,
+				latestBlock: 0,
+				nextStreamID: 1,
+				unconfirmedBlocks: [],
+			},
 			history: {
 				blockHashes: {},
 				reversals: {},
@@ -68,12 +65,12 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		this.singleEventProcessor.configure(config);
 	}
 
-	setExistingStateFetcher(fetcher: ExistingStateFecther<ABI, ProcessResultType>) {
-		this.existingStateFecther = fetcher;
-	}
-
-	setStateSaver(saver: StateSaver<ABI, ProcessResultType>) {
-		this.stateSaver = saver;
+	keepState(config: {
+		fetcher: ExistingStateFecther<ABI, ProcessResultType, {history: HistoryJSObject}>;
+		saver: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}>;
+	}) {
+		this.existingStateFecther = config.fetcher;
+		this.stateSaver = config.saver;
 	}
 
 	async reset() {
@@ -88,26 +85,34 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		};
 		this.history.setBlock(0, '0x0000');
 		this._json.data = this.singleEventProcessor.createInitialState();
+		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
 	}
 
 	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType}> {
+		this.source = source;
 		if (this.existingStateFecther) {
-			namedLogger.info(`fetching state...`);
-			const {lastSync: lastSyncFromExistingState, data, history} = await this.existingStateFecther();
-			if (
-				!this._json.lastSync?.lastToBlock ||
-				// TODO configure 100
-				Math.max(0, lastSyncFromExistingState.lastToBlock - this._json.lastSync?.lastToBlock || 0) > 100
-			) {
-				this._json.history = history;
-				this.history.setBlock(0, '0x0000');
+			namedLogger.info(`this.existingStateFecther()...`);
+			const existingStateData = await this.existingStateFecther(source);
+			namedLogger.info(`this.existingStateFecther() DONE`);
+			if (existingStateData) {
+				console.log(`existingStateData`, existingStateData.lastSync.lastToBlock);
+				const {lastSync: lastSyncFromExistingState, data, history} = existingStateData;
+				if (
+					!this._json.lastSync?.lastToBlock ||
+					// TODO configure 100
+					Math.max(0, lastSyncFromExistingState.lastToBlock - this._json.lastSync?.lastToBlock || 0) > 100
+				) {
+					this._json.history = history;
+					this.history.setBlock(0, '0x0000');
 
-				const keys = Object.keys(this._json.data);
-				for (const key of keys) {
-					delete this._json.data[key];
+					const keys = Object.keys(this._json.data);
+					for (const key of keys) {
+						delete this._json.data[key];
+					}
+					this._json.data = data;
+					this._json.lastSync = lastSyncFromExistingState;
+					this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
 				}
-				this._json.data = data;
-				this._json.lastSync = lastSyncFromExistingState;
 			}
 		}
 
@@ -118,6 +123,8 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			nextStreamID: 1,
 			unconfirmedBlocks: [],
 		};
+
+		namedLogger.info(`nextStreamID: ${lastSync.nextStreamID}`);
 
 		return {lastSync, state: this.state};
 	}
@@ -166,7 +173,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			this._json.lastSync = lastSyncDoc;
 			if (this.stateSaver) {
 				try {
-					await this.stateSaver(this._json);
+					await this.stateSaver(this.source, this._json);
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);
 				}
