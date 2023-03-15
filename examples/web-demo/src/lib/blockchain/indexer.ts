@@ -12,6 +12,11 @@ import {
 } from 'ethereum-indexer-browser';
 import {hash} from '../utils/hash';
 
+type StreamData<ABI extends Abi> = {
+	lastSync: LastSync<ABI>;
+	eventStream: EventWithId<ABI, undefined>[];
+};
+
 import {get, set, del} from 'idb-keyval';
 // import type {IDBPDatabase, DBSchema} from 'idb';
 // import {openDB} from 'idb';
@@ -100,8 +105,8 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 			fetchFrom: async (source, nextStreamId) => {
 				const storageID = `stream_${name}_${source.chainId}`;
 
-				const existingStream = await get(storageID);
-				return existingStream
+				const existingStream = await get<StreamData<ABI>>(storageID);
+				return existingStream && existingStream.eventStream[0]?.streamID <= nextStreamId
 					? {
 							eventStream: existingStream.eventStream.filter((v: any) => v.streamID >= nextStreamId),
 							lastSync: existingStream.lastSync,
@@ -111,13 +116,24 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 			saveNewEvents: async (source, stream) => {
 				const storageID = `stream_${name}_${source.chainId}`;
 
-				const existingStream = await get(storageID);
+				const existingStream = await get<StreamData<ABI>>(storageID);
 
-				if (existingStream) {
-					const eventStreamToSave = existingStream.eventStream.concat(stream.eventStream);
-					await set(storageID, {lastSync: stream.lastSync, eventStream: eventStreamToSave});
+				if (existingStream && existingStream.eventStream.length > 0) {
+					if (stream.eventStream.length > 0) {
+						const expectedNextStreamID = existingStream.eventStream[existingStream.eventStream.length - 1].streamID + 1;
+						if (expectedNextStreamID !== stream.eventStream[0].streamID) {
+							throw new Error(
+								`expect stream to be consecutive, got streamID ${stream.eventStream[0].streamID} while expecting ${expectedNextStreamID}`
+							);
+						}
+						const eventStreamToSave = existingStream.eventStream.concat(stream.eventStream);
+						await set(storageID, {lastSync: stream.lastSync, eventStream: eventStreamToSave});
+					} else {
+						await set(storageID, {lastSync: stream.lastSync, eventStream: existingStream.eventStream});
+					}
 				} else if (stream.eventStream.length > 0 && stream.eventStream[0].streamID !== 1) {
-					throw new Error(`did not save previous events`);
+					// throw new Error(`did not save previous events`);
+					await set(storageID, stream);
 				} else {
 					await set(storageID, stream);
 				}

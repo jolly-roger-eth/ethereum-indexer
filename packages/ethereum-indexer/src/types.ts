@@ -23,7 +23,7 @@ export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, P
 export type EventBlock<ABI extends Abi> = {
 	number: number;
 	hash: string;
-	events: LogEvent<ABI>[];
+	events: EventWithId<ABI>[]; //this could be replacec by start: number;end: number but we would need access to the old coreresponding events
 };
 
 export type ContextIdentifier = {source: {startBlock: number; hash: string}[]; config: string; processor: string};
@@ -35,7 +35,16 @@ export type LastSync<ABI extends Abi> = {
 	nextStreamID: number;
 };
 
-export type EventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = LogEvent<ABI, Extra> & {
+export type EventWithId<ABI extends Abi, Extra extends JSONObject = undefined> =
+	| ValidEventWithId<ABI, Extra>
+	| CancelledEventWithId<ABI, Extra>;
+
+export type ValidEventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = LogEvent<ABI, Extra> & {
+	streamID: number;
+};
+
+export type CancelledEventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = LogEvent<ABI, Extra> & {
+	cancelled: true;
 	streamID: number;
 };
 

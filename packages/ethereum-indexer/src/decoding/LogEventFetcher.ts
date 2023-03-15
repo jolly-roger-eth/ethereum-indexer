@@ -56,6 +56,9 @@ interface NumberifiedLog {
 
 export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
 export type BaseLogEvent<Extra extends JSONObject = undefined> = NumberifiedLog & {
+	removed: true;
+	removedStreamID?: number;
+} & {
 	extra: Extra;
 	blockTimestamp?: number;
 	transaction?: LogTransactionData;

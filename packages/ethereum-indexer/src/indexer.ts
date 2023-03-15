@@ -273,43 +273,61 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			// if mismatch found, we get a fresh sync
 			if (!lastSync) {
 				lastSync = this.freshLastSync(processorHash);
-			}
+				// but we might have some stream still valid here
+				if (this.existingStream) {
+					await this.signal('Fetching');
+					// we start from scratch
+					const existingStreamData = await this.existingStream.fetchFrom(this.source, lastSync.nextStreamID);
 
-			// but we might have some stream still valid here
-			if (this.existingStream) {
-				await this.signal('Fetching');
-				const existingStreamData = await this.existingStream.fetchFrom(this.source, lastSync.nextStreamID);
+					if (existingStreamData) {
+						const {eventStream, lastSync: lastSyncFetched} = existingStreamData;
+						if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
+							// we update the processorHash in case it was changed
+							lastSyncFetched.context.processor = processorHash;
 
-				if (existingStreamData) {
-					const {eventStream, lastSync: lastSyncFetched} = existingStreamData;
-					if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
-						// we update the processorHash in case it was changed
-						lastSyncFetched.context.processor = processorHash;
+							const eventStreamToFeed = eventStream.filter(
+								(event) => event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
+							);
 
-						const eventStreamToFeed = eventStream.filter(
-							(event) =>
-								event.streamID >= lastSync.nextStreamID &&
-								event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
-						);
+							// removeRemovedEventFromStream(eventStreamToFeed);
+							const evenStreamNormalized: EventWithId<ABI>[] = [];
+							const eventMap: {[streamID: string]: number} = {};
+							for (let i = 0; i < eventStreamToFeed.length; i++) {
+								const event = eventStreamToFeed[i];
 
-						namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
-						if (eventStreamToFeed.length > 0) {
-							await this.signal('Processing');
-							// TODO config for batchsize?
-							const batchSize = 300;
-							lastSync = lastSyncFetched;
-
-							for (let i = 0; i < eventStreamToFeed.length; i += batchSize) {
-								const slice = eventStreamToFeed.slice(i, Math.min(i + batchSize, eventStreamToFeed.length));
-								if (slice.length > 0) {
-									lastSync.nextStreamID = slice[slice.length - 1].streamID + 1;
-									await this.feed(slice, lastSync);
-									await this.signal('Processing');
-									await wait(0.001);
+								if ('removedStreamID' in event && event.removedStreamID) {
+									const eventIndexFromMap = eventMap[event.removedStreamID];
+									// evenStreamNormalized[eventIndexFromMap] = {
+									// 	...evenStreamNormalized[eventIndexFromMap],
+									// 	cancelled: true,
+									// };
+									evenStreamNormalized.splice(eventIndexFromMap, 1);
+									// we leave gap in the streamID
+								} else {
+									eventMap[event.streamID] = evenStreamNormalized.length;
+									evenStreamNormalized.push(event);
 								}
 							}
+
+							if (evenStreamNormalized.length > 0) {
+								await this.signal('Processing');
+								// TODO config for batchsize?
+								const batchSize = 300;
+								lastSync = lastSyncFetched;
+
+								for (let i = 0; i < evenStreamNormalized.length; i += batchSize) {
+									const slice = eventStreamToFeed.slice(i, Math.min(i + batchSize, evenStreamNormalized.length));
+									if (slice.length > 0) {
+										lastSync.nextStreamID = slice[slice.length - 1].streamID + 1;
+										await this.feed(slice, lastSync);
+										await this.signal('Processing');
+										await wait(0.001);
+									}
+								}
+							}
+						} else {
+							await this.existingStream.clear(this.source);
 						}
-						namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 					} else {
 						await this.existingStream.clear(this.source);
 					}
@@ -401,6 +419,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (!this._saving) {
 			if (this.existingStream) {
 				this._saving = this.promiseToSave(source, eventStream, lastSync);
+				return this._saving;
 			} else {
 				return Promise.resolve();
 			}
@@ -606,6 +625,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					nextStreamID: streamID,
 					unconfirmedBlocks,
 				});
+
+				if (newLastSync.nextStreamID > 1) {
+					namedLogger.log(`nextStreamID ${newLastSync.nextStreamID}`);
+				}
 				// TODO const chainId = await getChainId(this.provider);
 
 				// Note: we do not skip if  (eventStream.length > 0)
@@ -645,8 +668,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	): {eventStream: EventWithId<ABI>[]; newLastSync: LastSync<ABI>} {
 		// grouping per block...
 		const groups: {[hash: string]: BlockEvents<ABI>} = {};
-		const eventsGroupedPerBlock: BlockEvents<ABI>[] = [];
+		const logEventsGroupedPerBlock: BlockEvents<ABI>[] = [];
 		for (const event of newEvents) {
+			if (event.removed) {
+				// we skip event removed as we deal with them manually
+				continue;
+			}
 			let group = groups[event.blockHash];
 			if (!group) {
 				group = groups[event.blockHash] = {
@@ -654,7 +681,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					number: event.blockNumber,
 					events: [],
 				};
-				eventsGroupedPerBlock.push(group);
+				logEventsGroupedPerBlock.push(group);
 			}
 			group.events.push(event);
 		}
@@ -666,7 +693,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// find reorgs
 		let reorgBlock: EventBlock<ABI> | undefined;
 		let reorgedBlockIndex = 0;
-		for (const block of eventsGroupedPerBlock) {
+		for (const block of logEventsGroupedPerBlock) {
 			if (reorgedBlockIndex < unconfirmedBlocks.length) {
 				const unconfirmedBlockAtIndex = unconfirmedBlocks[reorgedBlockIndex];
 				if (unconfirmedBlockAtIndex.hash !== block.hash) {
@@ -682,9 +709,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			for (let i = reorgedBlockIndex; i < unconfirmedBlocks.length; i++) {
 				for (const event of unconfirmedBlocks[i].events) {
 					eventStream.push({
-						...event,
+						...event, // TODO delete that ?
 						streamID: nextStreamID++,
-						removed: true,
+						removed: true, // delete that ?
+						removedStreamID: event.streamID,
 					});
 				}
 			}
@@ -694,14 +722,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			? reorgBlock.number
 			: unconfirmedBlocks.length > 0
 			? unconfirmedBlocks[unconfirmedBlocks.length - 1].number + 1
-			: eventsGroupedPerBlock.length > 0
-			? eventsGroupedPerBlock[0].number
+			: logEventsGroupedPerBlock.length > 0
+			? logEventsGroupedPerBlock[0].number
 			: 0;
 		// the case for 0 is a void case as none of the loop below will be triggered
 
 		// new events and new unconfirmed blocks
 		const newUnconfirmedBlocks: EventBlock<ABI>[] = [];
-		const newUnconfirmedStream: LogEvent<ABI>[] = [];
 
 		// re-add unconfirmed blocks that might get reorg later still
 		for (const unconfirmedBlock of unconfirmedBlocks) {
@@ -712,28 +739,20 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 		}
 
-		for (const block of eventsGroupedPerBlock) {
+		for (const block of logEventsGroupedPerBlock) {
 			if (block.events.length > 0 && block.number >= startingBlockForNewEvent) {
+				const newEventsPerBlock: EventWithId<ABI>[] = [];
 				for (const event of block.events) {
-					eventStream.push({streamID: nextStreamID++, ...event});
+					const newEvent: EventWithId<ABI> = {streamID: nextStreamID++, ...event};
+					eventStream.push(newEvent);
+					newEventsPerBlock.push(newEvent);
 				}
 				if (latestBlock - block.number <= this.finality) {
 					newUnconfirmedBlocks.push({
 						hash: block.hash,
 						number: block.number,
-						events: block.events,
+						events: newEventsPerBlock,
 					});
-
-					for (const event of block.events) {
-						// TODO slim the event down ?
-						//  remove:
-						//  - topics
-						//  - data // assuming the event has been parsed succesfully
-						//  - args named // indexed based is more universal but named one are easier, choose
-						//  - signature
-						//  - topic
-						newUnconfirmedStream.push({...event});
-					}
 				}
 			}
 		}

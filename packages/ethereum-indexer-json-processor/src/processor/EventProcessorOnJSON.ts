@@ -156,8 +156,9 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 						lastBlockHash = event.blockHash;
 					}
 
-					this.singleEventProcessor.processEvent(this.state, event); // TODO check
-					// namedLogger.info(`EventProcessorOnJSON DONE`);
+					const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > 16; // TODO finality
+					const state = willNotChange ? this._json.data : this.state;
+					this.singleEventProcessor.processEvent(state, event);
 				}
 				this.lastEventID = event.streamID;
 			}
