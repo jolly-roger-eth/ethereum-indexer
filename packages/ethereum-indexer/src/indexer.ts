@@ -203,6 +203,37 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				);
 			}
 
+			// currently the processor dictates the refresh
+			// if it does not do correctly (source changes for example), then the stream has no way to kicks in
+
+			// proposal A
+			// we first fetch the stream
+			// if none, then, it is up to the processor do deal with it like before =>
+			// else we check the source. if it differs we ask the processor to delete all
+			// and we do not load
+
+			// issue is that if the stream was not saved, we have the same problem as before: processor will not know
+			// solution: we always ask to be saved
+			// proposal B
+			// lastSync can contains a source hash, this way it will be given by the processor too
+			// and so the process is as follow:
+			// - we load from processor like before
+			// - if lastSync.sourceHash differs from new sourceHash
+			//   - we tell processor to delete, and we discard the loaded datta
+			//   - we start from scratch and save the new sourceHash in lastSync
+			// - if same, then we are fine and we keep going like now
+
+			// What about prefetch
+			// proposal B1
+			// prefetch can fetch data and store it in logs.extra param
+			// prefecth need to keep track of nextStreamID and its version
+			// we need to add more data to lastSync
+			// prefetchVersion
+			// if version change, we discard processor data like above
+			//  - and we feed with prefetch to replace the extra field on each log + we resave that along with prefetch version in lastSync
+			// if no version changes, we are good
+			// whenever we process a log we perform a prefetch that add data to log.extra
+
 			let lastSync = this.lastSync;
 			if (!lastSync) {
 				await this.signal('Loading');
