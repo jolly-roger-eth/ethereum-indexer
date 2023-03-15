@@ -686,8 +686,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			group.events.push(event);
 		}
 
-		// set up the new entries to be added to the stream
-		// const newEventEntries: DurableObjectEntries<LogEvent> = {};
 		const eventStream: EventWithId<ABI>[] = [];
 
 		// find reorgs

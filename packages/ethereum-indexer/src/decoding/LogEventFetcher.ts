@@ -39,19 +39,19 @@ interface Result extends ReadonlyArray<any> {
 }
 
 interface NumberifiedLog {
-	blockNumber: number;
-	blockHash: `0x${string}`;
-	transactionIndex: number;
+	blockNumber: number; // TODO option to remove from saved data
+	blockHash: `0x${string}`; // TODO option to remove from saved data
+	transactionIndex: number; // TODO option to remove from saved data
 
-	removed: boolean;
+	removed: boolean; // // TODO option to remove from saved data, we should always be able to remove these by removing the corresponding cancelled event
 
-	address: `0x${string}`;
-	data: `0x${string}`;
+	address: `0x${string}`; // TODO option to remove from saved data
+	data: `0x${string}`; // TODO remove from parsed event
 
-	topics: Array<`0x${string}`>;
+	topics: Array<`0x${string}`>; // TODO remove from parsed event
 
-	transactionHash: `0x${string}`;
-	logIndex: number;
+	transactionHash: `0x${string}`; // TODO remove from saved data
+	logIndex: number; // TODO option to remove from saved data
 }
 
 export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
