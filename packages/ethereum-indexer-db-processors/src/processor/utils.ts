@@ -18,9 +18,6 @@ export type SingleEventProcessorObject<ABI extends Abi> = {
 	[func: string]: (db: PutAndGetDatabase, event: EventWithId<ABI>) => Promise<void>;
 } & {
 	setup?(db: Database): Promise<void>;
-	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
-	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
-	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 	handleUnparsedEvent?(event: UnparsedEventWithId);
 };
 
@@ -43,24 +40,6 @@ export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEvent
 		if (this.obj.setup) {
 			return this.obj.setup(db);
 		}
-	}
-	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean {
-		if (this.obj.shouldFetchTimestamp) {
-			return this.obj.shouldFetchTimestamp(event);
-		}
-		return false;
-	}
-	shouldFetchTransaction?(event: LogEvent<ABI>): boolean {
-		if (this.obj.shouldFetchTransaction) {
-			return this.obj.shouldFetchTransaction(event);
-		}
-		return false;
-	}
-	async filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
-		if (this.obj.filter) {
-			return this.obj.filter(eventsFetched);
-		}
-		return eventsFetched;
 	}
 }
 

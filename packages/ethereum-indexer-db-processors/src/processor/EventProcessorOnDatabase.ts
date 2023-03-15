@@ -9,9 +9,6 @@ const console = logs('EventProcessorOnDatabase');
 export interface SingleEventProcessor<ABI extends Abi> {
 	processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void>;
 	setup?(db: Database): Promise<void>;
-	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
-	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
-	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 	handleUnparsedEvent?(event: UnparsedEventWithId);
 }
 
@@ -128,14 +125,6 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 			this.processing = false;
 			console.info(`EventProcessorOnDatabase streamID: ${lastSync.nextStreamID}`);
 		}
-	}
-
-	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
-		return this.singleEventProcessor.shouldFetchTimestamp && this.singleEventProcessor.shouldFetchTimestamp(event);
-	}
-
-	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
-		return this.singleEventProcessor.shouldFetchTransaction && this.singleEventProcessor.shouldFetchTransaction(event);
 	}
 
 	query<T>(request: Query | (Query & ({blockHash: string} | {blockNumber: number}))): Promise<Result> {

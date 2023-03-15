@@ -160,7 +160,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 					chainId: chainId || connection.chainId,
 					contracts,
 				},
-				config: config?.parseConfig ? {parseConfig: config.parseConfig} : undefined,
+				config: config?.parseConfig ? {stream: {parse: config.parseConfig}} : undefined,
 			},
 			config?.processorConfig
 		);

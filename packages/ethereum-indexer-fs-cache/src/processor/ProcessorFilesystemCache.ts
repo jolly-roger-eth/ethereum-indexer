@@ -119,14 +119,4 @@ ${JSON.stringify(lastSyncFromProcessor, null, 2)}
 		fs.writeFileSync(this.folder + `/lastSync.json`, JSON.stringify(lastSync));
 		namedLogger.info(`EventListFSStore streamID: ${lastSync.nextStreamID}`);
 	}
-
-	filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
-		return this.processor.filter ? this.processor.filter(eventsFetched) : identity(eventsFetched);
-	}
-	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
-		return this.processor.shouldFetchTimestamp ? this.processor.shouldFetchTimestamp(event) : false;
-	}
-	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
-		return this.processor.shouldFetchTransaction ? this.processor.shouldFetchTransaction(event) : false;
-	}
 }

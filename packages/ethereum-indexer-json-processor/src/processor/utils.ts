@@ -9,9 +9,6 @@ export type JSProcessor<
 > = EventFunctions<ABI, ProcessResultType, ProcessorConfig> & {
 	version?: string;
 	construct(): ProcessResultType;
-	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
-	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
-	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 	handleUnparsedEvent?(json: ProcessResultType, event: UnparsedEventWithId);
 };
 
@@ -46,24 +43,6 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 		if (this.obj.construct) {
 			return this.obj.construct();
 		}
-	}
-	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean {
-		if (this.obj.shouldFetchTimestamp) {
-			return this.obj.shouldFetchTimestamp(event);
-		}
-		return false;
-	}
-	shouldFetchTransaction?(event: LogEvent<ABI>): boolean {
-		if (this.obj.shouldFetchTransaction) {
-			return this.obj.shouldFetchTransaction(event);
-		}
-		return false;
-	}
-	async filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
-		if (this.obj.filter) {
-			return this.obj.filter(eventsFetched) as unknown as LogEvent<ABI>[]; // TODO why unknow casting needed here ?
-		}
-		return eventsFetched;
 	}
 }
 

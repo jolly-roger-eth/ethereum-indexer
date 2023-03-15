@@ -25,9 +25,6 @@ export type SingleEventJSONProcessor<
 	createInitialState(): ProcessResultType;
 	configure(config: ProcessorConfig): void;
 	processEvent(json: ProcessResultType, event: EventWithId<ABI>): void;
-	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
-	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
-	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 };
 
 export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
@@ -198,13 +195,5 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			// namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
 		}
 		return this._json.data;
-	}
-
-	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
-		return this.singleEventProcessor.shouldFetchTimestamp && this.singleEventProcessor.shouldFetchTimestamp(event);
-	}
-
-	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
-		return this.singleEventProcessor.shouldFetchTransaction && this.singleEventProcessor.shouldFetchTransaction(event);
 	}
 }

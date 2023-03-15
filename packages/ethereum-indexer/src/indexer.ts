@@ -68,10 +68,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		protected source: IndexingSource<ABI>,
 		config: IndexerConfig<ABI> = {}
 	) {
-		this.finality = config.finality || 12;
-		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config, config?.parseConfig);
-		this.alwaysFetchTimestamps = config.alwaysFetchTimestamps ? true : false;
-		this.alwaysFetchTransactions = config.alwaysFetchTransactions ? true : false;
+		this.finality = config.stream.finality || 12;
+		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config?.fetch, config?.stream.parse);
+		this.alwaysFetchTimestamps = config.stream.alwaysFetchTimestamps ? true : false;
+		this.alwaysFetchTransactions = config.stream.alwaysFetchTransactions ? true : false;
 		this.fetchExistingStream = config.keepStream?.fetcher;
 		this.saveAppendedStream = config.keepStream?.saver;
 
@@ -219,20 +219,33 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			// and so the process is as follow:
 			// - we load from processor like before
 			// - if lastSync.sourceHash differs from new sourceHash
-			//   - we tell processor to delete, and we discard the loaded datta
+			//   - we tell processor to delete, and we discard the loaded data
 			//   - we start from scratch and save the new sourceHash in lastSync
 			// - if same, then we are fine and we keep going like now
 
 			// What about prefetch
 			// proposal B1
 			// prefetch can fetch data and store it in logs.extra param
-			// prefecth need to keep track of nextStreamID and its version
+			// prefecth need to keep track of its version
 			// we need to add more data to lastSync
 			// prefetchVersion
 			// if version change, we discard processor data like above
 			//  - and we feed with prefetch to replace the extra field on each log + we resave that along with prefetch version in lastSync
 			// if no version changes, we are good
 			// whenever we process a log we perform a prefetch that add data to log.extra
+
+			// prefetch filter capabilities
+			// if prefetch can filter by for example returning a specific code
+			// then it would be great if we slim down the size of the stream by removing from it entirely and skiping the streamID
+			// the issue is that a new prefetch version would mean a need for indexing from scratch again
+			// Need to also care of reorg but this should be trivial : event removed whose event is not found is discarded
+
+			// conclusion:
+			// prefetch only filter capabilities should skip the event from being passed to the processor/
+			// but this is not very useful as the extra data could already allow the processor to skip the event picked
+			// so => no filter for pre-fetch
+			// but we could still have filter capabilties managed by another pass/process
+			// and this one would slim down the event stream
 
 			let lastSync = this.lastSync;
 			if (!lastSync) {
@@ -258,7 +271,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
 					if (eventStreamToFeed.length > 0) {
 						await this.signal('Processing');
-						// TODO in batch ?
+						// TODO in batch to relieve the cpu ?
 						lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
 					}
 					namedLogger.info(`${eventStreamToFeed.length} events feeded`);
@@ -287,12 +300,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		lastSyncFetched?: LastSync<ABI>
 	): Promise<LastSync<ABI>> {
 		try {
-			// this create an infinite loop as load call promise
-			// TODO if we need to call promise first, we could add an option to load (and load will not use that option)
-			// if (!this.lastSync) {
-			// 	namedLogger.info(`load lastSync...`);
-			// 	await this.load();
-			// }
 			const lastSync: LastSync<ABI> = this.lastSync || {
 				lastToBlock: 0,
 				latestBlock: 0,
@@ -476,19 +483,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					let fetchTransaction = false;
 					let fetchBlock = false;
 
-					if (
-						this.alwaysFetchTransactions ||
-						(this.processor.shouldFetchTransaction && this.processor.shouldFetchTransaction(event))
-					) {
+					if (this.alwaysFetchTransactions) {
 						if (lastTransactionHash !== event.transactionHash) {
 							fetchTransaction = true;
 						}
 					}
 
-					if (
-						this.alwaysFetchTimestamps ||
-						(this.processor.shouldFetchTimestamp && this.processor.shouldFetchTimestamp(event))
-					) {
+					if (this.alwaysFetchTimestamps) {
 						if (!lastBlock || event.blockNumber > lastBlock) {
 							fetchBlock = true;
 						}
@@ -542,19 +543,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					}
 				}
 
-				let newEvents = eventsFetched;
-				if (this.processor.filter) {
-					namedLogger.info(`filtering...`);
-					newEvents = await this.processor.filter(eventsFetched);
-				}
-
 				if (!this._indexingMore) {
 					namedLogger.info(`not indexing anymore...`);
 					reject('aborted');
 					return;
 				}
 
-				const {eventStream, newLastSync} = this._generateStreamToAppend(newEvents, {
+				const {eventStream, newLastSync} = this._generateStreamToAppend(eventsFetched, {
 					latestBlock,
 					lastToBlock: toBlock,
 					nextStreamID: streamID,

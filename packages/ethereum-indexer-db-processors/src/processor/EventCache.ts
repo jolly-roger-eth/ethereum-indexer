@@ -156,18 +156,6 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 		await this.eventDB.put(lastSyncDoc);
 	}
 
-	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
-		return this.processor.shouldFetchTimestamp && this.processor.shouldFetchTimestamp(event);
-	}
-
-	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
-		return this.processor.shouldFetchTransaction && this.processor.shouldFetchTransaction(event);
-	}
-
-	async filter(eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> {
-		return this.processor.filter ? this.processor.filter(eventsFetched) : eventsFetched;
-	}
-
 	query<T>(request: Query | (Query & ({blockHash: string} | {blockNumber: number}))): Promise<Result> {
 		return this.eventDB.query(request);
 	}

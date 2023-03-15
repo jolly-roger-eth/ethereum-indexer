@@ -41,9 +41,6 @@ export type OnFunction = `on${string}`;
 
 export type SingleEventProcessorWithBatchSupport<ABI extends Abi> = {
 	setup?(db: Database): Promise<void>;
-	shouldFetchTimestamp?(event: LogEvent<ABI>): boolean;
-	shouldFetchTransaction?(event: LogEvent<ABI>): boolean;
-	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
 } & {
 	[name: OnFunction]: {
 		dependencies(event: EventWithId<ABI>): Dependency[];
@@ -276,14 +273,6 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 			this.processing = false;
 			console.info(`EventProcessorOnDatabase streamID: ${lastSync.nextStreamID}`);
 		}
-	}
-
-	shouldFetchTimestamp(event: LogEvent<ABI>): boolean {
-		return this.singleEventProcessor.shouldFetchTimestamp && this.singleEventProcessor.shouldFetchTimestamp(event);
-	}
-
-	shouldFetchTransaction(event: LogEvent<ABI>): boolean {
-		return this.singleEventProcessor.shouldFetchTransaction && this.singleEventProcessor.shouldFetchTransaction(event);
 	}
 
 	query<T>(request: Query | (Query & ({blockHash: string} | {blockNumber: number}))): Promise<Result> {

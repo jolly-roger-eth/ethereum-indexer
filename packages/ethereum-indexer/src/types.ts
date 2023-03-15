@@ -5,14 +5,10 @@ import {LogFetcherConfig} from './engine/LogFetcher';
 export type {LogFetcher, LogFetcherConfig} from './engine/LogFetcher';
 export type {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
 
-// when state can be serialised and fit in memory (especialy useful in browser context), we can have it returned
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	load: (source: IndexingSource<ABI>) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>}>;
 	process: (eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
-	filter?: (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]>;
-	shouldFetchTimestamp?: (event: LogEvent<ABI>) => boolean;
-	shouldFetchTransaction?: (event: LogEvent<ABI>) => boolean;
 };
 
 export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, ProcessorConfig> = EventProcessor<
@@ -79,13 +75,23 @@ export type StreamSaver<ABI extends Abi> = (
 	}
 ) => Promise<void>;
 
-export type IndexerConfig<ABI extends Abi> = LogFetcherConfig & {
-	finality?: number;
-	alwaysFetchTimestamps?: boolean;
-	alwaysFetchTransactions?: boolean;
+export type IndexerConfig<ABI extends Abi> = {
+	// do not a resync
+	fetch?: Omit<LogFetcherConfig, 'filters'>;
+
+	// any change to this stream config should trigger a resync from 0
+	stream?: {
+		finality?: number;
+		alwaysFetchTimestamps?: boolean;
+		alwaysFetchTransactions?: boolean;
+		parse?: LogParseConfig;
+	};
+
+	// do not a resync
 	providerSupportsETHBatch?: boolean;
+
+	// do not a resync
 	keepStream?: KeepStream<ABI>;
-	parseConfig?: LogParseConfig;
 };
 
 export type KeepStream<ABI extends Abi> = {
@@ -99,7 +105,8 @@ export type LogParseConfig = {
 		// for each event name we can specify a list of filter
 		// each filter is an array of (topic or topic[])
 		// so this is an array of array of (topic | topic[])
-		[eventName: string]: (`0x${string}` | `0x${string}`[])[][]; // TODO use abitype to construct named arguments ? (but note that diff name with same type would not work)
+		[eventName: string]: (`0x${string}` | `0x${string}`[])[][];
+		// Note we do not provide type arg here (could have done it via abitype) because multiple event could share the same order
 	};
 };
 
