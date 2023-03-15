@@ -16,13 +16,11 @@ import type {
 	EventBlock,
 	EventProcessor,
 	EventWithId,
-	ExistingStreamFecther,
-	StreamSaver,
 	IndexerConfig,
 	LastSync,
 	AllContractData,
 	ContextIdentifier,
-	StreamClearer,
+	ExistingStream,
 } from './types';
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
@@ -53,9 +51,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected alwaysFetchTimestamps: boolean;
 	protected alwaysFetchTransactions: boolean;
 	protected providerSupportsETHBatch: boolean;
-	protected fetchExistingStream: ExistingStreamFecther<ABI> | undefined;
-	protected saveAppendedStream: StreamSaver<ABI> | undefined;
-	protected clearExistingStream: StreamClearer<ABI> | undefined;
+	protected existingStream: ExistingStream<ABI>;
 	protected appendedStreamNotYetSaved: EventWithId<ABI>[] = [];
 	protected _reseting: Promise<void> | undefined;
 	protected _loading: Promise<LastSync<ABI>> | undefined;
@@ -81,9 +77,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config?.fetch, config?.stream.parse);
 		this.alwaysFetchTimestamps = config.stream.alwaysFetchTimestamps ? true : false;
 		this.alwaysFetchTransactions = config.stream.alwaysFetchTransactions ? true : false;
-		this.fetchExistingStream = config.keepStream?.fetcher;
-		this.saveAppendedStream = config.keepStream?.saver;
-		this.clearExistingStream = config.keepStream?.clear;
+		this.existingStream = config.keepStream;
 
 		this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
 
@@ -278,9 +272,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 
 			// but we might have some stream still valid here
-			if (this.fetchExistingStream) {
+			if (this.existingStream) {
 				await this.signal('Fetching');
-				const existingStreamData = await this.fetchExistingStream(this.source, lastSync.nextStreamID);
+				const existingStreamData = await this.existingStream.fetchFrom(this.source, lastSync.nextStreamID);
 
 				if (existingStreamData) {
 					const {eventStream, lastSync: lastSyncFetched} = existingStreamData;
@@ -302,7 +296,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 						}
 						namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 					} else {
-						await this.clearExistingStream(this.source);
+						await this.existingStream.clear(this.source);
 					}
 				}
 			}
@@ -405,7 +399,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected async save(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
 		if (!this._saving) {
-			if (this.saveAppendedStream) {
+			if (this.existingStream) {
 				this._saving = this.promiseToSave(source, eventStream, lastSync);
 			} else {
 				return Promise.resolve();
@@ -419,7 +413,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected async promiseToSave(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
 		this.appendedStreamNotYetSaved.push(...eventStream);
 		try {
-			await this.saveAppendedStream(source, {
+			await this.existingStream.saveNewEvents(source, {
 				eventStream: this.appendedStreamNotYetSaved,
 				lastSync,
 			});

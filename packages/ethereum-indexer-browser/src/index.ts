@@ -12,7 +12,7 @@ export type {
 	EventBlock,
 	EventProcessor,
 	EventWithId,
-	ExistingStreamFecther,
+	StreamFecther,
 	IndexerConfig,
 	LastSync,
 	LoadingState,
@@ -26,7 +26,7 @@ export type {
 	ExistingStateFecther,
 	StateSaver,
 	ProcessorContext,
-	KeepStream,
+	ExistingStream,
 } from 'ethereum-indexer';
 
 export type {

@@ -66,7 +66,7 @@ export type IndexingSource<ABI extends Abi> = {
 	readonly chainId: string;
 };
 
-export type ExistingStreamFecther<ABI extends Abi> = (
+export type StreamFecther<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	nextStreamID: number
 ) => Promise<{lastSync: LastSync<ABI>; eventStream: EventWithId<ABI>[]}>;
@@ -80,7 +80,7 @@ export type StreamSaver<ABI extends Abi> = (
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
 export type IndexerConfig<ABI extends Abi> = {
-	// do not a resync
+	// if this changes do not need a resync
 	fetch?: Omit<LogFetcherConfig, 'filters'>;
 
 	// any change to this stream config should trigger a resync from 0
@@ -91,16 +91,16 @@ export type IndexerConfig<ABI extends Abi> = {
 		parse?: LogParseConfig;
 	};
 
-	// do not a resync
+	// if this changes do not need a resync
 	providerSupportsETHBatch?: boolean;
 
-	// do not a resync
-	keepStream?: KeepStream<ABI>;
+	// if this changes do not need a resync
+	keepStream?: ExistingStream<ABI>;
 };
 
-export type KeepStream<ABI extends Abi> = {
-	fetcher: ExistingStreamFecther<ABI>;
-	saver: StreamSaver<ABI>;
+export type ExistingStream<ABI extends Abi> = {
+	fetchFrom: StreamFecther<ABI>;
+	saveNewEvents: StreamSaver<ABI>;
 	clear: StreamClearer<ABI>;
 };
 

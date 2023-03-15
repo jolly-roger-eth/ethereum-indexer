@@ -70,7 +70,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 			},
 		},
 		keepStream: {
-			fetcher: async (source, nextStreamId) => {
+			fetchFrom: async (source, nextStreamId) => {
 				const storageID = `stream_${name}_${source.chainId}`;
 				const fromStorage = localStorage.getItem(storageID);
 				const stream = fromStorage
@@ -95,7 +95,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 					  }
 					: undefined;
 			},
-			saver: async (source, stream) => {
+			saveNewEvents: async (source, stream) => {
 				const storageID = `stream_${name}_${source.chainId}`;
 				const fromStorage = localStorage.getItem(storageID);
 				if (fromStorage) {
