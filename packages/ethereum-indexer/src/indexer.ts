@@ -151,6 +151,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	}
 
 	async feed(eventStream: EventWithId<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
+		if (!lastSyncFetched) {
+			lastSyncFetched = this.freshLastSync(this.processor.getVersionHash());
+		}
 		if (this._indexingMore) {
 			throw new Error(`indexing... should not feed`);
 		}
@@ -295,13 +298,15 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 							// TODO config for batchsize?
 							const batchSize = 300;
 							lastSync = lastSyncFetched;
+
 							for (let i = 0; i < eventStreamToFeed.length; i += batchSize) {
 								const slice = eventStreamToFeed.slice(i, Math.min(i + batchSize, eventStreamToFeed.length));
-								lastSync.lastToBlock = slice[slice.length - 1].blockNumber;
-								lastSync.nextStreamID = slice[0].streamID;
-								lastSync = await this.feed(slice, lastSync);
-								await this.signal('Processing');
-								await wait(0.001);
+								if (slice.length > 0) {
+									lastSync.nextStreamID = slice[slice.length - 1].streamID + 1;
+									await this.feed(slice, lastSync);
+									await this.signal('Processing');
+									await wait(0.001);
+								}
 							}
 						}
 						namedLogger.info(`${eventStreamToFeed.length} events feeded`);
@@ -330,51 +335,32 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected async promiseToFeed(
 		eventStream: EventWithId<ABI>[],
-		lastSyncFetched?: LastSync<ABI>
+		lastSyncFetched: LastSync<ABI>
 	): Promise<LastSync<ABI>> {
 		try {
 			const lastSync: LastSync<ABI> = this.lastSync || this.freshLastSync(this.processor.getVersionHash());
-
 			const firstEvent = eventStream[0];
-			const lastEvent = eventStream[eventStream.length - 1];
-
-			let newLastSync = lastSyncFetched;
-
-			if (!newLastSync) {
-				const latestBlock = await getBlockNumber(this.provider);
-
-				if (!this._feeding) {
-					namedLogger.info(`not feeding anymore...`);
-					throw new Error('aborted');
-				}
-
-				if (latestBlock - lastEvent.blockNumber < this.finality) {
-					throw new Error('do not accept unconfirmed blocks');
-				}
-				newLastSync = {
-					context: lastSyncFetched.context,
-					latestBlock: latestBlock,
-					lastToBlock: lastEvent.blockNumber,
-					unconfirmedBlocks: [],
-					nextStreamID: lastEvent.streamID + 1,
-				};
-			}
 			if (firstEvent.streamID === lastSync.nextStreamID) {
 				namedLogger.time('processor.process');
-				const outcome = await this.processor.process(eventStream, newLastSync);
+				// TODO if clean feed (no removed event) then we can mentioned that to the processor
+				// this would allow the processor to not need to keep previous state for reorg
+				// this can significantly speed up a browser based indexer
+				const outcome = await this.processor.process(eventStream, lastSyncFetched);
 				namedLogger.timeEnd('processor.process');
 				if (!this._feeding) {
 					namedLogger.info(`not feeding anymore...`);
 					throw new Error('aborted');
 				}
-				this.lastSync = newLastSync;
+				this.lastSync = lastSyncFetched;
+
 				namedLogger.time('_onStateUpdated');
 				this._onStateUpdated(outcome);
 				namedLogger.timeEnd('_onStateUpdated');
+
+				return this.lastSync;
 			} else {
 				throw new Error(`invalid nextStreamID, ${firstEvent.streamID} === ${lastSync.nextStreamID}`);
 			}
-			return this.lastSync;
 		} finally {
 			this._feeding = undefined;
 		}
