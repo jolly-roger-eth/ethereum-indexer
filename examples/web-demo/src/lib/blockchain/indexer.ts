@@ -46,11 +46,12 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 							return value;
 						}
 					});
-					if ((context.version || parsed.__VERSION__) && parsed.__VERSION__ !== context.version) {
-						console.log(`NEW VERSION DETECTED, GET RID OF STATE`);
-						localStorage.removeItem(storageID);
-						return undefined;
-					}
+					// no need anymore as this is handled by the indexer and the lastSync.context values
+					// if ((context.version || parsed.__VERSION__) && parsed.__VERSION__ !== context.version) {
+					// 	console.log(`NEW VERSION DETECTED, GET RID OF STATE`);
+					// 	localStorage.removeItem(storageID);
+					// 	return undefined;
+					// }
 					return parsed;
 				}
 			},
@@ -70,16 +71,6 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 		},
 		keepStream: {
 			fetcher: async (source, nextStreamId) => {
-				const empty = {
-					lastSync: {
-						lastToBlock: 0,
-						latestBlock: 0,
-						nextStreamID: 1,
-						unconfirmedBlocks: [],
-					},
-					eventStream: [],
-				};
-
 				const storageID = `stream_${name}_${source.chainId}`;
 				const fromStorage = localStorage.getItem(storageID);
 				const stream = fromStorage
@@ -96,12 +87,13 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 							}
 					  })
 					: undefined;
+
 				return stream
 					? {
 							eventStream: stream.eventStream.filter((v: any) => v.streamID >= nextStreamId),
 							lastSync: stream.lastSync,
 					  }
-					: empty;
+					: undefined;
 			},
 			saver: async (source, stream) => {
 				const storageID = `stream_${name}_${source.chainId}`;
@@ -140,6 +132,10 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 						)
 					);
 				}
+			},
+			async clear(source) {
+				const storageID = `stream_${name}_${source.chainId}`;
+				localStorage.removeItem(storageID);
 			},
 		},
 	});

@@ -18,6 +18,10 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 		} catch (err) {}
 	}
 
+	getVersionHash(): string {
+		return this.processor.getVersionHash();
+	}
+
 	async reset() {
 		try {
 			namedLogger.info(`EventListFSStore: reseting...`);
@@ -29,18 +33,14 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 		}
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void}> {
-		let lastSync: LastSync<ABI>;
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+		let lastSync: LastSync<ABI> | undefined;
 		try {
 			const content = fs.readFileSync(this.folder + `/lastSync.json`, 'utf8');
 			lastSync = JSON.parse(content);
 		} catch (err) {
-			lastSync = {
-				lastToBlock: 0,
-				latestBlock: 0,
-				nextStreamID: 1,
-				unconfirmedBlocks: [],
-			};
+			console.error(`ERROR while getting the lastSync.json`);
+			return undefined;
 		}
 
 		// TODO check if source matches old sync
@@ -62,6 +62,7 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 						namedLogger.info(`sending ${subStream.length} (from ${i} to ${i + maxBatchSize - 1})`);
 						if (lastSyncFromProcessor.nextStreamID === subStream[0].streamID) {
 							lastSyncFromProcessor = {
+								context: lastSync.context,
 								lastToBlock: subStream[subStream.length - 1].blockNumber,
 								latestBlock: lastSync.latestBlock,
 								nextStreamID: subStream[subStream.length - 1].streamID + 1,
@@ -78,6 +79,7 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 				} else {
 					if (lastSyncFromProcessor.nextStreamID === eventStream[0].streamID) {
 						lastSyncFromProcessor = {
+							context: lastSync.context,
 							lastToBlock: eventStream[eventStream.length - 1].blockNumber,
 							latestBlock: lastSync.latestBlock,
 							nextStreamID: eventStream[eventStream.length - 1].streamID + 1,

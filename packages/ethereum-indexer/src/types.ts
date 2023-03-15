@@ -6,7 +6,8 @@ export type {LogFetcher, LogFetcherConfig} from './engine/LogFetcher';
 export type {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
 
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
-	load: (source: IndexingSource<ABI>) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>}>;
+	getVersionHash(): string;
+	load: (source: IndexingSource<ABI>) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>} | undefined>;
 	process: (eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
 };
@@ -25,7 +26,9 @@ export type EventBlock<ABI extends Abi> = {
 	events: LogEvent<ABI>[];
 };
 
+export type ContextIdentifier = {source: {startBlock: number; hash: string}[]; config: string; processor: string};
 export type LastSync<ABI extends Abi> = {
+	context: ContextIdentifier;
 	latestBlock: number;
 	lastToBlock: number;
 	unconfirmedBlocks: EventBlock<ABI>[];
@@ -74,6 +77,7 @@ export type StreamSaver<ABI extends Abi> = (
 		eventStream: EventWithId<ABI>[];
 	}
 ) => Promise<void>;
+export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
 export type IndexerConfig<ABI extends Abi> = {
 	// do not a resync
@@ -97,6 +101,7 @@ export type IndexerConfig<ABI extends Abi> = {
 export type KeepStream<ABI extends Abi> = {
 	fetcher: ExistingStreamFecther<ABI>;
 	saver: StreamSaver<ABI>;
+	clear: StreamClearer<ABI>;
 };
 
 export type LogParseConfig = {

@@ -21,6 +21,8 @@ import type {
 	IndexerConfig,
 	LastSync,
 	AllContractData,
+	ContextIdentifier,
+	StreamClearer,
 } from './types';
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
@@ -28,6 +30,10 @@ import type {Abi} from 'abitype';
 const namedLogger = logs('ethereum-indexer');
 
 export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
+
+// PROPOSAL FOR STATE ANCHORS
+// we can have state anchor that get provided by the processor
+// these set the minimum block to start fetching from
 
 export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
@@ -49,6 +55,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected providerSupportsETHBatch: boolean;
 	protected fetchExistingStream: ExistingStreamFecther<ABI> | undefined;
 	protected saveAppendedStream: StreamSaver<ABI> | undefined;
+	protected clearExistingStream: StreamClearer<ABI> | undefined;
 	protected appendedStreamNotYetSaved: EventWithId<ABI>[] = [];
 	protected _reseting: Promise<void> | undefined;
 	protected _loading: Promise<LastSync<ABI>> | undefined;
@@ -58,6 +65,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected _savingProcessor: Promise<void> | undefined;
 	protected _logEventPromise: ParsedLogsPromise<ABI>;
 
+	protected sourceHashes: {startBlock: number; hash: string}[];
+	protected configHash: string;
 	// ------------------------------------------------------------------------------------------------------------------
 	// CONSTRUCTOR
 	// ------------------------------------------------------------------------------------------------------------------
@@ -74,6 +83,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.alwaysFetchTransactions = config.stream.alwaysFetchTransactions ? true : false;
 		this.fetchExistingStream = config.keepStream?.fetcher;
 		this.saveAppendedStream = config.keepStream?.saver;
+		this.clearExistingStream = config.keepStream?.clear;
 
 		this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
 
@@ -91,6 +101,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		} else {
 			this.defaultFromBlock = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
 		}
+
+		this.sourceHashes = [{startBlock: 0, hash: 'TODO'}];
+		this.configHash = 'TODO';
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -129,12 +142,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				this._logEventPromise.stopRetrying();
 			}
 			this._feeding = undefined; // abort feeding if any, see `feed`
-			this.lastSync = {
-				lastToBlock: 0,
-				latestBlock: 0,
-				nextStreamID: 1,
-				unconfirmedBlocks: [],
-			};
+			this.lastSync = undefined;
 			try {
 				await this.processor.reset();
 				this._reseting = undefined;
@@ -247,34 +255,55 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			// but we could still have filter capabilties managed by another pass/process
 			// and this one would slim down the event stream
 
-			let lastSync = this.lastSync;
+			let lastSync: LastSync<ABI> | undefined = undefined;
+			await this.signal('Loading');
+			const processorHash = this.processor.getVersionHash();
+			const loaded = await this.processor.load(this.source);
+			if (loaded) {
+				const {lastSync: loadedLastSync, state} = loaded;
+				if (
+					processorHash === loadedLastSync.context.processor &&
+					this.indexerMatches(loadedLastSync.lastToBlock, loadedLastSync.context)
+				) {
+					lastSync = loadedLastSync;
+					this._onStateUpdated(state);
+				} else {
+					namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
+					// this.processor.clear(); // TODO ?
+				}
+			}
+			// if mismatch found, we get a fresh sync
 			if (!lastSync) {
-				await this.signal('Loading');
-				const {lastSync: loadedLastSync, state} = await this.processor.load(this.source);
-				lastSync = loadedLastSync;
-				this._onStateUpdated(state);
+				lastSync = this.freshLastSync(processorHash);
 			}
 
+			// but we might have some stream still valid here
 			if (this.fetchExistingStream) {
 				await this.signal('Fetching');
 				const existingStreamData = await this.fetchExistingStream(this.source, lastSync.nextStreamID);
 
 				if (existingStreamData) {
 					const {eventStream, lastSync: lastSyncFetched} = existingStreamData;
+					if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
+						// we update the processorHash in case it was changed
+						lastSyncFetched.context.processor = processorHash;
 
-					const eventStreamToFeed = eventStream.filter(
-						(event) =>
-							event.streamID >= lastSync.nextStreamID &&
-							event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
-					);
+						const eventStreamToFeed = eventStream.filter(
+							(event) =>
+								event.streamID >= lastSync.nextStreamID &&
+								event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
+						);
 
-					namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
-					if (eventStreamToFeed.length > 0) {
-						await this.signal('Processing');
-						// TODO in batch to relieve the cpu ?
-						lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
+						namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
+						if (eventStreamToFeed.length > 0) {
+							await this.signal('Processing');
+							// TODO in batch to relieve the cpu ?
+							lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
+						}
+						namedLogger.info(`${eventStreamToFeed.length} events feeded`);
+					} else {
+						await this.clearExistingStream(this.source);
 					}
-					namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 				}
 			}
 
@@ -300,12 +329,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		lastSyncFetched?: LastSync<ABI>
 	): Promise<LastSync<ABI>> {
 		try {
-			const lastSync: LastSync<ABI> = this.lastSync || {
-				lastToBlock: 0,
-				latestBlock: 0,
-				nextStreamID: 1,
-				unconfirmedBlocks: [],
-			};
+			const lastSync: LastSync<ABI> = this.lastSync || this.freshLastSync(this.processor.getVersionHash());
 
 			const firstEvent = eventStream[0];
 			const lastEvent = eventStream[eventStream.length - 1];
@@ -324,6 +348,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					throw new Error('do not accept unconfirmed blocks');
 				}
 				newLastSync = {
+					context: lastSyncFetched.context,
 					latestBlock: latestBlock,
 					lastToBlock: lastEvent.blockNumber,
 					unconfirmedBlocks: [],
@@ -345,6 +370,37 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		} finally {
 			this._feeding = undefined;
 		}
+	}
+
+	protected indexerMatches(lastToBlock: number, context: ContextIdentifier): boolean {
+		if (context.config !== this.configHash) {
+			return false;
+		}
+		for (let i = 0; i < this.sourceHashes.length; i++) {
+			const indexerSourceItem = this.sourceHashes[i];
+			const fetchedSourceItem = context.source[i];
+			if (fetchedSourceItem) {
+				if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
+					return false;
+				}
+			} else {
+				if (indexerSourceItem.startBlock <= lastToBlock) {
+					return false;
+				}
+			}
+		}
+		// no mismatch found
+		return true;
+	}
+
+	protected freshLastSync(processorHash: string): LastSync<ABI> {
+		return {
+			context: {source: this.sourceHashes, config: this.configHash, processor: processorHash},
+			lastToBlock: 0,
+			latestBlock: 0,
+			nextStreamID: 1,
+			unconfirmedBlocks: [],
+		};
 	}
 
 	protected async save(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
@@ -550,6 +606,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				}
 
 				const {eventStream, newLastSync} = this._generateStreamToAppend(eventsFetched, {
+					context: lastSync.context,
 					latestBlock,
 					lastToBlock: toBlock,
 					nextStreamID: streamID,
@@ -590,7 +647,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected _generateStreamToAppend(
 		newEvents: LogEvent<ABI>[],
-		{latestBlock, lastToBlock, unconfirmedBlocks, nextStreamID}: LastSync<ABI>
+		{context, latestBlock, lastToBlock, unconfirmedBlocks, nextStreamID}: LastSync<ABI>
 	): {eventStream: EventWithId<ABI>[]; newLastSync: LastSync<ABI>} {
 		// grouping per block...
 		const groups: {[hash: string]: BlockEvents<ABI>} = {};
@@ -690,6 +747,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return {
 			eventStream,
 			newLastSync: {
+				context,
 				latestBlock,
 				lastToBlock,
 				unconfirmedBlocks: newUnconfirmedBlocks,

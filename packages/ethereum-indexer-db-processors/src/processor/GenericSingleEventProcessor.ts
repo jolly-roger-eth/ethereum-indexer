@@ -18,4 +18,5 @@ export abstract class GenericSingleEventProcessor<ABI extends Abi> implements Si
 			await this[functionName](event);
 		}
 	}
+	abstract getVersionHash(): string;
 }

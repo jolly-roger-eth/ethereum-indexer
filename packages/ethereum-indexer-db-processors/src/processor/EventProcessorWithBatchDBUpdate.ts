@@ -47,6 +47,7 @@ export type SingleEventProcessorWithBatchSupport<ABI extends Abi> = {
 		processEvent(db: SyncDB, event: EventWithId<ABI>);
 	};
 	handleUnparsedEvent?(event: UnparsedEventWithId);
+	getVersionHash(): string;
 };
 
 export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventProcessor<ABI, void> {
@@ -57,6 +58,10 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 		this.initialization = this.init();
 		this.keepAllHistory = false; // this allow time-travel queries but requires processing and will not scale
 		this.revertableDatabase = new RevertableDatabase(db, this.keepAllHistory);
+	}
+
+	getVersionHash(): string {
+		return this.singleEventProcessor.getVersionHash();
 	}
 
 	private init(): Promise<void> {
@@ -81,15 +86,7 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 		if (lastSync) {
 			return {lastSync: lastSync as unknown as LastSync<ABI>, state: undefined};
 		} else {
-			return {
-				lastSync: {
-					lastToBlock: 0,
-					latestBlock: 0,
-					nextStreamID: 1,
-					unconfirmedBlocks: [],
-				},
-				state: undefined,
-			};
+			return undefined;
 		}
 	}
 

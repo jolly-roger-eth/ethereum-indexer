@@ -19,6 +19,7 @@ export type SingleEventProcessorObject<ABI extends Abi> = {
 } & {
 	setup?(db: Database): Promise<void>;
 	handleUnparsedEvent?(event: UnparsedEventWithId);
+	getVersionHash(): string;
 };
 
 export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEventProcessor<ABI> {
@@ -40,6 +41,10 @@ export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEvent
 		if (this.obj.setup) {
 			return this.obj.setup(db);
 		}
+	}
+
+	getVersionHash(): string {
+		return this.obj.getVersionHash();
 	}
 }
 

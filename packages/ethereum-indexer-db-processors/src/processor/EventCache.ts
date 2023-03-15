@@ -15,6 +15,10 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 		this.initialization = this.init();
 	}
 
+	getVersionHash(): string {
+		return this.processor.getVersionHash();
+	}
+
 	protected init(): Promise<void> {
 		this.initialization = this.eventDB.setup({
 			indexes: [{fields: ['batch']}], // 'blockNumber', 'blockHash', 'address', 'transactionHash', 'name', 'signature', 'topic'
@@ -30,7 +34,7 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 		await this.init();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void}> {
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
 		// TODO check if source matches old sync
 		try {
 			const lastSync = await this.eventDB.get<LastSync<ABI> & {batch: number}>('lastSync');
@@ -40,15 +44,7 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 				state: undefined,
 			};
 		} catch (err) {
-			return {
-				lastSync: {
-					lastToBlock: 0,
-					latestBlock: 0,
-					nextStreamID: 1,
-					unconfirmedBlocks: [],
-				},
-				state: undefined,
-			};
+			return undefined;
 		}
 	}
 
@@ -86,6 +82,7 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 					const lastEvent = events[events.length - 1];
 					console.info(`EventCache replaying batch ${i}...`);
 					await this.processor.process(events, {
+						context: lastSync.context,
 						lastToBlock: lastEvent.blockNumber,
 						latestBlock: lastEvent.blockNumber,
 						nextStreamID: lastEvent.streamID + 1,

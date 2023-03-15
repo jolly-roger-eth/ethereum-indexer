@@ -31,7 +31,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
 {
 	protected state: ProcessResultType;
-	protected _json: AllData<ABI, ProcessResultType, {history: HistoryJSObject}>;
+	protected _json: Partial<AllData<ABI, ProcessResultType, {history: HistoryJSObject}>>;
 	protected history: History;
 	protected existingStateFecther?: ExistingStateFecther<
 		ABI,
@@ -48,12 +48,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		const data = singleEventProcessor.createInitialState();
 		this._json = {
 			data,
-			lastSync: {
-				lastToBlock: 0,
-				latestBlock: 0,
-				nextStreamID: 1,
-				unconfirmedBlocks: [],
-			},
+			lastSync: undefined,
 			history: {
 				blockHashes: {},
 				reversals: {},
@@ -61,6 +56,10 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		};
 		this.history = new History(this._json.history, 12); // TODO finality
 		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
+	}
+
+	getVersionHash(): string {
+		return this.version + '_TODO_config'; // TODO config
 	}
 
 	createInitialState(): ProcessResultType {
@@ -124,17 +123,10 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			}
 		}
 
-		// TODO check if contractsData matches old sync
-		const lastSync = this._json.lastSync || {
-			lastToBlock: 0,
-			latestBlock: 0,
-			nextStreamID: 1,
-			unconfirmedBlocks: [],
-		};
-
-		namedLogger.info(`nextStreamID: ${lastSync.nextStreamID}`);
-
-		return {lastSync, state: this._json.data};
+		if (!this._json.lastSync) {
+			return undefined;
+		}
+		return {lastSync: this._json.lastSync, state: this._json.data};
 	}
 
 	private lastEventID: number;
@@ -179,6 +171,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 				...lastSync,
 			};
 			this._json.lastSync = lastSyncDoc;
+
 			if (this.stateSaver) {
 				try {
 					const config = this.config as ProcessorConfig;
@@ -186,13 +179,20 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 					const version = this.version;
 					// TODO why do we need the `as` ?
 					const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
-					await this.stateSaver(context, this._json);
+					if (!this._json.data || !this._json.lastSync || !this._json.history) {
+						throw new Error(`empty _json`);
+					}
+					await this.stateSaver(context, this._json as AllData<ABI, ProcessResultType, {history: HistoryJSObject}>);
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);
 				}
 			}
 		} finally {
 			// namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
+		}
+
+		if (!this._json.data) {
+			throw new Error(`empty _json`);
 		}
 		return this._json.data;
 	}

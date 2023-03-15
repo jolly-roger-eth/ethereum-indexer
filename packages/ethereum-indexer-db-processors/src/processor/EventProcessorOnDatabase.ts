@@ -7,6 +7,7 @@ import {RevertableDatabase} from './RevertableDatabase';
 const console = logs('EventProcessorOnDatabase');
 
 export interface SingleEventProcessor<ABI extends Abi> {
+	getVersionHash(): string;
 	processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void>;
 	setup?(db: Database): Promise<void>;
 	handleUnparsedEvent?(event: UnparsedEventWithId);
@@ -19,6 +20,10 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 		this.initialization = this.init();
 		// this.revertableDatabase = new RevertableDatabase(db, true); // this allow time-travel queries but requires processing and will not scale
 		this.revertableDatabase = new RevertableDatabase(db);
+	}
+
+	getVersionHash(): string {
+		return this.singleEventProcessor.getVersionHash();
 	}
 
 	private init(): Promise<void> {
@@ -37,21 +42,13 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 		await this.init();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void}> {
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
 		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
 			return {lastSync: lastSync as unknown as LastSync<ABI>, state: undefined};
 		} else {
-			return {
-				lastSync: {
-					lastToBlock: 0,
-					latestBlock: 0,
-					nextStreamID: 1,
-					unconfirmedBlocks: [],
-				},
-				state: undefined,
-			};
+			return undefined;
 		}
 	}
 
