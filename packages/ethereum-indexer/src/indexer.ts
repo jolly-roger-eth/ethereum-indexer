@@ -115,7 +115,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this._indexingMore = undefined;
 		if (this._logEventPromise) {
 			// we stop pending log fetch
-			this._logEventPromise.stopRetrying();
+			this._logEventPromise.stopRetrying(); // TODO RejectablePromise instead
 		}
 	}
 
