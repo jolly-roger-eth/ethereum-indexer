@@ -173,6 +173,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			this._json.lastSync = lastSyncDoc;
 
 			if (this.stateSaver) {
+				namedLogger.time('EventProcessorOnJSON.stateSaver');
 				try {
 					const config = this.config as ProcessorConfig;
 					const source = this.source as IndexingSource<ABI>;
@@ -186,6 +187,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);
 				}
+				namedLogger.timeEnd('EventProcessorOnJSON.stateSaver');
 			}
 		} finally {
 			// namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);

@@ -17,7 +17,7 @@
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
 		"fs-extra": "^10.1.0",
-		"named-logs": "^0.2.0",
+		"named-logs": "^0.2.2",
 		"pouchdb": "^7.3.0",
 		"pouchdb-find": "^7.3.0"
 	},

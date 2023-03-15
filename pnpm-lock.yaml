@@ -15,13 +15,13 @@ importers:
       dotenv: ^16.0.1
       ethereum-indexer-json-processor: workspace:*
       ethereum-indexer-server: workspace:*
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       tsup: ^6.2.1
       typescript: ^4.7.4
     dependencies:
       dotenv: 16.0.2
       ethereum-indexer-json-processor: link:../../packages/ethereum-indexer-json-processor
-      named-logs: 0.2.0
+      named-logs: 0.2.2
     devDependencies:
       ethereum-indexer-server: link:../../packages/ethereum-indexer-server
       tsup: 6.2.3_typescript@4.8.3
@@ -32,13 +32,13 @@ importers:
       dotenv: ^16.0.1
       ethereum-indexer-json-processor: workspace:*
       ethereum-indexer-server: workspace:*
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       tsup: ^6.2.1
       typescript: ^4.7.4
     dependencies:
       dotenv: 16.0.2
       ethereum-indexer-json-processor: link:../../packages/ethereum-indexer-json-processor
-      named-logs: 0.2.0
+      named-logs: 0.2.2
     devDependencies:
       ethereum-indexer-server: link:../../packages/ethereum-indexer-server
       tsup: 6.2.3_typescript@4.9.5
@@ -49,13 +49,13 @@ importers:
       dotenv: ^16.0.1
       ethereum-indexer-json-processor: workspace:*
       ethereum-indexer-server: workspace:*
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       tsup: ^6.2.1
       typescript: ^4.7.4
     dependencies:
       dotenv: 16.0.2
       ethereum-indexer-json-processor: link:../../packages/ethereum-indexer-json-processor
-      named-logs: 0.2.0
+      named-logs: 0.2.2
     devDependencies:
       ethereum-indexer-server: link:../../packages/ethereum-indexer-server
       tsup: 6.2.3_typescript@4.8.3
@@ -71,8 +71,9 @@ importers:
       event-processor-conquest-eth: workspace:*
       event-processor-nfts: workspace:*
       event-processor-voidrunners: workspace:*
-      named-logs: ^0.2.0
-      named-logs-console: ^0.2.1
+      idb-keyval: ^6.2.0
+      named-logs: ^0.2.2
+      named-logs-console: ^0.2.3
       prettier: ^2.7.1
       prettier-plugin-svelte: ^2.7.1
       svelte: ^3.55.1
@@ -91,8 +92,9 @@ importers:
       event-processor-conquest-eth: link:../event-processor-conquest-eth
       event-processor-nfts: link:../event-processor-nfts
       event-processor-voidrunners: link:../event-processor-voidrunners
-      named-logs: 0.2.0
-      named-logs-console: 0.2.1
+      idb-keyval: 6.2.0
+      named-logs: 0.2.2
+      named-logs-console: 0.2.3
       svelte-json-tree: 1.0.0
       sveltore: 0.0.1
       viem: 0.1.9_typescript@4.9.5
@@ -114,12 +116,12 @@ importers:
     specifiers:
       abitype: ^0.7.0
       eip-1193: ^0.2.3
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       tsup: ^6.2.1
       typescript: ^4.9.5
       viem: ^0.1.9
     dependencies:
-      named-logs: 0.2.0
+      named-logs: 0.2.2
       viem: 0.1.9_typescript@4.9.5
     devDependencies:
       abitype: 0.7.0_typescript@4.9.5
@@ -131,13 +133,13 @@ importers:
     specifiers:
       eip-1193: ^0.2.3
       ethereum-indexer: workspace:*
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       sveltore: ^0.0.1
       tsup: ^6.2.1
       typescript: ^4.6.4
     dependencies:
       ethereum-indexer: link:../ethereum-indexer
-      named-logs: 0.2.0
+      named-logs: 0.2.2
       sveltore: 0.0.1
     devDependencies:
       eip-1193: 0.2.3
@@ -148,14 +150,14 @@ importers:
     specifiers:
       '@types/pouchdb': ^6.4.0
       ethereum-indexer: workspace:*
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       pouchdb: ^7.3.0
       pouchdb-find: ^7.3.0
       tsup: ^6.2.1
       typescript: ^4.7.4
     dependencies:
       ethereum-indexer: link:../ethereum-indexer
-      named-logs: 0.2.0
+      named-logs: 0.2.2
       pouchdb: 7.3.0
       pouchdb-find: 7.3.0
     devDependencies:
@@ -169,7 +171,7 @@ importers:
       '@types/pouchdb': ^6.4.0
       ethereum-indexer: workspace:*
       fs-extra: ^10.1.0
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       pouchdb: ^7.3.0
       pouchdb-find: ^7.3.0
       ts-node: ^10.9.1
@@ -178,7 +180,7 @@ importers:
     dependencies:
       ethereum-indexer: link:../ethereum-indexer
       fs-extra: 10.1.0
-      named-logs: 0.2.0
+      named-logs: 0.2.2
       pouchdb: 7.3.0
       pouchdb-find: 7.3.0
     devDependencies:
@@ -191,12 +193,12 @@ importers:
   packages/ethereum-indexer-json-processor:
     specifiers:
       ethereum-indexer: workspace:*
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       tsup: ^6.2.1
       typescript: ^4.9.5
     dependencies:
       ethereum-indexer: link:../ethereum-indexer
-      named-logs: 0.2.0
+      named-logs: 0.2.2
     devDependencies:
       tsup: 6.2.3_typescript@4.9.5
       typescript: 4.9.5
@@ -224,7 +226,7 @@ importers:
       koa-json: ^2.0.2
       koa-logger: ^3.2.1
       koa-router: ^12.0.0
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       named-logs-console: ^0.2.1
       nodemon: ^2.0.19
       pouchdb: ^7.3.0
@@ -247,7 +249,7 @@ importers:
       koa-json: 2.0.2
       koa-logger: 3.2.1
       koa-router: 12.0.0
-      named-logs: 0.2.0
+      named-logs: 0.2.2
       named-logs-console: 0.2.1
       pouchdb: 7.3.0
       pouchdb-find: 7.3.0
@@ -275,7 +277,7 @@ importers:
       ethereum-indexer: workspace:*
       ethereum-indexer-fs-cache: workspace:*
       ethereum-indexer-utils: workspace:*
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       named-logs-console: ^0.2.1
       tslib: ^2.4.0
       tsup: ^6.2.1
@@ -287,7 +289,7 @@ importers:
       ethereum-indexer: link:../ethereum-indexer
       ethereum-indexer-fs-cache: link:../ethereum-indexer-fs-cache
       ethereum-indexer-utils: link:../ethereum-indexer-utils
-      named-logs: 0.2.0
+      named-logs: 0.2.2
       named-logs-console: 0.2.1
     devDependencies:
       '@types/node': 15.6.1
@@ -303,7 +305,7 @@ importers:
       eip-1193: ^0.2.3
       ethereum-indexer: workspace:*
       isomorphic-unfetch: ^3.1.0
-      named-logs: ^0.2.0
+      named-logs: ^0.2.2
       tsup: ^6.2.1
       typescript: ^4.6.4
     dependencies:
@@ -312,7 +314,7 @@ importers:
       '@ethersproject/bytes': 5.7.0
       ethereum-indexer: link:../ethereum-indexer
       isomorphic-unfetch: 3.1.0
-      named-logs: 0.2.0
+      named-logs: 0.2.2
     devDependencies:
       eip-1193: 0.2.3
       tsup: 6.2.3_typescript@4.8.3
@@ -2716,6 +2718,12 @@ packages:
     dependencies:
       safer-buffer: 2.1.2
 
+  /idb-keyval/6.2.0:
+    resolution: {integrity: sha512-uw+MIyQn2jl3+hroD7hF8J7PUviBU7BPKWw4f/ISf32D4LoGu98yHjrzWWJDASu9QNrX10tCJqk9YY0ClWm8Ng==}
+    dependencies:
+      safari-14-idb-fix: 3.0.0
+    dev: false
+
   /idna-uts46-hx/4.1.2:
     resolution: {integrity: sha512-EAB3egrcalcTQHcjA7yzXXkE4E09TIFerR//4yUYGYCeCfXmkU0LgsGJgYSIQA1lQunfsn4ZCWJhbelgl3cdiQ==}
     engines: {node: '>=16.15.1', npm: '>=8.11.1'}
@@ -3436,8 +3444,18 @@ packages:
       named-logs: 0.2.0
     dev: false
 
+  /named-logs-console/0.2.3:
+    resolution: {integrity: sha512-pfKeXt9KTt5GVYnQSYq8zIf80d3K1pQP8gtnUBWx6XHqljbu6RpYbGOrP2lgfWyM6aAJCqdlkJamLmuukaUT9Q==}
+    dependencies:
+      named-logs: 0.2.2
+    dev: false
+
   /named-logs/0.2.0:
     resolution: {integrity: sha512-XQN0OQyDhGlUnZxwFJ+whi7Wju3AOrNh/MXoY+gzXYuX2Dyqn8fQ7kz+1YgXn5PIYLQHx9WkTce/sQBdInn24Q==}
+    dev: false
+
+  /named-logs/0.2.2:
+    resolution: {integrity: sha512-uXvQSEp8W99elz/UFpmptvRkjbr+UwJRfONsTND/W4ncqLlio0hfIBKe2HUhz3pPHhNd1XUoHyf1cn8Pgxt4oA==}
     dev: false
 
   /nanoid/3.3.4:
@@ -4148,6 +4166,10 @@ packages:
     dependencies:
       mri: 1.2.0
     dev: true
+
+  /safari-14-idb-fix/3.0.0:
+    resolution: {integrity: sha512-eBNFLob4PMq8JA1dGyFn6G97q3/WzNtFK4RnzT1fnLq+9RyrGknzYiM/9B12MnKAxuj1IXr7UKYtTNtjyKMBog==}
+    dev: false
 
   /safe-buffer/5.1.2:
     resolution: {integrity: sha512-Gd2UZBJDkXlY7GbJxfsE8/nvKkUEU1G38c1siN6QP6a9PT9MmHB8GnpscSmMJSoF8LOIrt8ud/wPtojys4G6+g==}

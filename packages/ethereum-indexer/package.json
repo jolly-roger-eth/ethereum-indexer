@@ -18,7 +18,7 @@
 		"abitype": "^0.7.0"
 	},
 	"dependencies": {
-		"named-logs": "^0.2.0",
+		"named-logs": "^0.2.2",
 		"viem": "^0.1.9"
 	}
 }

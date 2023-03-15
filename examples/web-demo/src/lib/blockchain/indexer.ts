@@ -7,8 +7,35 @@ import {
 	type ContractData,
 	type LogParseConfig,
 	type EventProcessorWithInitialState,
+	type LastSync,
+	type EventWithId,
 } from 'ethereum-indexer-browser';
 import {hash} from '../utils/hash';
+
+import {get, set, del} from 'idb-keyval';
+// import type {IDBPDatabase, DBSchema} from 'idb';
+// import {openDB} from 'idb';
+
+// interface MyDB<ABI extends Abi> extends DBSchema {
+// 	keyval: {
+// 		key: string;
+// 		value: {
+// 			lastSync: LastSync<ABI>;
+// 			eventStream: EventWithId<ABI, undefined>[];
+// 		};
+// 	};
+// }
+// let _db: IDBPDatabase<MyDB<Abi>> | undefined;
+// async function getDB<ABI extends Abi>(): Promise<IDBPDatabase<MyDB<ABI>>> {
+// 	if (!_db) {
+// 		_db = await openDB('INDEXER', 1, {
+// 			upgrade(db) {
+// 				db.createObjectStore('keyval');
+// 			},
+// 		});
+// 	}
+// 	return _db;
+// }
 
 async function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
 	const configHash = config ? await hash(config) : undefined;
@@ -72,70 +99,32 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 		keepStream: {
 			fetchFrom: async (source, nextStreamId) => {
 				const storageID = `stream_${name}_${source.chainId}`;
-				const fromStorage = localStorage.getItem(storageID);
-				const stream = fromStorage
-					? JSON.parse(fromStorage, (key, value) => {
-							if (typeof value === 'string' && value.endsWith('n')) {
-								try {
-									const bn = BigInt(value.slice(0, -1));
-									return bn;
-								} catch (err) {
-									return value;
-								}
-							} else {
-								return value;
-							}
-					  })
-					: undefined;
 
-				return stream
+				const existingStream = await get(storageID);
+				return existingStream
 					? {
-							eventStream: stream.eventStream.filter((v: any) => v.streamID >= nextStreamId),
-							lastSync: stream.lastSync,
+							eventStream: existingStream.eventStream.filter((v: any) => v.streamID >= nextStreamId),
+							lastSync: existingStream.lastSync,
 					  }
 					: undefined;
 			},
 			saveNewEvents: async (source, stream) => {
 				const storageID = `stream_${name}_${source.chainId}`;
-				const fromStorage = localStorage.getItem(storageID);
-				if (fromStorage) {
-					const existingStream = JSON.parse(fromStorage, (key, value) => {
-						if (typeof value === 'string' && value.endsWith('n')) {
-							try {
-								const bn = BigInt(value.slice(0, -1));
-								return bn;
-							} catch (err) {
-								return value;
-							}
-						} else {
-							return value;
-						}
-					});
-					// TODO check streamID is exactly +1 next
+
+				const existingStream = await get(storageID);
+
+				if (existingStream) {
 					const eventStreamToSave = existingStream.eventStream.concat(stream.eventStream);
-					// console.log(`saving nextStreamID: ${stream.lastSync.nextStreamID}, events : ${eventStreamToSave.length}`);
-					localStorage.setItem(
-						storageID,
-						JSON.stringify(
-							{lastSync: stream.lastSync, eventStream: eventStreamToSave},
-							(key, value) => (typeof value === 'bigint' ? value.toString() + `n` : value) // return everything else unchanged
-						)
-					);
+					await set(storageID, {lastSync: stream.lastSync, eventStream: eventStreamToSave});
 				} else if (stream.eventStream.length > 0 && stream.eventStream[0].streamID !== 1) {
 					throw new Error(`did not save previous events`);
 				} else {
-					localStorage.setItem(
-						storageID,
-						JSON.stringify(
-							stream,
-							(key, value) => (typeof value === 'bigint' ? value.toString() + `n` : value) // return everything else unchanged
-						)
-					);
+					await set(storageID, stream);
 				}
 			},
 			async clear(source) {
 				const storageID = `stream_${name}_${source.chainId}`;
-				localStorage.removeItem(storageID);
+				await del(storageID, undefined);
 			},
 		},
 	});

@@ -24,6 +24,7 @@ import type {
 } from './types';
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
+import {wait} from './engine/utils';
 
 const namedLogger = logs('ethereum-indexer');
 
@@ -39,7 +40,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 
 	public readonly defaultFromBlock: number;
-	public onLoad: ((state: LoadingState) => Promise<void>) | undefined;
+	public onLoad: ((state: LoadingState, lastSync?: LastSync<ABI>) => Promise<void>) | undefined;
 	public onStateUpdated: ((state: ProcessResultType) => void) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -191,7 +192,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected async signal(state: LoadingState) {
 		if (this.onLoad) {
 			namedLogger.info(`onLoad ${state}...`);
-			await this.onLoad(state);
+			await this.onLoad(state, this.lastSync);
 			namedLogger.info(`...onLoad ${state}`);
 		}
 	}
@@ -291,8 +292,17 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 						namedLogger.info(`${eventStreamToFeed.length} events loaded, feeding...`);
 						if (eventStreamToFeed.length > 0) {
 							await this.signal('Processing');
-							// TODO in batch to relieve the cpu ?
-							lastSync = await this.feed(eventStreamToFeed, lastSyncFetched);
+							// TODO config for batchsize?
+							const batchSize = 300;
+							lastSync = lastSyncFetched;
+							for (let i = 0; i < eventStreamToFeed.length; i += batchSize) {
+								const slice = eventStreamToFeed.slice(i, Math.min(i + batchSize, eventStreamToFeed.length));
+								lastSync.lastToBlock = slice[slice.length - 1].blockNumber;
+								lastSync.nextStreamID = slice[0].streamID;
+								lastSync = await this.feed(slice, lastSync);
+								await this.signal('Processing');
+								await wait(0.001);
+							}
 						}
 						namedLogger.info(`${eventStreamToFeed.length} events feeded`);
 					} else {
@@ -350,13 +360,17 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				};
 			}
 			if (firstEvent.streamID === lastSync.nextStreamID) {
+				namedLogger.time('processor.process');
 				const outcome = await this.processor.process(eventStream, newLastSync);
+				namedLogger.timeEnd('processor.process');
 				if (!this._feeding) {
 					namedLogger.info(`not feeding anymore...`);
 					throw new Error('aborted');
 				}
 				this.lastSync = newLastSync;
+				namedLogger.time('_onStateUpdated');
 				this._onStateUpdated(outcome);
+				namedLogger.timeEnd('_onStateUpdated');
 			} else {
 				throw new Error(`invalid nextStreamID, ${firstEvent.streamID} === ${lastSync.nextStreamID}`);
 			}
