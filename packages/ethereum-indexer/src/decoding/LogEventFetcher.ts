@@ -5,7 +5,7 @@ import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
 import {decodeEventLog, encodeEventTopics} from 'viem';
 import {deepEqual} from '../utils/compae';
-import {LogParseConfig} from '../types';
+import {IncludedEIP1193Log, LogParseConfig} from '../types';
 
 function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
 	if (!map) {
@@ -13,9 +13,9 @@ function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) 
 	}
 	for (let i = 0; i < events.length; i++) {
 		const event = events[i];
-		const namedEvent = map[event.name];
+		const namedEvent = map.get(event.name);
 		if (!namedEvent) {
-			map[event.name] = event;
+			map.set(event.name, event);
 		} else {
 			if (!deepEqual(event.inputs, namedEvent.inputs)) {
 				// {a: event, b: namedEvent}
@@ -55,7 +55,7 @@ interface NumberifiedLog {
 }
 
 export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
-export type BaseLogEvent<Extra extends JSONObject = undefined> = NumberifiedLog & {
+export type BaseLogEvent<Extra extends JSONObject | undefined = undefined> = NumberifiedLog & {
 	removed: true;
 	removedStreamID?: number;
 } & {
@@ -63,12 +63,12 @@ export type BaseLogEvent<Extra extends JSONObject = undefined> = NumberifiedLog 
 	blockTimestamp?: number;
 	transaction?: LogTransactionData;
 };
-export type ParsedLogEvent<ABI extends Abi, Extra extends JSONObject = undefined> = BaseLogEvent<Extra> &
+export type ParsedLogEvent<ABI extends Abi, Extra extends JSONObject | undefined = undefined> = BaseLogEvent<Extra> &
 	LogParsedData<ABI>;
-export type LogEventWithParsingFailure<Extra extends JSONObject = undefined> = BaseLogEvent<Extra> & {
+export type LogEventWithParsingFailure<Extra extends JSONObject | undefined = undefined> = BaseLogEvent<Extra> & {
 	decodeError: string;
 };
-export type LogEvent<ABI extends Abi, Extra extends JSONObject = undefined> =
+export type LogEvent<ABI extends Abi, Extra extends JSONObject | undefined = undefined> =
 	| ParsedLogEvent<ABI, Extra>
 	| LogEventWithParsingFailure<Extra>;
 
@@ -99,9 +99,9 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 			contractAddresses = [];
 			for (const contract of contractsData as ContractList<ABI>) {
 				const contractEventsABI: AbiEvent[] = contract.abi.filter((item) => item.type === 'event') as AbiEvent[];
-				const abiAtThatAddress = _abiPerAddress[contract.address];
+				const abiAtThatAddress = _abiPerAddress.get(contract.address);
 				if (!abiAtThatAddress) {
-					_abiPerAddress[contract.address] = contractEventsABI;
+					_abiPerAddress.set(contract.address, contractEventsABI);
 					contractAddresses.push(contract.address);
 				} else {
 					abiAtThatAddress.push(...contractEventsABI);
@@ -110,9 +110,9 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				_allABIEvents.push(...contractEventsABI);
 
 				for (const event of contractEventsABI) {
-					const list = _eventNameToContractAddresses[event.name] || [];
+					const list = _eventNameToContractAddresses.get(event.name) || [];
 					if (list.length === 0) {
-						_eventNameToContractAddresses[event.name] = list;
+						_eventNameToContractAddresses.set(event.name, list);
 					}
 					if (list.indexOf(contract.address) === -1) {
 						list.push(contract.address);
@@ -134,11 +134,11 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				eventName: item.name as ExtractAbiEventNames<ABI>,
 			});
 			if (topics.length > 0) {
-				_nameToTopic[item.name] = topics[0];
+				_nameToTopic.set(item.name, topics[0]);
 			}
 			for (const v of topics) {
-				if (!_abiEventPerTopic[v]) {
-					_abiEventPerTopic[v] = item;
+				if (!_abiEventPerTopic.get(v)) {
+					_abiEventPerTopic.set(v, item);
 					eventNameTopics.push(v);
 				} else {
 					throw new Error(`duplicate topics found`);
@@ -150,10 +150,13 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 			const filters: ExtraFilters = {};
 			for (const eventName of Object.keys(parseConfig.filters)) {
 				const filterList = parseConfig.filters[eventName];
-				filters[_nameToTopic[eventName]] = {
-					list: filterList,
-					contractAddresses: _eventNameToContractAddresses[eventName],
-				};
+				const signatureTopic = _nameToTopic.get(eventName);
+				if (signatureTopic) {
+					filters[signatureTopic] = {
+						list: filterList,
+						contractAddresses: _eventNameToContractAddresses.get(eventName),
+					};
+				}
 			}
 			fetcherConfig = {...fetcherConfig, filters};
 		}
@@ -175,11 +178,11 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		return promise as ParsedLogsPromise<ABI>;
 	}
 
-	parse(logs: EIP1193Log[]): LogEvent<ABI>[] {
+	parse(logs: IncludedEIP1193Log[]): LogEvent<ABI>[] {
 		const events: LogEvent<ABI>[] = [];
 		for (let i = 0; i < logs.length; i++) {
 			const log = logs[i];
-			const eventAddress = log.address.toLowerCase();
+			const eventAddress = log.address.toLowerCase() as `0x${string}`;
 			const event: NumberifiedLog = {
 				blockNumber: parseInt(log.blockNumber.slice(2), 16),
 				blockHash: log.blockHash,
@@ -191,10 +194,10 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				transactionHash: log.transactionHash,
 				logIndex: parseInt(log.logIndex.slice(2), 16),
 			};
-			const correspondingABI: AbiEvent[] =
+			const correspondingABI: AbiEvent[] | undefined =
 				this.abiPerAddress.size == 0 || this.parseConfig?.globalABI
 					? this.allABIEvents
-					: this.abiPerAddress[eventAddress];
+					: this.abiPerAddress.get(eventAddress);
 			if (correspondingABI) {
 				let parsed: DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`> | null = null;
 				try {
@@ -203,13 +206,13 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 						data: log.data,
 						topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
 					});
-					if (Object.keys(parsed.args).length !== this.abiEventPerTopic[log.topics[0]].inputs.length) {
+					if (!parsed || !parsed.args) {
 						// needed because of this : https://github.com/wagmi-dev/viem/issues/197
 						throw new Error(`did not parse all inputs`);
 					}
 				} catch (err) {
 					parsed = null;
-					(event as LogEventWithParsingFailure).decodeError = `decoding error: ${err.toString()}`;
+					(event as LogEventWithParsingFailure).decodeError = `decoding error: ${err}`;
 				}
 
 				if (parsed) {

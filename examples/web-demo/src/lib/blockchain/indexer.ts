@@ -171,30 +171,31 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				config: config?.parseConfig ? {stream: {parse: config.parseConfig}} : undefined,
 			},
 			config?.processorConfig
-		);
-		indexToLatest().then(() => {
-			provider
-				.request({method: 'eth_subscribe', params: ['newHeads']})
-				.then((subscriptionId: unknown) => {
-					if ((provider as any).on) {
-						(provider as any).on('message', (message: {type: string; data: {subscription: `0x${string}`}}) => {
-							if (message.type === 'eth_subscription') {
-								if (message?.data?.subscription === subscriptionId) {
-									indexMore();
+		).then(() => {
+			indexToLatest().then(() => {
+				provider
+					.request({method: 'eth_subscribe', params: ['newHeads']})
+					.then((subscriptionId: unknown) => {
+						if ((provider as any).on) {
+							(provider as any).on('message', (message: {type: string; data: {subscription: `0x${string}`}}) => {
+								if (message.type === 'eth_subscription') {
+									if (message?.data?.subscription === subscriptionId) {
+										indexMore();
+									}
 								}
-							}
-						});
-					}
-				})
-				.catch((err) => {
-					console.error(
-						`Error making newHeads subscription: ${err.message}.
-         Code: ${err.code}. Data: ${err.data}
-         Falling back on timeout
-         `
-					);
-					startAutoIndexing();
-				});
+							});
+						}
+					})
+					.catch((err) => {
+						console.error(
+							`Error making newHeads subscription: ${err.message}.
+					 Code: ${err.code}. Data: ${err.data}
+					 Falling back on timeout
+					 `
+						);
+						startAutoIndexing();
+					});
+			});
 		});
 	}
 	(window as any).indexer = indexer;

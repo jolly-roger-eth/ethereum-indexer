@@ -8,6 +8,7 @@ import {
 	ExistingStateFecther,
 	StateSaver,
 	ProcessorContext,
+	hash,
 } from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
@@ -42,32 +43,35 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	protected source: IndexingSource<ABI> | undefined;
 	protected config: ProcessorConfig | undefined;
 	protected version: string | undefined;
+	protected configHash: string | undefined;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
 		this.version = singleEventProcessor.version;
 		const data = singleEventProcessor.createInitialState();
+		const history = {
+			blockHashes: {},
+			reversals: {},
+		};
 		this._json = {
 			data,
 			lastSync: undefined,
-			history: {
-				blockHashes: {},
-				reversals: {},
-			},
+			history,
 		};
-		this.history = new History(this._json.history, 12); // TODO finality
-		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
+		this.history = new History(history, 12); // TODO finality
+		this.state = proxifyJSON<ProcessResultType>(data, this.history);
 	}
 
 	getVersionHash(): string {
-		return this.version + '_TODO_config'; // TODO config
+		return `${this.version || 'unknown'}-${this.configHash || 'not-configured'}`;
 	}
 
 	createInitialState(): ProcessResultType {
 		return this.singleEventProcessor.createInitialState();
 	}
 
-	configure(config: ProcessorConfig) {
+	async configure(config: ProcessorConfig) {
 		this.config = config;
 		this.singleEventProcessor.configure(config);
+		this.configHash = await hash(this.config);
 	}
 
 	keepState(config: {
@@ -80,6 +84,9 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 
 	async reset() {
 		namedLogger.info('EventProcessorOnJSON reseting...');
+		if (!this._json.data) {
+			throw new Error(`no data`);
+		}
 		const keys = Object.keys(this._json.data);
 		for (const key of keys) {
 			delete this._json.data[key];
@@ -93,7 +100,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType}> {
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
 		this.source = source;
 		if (this.existingStateFecther) {
 			const config = this.config as ProcessorConfig;
@@ -111,6 +118,9 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 					this._json.history = history;
 					this.history.setBlock(0, '0x0000');
 
+					if (!this._json.data) {
+						throw new Error(`no data`);
+					}
 					const keys = Object.keys(this._json.data);
 					for (const key of keys) {
 						delete this._json.data[key];
@@ -125,12 +135,18 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		if (!this._json.lastSync) {
 			return undefined;
 		}
+		if (!this._json.data) {
+			throw new Error(`no data`);
+		}
 		return {lastSync: this._json.lastSync, state: this._json.data};
 	}
 
 	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
 		// namedLogger.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 
+		if (!this._json.data) {
+			throw new Error(`no data`);
+		}
 		try {
 			let lastBlock: number | undefined;
 			let lastBlockHash: string | undefined;
@@ -162,7 +178,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			} catch (err) {}
 			const lastSyncDoc = {
 				_id: 'lastSync',
-				_rev: lastLastSync?._rev,
+				_rev: (lastLastSync as any)?._rev,
 				...lastSync,
 			};
 			this._json.lastSync = lastSyncDoc;

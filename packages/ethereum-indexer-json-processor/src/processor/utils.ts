@@ -1,5 +1,5 @@
 import {EventProcessorOnJSON} from './EventProcessorOnJSON';
-import {Abi, EventWithId, LogEvent, UnparsedEventWithId} from 'ethereum-indexer';
+import {Abi, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
 import {EventFunctions, JSObject} from './types';
 
 export type JSProcessor<
@@ -9,7 +9,7 @@ export type JSProcessor<
 > = EventFunctions<ABI, ProcessResultType, ProcessorConfig> & {
 	version?: string;
 	construct(): ProcessResultType;
-	handleUnparsedEvent?(json: ProcessResultType, event: UnparsedEventWithId);
+	handleUnparsedEvent?(json: ProcessResultType, event: LogEventWithParsingFailure): Promise<void>;
 };
 
 class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig> {
@@ -22,12 +22,12 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 		return this.obj.construct();
 	}
 
-	protected config: ProcessorConfig;
-	configure(config: ProcessorConfig): void {
+	protected config: ProcessorConfig | undefined;
+	async configure(config: ProcessorConfig): Promise<void> {
 		this.config = config;
 	}
 
-	processEvent(json: ProcessResultType, event: EventWithId<ABI>) {
+	processEvent(json: ProcessResultType, event: LogEvent<ABI>) {
 		if ('decodeError' in event) {
 			if (this.obj.handleUnparsedEvent) {
 				return this.obj.handleUnparsedEvent(json, event);
@@ -35,14 +35,15 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 			return;
 		}
 		const functionName = `on${event.eventName}`;
-		if (this.obj[functionName]) {
-			return this.obj[functionName](json, event, this.config);
+		if ((this.obj as any)[functionName]) {
+			return (this.obj as any)[functionName](json, event, this.config);
 		}
 	}
 	construct(): ProcessResultType {
 		if (this.obj.construct) {
 			return this.obj.construct();
 		}
+		return undefined as any;
 	}
 }
 
@@ -60,6 +61,6 @@ export function computeArchiveID(id: string, endBlock: number): string {
 	return `archive_${endBlock}_${id}`;
 }
 
-export function computeEventID<ABI extends Abi>(event: EventWithId<ABI>): string {
+export function computeEventID<ABI extends Abi>(event: LogEvent<ABI>): string {
 	return `${event.transactionHash}_${event.logIndex}`;
 }

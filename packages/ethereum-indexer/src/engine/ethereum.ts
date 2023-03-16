@@ -9,6 +9,7 @@ import {
 } from 'eip-1193';
 
 import {logs} from 'named-logs';
+import {IncludedEIP1193Log} from '../types';
 const namedLogger = logs('ethereum-utils');
 
 /**
@@ -131,7 +132,7 @@ export function generateLogRequestForTopicsAndFiltersCombinations(
 	if (!filters) {
 		return [{topics: [eventNameTopics], contractAddresses}];
 	} else {
-		const sharedRequest = {topics: [], contractAddresses};
+		const sharedRequest: LogRequest = {topics: [], contractAddresses};
 		const moreRequests: LogRequest[] = [];
 		for (const eventNameTopic of eventNameTopics) {
 			const filtersPerEventTopic = filters[eventNameTopic];
@@ -164,13 +165,17 @@ export async function getLogsWithVariousFilters(
 	eventNameTopics: EIP1193DATA[] | null,
 	filters: ExtraFilters | null,
 	options: {fromBlock: number; toBlock: number}
-): Promise<EIP1193Log[]> {
+): Promise<IncludedEIP1193Log[]> {
 	if (!eventNameTopics) {
-		return getLogs(provider, contractAddresses, [eventNameTopics], options);
+		return getLogs(provider, contractAddresses, eventNameTopics ? [eventNameTopics] : null, options);
 	}
-	const requestList = generateLogRequestForTopicsAndFiltersCombinations(contractAddresses, eventNameTopics, filters);
+	const requestList = generateLogRequestForTopicsAndFiltersCombinations(
+		contractAddresses,
+		eventNameTopics,
+		filters ? filters : undefined
+	);
 
-	const logs: EIP1193Log[] = [];
+	const logs: IncludedEIP1193Log[] = [];
 	for (const request of requestList) {
 		const tmpLogs = await getLogs(provider, request.contractAddresses, request.topics, options);
 		logs.push(...tmpLogs);
@@ -215,7 +220,7 @@ export async function getLogs(
 	contractAddresses: EIP1193Account[] | null,
 	topics: (EIP1193DATA | EIP1193DATA[])[] | null,
 	options: {fromBlock: number; toBlock: number}
-): Promise<EIP1193Log[]> {
+): Promise<IncludedEIP1193Log[]> {
 	const logs: EIP1193Log[] = await provider.request({
 		method: 'eth_getLogs',
 		params: [
@@ -227,5 +232,5 @@ export async function getLogs(
 			},
 		],
 	});
-	return logs;
+	return logs.filter((v) => v.blockNumber !== null) as IncludedEIP1193Log[];
 }

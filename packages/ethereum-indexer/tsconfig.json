@@ -1,9 +1,11 @@
 {
 	"compilerOptions": {
 		"moduleResolution": "node",
+		"lib": ["ES6", "DOM", "ES2017.String"],
 		"target": "ES6",
 		"declaration": true,
 		"declarationMap": true,
-		"sourceMap": true
+		"sourceMap": true,
+		"strict": true
 	}
 }

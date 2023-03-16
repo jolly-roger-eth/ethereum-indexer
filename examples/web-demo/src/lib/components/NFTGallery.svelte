@@ -12,7 +12,7 @@
 	export let etherscanURL: string | undefined = undefined;
 
 	let currentPage = 1;
-	const pageSize = 9;
+	const pageSize = 12;
 	$: items = paginate({items: $state.nfts, pageSize, currentPage});
 </script>
 

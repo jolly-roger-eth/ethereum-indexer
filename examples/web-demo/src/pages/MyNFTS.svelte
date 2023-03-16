@@ -12,7 +12,7 @@
 
 	let accountsToUse: `0x${string}` | boolean = true;
 	onMount(() => {
-		accountsToUse = params['account'] as `0x${string}`;
+		accountsToUse = (params['account'] as `0x${string}`) || true;
 		console.log({accountsToUse});
 	});
 	const latestContractsData = {
@@ -45,6 +45,6 @@
 
 <IndexerButton initialize={initalizeWithAccount} {accountsToUse} />
 <IndexerProgress {syncing} />
-<IndexerStatus {status} {syncing} />
+<!-- <IndexerStatus {status} {syncing} /> -->
 
 <NftGallery {state} {provider} {etherscanURL} />

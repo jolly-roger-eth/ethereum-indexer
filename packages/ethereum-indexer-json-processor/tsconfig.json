@@ -4,6 +4,7 @@
 		"target": "ES6",
 		"declaration": true,
 		"declarationMap": true,
-		"sourceMap": true
+		"sourceMap": true,
+		"strict": true
 	}
 }

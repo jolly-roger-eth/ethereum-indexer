@@ -1,5 +1,7 @@
 export * from './types';
 export * from './indexer';
+export * from './utils';
+export * from './decoding/LogEventFetcher';
 
 export type {
 	Abi,

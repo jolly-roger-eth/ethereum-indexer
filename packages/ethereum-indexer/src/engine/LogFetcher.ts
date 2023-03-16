@@ -1,4 +1,5 @@
 import {EIP1193Account, EIP1193DATA, EIP1193Log, EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {IncludedEIP1193Log} from '../types';
 import {ExtraFilters, getLogs, getLogsWithVariousFilters} from './ethereum';
 
 type InternalLogFetcherConfig = {
@@ -9,7 +10,7 @@ type InternalLogFetcherConfig = {
 	numRetry: number;
 };
 
-export type LogsResult = {logs: EIP1193Log[]; toBlockUsed: number};
+export type LogsResult = {logs: IncludedEIP1193Log[]; toBlockUsed: number};
 export type LogsPromise = Promise<LogsResult> & {stopRetrying(): void};
 
 export type LogFetcherConfig = {
@@ -77,7 +78,7 @@ export class LogFetcher {
 			retry = 0;
 		};
 		const promise = new Promise<LogsResult>(async (resolve, reject) => {
-			let logs: EIP1193Log[];
+			let logs: IncludedEIP1193Log[];
 
 			const fromBlock = options.fromBlock;
 			let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
@@ -96,10 +97,15 @@ export class LogFetcher {
 					);
 					logs = await logsProm;
 				} else {
-					logs = await getLogs(this.provider, this.contractAddresses, [this.eventNameTopics], {
-						fromBlock,
-						toBlock,
-					});
+					logs = await getLogs(
+						this.provider,
+						this.contractAddresses,
+						this.eventNameTopics ? [this.eventNameTopics] : null,
+						{
+							fromBlock,
+							toBlock,
+						}
+					);
 				}
 			} catch (err: any) {
 				if (retry <= 0) {

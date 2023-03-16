@@ -38,7 +38,7 @@ export function createRejectablePromise<T>(
 				reject(err);
 			}
 		}
-		function resolveIfNotRejectedAlready(result: T) {
+		function resolveIfNotRejectedAlready(result: T | PromiseLike<T>) {
 			if (!rejected) {
 				resolve(result);
 			}
@@ -77,7 +77,7 @@ export function createCancellablePromise<T>(
 				reject(err);
 			}
 		}
-		function resolveIfNotCancelledAlready(result: T) {
+		function resolveIfNotCancelledAlready(result: T | PromiseLike<T>) {
 			if (!cancelled) {
 				cancellable = false;
 				resolve(result);

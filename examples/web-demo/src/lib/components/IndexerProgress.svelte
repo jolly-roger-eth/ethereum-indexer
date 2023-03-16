@@ -5,4 +5,4 @@
 </script>
 
 <progress value={($syncing.lastSync?.syncPercentage || 0) / 100} style="width:100%;" />
-<progress value={($syncing.lastSync?.totalPercentage || 0) / 100} style="width:100%;" />
+<!-- <progress value={($syncing.lastSync?.totalPercentage || 0) / 100} style="width:100%;" /> -->

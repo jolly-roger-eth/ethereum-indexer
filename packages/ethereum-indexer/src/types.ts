@@ -1,4 +1,5 @@
 import {Abi} from 'abitype';
+import {EIP1193DATA, EIP1193Log, EIP1193QUANTITY} from 'eip-1193';
 import {LogEvent} from './decoding/LogEventFetcher';
 import {LogFetcherConfig} from './engine/LogFetcher';
 
@@ -17,13 +18,21 @@ export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, P
 	ProcessResultType
 > & {
 	createInitialState(): ProcessResultType;
-	configure(config: ProcessorConfig): void;
+	configure(config: ProcessorConfig): Promise<void>;
 };
 
 export type EventBlock<ABI extends Abi> = {
 	number: number;
 	hash: string;
 	events: LogEvent<ABI>[]; //this could be replacec by start: number;end: number but we would need access to the old coreresponding events
+};
+
+export type IncludedEIP1193Log = EIP1193Log & {
+	blockNumber: EIP1193DATA;
+	logIndex: EIP1193DATA;
+	blockHash: EIP1193DATA;
+	transactionIndex: EIP1193QUANTITY;
+	transactionHash: EIP1193DATA;
 };
 
 export type ContextIdentifier = {source: {startBlock: number; hash: string}[]; config: string; processor: string};
@@ -64,17 +73,19 @@ export type StreamSaver<ABI extends Abi> = (
 ) => Promise<void>;
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
+export type StreamConfig = {
+	finality?: number;
+	alwaysFetchTimestamps?: boolean;
+	alwaysFetchTransactions?: boolean;
+	parse?: LogParseConfig;
+};
+
 export type IndexerConfig<ABI extends Abi> = {
 	// if this changes do not need a resync
 	fetch?: Omit<LogFetcherConfig, 'filters'>;
 
 	// any change to this stream config should trigger a resync from 0
-	stream?: {
-		finality?: number;
-		alwaysFetchTimestamps?: boolean;
-		alwaysFetchTransactions?: boolean;
-		parse?: LogParseConfig;
-	};
+	stream?: StreamConfig;
 
 	// if this changes do not need a resync
 	providerSupportsETHBatch?: boolean;

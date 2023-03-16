@@ -46,12 +46,12 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
 				config?: IndexerConfig<ABI>;
 			},
 			processorConfig: ProcessorConfig
-	  ) => void
+	  ) => Promise<void>
 	: (indexerSetup: {
 			provider: EIP1193ProviderWithoutEvents;
 			source: IndexingSource<ABI>;
 			config?: IndexerConfig<ABI>;
-	  }) => void;
+	  }) => Promise<void>;
 
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
@@ -93,7 +93,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	let indexingTimeout: number | undefined;
 	let autoIndexingInterval: number = 4;
 
-	function init(
+	async function init(
 		indexerSetup: {
 			provider: EIP1193ProviderWithoutEvents;
 			source: IndexingSource<ABI>;
@@ -118,7 +118,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			  })
 			: indexerSetup.provider;
 		if (processor.configure && processorConfig) {
-			processor.configure(processorConfig);
+			await processor.configure(processorConfig);
 		}
 		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, config);
 		setSyncing({waitingForProvider: false});
@@ -162,10 +162,14 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				setSyncing({fetchingLogs: true});
 			} else if (loadingState === 'Processing') {
 				setSyncing({fetchingLogs: false, processingFetchedLogs: true});
-				setLastSync(lastSync);
+				if (lastSync) {
+					setLastSync(lastSync);
+				}
 			} else if (loadingState === 'Done') {
 				setSyncing({processingFetchedLogs: false});
-				setLastSync(lastSync);
+				if (lastSync) {
+					setLastSync(lastSync);
+				}
 			}
 			await wait(0.001); // allow propagation if the whole proces is synchronous
 		};
