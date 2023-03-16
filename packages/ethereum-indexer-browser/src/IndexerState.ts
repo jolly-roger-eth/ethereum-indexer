@@ -135,9 +135,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		const startingBlock = indexer.defaultFromBlock;
 		const latestBlock = lastSync.latestBlock;
 		const lastToBlock = lastSync.lastToBlock;
-		if (lastLastToBlock && lastLastToBlock > lastToBlock) {
-			console.error(`INVALID lastToBlock`);
-		}
 		lastLastToBlock = lastToBlock;
 
 		const totalToProcess = latestBlock - startingBlock;

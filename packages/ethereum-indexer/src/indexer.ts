@@ -56,7 +56,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected _indexingMore: Promise<LastSync<ABI>> | undefined;
 	protected _feeding: Promise<LastSync<ABI>> | undefined;
 	protected _saving: Promise<void> | undefined;
-	protected _savingProcessor: Promise<void> | undefined;
 	protected _logEventPromise: ParsedLogsPromise<ABI>;
 
 	protected sourceHashes: {startBlock: number; hash: string}[];
