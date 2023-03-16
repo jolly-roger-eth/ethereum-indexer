@@ -18,4 +18,4 @@
 	<p>requests sent: {$syncing.numRequests}</p>
 {/if}
 <p>block processed: {$syncing.lastSync?.numBlocksProcessedSoFar?.toLocaleString() || 0}</p>
-<p>num events: {(($syncing.lastSync?.nextStreamID || 1) - 1).toLocaleString()}</p>
+<!-- <p>num events: {(($syncing.lastSync?.numEvents ? || 1) - 1).toLocaleString()}</p> -->

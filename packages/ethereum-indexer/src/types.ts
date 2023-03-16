@@ -1,5 +1,5 @@
 import {Abi} from 'abitype';
-import {JSONObject, LogEvent, LogEventWithParsingFailure, ParsedLogEvent} from './decoding/LogEventFetcher';
+import {LogEvent} from './decoding/LogEventFetcher';
 import {LogFetcherConfig} from './engine/LogFetcher';
 
 export type {LogFetcher, LogFetcherConfig} from './engine/LogFetcher';
@@ -8,7 +8,7 @@ export type {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	getVersionHash(): string;
 	load: (source: IndexingSource<ABI>) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>} | undefined>;
-	process: (eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
+	process: (eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
 };
 
@@ -23,7 +23,7 @@ export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, P
 export type EventBlock<ABI extends Abi> = {
 	number: number;
 	hash: string;
-	events: EventWithId<ABI>[]; //this could be replacec by start: number;end: number but we would need access to the old coreresponding events
+	events: LogEvent<ABI>[]; //this could be replacec by start: number;end: number but we would need access to the old coreresponding events
 };
 
 export type ContextIdentifier = {source: {startBlock: number; hash: string}[]; config: string; processor: string};
@@ -32,31 +32,7 @@ export type LastSync<ABI extends Abi> = {
 	latestBlock: number;
 	lastToBlock: number;
 	unconfirmedBlocks: EventBlock<ABI>[];
-	nextStreamID: number;
 };
-
-export type EventWithId<ABI extends Abi, Extra extends JSONObject = undefined> =
-	| ValidEventWithId<ABI, Extra>
-	| CancelledEventWithId<ABI, Extra>;
-
-export type ValidEventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = LogEvent<ABI, Extra> & {
-	streamID: number;
-};
-
-export type CancelledEventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = LogEvent<ABI, Extra> & {
-	cancelled: true;
-	streamID: number;
-};
-
-export type ParsedEventWithId<ABI extends Abi, Extra extends JSONObject = undefined> = ParsedLogEvent<ABI, Extra> & {
-	streamID: number;
-};
-
-export type UnparsedEventWithId<Extra extends JSONObject = undefined> = LogEventWithParsingFailure<Extra> & {
-	streamID: number;
-};
-
-export type BlockEvents<ABI extends Abi> = {hash: string; number: number; events: LogEvent<ABI>[]};
 
 export type ContractData<ABI extends Abi> = {
 	readonly abi: ABI;
@@ -77,13 +53,13 @@ export type IndexingSource<ABI extends Abi> = {
 
 export type StreamFecther<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
-	nextStreamID: number
-) => Promise<{lastSync: LastSync<ABI>; eventStream: EventWithId<ABI>[]}>;
+	fromBlock: number
+) => Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]}>;
 export type StreamSaver<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	stream: {
 		lastSync: LastSync<ABI>;
-		eventStream: EventWithId<ABI>[];
+		eventStream: LogEvent<ABI>[];
 	}
 ) => Promise<void>;
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;

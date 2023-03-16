@@ -8,6 +8,9 @@ import {
 	EIP1193TransactionReceipt,
 } from 'eip-1193';
 
+import {logs} from 'named-logs';
+const namedLogger = logs('ethereum-utils');
+
 /**
  * Data from the tx that emitted the log.
  * It is not automatically added to the log as this require fetching extra information.
@@ -173,9 +176,9 @@ export async function getLogsWithVariousFilters(
 		logs.push(...tmpLogs);
 	}
 
-	return logs.sort((a, b) => {
-		const aT = parseInt(a.transactionIndex.slice(2), 16);
-		const bT = parseInt(b.transactionIndex.slice(2), 16);
+	const sortedLogs = logs.sort((a, b) => {
+		const aT = parseInt(a.blockNumber.slice(2), 16);
+		const bT = parseInt(b.blockNumber.slice(2), 16);
 		if (aT > bT) {
 			return 1;
 		} else if (aT < bT) {
@@ -192,6 +195,19 @@ export async function getLogsWithVariousFilters(
 			}
 		}
 	});
+
+	const logsToReturn = [];
+	let lastAdded: EIP1193Log | undefined;
+	for (const sortedLog of sortedLogs) {
+		if (lastAdded && sortedLog.blockHash === lastAdded.blockHash && sortedLog.logIndex === lastAdded.logIndex) {
+			namedLogger.log(`DUPLICATE LOG`);
+			continue;
+		}
+		lastAdded = sortedLog;
+		logsToReturn.push(sortedLog);
+	}
+
+	return logsToReturn;
 }
 
 export async function getLogs(

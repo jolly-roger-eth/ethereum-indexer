@@ -11,11 +11,8 @@ import {EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 import {logs} from 'named-logs';
 import type {
-	BlockEvents,
 	IndexingSource,
-	EventBlock,
 	EventProcessor,
-	EventWithId,
 	IndexerConfig,
 	LastSync,
 	AllContractData,
@@ -24,7 +21,7 @@ import type {
 } from './types';
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
-import {wait} from './engine/utils';
+import {generateStreamToAppend, getFromBlock, wait} from './engine/utils';
 
 const namedLogger = logs('ethereum-indexer');
 
@@ -53,7 +50,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected alwaysFetchTransactions: boolean;
 	protected providerSupportsETHBatch: boolean;
 	protected existingStream: ExistingStream<ABI>;
-	protected appendedStreamNotYetSaved: EventWithId<ABI>[] = [];
+	protected appendedStreamNotYetSaved: LogEvent<ABI>[] = [];
 	protected _reseting: Promise<void> | undefined;
 	protected _loading: Promise<LastSync<ABI>> | undefined;
 	protected _indexingMore: Promise<LastSync<ABI>> | undefined;
@@ -150,7 +147,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return this._reseting;
 	}
 
-	async feed(eventStream: EventWithId<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
+	async feed(eventStream: LogEvent<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
 		if (!lastSyncFetched) {
 			lastSyncFetched = this.freshLastSync(this.processor.getVersionHash());
 		}
@@ -253,7 +250,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			// but we could still have filter capabilties managed by another pass/process
 			// and this one would slim down the event stream
 
-			let lastSync: LastSync<ABI> | undefined = undefined;
+			let currentLastSync: LastSync<ABI> | undefined = undefined;
 			await this.signal('Loading');
 			const processorHash = this.processor.getVersionHash();
 			const loaded = await this.processor.load(this.source);
@@ -263,7 +260,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					processorHash === loadedLastSync.context.processor &&
 					this.indexerMatches(loadedLastSync.lastToBlock, loadedLastSync.context)
 				) {
-					lastSync = loadedLastSync;
+					currentLastSync = loadedLastSync;
 					this._onStateUpdated(state);
 				} else {
 					namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
@@ -271,72 +268,43 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				}
 			}
 			// if mismatch found, we get a fresh sync
-			if (!lastSync) {
-				lastSync = this.freshLastSync(processorHash);
+			if (!currentLastSync) {
+				currentLastSync = this.freshLastSync(processorHash);
 				// but we might have some stream still valid here
 				if (this.existingStream) {
 					await this.signal('Fetching');
 					// we start from scratch
-					const existingStreamData = await this.existingStream.fetchFrom(this.source, lastSync.nextStreamID);
+					const existingStreamData = await this.existingStream.fetchFrom(
+						this.source,
+						getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
+					);
 
+					// we assume the stream is correct and start from the requested number
 					if (existingStreamData) {
-						const {eventStream, lastSync: lastSyncFetched} = existingStreamData;
+						const {eventStream: eventsFetched, lastSync: lastSyncFetched} = existingStreamData;
 						if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
 							// we update the processorHash in case it was changed
-							lastSyncFetched.context.processor = processorHash;
-
-							const eventStreamToFeed = eventStream.filter(
-								(event) => event.blockNumber < Math.max(0, lastSyncFetched.latestBlock - this.finality)
-							);
-
-							// removeRemovedEventFromStream(eventStreamToFeed);
-							const evenStreamNormalized: EventWithId<ABI>[] = [];
-							const eventMap: {[streamID: string]: number} = {};
-							for (let i = 0; i < eventStreamToFeed.length; i++) {
-								const event = eventStreamToFeed[i];
-
-								if ('removedStreamID' in event && event.removedStreamID) {
-									const eventIndexFromMap = eventMap[event.removedStreamID];
-									// evenStreamNormalized[eventIndexFromMap] = {
-									// 	...evenStreamNormalized[eventIndexFromMap],
-									// 	cancelled: true,
-									// };
-									evenStreamNormalized.splice(eventIndexFromMap, 1);
-									// we leave gap in the streamID
-								} else {
-									eventMap[event.streamID] = evenStreamNormalized.length;
-									evenStreamNormalized.push(event);
-								}
-							}
-
-							if (evenStreamNormalized.length > 0) {
+							currentLastSync.context.processor = processorHash;
+							this.lastSync = currentLastSync;
+							if (eventsFetched.length > 0) {
 								await this.signal('Processing');
-								// TODO config for batchsize?
-								const batchSize = 300;
-								lastSync = lastSyncFetched;
-
-								for (let i = 0; i < evenStreamNormalized.length; i += batchSize) {
-									const slice = eventStreamToFeed.slice(i, Math.min(i + batchSize, evenStreamNormalized.length));
-									if (slice.length > 0) {
-										lastSync.nextStreamID = slice[slice.length - 1].streamID + 1;
-										await this.feed(slice, lastSync);
-										await this.signal('Processing');
-										await wait(0.001);
-									}
-								}
+								await this.feed(eventsFetched, lastSyncFetched);
 							}
 						} else {
+							this.lastSync = currentLastSync;
 							await this.existingStream.clear(this.source);
 						}
 					} else {
+						this.lastSync = currentLastSync;
 						await this.existingStream.clear(this.source);
 					}
+				} else {
+					this.lastSync = currentLastSync;
 				}
+			} else {
+				this.lastSync = currentLastSync;
 			}
-
 			await this.signal('Done');
-
-			this.lastSync = lastSync;
 			return this.lastSync;
 		} finally {
 			this._loading = undefined;
@@ -351,34 +319,54 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 	}
 
-	protected async promiseToFeed(
-		eventStream: EventWithId<ABI>[],
-		lastSyncFetched: LastSync<ABI>
-	): Promise<LastSync<ABI>> {
+	protected async promiseToFeed(newEvents: LogEvent<ABI>[], lastSyncFetched: LastSync<ABI>): Promise<LastSync<ABI>> {
 		try {
-			const lastSync: LastSync<ABI> = this.lastSync || this.freshLastSync(this.processor.getVersionHash());
-			const firstEvent = eventStream[0];
-			if (firstEvent.streamID === lastSync.nextStreamID) {
-				namedLogger.time('processor.process');
-				// TODO if clean feed (no removed event) then we can mentioned that to the processor
-				// this would allow the processor to not need to keep previous state for reorg
-				// this can significantly speed up a browser based indexer
-				const outcome = await this.processor.process(eventStream, lastSyncFetched);
-				namedLogger.timeEnd('processor.process');
-				if (!this._feeding) {
-					namedLogger.info(`not feeding anymore...`);
-					throw new Error('aborted');
+			// assume lastSyncFetched is newer
+			// TODO throw otherwise ?
+
+			// ----------------------------------------------------------------------------------------
+			// GENERATE THE STREAM
+			// ----------------------------------------------------------------------------------------
+			const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, newEvents, {
+				newLatestBlock: lastSyncFetched.latestBlock,
+				newLastToBlock: lastSyncFetched.lastToBlock,
+				finality: this.finality,
+			});
+			// ----------------------------------------------------------------------------------------
+
+			// await this.signal('Processing');
+			// TODO config for batchsize?
+			const batchSize = 300;
+			let currentLastSync = {...newLastSync};
+
+			for (let i = 0; i < eventStream.length; i += batchSize) {
+				const slice = eventStream.slice(i, Math.min(i + batchSize, eventStream.length));
+				if (slice.length > 0) {
+					currentLastSync.lastToBlock = slice[slice.length - 1].blockNumber;
+
+					namedLogger.time('processor.process');
+					// TODO if clean feed (no removed event) then we can mentioned that to the processor
+					// this would allow the processor to not need to keep previous state for reorg
+					// this can significantly speed up a browser based indexer
+					const outcome = await this.processor.process(slice, currentLastSync);
+					namedLogger.timeEnd('processor.process');
+
+					namedLogger.time('_onStateUpdated');
+					this._onStateUpdated(outcome);
+					namedLogger.timeEnd('_onStateUpdated');
+
+					await this.signal('Processing');
+					await wait(0.001);
+					this.lastSync = currentLastSync;
 				}
-				this.lastSync = lastSyncFetched;
-
-				namedLogger.time('_onStateUpdated');
-				this._onStateUpdated(outcome);
-				namedLogger.timeEnd('_onStateUpdated');
-
-				return this.lastSync;
-			} else {
-				throw new Error(`invalid nextStreamID, ${firstEvent.streamID} === ${lastSync.nextStreamID}`);
 			}
+
+			if (!this._feeding) {
+				namedLogger.info(`not feeding anymore...`);
+				throw new Error('aborted');
+			}
+			this.lastSync = newLastSync;
+			return this.lastSync;
 		} finally {
 			this._feeding = undefined;
 		}
@@ -410,12 +398,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			context: {source: this.sourceHashes, config: this.configHash, processor: processorHash},
 			lastToBlock: 0,
 			latestBlock: 0,
-			nextStreamID: 1,
 			unconfirmedBlocks: [],
 		};
 	}
 
-	protected async save(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
+	protected async save(source: IndexingSource<ABI>, eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) {
 		if (!this._saving) {
 			if (this.existingStream) {
 				this._saving = this.promiseToSave(source, eventStream, lastSync);
@@ -429,7 +416,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return this._saving.then(() => this.promiseToSave(source, eventStream, lastSync));
 	}
 
-	protected async promiseToSave(source: IndexingSource<ABI>, eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>) {
+	protected async promiseToSave(source: IndexingSource<ABI>, eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) {
 		this.appendedStreamNotYetSaved.push(...eventStream);
 		try {
 			await this.existingStream.saveNewEvents(source, {
@@ -488,18 +475,27 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				}
 				const lastSync = this.lastSync as LastSync<ABI>;
 
-				const unconfirmedBlocks = lastSync.unconfirmedBlocks;
-				let streamID = lastSync.nextStreamID;
+				const lastUnconfirmedBlocks = lastSync.unconfirmedBlocks;
 
+				// ----------------------------------------------------------------------------------------
+				// COMPUTE fromBlock
+				// ----------------------------------------------------------------------------------------
 				let fromBlock = this.defaultFromBlock;
-				if (unconfirmedBlocks.length > 0) {
-					fromBlock = lastSync.unconfirmedBlocks[0].number;
+				if (lastUnconfirmedBlocks.length > 0) {
+					// this is wrong, we need to take fromBlock from lastSync (+ finality or use fromBlock)
+					fromBlock = lastUnconfirmedBlocks[0].number;
 				} else {
+					// same this is wrong, there could be reorg missed and event to add
+					// fromBlock / lastSync need to be used and of course depending on lastSync.latestBlock to check finality of that last request
 					if (lastSync.lastToBlock !== 0) {
 						fromBlock = lastSync.lastToBlock + 1;
 					}
 				}
+				// ----------------------------------------------------------------------------------------
 
+				// ----------------------------------------------------------------------------------------
+				// FETCH LOGS
+				// ----------------------------------------------------------------------------------------
 				const latestBlock = await getBlockNumber(this.provider);
 
 				if (!this._indexingMore) {
@@ -519,6 +515,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				if (this._logEventPromise) {
 					throw new Error(`duplicate _logEventPromise`);
 				}
+				// namedLogger.log(`from: ${fromBlock} to: ${toBlock}`);
 				this._logEventPromise = this.logEventFetcher.getLogEvents({
 					fromBlock,
 					toBlock: toBlock,
@@ -533,6 +530,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 				const {events: eventsFetched, toBlockUsed: newToBlock} = logResult;
 				toBlock = newToBlock;
+
+				// namedLogger.log(`from: ${fromBlock} toBlock: ${toBlock}`);
 
 				if (!this._indexingMore) {
 					namedLogger.info(`not indexing anymore...`);
@@ -617,23 +616,26 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					reject('aborted');
 					return;
 				}
+				// ----------------------------------------------------------------------------------------
 
-				const {eventStream, newLastSync} = this._generateStreamToAppend(eventsFetched, {
-					context: lastSync.context,
-					latestBlock,
-					lastToBlock: toBlock,
-					nextStreamID: streamID,
-					unconfirmedBlocks,
+				// ----------------------------------------------------------------------------------------
+				// GENERATE THE STREAM
+				// ----------------------------------------------------------------------------------------
+				const {eventStream, newLastSync} = generateStreamToAppend(lastSync, eventsFetched, {
+					newLatestBlock: latestBlock,
+					newLastToBlock: toBlock,
+					finality: this.finality,
 				});
+				// ----------------------------------------------------------------------------------------
 
-				if (newLastSync.nextStreamID > 1) {
-					namedLogger.log(`nextStreamID ${newLastSync.nextStreamID}`);
-				}
 				// TODO const chainId = await getChainId(this.provider);
 
 				// Note: we do not skip if  (eventStream.length > 0)
 				//  Because the process might want to use that info to keep track of the syncinf status
 
+				// ----------------------------------------------------------------------------------------
+				// PROCESS IT
+				// ----------------------------------------------------------------------------------------
 				const outcome = await this.processor.process(eventStream, newLastSync);
 
 				if (this._reseting && !this._indexingMore) {
@@ -654,116 +656,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 				this._indexingMore = undefined;
 				return resolve(newLastSync);
+				// ----------------------------------------------------------------------------------------
 			} catch (e: any) {
 				globalThis.console.error(`error`, e);
 				this._indexingMore = undefined;
 				return reject(e);
 			}
 		});
-	}
-
-	protected _generateStreamToAppend(
-		newEvents: LogEvent<ABI>[],
-		{context, latestBlock, lastToBlock, unconfirmedBlocks, nextStreamID}: LastSync<ABI>
-	): {eventStream: EventWithId<ABI>[]; newLastSync: LastSync<ABI>} {
-		// grouping per block...
-		const groups: {[hash: string]: BlockEvents<ABI>} = {};
-		const logEventsGroupedPerBlock: BlockEvents<ABI>[] = [];
-		for (const event of newEvents) {
-			if (event.removed) {
-				// we skip event removed as we deal with them manually
-				continue;
-			}
-			let group = groups[event.blockHash];
-			if (!group) {
-				group = groups[event.blockHash] = {
-					hash: event.blockHash,
-					number: event.blockNumber,
-					events: [],
-				};
-				logEventsGroupedPerBlock.push(group);
-			}
-			group.events.push(event);
-		}
-
-		const eventStream: EventWithId<ABI>[] = [];
-
-		// find reorgs
-		let reorgBlock: EventBlock<ABI> | undefined;
-		let reorgedBlockIndex = 0;
-		for (const block of logEventsGroupedPerBlock) {
-			if (reorgedBlockIndex < unconfirmedBlocks.length) {
-				const unconfirmedBlockAtIndex = unconfirmedBlocks[reorgedBlockIndex];
-				if (unconfirmedBlockAtIndex.hash !== block.hash) {
-					reorgBlock = unconfirmedBlockAtIndex;
-					break;
-				}
-				reorgedBlockIndex++;
-			}
-		}
-
-		if (reorgBlock) {
-			// re-add event to the stream but flag them as removed
-			for (let i = reorgedBlockIndex; i < unconfirmedBlocks.length; i++) {
-				for (const event of unconfirmedBlocks[i].events) {
-					eventStream.push({
-						...event, // TODO delete that ?
-						streamID: nextStreamID++,
-						removed: true, // delete that ?
-						removedStreamID: event.streamID,
-					});
-				}
-			}
-		}
-
-		const startingBlockForNewEvent = reorgBlock
-			? reorgBlock.number
-			: unconfirmedBlocks.length > 0
-			? unconfirmedBlocks[unconfirmedBlocks.length - 1].number + 1
-			: logEventsGroupedPerBlock.length > 0
-			? logEventsGroupedPerBlock[0].number
-			: 0;
-		// the case for 0 is a void case as none of the loop below will be triggered
-
-		// new events and new unconfirmed blocks
-		const newUnconfirmedBlocks: EventBlock<ABI>[] = [];
-
-		// re-add unconfirmed blocks that might get reorg later still
-		for (const unconfirmedBlock of unconfirmedBlocks) {
-			if (unconfirmedBlock.number < startingBlockForNewEvent) {
-				if (latestBlock - unconfirmedBlock.number <= this.finality) {
-					newUnconfirmedBlocks.push(unconfirmedBlock);
-				}
-			}
-		}
-
-		for (const block of logEventsGroupedPerBlock) {
-			if (block.events.length > 0 && block.number >= startingBlockForNewEvent) {
-				const newEventsPerBlock: EventWithId<ABI>[] = [];
-				for (const event of block.events) {
-					const newEvent: EventWithId<ABI> = {streamID: nextStreamID++, ...event};
-					eventStream.push(newEvent);
-					newEventsPerBlock.push(newEvent);
-				}
-				if (latestBlock - block.number <= this.finality) {
-					newUnconfirmedBlocks.push({
-						hash: block.hash,
-						number: block.number,
-						events: newEventsPerBlock,
-					});
-				}
-			}
-		}
-
-		return {
-			eventStream,
-			newLastSync: {
-				context,
-				latestBlock,
-				lastToBlock,
-				unconfirmedBlocks: newUnconfirmedBlocks,
-				nextStreamID,
-			},
-		};
 	}
 }

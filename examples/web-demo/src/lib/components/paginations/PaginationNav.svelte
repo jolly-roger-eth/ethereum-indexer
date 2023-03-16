@@ -62,3 +62,40 @@
 		</span>
 	{/each}
 </div>
+
+<style>
+	.pagination-nav {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 20px;
+	}
+
+	.pagination-nav :global(.pagination-nav) {
+		display: flex;
+		justify-content: center;
+		background: #fff;
+		border-radius: 3px;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+	}
+	.pagination-nav :global(.option) {
+		padding: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: 0.2s all ease-out;
+		user-select: none;
+		color: hsl(200, 90%, 10%);
+	}
+	.pagination-nav :global(.option.number),
+	.pagination-nav :global(.option.ellipsis) {
+		padding: 10px 15px;
+	}
+	.pagination-nav :global(.option:hover) {
+		background: rgba(0, 0, 0, 0.1);
+		cursor: pointer;
+	}
+	.pagination-nav :global(.option.active) {
+		color: hsl(200, 70%, 50%);
+	}
+</style>

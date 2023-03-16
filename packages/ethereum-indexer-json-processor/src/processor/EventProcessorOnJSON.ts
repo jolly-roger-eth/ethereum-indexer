@@ -1,6 +1,5 @@
 import {
 	IndexingSource,
-	EventWithId,
 	LastSync,
 	LogEvent,
 	Abi,
@@ -24,7 +23,7 @@ export type SingleEventJSONProcessor<
 	version?: string;
 	createInitialState(): ProcessResultType;
 	configure(config: ProcessorConfig): void;
-	processEvent(json: ProcessResultType, event: EventWithId<ABI>): void;
+	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void;
 };
 
 export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
@@ -129,8 +128,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		return {lastSync: this._json.lastSync, state: this._json.data};
 	}
 
-	private lastEventID: number;
-	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
+	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
 		// namedLogger.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 
 		try {
@@ -138,9 +136,6 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			let lastBlockHash: string | undefined;
 			let lastBlockDeleted: string | undefined;
 			for (const event of eventStream) {
-				if (this.lastEventID && event.streamID <= this.lastEventID) {
-					continue;
-				}
 				if (event.removed) {
 					namedLogger.info(`EventProcessorOnJSON event removed....`);
 
@@ -160,7 +155,6 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 					const state = willNotChange ? this._json.data : this.state;
 					this.singleEventProcessor.processEvent(state, event);
 				}
-				this.lastEventID = event.streamID;
 			}
 			let lastLastSync;
 			try {

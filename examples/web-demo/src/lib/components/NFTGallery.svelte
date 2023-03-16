@@ -32,6 +32,14 @@
 				<LoadingNft {etherscanURL} {provider} tokenAddress={nft.tokenAddress} tokenID={nft.tokenID} />
 			{/each}
 		</ul>
+		<PaginationNav
+			{currentPage}
+			{pageSize}
+			totalItems={$state.nfts.length}
+			limit={1}
+			showStepOptions={true}
+			on:setPage={(e) => (currentPage = e.detail.page)}
+		/>
 	</div>
 {/if}
 

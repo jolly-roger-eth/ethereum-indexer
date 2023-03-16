@@ -7,6 +7,7 @@
 	import {createIndexeInitializer} from '../lib/blockchain/indexer';
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
+	import IndexerStatus from '../lib/components/IndexerStatus.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
 
 	let accountsToUse: `0x${string}` | boolean = true;
@@ -18,7 +19,7 @@
 		...contractsData,
 		// startBlock: 14432000,
 	};
-	const {state, syncing, initialize} = createIndexeInitializer(
+	const {state, status, syncing, initialize} = createIndexeInitializer(
 		'mynfts',
 		createProcessor(),
 		latestContractsData,
@@ -44,6 +45,6 @@
 
 <IndexerButton initialize={initalizeWithAccount} {accountsToUse} />
 <IndexerProgress {syncing} />
-<!-- <IndexerStatus {status} {syncing} /> -->
+<IndexerStatus {status} {syncing} />
 
 <NftGallery {state} {provider} {etherscanURL} />

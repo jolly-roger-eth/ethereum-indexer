@@ -14,7 +14,16 @@
 	{#if value.visuals}
 		{#if value.visuals[0].type === 'image'}
 			<img src={value.visuals[0].url} alt={value.name || 'unnamed NFT'} />
-			<div class="overlay"><span>{value.name || 'unnamed NFT'}</span></div>
+			{#if etherscanURL}<a
+					class="overlay"
+					href={`${etherscanURL}/nft/${tokenAddress}/${tokenIDAsString}`}
+					target="_blank"
+					rel="noreferrer"
+					><span>{value.name || 'unnamed NFT'}</span>
+				</a>
+			{:else}
+				<div class="overlay"><span>{value.name || 'unnamed NFT'}</span></div>
+			{/if}
 		{:else if value.visuals[0].type === 'iframe'}
 			<div style="height: 350px;">
 				<span

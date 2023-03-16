@@ -124,6 +124,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		setSyncing({waitingForProvider: false});
 	}
 
+	let lastLastToBlock: number;
 	function setLastSync(lastSync: LastSync<ABI>) {
 		if (!lastSync) {
 			return;
@@ -134,6 +135,10 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		const startingBlock = indexer.defaultFromBlock;
 		const latestBlock = lastSync.latestBlock;
 		const lastToBlock = lastSync.lastToBlock;
+		if (lastLastToBlock && lastLastToBlock > lastToBlock) {
+			console.error(`INVALID lastToBlock`);
+		}
+		lastLastToBlock = lastToBlock;
 
 		const totalToProcess = latestBlock - startingBlock;
 		const numBlocksProcessedSoFar = Math.max(0, lastToBlock - startingBlock);
