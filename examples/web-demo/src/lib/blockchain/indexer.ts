@@ -56,7 +56,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 	const indexer = createIndexerState(processor, {
 		trackNumRequests: true,
 		keepState: {
-			fetcher: async (context) => {
+			fetch: async (context) => {
 				const storageID = await getStorageID(
 					name,
 					context.source.chainId,
@@ -87,7 +87,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 					return parsed;
 				}
 			},
-			saver: async (context, all) => {
+			save: async (context, all) => {
 				const storageID = await getStorageID(
 					name,
 					context.source.chainId,
@@ -99,6 +99,14 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 						typeof value === 'bigint' ? value.toString() + 'n' : value
 					)
 				);
+			},
+			clear: async (context) => {
+				const storageID = await getStorageID(
+					name,
+					context.source.chainId,
+					'config' in context ? context.config : undefined
+				);
+				localStorage.removeItem(storageID);
 			},
 		},
 		keepStream: {

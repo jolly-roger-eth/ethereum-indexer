@@ -1,13 +1,12 @@
 <script lang="ts">
 	import type {EIP1193Provider} from 'eip-1193';
-	import {createProcessor, contractsData} from 'event-processor-nfts';
+	import {processorFactory, contractsData, initialFactory} from '../lib/blockchain/nftProcessor';
 	import {onMount} from 'svelte';
 	import {params} from '../config';
 	import type {ActiveConnection} from '../lib/blockchain/connection';
 	import {createIndexeInitializer} from '../lib/blockchain/indexer';
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
-	import IndexerStatus from '../lib/components/IndexerStatus.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
 
 	let accountsToUse: `0x${string}` | boolean = true;
@@ -19,17 +18,36 @@
 		...contractsData,
 		// startBlock: 14432000,
 	};
-	const {state, status, syncing, initialize} = createIndexeInitializer(
+	const initialProcessor = initialFactory();
+	const {state, status, syncing, initialize, setProcessor} = createIndexeInitializer(
 		'mynfts',
-		createProcessor(),
+		initialProcessor,
 		latestContractsData,
 		undefined
 	);
+
+	let runningProcessor = initialProcessor;
+	processorFactory.subscribe(async (v) => {
+		try {
+			const newProcessor = v();
+			(newProcessor as any).copyFrom && (newProcessor as any).copyFrom(runningProcessor);
+			setProcessor(newProcessor);
+			runningProcessor = newProcessor;
+		} catch (err) {
+			console.error(err);
+		}
+	});
+
 	let provider: EIP1193Provider | undefined;
 	let etherscanURL: string | undefined = undefined;
 	function initalizeWithAccount(connection: ActiveConnection) {
 		provider = connection.ethereum;
-		etherscanURL = connection.chainId === '1' ? 'https://etherscan.io' : undefined;
+		etherscanURL =
+			connection.chainId === '1'
+				? 'https://etherscan.io'
+				: connection.chainId === '42161'
+				? 'https://arbiscan.io'
+				: undefined;
 		// TODO padStart
 		const accountAs32Bytes = `0x000000000000000000000000${connection.accounts[0].slice(2)}` as const;
 		return initialize(connection, {

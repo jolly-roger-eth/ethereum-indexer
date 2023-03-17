@@ -10,7 +10,7 @@ import {
 	AbiParametersToPrimitiveTypes,
 	ExtractAbiEventNames,
 	Abi,
-	EventWithId,
+	LogEvent,
 	ExtractAbiEvent,
 } from 'ethereum-indexer';
 
@@ -23,10 +23,10 @@ export type InputValueArray<T extends AbiEvent> = AbiParametersToPrimitiveTypes<
 
 export type EventFunctions<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined> = {
 	[Property in ExtractAbiEventNames<ABI> as `on${Property}`]?: ProcessorConfig extends undefined
-		? (json: ProcessResultType, event: EventWithId<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>}) => void
+		? (json: ProcessResultType, event: LogEvent<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>}) => void
 		: (
 				json: ProcessResultType,
-				event: EventWithId<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>},
+				event: LogEvent<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>},
 				config: ProcessorConfig
 		  ) => void;
 };

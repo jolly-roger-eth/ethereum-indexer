@@ -3,7 +3,7 @@ import eip721 from './eip721';
 import {Data, NFT} from './types';
 
 const NFTEventProcessor: JSProcessor<typeof eip721, Data, {account: `0x${string}`}> = {
-	version: '0.0.16',
+	version: '0.0.28',
 	construct(): Data {
 		return {nfts: []};
 	},
@@ -24,7 +24,9 @@ const NFTEventProcessor: JSProcessor<typeof eip721, Data, {account: `0x${string}
 					tokenID,
 					tokenAddress: event.address,
 				};
-				data.nfts.push(nft);
+				// data.nfts.push(nft);
+				// data.nfts.push({tokenID: tokenID + `1`, tokenAddress: event.address});
+				// never add
 			}
 		} else {
 			if (to.toLowerCase() !== config.account.toLowerCase()) {

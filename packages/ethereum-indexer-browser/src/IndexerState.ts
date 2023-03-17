@@ -7,6 +7,7 @@ import type {
 	LastSync,
 	StateSaver,
 	ExistingStream,
+	KeepState,
 } from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
 import {createRootStore, createStore} from './utils/stores';
@@ -57,10 +58,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
 		trackNumRequests?: boolean;
-		keepState?: {
-			fetcher: ExistingStateFecther<ABI, ProcessResultType, unknown, ProcessorConfig>;
-			saver: StateSaver<ABI, ProcessResultType, unknown, ProcessorConfig>;
-		};
+		keepState?: KeepState<ABI, ProcessResultType, unknown, ProcessorConfig>;
 		keepStream?: ExistingStream<ABI>;
 	}
 ) {
@@ -296,5 +294,11 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		indexMore,
 		startAutoIndexing,
 		stopAutoIndexing,
+		setProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
+			if (!indexer) {
+				throw new Error(`no indexer setup, call init`);
+			}
+			indexer.updateProcessor(newProcessor);
+		},
 	};
 }

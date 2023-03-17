@@ -5,10 +5,9 @@ import {
 	Abi,
 	EventProcessorWithInitialState,
 	AllData,
-	ExistingStateFecther,
-	StateSaver,
 	ProcessorContext,
 	hash,
+	KeepState,
 } from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
@@ -23,7 +22,7 @@ export type SingleEventJSONProcessor<
 > = EventFunctions<ABI, ProcessResultType> & {
 	version?: string;
 	createInitialState(): ProcessResultType;
-	configure(config: ProcessorConfig): void;
+	configure(config: ProcessorConfig): Promise<void>;
 	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void;
 };
 
@@ -33,13 +32,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	protected state: ProcessResultType;
 	protected _json: Partial<AllData<ABI, ProcessResultType, {history: HistoryJSObject}>>;
 	protected history: History;
-	protected existingStateFecther?: ExistingStateFecther<
-		ABI,
-		ProcessResultType,
-		{history: HistoryJSObject},
-		ProcessorConfig
-	>;
-	protected stateSaver?: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
+	protected keeper?: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
 	protected source: IndexingSource<ABI> | undefined;
 	protected config: ProcessorConfig | undefined;
 	protected version: string | undefined;
@@ -60,6 +53,16 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		this.state = proxifyJSON<ProcessResultType>(data, this.history);
 	}
 
+	copyFrom(otherProcessor: EventProcessorOnJSON<ABI, ProcessResultType, ProcessorConfig>) {
+		this.state = otherProcessor.state;
+		this._json = otherProcessor._json;
+		this.history = otherProcessor.history;
+		this.keeper = otherProcessor.keeper;
+		this.source = otherProcessor.source;
+		this.config = otherProcessor.config;
+		this.configHash = otherProcessor.configHash;
+	}
+
 	getVersionHash(): string {
 		return `${this.version || 'unknown'}-${this.configHash || 'not-configured'}`;
 	}
@@ -70,19 +73,23 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 
 	async configure(config: ProcessorConfig) {
 		this.config = config;
-		this.singleEventProcessor.configure(config);
+		await this.singleEventProcessor.configure(config);
 		this.configHash = await hash(this.config);
 	}
 
-	keepState(config: {
-		fetcher: ExistingStateFecther<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
-		saver: StateSaver<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
-	}) {
-		this.existingStateFecther = config.fetcher;
-		this.stateSaver = config.saver;
+	keepState(keeper: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>) {
+		this.keeper = keeper;
 	}
 
 	async reset() {
+		if (this.keeper) {
+			const config = this.config as ProcessorConfig;
+			const source = this.source as IndexingSource<ABI>;
+			const version = this.version;
+			// TODO why do we need the `as` ?
+			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
+			await this.keeper.clear(context);
+		}
 		namedLogger.info('EventProcessorOnJSON reseting...');
 		if (!this._json.data) {
 			throw new Error(`no data`);
@@ -98,16 +105,17 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		this.history.setBlock(0, '0x0000');
 		this._json.data = this.singleEventProcessor.createInitialState();
 		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
+		// return this._json.data;
 	}
 
 	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
 		this.source = source;
-		if (this.existingStateFecther) {
+		if (this.keeper) {
 			const config = this.config as ProcessorConfig;
 			const version = this.version;
 			// TODO why do we need the `as` ?
 			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
-			const existingStateData = await this.existingStateFecther(context);
+			const existingStateData = await this.keeper.fetch(context);
 			if (existingStateData) {
 				const {lastSync: lastSyncFromExistingState, data, history} = existingStateData;
 				if (
@@ -183,7 +191,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			};
 			this._json.lastSync = lastSyncDoc;
 
-			if (this.stateSaver) {
+			if (this.keeper) {
 				namedLogger.time('EventProcessorOnJSON.stateSaver');
 				try {
 					const config = this.config as ProcessorConfig;
@@ -194,7 +202,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 					if (!this._json.data || !this._json.lastSync || !this._json.history) {
 						throw new Error(`empty _json`);
 					}
-					await this.stateSaver(context, this._json as AllData<ABI, ProcessResultType, {history: HistoryJSObject}>);
+					await this.keeper.save(context, this._json as AllData<ABI, ProcessResultType, {history: HistoryJSObject}>);
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);
 				}

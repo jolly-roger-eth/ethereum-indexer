@@ -45,19 +45,19 @@ function getReversal(
 function applyAction(json: JSObject | JSType[], action: ReversalAction, property: string) {
 	if (action.__action__ === 'ValueSet') {
 		if (action.value === undefined) {
-			delete json[property];
+			delete (json as any)[property];
 		} else {
-			json[property] = action.value;
+			(json as any)[property] = action.value;
 		}
 	} else {
 		for (let i = action.actions.length - 1; i >= 0; i--) {
 			const arrayAction = action.actions[i];
 			if ('deleteCount' in arrayAction) {
-				json[property].splice(arrayAction.index, arrayAction.deleteCount);
+				(json as any)[property].splice(arrayAction.index, arrayAction.deleteCount);
 			} else if ('values' in arrayAction) {
-				json[property].splice(arrayAction.index, 0, ...arrayAction.values);
+				(json as any)[property].splice(arrayAction.index, 0, ...arrayAction.values);
 			} else {
-				json[property].splice(arrayAction.index, 0, arrayAction.value);
+				(json as any)[property].splice(arrayAction.index, 0, arrayAction.value);
 			}
 		}
 	}
@@ -69,14 +69,14 @@ function applyReversals(json: JSObject | JSType[], reversal: Reversal) {
 		if (item.__action__) {
 			applyAction(json, item as ReversalAction, key);
 		} else {
-			applyReversals(json[key], item as Reversal);
+			applyReversals((json as any)[key], item as Reversal);
 		}
 	}
 }
 
 export class History {
-	protected blockNumber: number;
-	protected blockHash: string;
+	protected blockNumber: number | undefined;
+	protected blockHash: string | undefined;
 	constructor(protected historyJSON: HistoryJSObject, protected finality: number) {}
 
 	setBlock(blockNumber: number, blockHash: string) {
@@ -84,25 +84,31 @@ export class History {
 		this.blockHash = blockHash;
 		for (const key of Object.keys(this.historyJSON.blockHashes)) {
 			if (blockNumber - parseInt(key) > this.finality) {
-				const blockHash = this.historyJSON.blockHashes[key];
+				const blockHash = this.historyJSON.blockHashes[parseInt(key)];
 				delete this.historyJSON.reversals[blockHash];
-				delete this.historyJSON.blockHashes[key];
+				delete this.historyJSON.blockHashes[parseInt(key)];
 			}
 		}
 		this.historyJSON.blockHashes[blockNumber] = blockHash;
 	}
 
 	reverseBlock(blockNumber: number, blockHash: string, json: JSObject) {
+		if (!this.blockHash) {
+			throw new Error(`no blockhash set`);
+		}
 		applyReversals(json, this.historyJSON.reversals[this.blockHash]);
 		delete this.historyJSON.reversals[blockHash];
 		delete this.historyJSON.blockHashes[blockNumber];
 	}
 
 	setReversal(fieldPath: string[], action: ReversalAction) {
+		if (!this.blockHash) {
+			throw new Error(`no blockhash set`);
+		}
 		let reversalPerBlockHash: Reversal = this.historyJSON.reversals[this.blockHash];
 		const found = reversalPerBlockHash && getReversal(reversalPerBlockHash, fieldPath);
 		if (!found) {
-			let rootReversal: Reversal;
+			let rootReversal: Reversal | undefined;
 			for (let i = fieldPath.length - 1; i >= 0; i--) {
 				const property = fieldPath[i];
 				if (property) {
@@ -157,7 +163,7 @@ function arrayGetter(
 	history: History
 ): (target: JSType[], property: string) => JSType {
 	return (target, property) => {
-		const value = target[property];
+		const value = (target as any)[property];
 		if (typeof value === 'function') {
 			if (['indexOf', 'find', 'findIndex'].indexOf(property) !== -1) {
 				return value;
@@ -173,10 +179,12 @@ function arrayGetter(
 			} else if (property === 'pop') {
 				return () => {
 					const value = target.pop();
-					history.setReversal(fieldPath, {
-						__action__: 'ArraySet',
-						actions: [{index: target.length, values: [value]}],
-					});
+					if (value) {
+						history.setReversal(fieldPath, {
+							__action__: 'ArraySet',
+							actions: [{index: target.length, values: [value]}],
+						});
+					}
 					return value;
 				};
 			} else if (property === 'splice') {
@@ -222,9 +230,9 @@ function setter(
 	return (target, property, value) => {
 		history.setReversal([...fieldPath, property], {
 			__action__: 'ValueSet',
-			value: target[property], // TODO deepCopy
+			value: (target as any)[property], // TODO deepCopy
 		});
-		target[property] = value;
+		(target as any)[property] = value;
 		return true;
 	};
 }

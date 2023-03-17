@@ -134,3 +134,9 @@ export type StateSaver<ABI extends Abi, ProcessResultType, Extra, ProcessorConfi
 	context: ProcessorContext<ABI, ProcessorConfig>,
 	all: AllData<ABI, ProcessResultType, Extra>
 ) => Promise<void>;
+
+export type KeepState<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = {
+	fetch: ExistingStateFecther<ABI, ProcessResultType, Extra, ProcessorConfig>;
+	save: StateSaver<ABI, ProcessResultType, Extra, ProcessorConfig>;
+	clear: (context: ProcessorContext<ABI, ProcessorConfig>) => Promise<void>;
+};

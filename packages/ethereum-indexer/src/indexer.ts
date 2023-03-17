@@ -23,7 +23,7 @@ import type {
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
 import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './engine/utils';
-import {hash} from './utils';
+import {ActionOperations, CancelOperations, createAction, hash} from './utils';
 
 const namedLogger = logs('ethereum-indexer');
 
@@ -89,24 +89,35 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
 	// ------------------------------------------------------------------------------------------------------------------
-	protected logEventFetcher: LogEventFetcher<ABI>;
-	protected lastSync: LastSync<ABI> | undefined;
 	protected finality: number;
 	protected alwaysFetchTimestamps: boolean;
 	protected alwaysFetchTransactions: boolean;
 	protected providerSupportsETHBatch: boolean;
 	protected existingStream: ExistingStream<ABI> | undefined;
+	protected streamConfig: StreamConfig;
+
+	protected logEventFetcher: LogEventFetcher<ABI>;
+	protected lastSync: LastSync<ABI> | undefined;
+
 	protected appendedStreamNotYetSaved: LogEvent<ABI>[] = [];
-	protected _reseting: Promise<void> | undefined;
-	protected _loading: Promise<LastSync<ABI>> | undefined;
-	protected _indexingMore: Promise<LastSync<ABI>> | undefined;
-	protected _feeding: Promise<LastSync<ABI>> | undefined;
-	protected _saving: Promise<void> | undefined;
-	protected _logEventPromise: ParsedLogsPromise<ABI> | undefined;
 
 	protected sourceHashes: {startBlock: number; hash: string}[] | undefined;
 	protected configHash: string | undefined;
-	protected streamConfig: StreamConfig;
+
+	// ------------------------------------------------------------------------------------------------------------------
+	// ACTIONS
+	// ------------------------------------------------------------------------------------------------------------------
+	protected _index = createAction<LastSync<ABI>>(this.promiseToIndex.bind(this));
+	protected _reset = createAction<void>(this.promiseToReset.bind(this));
+	protected _feed = createAction<LastSync<ABI>, {newEvents: LogEvent<ABI>[]; lastSyncFetched: LastSync<ABI>}>(
+		this.promiseToFeed.bind(this)
+	);
+	protected _load = createAction<LastSync<ABI>>(this.promiseToLoad.bind(this));
+	protected _save = createAction<
+		void,
+		{source: IndexingSource<ABI>; eventStream: LogEvent<ABI>[]; lastSync: LastSync<ABI>}
+	>(this.promiseToSave.bind(this));
+
 	// ------------------------------------------------------------------------------------------------------------------
 	// CONSTRUCTOR
 	// ------------------------------------------------------------------------------------------------------------------
@@ -146,93 +157,119 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// PUBLIC INTERFACE
 	// ------------------------------------------------------------------------------------------------------------------
 	load(): Promise<LastSync<ABI>> {
-		if (!this._loading) {
-			this._loading = this.promiseToLoad();
+		if (this._reset.executing) {
+			throw new Error(`reseting... should not load until complete`);
 		}
-		return this._loading;
-	}
 
-	stopProcessing() {
-		this._indexingMore = undefined;
-		if (this._logEventPromise) {
-			// we stop pending log fetch
-			this._logEventPromise.stopRetrying(); // TODO RejectablePromise instead
-		}
+		// load only once, once loaded it will return the same result
+		return this._load.once();
 	}
 
 	async reset() {
-		if (this._reseting) {
-			return this._reseting;
+		if (this._reset.executing) {
+			throw new Error(`reseting... should not reset until complete`);
 		}
-		if (this._loading) {
-			try {
-				// finish loading if any
-				await this._loading;
-			} catch (err) {
-				// but ignore failures
-			}
-		}
-		this._reseting = new Promise(async (resolve, reject) => {
-			this._indexingMore = undefined; // abort indexing if any, see `indexMore`
-			if (this._logEventPromise) {
-				this._logEventPromise.stopRetrying();
-			}
-			this._feeding = undefined; // abort feeding if any, see `feed`
-			this.lastSync = undefined;
-			try {
-				await this.processor.reset();
-				this._reseting = undefined;
-				resolve();
-			} catch (err) {
-				this._reseting = undefined;
-				reject(err);
-			}
-		});
-		return this._reseting;
+		// reset all actions
+		this._load.reset();
+		this._index.reset();
+		this._feed.reset();
+		this._save.reset();
+		return this._reset.now();
 	}
 
 	async feed(eventStream: LogEvent<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
-		if (!lastSyncFetched) {
-			lastSyncFetched = this.freshLastSync(this.processor.getVersionHash());
-		}
-		if (this._indexingMore) {
-			throw new Error(`indexing... should not feed`);
-		}
-		if (this._reseting) {
+		// we first check if this valid to be called
+
+		if (this._reset.executing) {
 			throw new Error(`reseting... should not feed`);
 		}
 
-		if (this._feeding) {
+		if (this._index.executing) {
+			throw new Error(`indexing... should not feed`);
+		}
+
+		if (this._feed.executing) {
 			throw new Error(`already feeding... should not feed`);
 		}
 
-		this._feeding = this.promiseToFeed(eventStream, lastSyncFetched);
-		return this._feeding;
+		// we do next but as we check first that it is not executing the feed
+		// we could as well say feed.ifNotExecuting
+		return this._feed.next({
+			newEvents: eventStream,
+			lastSyncFetched: lastSyncFetched || this.freshLastSync(this.processor.getVersionHash()),
+		});
 	}
 
 	indexMore(): Promise<LastSync<ABI>> {
-		if (this._feeding) {
-			throw new Error(`feeding... cannot index until feeding is complete`);
+		// we first check if this valid to be called
+
+		if (this._feed.executing) {
+			throw new Error(`feed is not complete`);
 		}
 
-		if (this._indexingMore) {
-			namedLogger.info(`still indexing...`);
-			return this._indexingMore;
+		if (this._reset.executing) {
+			// of reset we let it wait for it, we could do that for other
+			return this._reset.executing.then(() => this.indexMore());
 		}
 
-		if (this._reseting) {
-			namedLogger.info(`reseting...`);
-			this._indexingMore = this._reseting.then(() => this.promiseToIndex());
-		} else {
-			this._indexingMore = this.promiseToIndex();
+		// if we call twice in a row, it will keep merging
+		return this._index.ifNotExecuting();
+	}
+
+	stopProcessing() {
+		// this will stop whatever it is doing
+		// except reset
+		this._load.cancel();
+		this._feed.cancel();
+		this._index.cancel();
+	}
+
+	async updateSource(source: IndexingSource<ABI>) {
+		// TODO reset if not matching
+		// const oldProcessor = this.processor;
+		// this.processor = newProcessor;
+		// if (oldProcessor.getVersionHash() != newProcessor.getVersionHash()) {
+		// 	// reset should close but we need to take care of state
+		// 	await oldProcessor
+		// 		.reset()
+		// 		.then(() => newProcessor.reset())
+		// 		.then(() => {
+		// 			// TODO use counter
+		// 			this._feeding = undefined;
+		// 			this._indexingMore = undefined;
+		// 			this._loading = undefined;
+		// 			this._saving = undefined;
+		// 			this.load();
+		// 		});
+		// }
+	}
+
+	async updateProcessor(newProcessor: EventProcessor<ABI, ProcessResultType>) {
+		const oldProcessor = this.processor;
+		this.processor = newProcessor;
+		if (oldProcessor.getVersionHash() != newProcessor.getVersionHash()) {
+			// reset should close but we need to take care of state
+			if (this._index.executing) {
+				this._index.cancel();
+			}
+			if (this._feed.executing) {
+				this._feed.cancel();
+			}
+
+			await oldProcessor
+				.reset()
+				.then(() => newProcessor.reset())
+				.then(() => this.load());
 		}
-		return this._indexingMore;
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNALS
 	// ------------------------------------------------------------------------------------------------------------------
 
+	protected async save(source: IndexingSource<ABI>, eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) {
+		return this._save.next({source, eventStream, lastSync});
+	}
 	protected async signal(state: LoadingState) {
 		if (this.onLoad) {
 			namedLogger.info(`onLoad ${state}...`);
@@ -241,62 +278,62 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 	}
 
+	async promiseToReset() {
+		this.lastSync = undefined;
+		await this.processor.reset();
+	}
+
 	protected async promiseToLoad(): Promise<LastSync<ABI>> {
-		try {
-			this.configHash = await hash(this.streamConfig);
-			// TODO handle history (in reverse order)
-			this.sourceHashes = [{startBlock: 0, hash: await hash(this.source)}];
+		this.configHash = await hash(this.streamConfig);
+		// TODO handle history (in reverse order)
+		this.sourceHashes = [{startBlock: 0, hash: await hash(this.source)}];
 
-			const chainId = await this.provider.request({method: 'eth_chainId'});
-			if (parseInt(chainId.slice(2), 16).toString() !== this.source.chainId) {
-				throw new Error(
-					`Connected to a different chain (chainId : ${chainId}). Expected chainId === ${this.source.chainId}`
+		const chainId = await this.provider.request({method: 'eth_chainId'});
+		if (parseInt(chainId.slice(2), 16).toString() !== this.source.chainId) {
+			throw new Error(
+				`Connected to a different chain (chainId : ${chainId}). Expected chainId === ${this.source.chainId}`
+			);
+		}
+
+		let currentLastSync: LastSync<ABI> | undefined = undefined;
+		await this.signal('Loading');
+		const processorHash = this.processor.getVersionHash();
+		const loaded = await this.processor.load(this.source);
+		if (loaded) {
+			const {lastSync: loadedLastSync, state} = loaded;
+			if (
+				processorHash === loadedLastSync.context.processor &&
+				this.indexerMatches(loadedLastSync.lastToBlock, loadedLastSync.context)
+			) {
+				currentLastSync = loadedLastSync;
+				this._onStateUpdated(state);
+			} else {
+				namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
+				// this.processor.clear(); // TODO ?
+			}
+		}
+		// if mismatch found, we get a fresh sync
+		if (!currentLastSync) {
+			currentLastSync = this.freshLastSync(processorHash);
+			// but we might have some stream still valid here
+			if (this.existingStream) {
+				await this.signal('Fetching');
+				// we start from scratch
+				const existingStreamData = await this.existingStream.fetchFrom(
+					this.source,
+					getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
 				);
-			}
 
-			let currentLastSync: LastSync<ABI> | undefined = undefined;
-			await this.signal('Loading');
-			const processorHash = this.processor.getVersionHash();
-			const loaded = await this.processor.load(this.source);
-			if (loaded) {
-				const {lastSync: loadedLastSync, state} = loaded;
-				if (
-					processorHash === loadedLastSync.context.processor &&
-					this.indexerMatches(loadedLastSync.lastToBlock, loadedLastSync.context)
-				) {
-					currentLastSync = loadedLastSync;
-					this._onStateUpdated(state);
-				} else {
-					namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
-					// this.processor.clear(); // TODO ?
-				}
-			}
-			// if mismatch found, we get a fresh sync
-			if (!currentLastSync) {
-				currentLastSync = this.freshLastSync(processorHash);
-				// but we might have some stream still valid here
-				if (this.existingStream) {
-					await this.signal('Fetching');
-					// we start from scratch
-					const existingStreamData = await this.existingStream.fetchFrom(
-						this.source,
-						getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
-					);
-
-					// we assume the stream is correct and start from the requested number
-					if (existingStreamData) {
-						const {eventStream: eventsFetched, lastSync: lastSyncFetched} = existingStreamData;
-						if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
-							// we update the processorHash in case it was changed
-							currentLastSync.context.processor = processorHash;
-							this.lastSync = currentLastSync;
-							if (eventsFetched.length > 0) {
-								await this.signal('Processing');
-								await this.feed(eventsFetched, lastSyncFetched);
-							}
-						} else {
-							this.lastSync = currentLastSync;
-							await this.existingStream.clear(this.source);
+				// we assume the stream is correct and start from the requested number
+				if (existingStreamData) {
+					const {eventStream: eventsFetched, lastSync: lastSyncFetched} = existingStreamData;
+					if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
+						// we update the processorHash in case it was changed
+						currentLastSync.context.processor = processorHash;
+						this.lastSync = currentLastSync;
+						if (eventsFetched.length > 0) {
+							await this.signal('Processing');
+							await this.feed(eventsFetched, lastSyncFetched);
 						}
 					} else {
 						this.lastSync = currentLastSync;
@@ -304,92 +341,86 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					}
 				} else {
 					this.lastSync = currentLastSync;
+					await this.existingStream.clear(this.source);
 				}
 			} else {
-				if (this.existingStream) {
-					// we still need to clear if it does not matches, as otherwise it will be written as if it contained all logs
-					const existingStreamData = await this.existingStream.fetchFrom(
-						this.source,
-						getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
-					);
-					const {lastSync: lastSyncFetched} = existingStreamData;
-					if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
-						await this.existingStream.clear(this.source);
-					}
-				}
 				this.lastSync = currentLastSync;
 			}
-			await this.signal('Done');
-			return this.lastSync;
-		} finally {
-			this._loading = undefined;
-		}
-	}
-
-	protected async promiseToFeed(newEvents: LogEvent<ABI>[], lastSyncFetched: LastSync<ABI>): Promise<LastSync<ABI>> {
-		try {
-			// assume lastSyncFetched is newer
-			// TODO throw otherwise ?
-
-			if (!this.lastSync) {
-				this.lastSync = this.freshLastSync(this.processor.getVersionHash());
-			}
-			const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, newEvents, {
-				newLatestBlock: lastSyncFetched.latestBlock,
-				newLastToBlock: lastSyncFetched.lastToBlock,
-				finality: this.finality,
-			});
-
-			const eventsInGroups = groupLogsPerBlock(eventStream);
-			// TODO config batchSize
-			const batchSize = 300;
-			let currentLastSync = {...newLastSync};
-			while (eventsInGroups.length > 0) {
-				const list: LogEvent<ABI>[] = [];
-				while (eventsInGroups.length > 0 && list.length < batchSize) {
-					const blockGroup = eventsInGroups.shift();
-					if (blockGroup) {
-						list.push(...blockGroup.events);
-					}
-				}
-
-				if (list.length > 0) {
-					await this.signal('Processing'); // TODO call it "Feeding"
-					currentLastSync.lastToBlock = list[list.length - 1].blockNumber;
-					const outcome = await this.processor.process(list, currentLastSync);
-					this.lastSync = currentLastSync;
-
-					this.rejectIfAborted('_feeding');
-
-					this._onStateUpdated(outcome);
-
-					await wait(0.001);
-
-					this.rejectIfAborted('_feeding');
-				}
-			}
-			this.lastSync = newLastSync;
-
-			return this.lastSync;
-		} finally {
-			this._feeding = undefined;
-		}
-	}
-	protected async save(source: IndexingSource<ABI>, eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) {
-		if (!this._saving) {
+		} else {
 			if (this.existingStream) {
-				this._saving = this.promiseToSave(source, eventStream, lastSync);
-				return this._saving;
-			} else {
-				return Promise.resolve();
+				// we still need to clear if it does not matches, as otherwise it will be written as if it contained all logs
+				const existingStreamData = await this.existingStream.fetchFrom(
+					this.source,
+					getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
+				);
+				const {lastSync: lastSyncFetched} = existingStreamData;
+				if (!this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
+					await this.existingStream.clear(this.source);
+				}
 			}
+			this.lastSync = currentLastSync;
 		}
-		// we keep previous attempt
-		// if fails we still fail though
-		return this._saving.then(() => this.promiseToSave(source, eventStream, lastSync));
+		await this.signal('Done');
+		return this.lastSync;
 	}
 
-	protected async promiseToSave(source: IndexingSource<ABI>, eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) {
+	protected async promiseToFeed(
+		params: {
+			newEvents: LogEvent<ABI>[];
+			lastSyncFetched: LastSync<ABI>;
+		},
+		{unlessCancelled}: CancelOperations
+	): Promise<LastSync<ABI>> {
+		// assume lastSyncFetched is newer
+		// TODO throw otherwise ?
+
+		const newEvents = params.newEvents;
+		const lastSyncFetched = params.lastSyncFetched;
+
+		if (!this.lastSync) {
+			this.lastSync = this.freshLastSync(this.processor.getVersionHash());
+		}
+		const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, newEvents, {
+			newLatestBlock: lastSyncFetched.latestBlock,
+			newLastToBlock: lastSyncFetched.lastToBlock,
+			finality: this.finality,
+		});
+
+		const eventsInGroups = groupLogsPerBlock(eventStream);
+		// TODO config batchSize
+		const batchSize = 300;
+		let currentLastSync = {...newLastSync};
+		while (eventsInGroups.length > 0) {
+			const list: LogEvent<ABI>[] = [];
+			while (eventsInGroups.length > 0 && list.length < batchSize) {
+				const blockGroup = eventsInGroups.shift();
+				if (blockGroup) {
+					list.push(...blockGroup.events);
+				}
+			}
+
+			if (list.length > 0) {
+				await this.signal('Processing'); // TODO call it "Feeding"
+				currentLastSync.lastToBlock = list[list.length - 1].blockNumber;
+				const outcome = await unlessCancelled(this.processor.process(list, currentLastSync));
+				this.lastSync = currentLastSync;
+
+				this._onStateUpdated(outcome);
+
+				await unlessCancelled(wait(0.001));
+			}
+		}
+		this.lastSync = newLastSync;
+
+		return this.lastSync;
+	}
+
+	protected async promiseToSave(params: {
+		source: IndexingSource<ABI>;
+		eventStream: LogEvent<ABI>[];
+		lastSync: LastSync<ABI>;
+	}) {
+		const {eventStream, source, lastSync} = params;
 		this.appendedStreamNotYetSaved.push(...eventStream);
 		try {
 			await this.existingStream?.saveNewEvents(source, {
@@ -400,45 +431,36 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		} catch (e) {
 			namedLogger.error(`could not save stream, ${e}`);
 			// ignore error
-		} finally {
-			this._saving = undefined;
 		}
 	}
 
-	protected async promiseToIndex(): Promise<LastSync<ABI>> {
-		try {
-			if (!this.lastSync) {
-				namedLogger.info(`load lastSync...`);
-				await this.load();
-			}
-			const previousLastSync = this.lastSync as LastSync<ABI>;
-			const {lastSync: newLastSync, eventStream} = await this.fetchLogsFromProvider(previousLastSync);
-
-			this.rejectIfAborted('_indexingMore');
-
-			// ----------------------------------------------------------------------------------------
-			// MAKE THE PROCESSOR PROCESS IT
-			// ----------------------------------------------------------------------------------------
-			const outcome = await this.processor.process(eventStream, newLastSync);
-
-			this.rejectIfAborted('_indexingMore');
-
-			// this does not throw, but we could be stuck here ?
-			// TODO timeout ?
-			await this.save(this.source, eventStream, newLastSync);
-
-			this._onStateUpdated(outcome);
-
-			this.lastSync = newLastSync;
-			return this.lastSync;
-			// ----------------------------------------------------------------------------------------
-		} finally {
-			this._indexingMore = undefined;
+	protected async promiseToIndex({unlessCancelled}: CancelOperations): Promise<LastSync<ABI>> {
+		if (!this.lastSync) {
+			namedLogger.info(`load lastSync...`);
+			await this.load();
 		}
+		const previousLastSync = this.lastSync as LastSync<ABI>;
+		const {lastSync: newLastSync, eventStream} = await this.fetchLogsFromProvider(previousLastSync, unlessCancelled);
+
+		// ----------------------------------------------------------------------------------------
+		// MAKE THE PROCESSOR PROCESS IT
+		// ----------------------------------------------------------------------------------------
+		const outcome = await unlessCancelled(this.processor.process(eventStream, newLastSync));
+
+		// this does not throw, but we could be stuck here ?
+		// TODO timeout ?
+		await this.save(this.source, eventStream, newLastSync);
+
+		this._onStateUpdated(outcome);
+
+		this.lastSync = newLastSync;
+		return this.lastSync;
+		// ----------------------------------------------------------------------------------------
 	}
 
 	async fetchLogsFromProvider<ABI extends Abi>(
-		lastSync: LastSync<ABI>
+		lastSync: LastSync<ABI>,
+		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
 	): Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]}> {
 		const lastUnconfirmedBlocks = lastSync.unconfirmedBlocks;
 
@@ -461,9 +483,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		// FETCH LOGS
 		// ----------------------------------------------------------------------------------------
-		const latestBlock = await getBlockNumber(this.provider);
-
-		this.rejectIfAborted('_indexingMore');
+		const latestBlock = await unlessCancelled(getBlockNumber(this.provider));
 
 		let toBlock = latestBlock;
 
@@ -472,13 +492,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			return {lastSync, eventStream: []};
 		}
 
-		const {events: eventsFetched, toBlockUsed: newToBlock} = await this.logEventFetcher.getLogEvents({
-			fromBlock,
-			toBlock: toBlock,
-		});
+		const {events: eventsFetched, toBlockUsed: newToBlock} = await unlessCancelled(
+			this.logEventFetcher.getLogEvents({
+				fromBlock,
+				toBlock: toBlock,
+			})
+		);
 		toBlock = newToBlock;
-
-		this.rejectIfAborted('_indexingMore');
 
 		const blockTimestamps: {[hash: string]: number} = {};
 		const transactions: {[hash: string]: LogTransactionData} = {};
@@ -515,9 +535,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 		if (blockHashes.length > 0) {
 			namedLogger.info(`fetching a batch of  ${blockHashes.length} blocks...`);
-			const blocks = await this.getBlocks(blockHashes);
-
-			this.rejectIfAborted('_indexingMore');
+			const blocks = await this.getBlocks(blockHashes, unlessCancelled);
 
 			namedLogger.info(`...got  ${blocks.length} blocks back`);
 
@@ -529,9 +547,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		if (transactionHashes.length > 0) {
 			namedLogger.info(`fetching a batch of ${transactionHashes.length} transactions...`);
-			const transactionReceipts = await this.getTransactions(transactionHashes);
-
-			this.rejectIfAborted('_indexingMore');
+			const transactionReceipts = await this.getTransactions(transactionHashes, unlessCancelled);
 
 			namedLogger.info(`...got ${transactionReceipts.length} transactions back`);
 
@@ -561,30 +577,35 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return {lastSync: newLastSync, eventStream};
 	}
 
-	protected async getBlocks(blockHashes: string[]): Promise<{timestamp: number}[]> {
+	protected async getBlocks(
+		blockHashes: string[],
+		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
+	): Promise<{timestamp: number}[]> {
 		if (this.providerSupportsETHBatch) {
 			return getBlockDataFromMultipleHashes(this.provider, blockHashes);
 		} else {
 			const result = [];
 			for (const blockHash of blockHashes) {
 				namedLogger.info(`getting block ${blockHash}...`);
-				const actualBlock = await getBlockData(this.provider, blockHash as EIP1193DATA);
-				this.rejectIfAborted('_indexingMore');
+				const actualBlock = await unlessCancelled(getBlockData(this.provider, blockHash as EIP1193DATA));
 				result.push(actualBlock);
 			}
 			return result;
 		}
 	}
 
-	protected async getTransactions(transactionHashes: string[]): Promise<LogTransactionData[]> {
+	protected async getTransactions(
+		transactionHashes: string[],
+		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
+	): Promise<LogTransactionData[]> {
 		if (this.providerSupportsETHBatch) {
 			return getTransactionDataFromMultipleHashes(this.provider, transactionHashes);
 		} else {
 			const result = [];
 			for (const transactionHash of transactionHashes) {
 				namedLogger.info(`getting block ${transactionHash}...`);
-				const tx = await getTransactionData(this.provider, transactionHash as EIP1193DATA);
-				this.rejectIfAborted('_indexingMore');
+				const tx = await unlessCancelled(getTransactionData(this.provider, transactionHash as EIP1193DATA));
+
 				result.push(tx);
 			}
 			return result;
@@ -634,14 +655,5 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				this.onStateUpdated(outcome);
 			} catch (err) {}
 		}
-	}
-
-	protected rejectIfAborted(...fields: string[]) {
-		for (const field of fields) {
-			if ((this as any)[field]) {
-				return; //one of them is on, we do not throw
-			}
-		}
-		throw new Error(`Aborted: ${fields.join(',')}`);
 	}
 }

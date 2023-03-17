@@ -21,7 +21,7 @@
 	<li>
 		<div style="height: 350px;">
 			<span style="color: red;"
-				>{error.message || error.toString()}
+				>{error.data?.message || error.message || error.toString()}
 				{#if etherscanURL}<a
 						style="text-decoration: underline; color: blue;"
 						href={`${etherscanURL}/nft/${tokenAddress}/${tokenIDAsString}`}
