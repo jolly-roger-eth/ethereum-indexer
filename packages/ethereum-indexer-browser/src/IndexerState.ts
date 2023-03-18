@@ -8,6 +8,7 @@ import type {
 	StateSaver,
 	ExistingStream,
 	KeepState,
+	StreamConfig,
 } from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
 import {createRootStore, createStore} from './utils/stores';
@@ -91,7 +92,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	let indexingTimeout: number | undefined;
 	let autoIndexingInterval: number = 4;
 
-	function init(
+	async function init(
 		indexerSetup: {
 			provider: EIP1193ProviderWithoutEvents;
 			source: IndexingSource<ABI>;
@@ -294,11 +295,21 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		indexMore,
 		startAutoIndexing,
 		stopAutoIndexing,
-		setProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
+		updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
 			indexer.updateProcessor(newProcessor);
+		},
+		updateIndexer(update: {
+			provider?: EIP1193ProviderWithoutEvents;
+			source?: IndexingSource<ABI>;
+			streamConfig?: StreamConfig;
+		}) {
+			if (!indexer) {
+				throw new Error(`no indexer setup, call init`);
+			}
+			indexer.updateIndexer(update);
 		},
 	};
 }

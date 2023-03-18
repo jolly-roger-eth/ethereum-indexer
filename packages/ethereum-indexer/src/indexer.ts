@@ -86,7 +86,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ACTIONS
 	// ------------------------------------------------------------------------------------------------------------------
 	protected _index = createAction<LastSync<ABI>>(this.promiseToIndex.bind(this));
-	protected _reset = createAction<void>(this.promiseToReset.bind(this));
 	protected _feed = createAction<LastSync<ABI>, {newEvents: LogEvent<ABI>[]; lastSyncFetched: LastSync<ABI>}>(
 		this.promiseToFeed.bind(this)
 	);
@@ -133,7 +132,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 		(this.defaultFromBlock as any) = defaultFromBlock;
 
-		this.streamConfigHash = hash(this.config.stream);
+		this.streamConfigHash = hash(this.config.stream || 'undefined');
 
 		// TODO handle history (in reverse order)
 		this.sourceHashes = [{startBlock: 0, hash: hash(this.source)}];
@@ -143,33 +142,20 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// PUBLIC INTERFACE
 	// ------------------------------------------------------------------------------------------------------------------
 	load(): Promise<LastSync<ABI>> {
-		if (this._reset.executing) {
-			throw new Error(`reseting... should not load until complete`);
+		if (this._index.executing) {
+			throw new Error(`indexing... should not load`);
+		}
+
+		if (this._feed.executing) {
+			throw new Error(`feeding... should not load`);
 		}
 
 		// load only once, once loaded it will return the same result
 		return this._load.once();
 	}
 
-	async reset() {
-		if (this._reset.executing) {
-			throw new Error(`reseting... should not reset until complete`);
-		}
-		// reset all actions
-		this._load.reset();
-		this._index.reset();
-		this._feed.reset();
-		this._save.reset();
-		return this._reset.now();
-	}
-
 	async feed(eventStream: LogEvent<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
 		// we first check if this valid to be called
-
-		if (this._reset.executing) {
-			throw new Error(`reseting... should not feed`);
-		}
-
 		if (this._index.executing) {
 			throw new Error(`indexing... should not feed`);
 		}
@@ -197,21 +183,20 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			throw new Error(`feed is not complete`);
 		}
 
-		if (this._reset.executing) {
-			// of reset we let it wait for it, we could do that for other
-			return this._reset.executing.then(() => this.indexMore());
-		}
-
 		// if we call twice in a row, it will keep merging
 		return this._index.ifNotExecuting();
 	}
 
-	stopProcessing() {
+	disableProcessing() {
 		// this will stop whatever it is doing
 		// except reset
 		this._load.cancel();
 		this._feed.cancel();
-		this._index.cancel();
+		this._index.block();
+	}
+
+	reenableProcessing() {
+		this._index.unblock();
 	}
 
 	async updateIndexer(update: {
@@ -219,11 +204,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		source?: IndexingSource<ABI>;
 		streamConfig?: StreamConfig;
 	}) {
+		this.disableProcessing();
 		const newConfigHash = update.streamConfig ? hash(update.streamConfig) : this.streamConfigHash;
 
 		// TODO handle history (in reverse order)
 		const newSourceHashes = update.source ? [{startBlock: 0, hash: hash(update.source)}] : this.sourceHashes;
 		const newProvider = update.provider || this.provider;
+		const oldSource = this.source;
 
 		const resetNeeded = !indexerMatches(newSourceHashes, newConfigHash, 0, {
 			source: this.sourceHashes,
@@ -231,14 +218,40 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			processor: this.processor.getVersionHash(),
 		});
 
-		this._feed.cancel();
-		this._index.cancel();
-		this._save.cancel();
-		this._load.cancel();
-		this.reinit(newProvider, update.source || this.source, update.streamConfig ? {} : this.config);
+		// TODO remove, this is the responsibility of the developer to ensure it pass correct data when indexer context changes
+		// for now we do a minimu check of chainId
+		// if this has been updated but the source remain unchanged, then the developer must have forgot to send a different source
+		if (!resetNeeded) {
+			const newChainIdAsHex = await newProvider.request({method: 'eth_chainId'});
+			const newChainId = parseInt(newChainIdAsHex.slice(2), 16).toString();
+			if (newChainId !== oldSource.chainId) {
+				throw new Error(
+					`
+					Connected to a different chain (chainId : ${newChainId}) than the previous indexer conext (${oldSource.chainId}).
+					Indexer should reset.
+					Did you forget to pass some new source?
+					`
+				);
+			}
+		}
+
+		this._feed.reset();
+		this._index.reset();
+		this._save.reset();
+		this._load.reset();
+		this.reinit(
+			newProvider,
+			update.source || this.source,
+			update.streamConfig ? {...this.config, stream: update.streamConfig} : this.config
+		);
 
 		if (resetNeeded) {
-			await this.reset().then(() => this.load());
+			await this.processor
+				.reset()
+				.then((v) => this.load())
+				.then(() => this.reenableProcessing());
+		} else {
+			this.reenableProcessing();
 		}
 	}
 
@@ -255,10 +268,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 			this._load.reset();
 
-			await oldProcessor
-				.reset()
-				.then(() => newProcessor.reset())
-				.then(() => this.load());
+			await oldProcessor.clear().then(() => this.load());
 		}
 	}
 
@@ -275,11 +285,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			await this.onLoad(state, this.lastSync);
 			namedLogger.info(`...onLoad ${state}`);
 		}
-	}
-
-	async promiseToReset() {
-		this.lastSync = undefined;
-		await this.processor.reset();
 	}
 
 	protected async promiseToLoad(): Promise<LastSync<ABI>> {
@@ -304,7 +309,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				this._onStateUpdated(state);
 			} else {
 				namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
-				await this.processor.reset();
+				await this.processor.clear();
 			}
 		}
 		// if mismatch found, we get a fresh sync
@@ -443,6 +448,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 		const previousLastSync = this.lastSync as LastSync<ABI>;
 		const {lastSync: newLastSync, eventStream} = await this.fetchLogsFromProvider(previousLastSync, unlessCancelled);
+
+		// as precautious measure, we check chainId in case the provider is now pointing to a new chain
+		const chainIdAsHex = await unlessCancelled(this.provider.request({method: 'eth_chainId'}));
+		const chainId = parseInt(chainIdAsHex.slice(2), 16).toString();
+		if (chainId !== this.source.chainId) {
+			throw new Error(`chainId changed`);
+		}
 
 		// ----------------------------------------------------------------------------------------
 		// MAKE THE PROCESSOR PROCESS IT

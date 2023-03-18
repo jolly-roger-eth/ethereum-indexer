@@ -1,35 +1,35 @@
 type ResolveFunction<T> = (value: T | PromiseLike<T>) => void;
 type RejectFunction = (reason?: any) => void;
 
-export type RejectablePromise<T> = PromiseLike<T> & {
-	reject(err: any): void;
-	rejected: boolean;
-};
+// export type RejectablePromise<T> = PromiseLike<T> & {
+// 	reject(err: any): void;
+// 	rejected: boolean;
+// };
 
-export class RejectablePromiseAlreadyRejectedError extends Error {
-	constructor() {
-		super('RejectablePromiseAlreadyRejectedError');
-	}
-}
+// export class RejectablePromiseAlreadyRejectedError extends Error {
+// 	constructor() {
+// 		super('RejectablePromiseAlreadyRejectedError');
+// 	}
+// }
 
-export class RejectablePromiseRejected extends Error {
-	constructor() {
-		super('RejectablePromiseRejected');
-	}
-}
+// export class RejectablePromiseRejected extends Error {
+// 	constructor() {
+// 		super('RejectablePromiseRejected');
+// 	}
+// }
 
 export type CancellablePromise<T> = PromiseLike<T> & {
 	cancel(): void;
 	cancelled: boolean;
-	cancellable: boolean;
+	// cancellable: boolean;
 	completed: boolean;
 };
 
-export class CancellablePromiseError extends Error {
-	constructor() {
-		super('CancellablePromiseError');
-	}
-}
+// export class CancellablePromiseError extends Error {
+// 	constructor() {
+// 		super('CancellablePromiseError');
+// 	}
+// }
 
 export class CancellablePromiseCancelled extends Error {
 	constructor() {
@@ -37,42 +37,42 @@ export class CancellablePromiseCancelled extends Error {
 	}
 }
 
-export function createRejectablePromise<T>(
-	executor: (resolve: ResolveFunction<T>, reject: RejectFunction) => void
-): RejectablePromise<T> {
-	const promise = new Promise<T>((resolve, reject) => {
-		let rejected = false;
-		function rejectIfNotRejectedAlready(err: any) {
-			if (!rejected) {
-				rejected = true;
-				reject(err);
-			}
-		}
-		function resolveIfNotRejectedAlready(result: T | PromiseLike<T>) {
-			if (!rejected) {
-				resolve(result);
-			}
-		}
+// export function createRejectablePromise<T>(
+// 	executor: (resolve: ResolveFunction<T>, reject: RejectFunction) => void
+// ): RejectablePromise<T> {
+// 	const promise = new Promise<T>((resolve, reject) => {
+// 		let rejected = false;
+// 		function rejectIfNotRejectedAlready(err: any) {
+// 			if (!rejected) {
+// 				rejected = true;
+// 				reject(err);
+// 			}
+// 		}
+// 		function resolveIfNotRejectedAlready(result: T | PromiseLike<T>) {
+// 			if (!rejected) {
+// 				resolve(result);
+// 			}
+// 		}
 
-		(promise as any).reject = () => {
-			if (rejected) {
-				throw new RejectablePromiseAlreadyRejectedError();
-			} else {
-				rejected = true;
-				reject(new RejectablePromiseRejected());
-			}
-		};
-		executor(resolveIfNotRejectedAlready, rejectIfNotRejectedAlready);
+// 		(promise as any).reject = () => {
+// 			if (rejected) {
+// 				throw new RejectablePromiseAlreadyRejectedError();
+// 			} else {
+// 				rejected = true;
+// 				reject(new RejectablePromiseRejected());
+// 			}
+// 		};
+// 		executor(resolveIfNotRejectedAlready, rejectIfNotRejectedAlready);
 
-		Object.defineProperty(promise, 'rejected', {
-			get: function () {
-				return rejected;
-			},
-		});
-	});
+// 		Object.defineProperty(promise, 'rejected', {
+// 			get: function () {
+// 				return rejected;
+// 			},
+// 		});
+// 	});
 
-	return promise as PromiseLike<T> as RejectablePromise<T>;
-}
+// 	return promise as PromiseLike<T> as RejectablePromise<T>;
+// }
 
 // type OnePromiseArgFn<T> = T extends void ? () => void : (arg: Promise<T>) => void;
 // type UnlessCancelledFunction = <U>(...a: Parameters<OnePromiseArgFn<U>>) => U extends undefined ? void : Promise<U>;
@@ -91,31 +91,31 @@ export function createCancellablePromise<T>(
 	let resolve: ResolveFunction<T>;
 	let reject: RejectFunction;
 	let cancelled = false;
-	let cancellable = true;
+	// let cancellable = true;
 	let completed = false;
 
 	function rejectIfNotCancelledAlready(err: any) {
 		if (!cancelled && !completed) {
-			cancellable = false;
+			// cancellable = false;
 			completed = true;
 			reject(err);
 		}
 	}
 	function resolveIfNotCancelledAlready(result: T | PromiseLike<T>) {
 		if (!cancelled && !completed) {
-			cancellable = false;
+			// cancellable = false;
 			completed = true;
 			resolve(result);
 		}
 	}
 
 	function cancel() {
-		if (!cancellable) {
-			throw new CancellablePromiseError();
-		}
+		// if (!cancellable) {
+		// 	throw new CancellablePromiseError();
+		// }
 		if (!cancelled) {
 			cancelled = true;
-			cancellable = false;
+			// cancellable = false;
 			reject(new CancellablePromiseCancelled());
 			if (onCancel) {
 				onCancel();
@@ -155,11 +155,11 @@ export function createCancellablePromise<T>(
 			return cancelled;
 		},
 	});
-	Object.defineProperty(promise, 'cancellable', {
-		get: function () {
-			return cancellable;
-		},
-	});
+	// Object.defineProperty(promise, 'cancellable', {
+	// 	get: function () {
+	// 		return cancellable;
+	// 	},
+	// });
 	Object.defineProperty(promise, 'completed', {
 		get: function () {
 			return completed;
@@ -188,8 +188,12 @@ export function createAction<T, U = undefined, C = undefined>(
 ) {
 	let _context: C | undefined;
 	let _promise: CancellablePromise<T> | undefined;
+	let _blocked: boolean = false;
 
 	function _execute(mode: 'queue' | 'wait' | 'force' | 'once' = 'wait', args: U) {
+		if (_blocked) {
+			throw new Error('Blocked');
+		}
 		if (_promise) {
 			if (_promise.completed) {
 				if (mode === 'once') {
@@ -240,8 +244,16 @@ export function createAction<T, U = undefined, C = undefined>(
 		cancel() {
 			_promise?.cancel();
 		},
+		block() {
+			_promise?.cancel();
+			_blocked = true;
+		},
+		unblock() {
+			_blocked = false;
+		},
 		reset() {
-			if (_promise && _promise.cancellable) {
+			if (_promise) {
+				//} && _promise.cancellable) {
 				_promise?.cancel();
 			}
 			_promise = undefined;
@@ -265,6 +277,8 @@ export function createAction<T, U = undefined, C = undefined>(
 		once: Func<T, U>;
 		cancel(): void;
 		reset(): void;
+		block(): void;
+		unblock(): void;
 		get executing(): Promise<T> | undefined;
 		setContext(context: C): void;
 		getContext(): C | undefined;

@@ -19,7 +19,7 @@
 		// startBlock: 14432000,
 	};
 	const initialProcessor = initialFactory();
-	const {state, status, syncing, initialize, setProcessor} = createIndexeInitializer(
+	const {state, status, syncing, initialize, updateProcessor, updateIndexer} = createIndexeInitializer(
 		'mynfts',
 		initialProcessor,
 		latestContractsData,
@@ -31,7 +31,7 @@
 		try {
 			const newProcessor = v();
 			(newProcessor as any).copyFrom && (newProcessor as any).copyFrom(runningProcessor);
-			setProcessor(newProcessor);
+			updateProcessor(newProcessor);
 			runningProcessor = newProcessor;
 		} catch (err) {
 			console.error(err);
@@ -41,6 +41,12 @@
 	let provider: EIP1193Provider | undefined;
 	let etherscanURL: string | undefined = undefined;
 	function initalizeWithAccount(connection: ActiveConnection) {
+		connection.ethereum.on('chainChanged', (chainIdAsHex) => {
+			const newChainId = parseInt(chainIdAsHex.slice(2), 16).toString();
+			updateIndexer({
+				source: {contracts: latestContractsData, chainId: newChainId},
+			});
+		});
 		provider = connection.ethereum;
 		etherscanURL =
 			connection.chainId === '1'

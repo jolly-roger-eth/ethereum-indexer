@@ -83,14 +83,6 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	}
 
 	async reset() {
-		if (this.keeper) {
-			const config = this.config as ProcessorConfig;
-			const source = this.source as IndexingSource<ABI>;
-			const version = this.version;
-			// TODO why do we need the `as` ?
-			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
-			await this.keeper.clear(context);
-		}
 		namedLogger.info('EventProcessorOnJSON reseting...');
 		if (!this._json.data) {
 			throw new Error(`no data`);
@@ -99,14 +91,33 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		for (const key of keys) {
 			delete this._json.data[key];
 		}
-		this._json.history = {
+		const data = this.singleEventProcessor.createInitialState();
+		this.version = this.singleEventProcessor.version;
+		const history = {
 			blockHashes: {},
 			reversals: {},
 		};
-		this.history.setBlock(0, '0x0000');
-		this._json.data = this.singleEventProcessor.createInitialState();
-		this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
+		this._json = {
+			data,
+			lastSync: undefined,
+			history,
+		};
+		this.history = new History(history, 12); // TODO finality
+
+		this.state = proxifyJSON<ProcessResultType>(this._json.data as ProcessResultType, this.history);
 		// return this._json.data;
+	}
+
+	async clear() {
+		if (this.keeper) {
+			const config = this.config as ProcessorConfig;
+			const source = this.source as IndexingSource<ABI>;
+			const version = this.version;
+			// TODO why do we need the `as` ?
+			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
+			await this.keeper.clear(context);
+		}
+		return this.reset();
 	}
 
 	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
@@ -193,7 +204,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			this._json.lastSync = lastSyncDoc;
 
 			if (this.keeper) {
-				namedLogger.time('EventProcessorOnJSON.stateSaver');
+				// namedLogger.time('EventProcessorOnJSON.stateSaver');
 				try {
 					const config = this.config as ProcessorConfig;
 					const source = this.source as IndexingSource<ABI>;
@@ -207,7 +218,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);
 				}
-				namedLogger.timeEnd('EventProcessorOnJSON.stateSaver');
+				// namedLogger.timeEnd('EventProcessorOnJSON.stateSaver');
 			}
 		} finally {
 			// namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
