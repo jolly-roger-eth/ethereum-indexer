@@ -1,7 +1,10 @@
 export * from './IndexerState';
 
+export {hash} from 'ethereum-indexer';
+
 // convenience : export type from ethereum-indexer and incidently from abitype
 
+// TODO
 // typescript 5 export type * from 'ethereum-indexer';
 export type {
 	AllContractData,

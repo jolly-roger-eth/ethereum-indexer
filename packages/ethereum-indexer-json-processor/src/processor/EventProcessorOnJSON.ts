@@ -72,10 +72,10 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		return this.singleEventProcessor.createInitialState();
 	}
 
-	async configure(config: ProcessorConfig) {
+	configure(config: ProcessorConfig) {
 		this.config = config;
 		this.singleEventProcessor.configure(config);
-		this.configHash = await hash(this.config);
+		this.configHash = hash(this.config);
 	}
 
 	keepState(keeper: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>) {

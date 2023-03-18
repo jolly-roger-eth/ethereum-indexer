@@ -33,40 +33,20 @@ export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
 // we can have state anchor that get provided by the processor
 // these set the minimum block to start fetching from
 
-// currently the processor dictates the refresh
-// if it does not do correctly (source changes for example), then the stream has no way to kicks in
-
-// proposal A
-// we first fetch the stream
-// if none, then, it is up to the processor do deal with it like before =>
-// else we check the source. if it differs we ask the processor to delete all
-// and we do not load
-
-// issue is that if the stream was not saved, we have the same problem as before: processor will not know
-// solution: we always ask to be saved
-// proposal B
-// lastSync can contains a source hash, this way it will be given by the processor too
-// and so the process is as follow:
-// - we load from processor like before
-// - if lastSync.sourceHash differs from new sourceHash
-//   - we tell processor to delete, and we discard the loaded data
-//   - we start from scratch and save the new sourceHash in lastSync
-// - if same, then we are fine and we keep going like now
-
 // What about prefetch
 // proposal B1
 // prefetch can fetch data and store it in logs.extra param
 // prefecth need to keep track of its version
 // we need to add more data to lastSync
 // prefetchVersion
-// if version change, we discard processor data like above
+// if version change, we discard processor
 //  - and we feed with prefetch to replace the extra field on each log + we resave that along with prefetch version in lastSync
 // if no version changes, we are good
 // whenever we process a log we perform a prefetch that add data to log.extra
 
 // prefetch filter capabilities
 // if prefetch can filter by for example returning a specific code
-// then it would be great if we slim down the size of the stream by removing from it entirely and skiping the streamID
+// then it would be great if we slim down the size of the stream by removing from it entirely
 // the issue is that a new prefetch version would mean a need for indexing from scratch again
 // Need to also care of reorg but this should be trivial : event removed whose event is not found is discarded
 
@@ -74,7 +54,7 @@ export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
 // prefetch only filter capabilities should skip the event from being passed to the processor/
 // but this is not very useful as the extra data could already allow the processor to skip the event picked
 // so => no filter for pre-fetch
-// but we could still have filter capabilties managed by another pass/process
+// but we could still have filter capabilties managed by another pass/process or has part of the indexer config
 // and this one would slim down the event stream
 
 export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
@@ -82,25 +62,25 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// PUBLIC VARIABLES
 	// ------------------------------------------------------------------------------------------------------------------
 
-	public readonly defaultFromBlock: number;
+	public readonly defaultFromBlock!: number;
 	public onLoad: ((state: LoadingState, lastSync?: LastSync<ABI>) => Promise<void>) | undefined;
 	public onStateUpdated: ((state: ProcessResultType) => void) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
 	// ------------------------------------------------------------------------------------------------------------------
-	protected finality: number;
-	protected alwaysFetchTimestamps: boolean;
-	protected alwaysFetchTransactions: boolean;
-	protected providerSupportsETHBatch: boolean;
-	protected existingStream: ExistingStream<ABI> | undefined;
-	protected streamConfig: StreamConfig;
+	protected provider!: EIP1193ProviderWithoutEvents;
+	protected source!: IndexingSource<ABI>;
 
-	protected logEventFetcher: LogEventFetcher<ABI>;
+	protected config!: IndexerConfig<ABI>;
+	protected finality: number = 16;
+
+	protected sourceHashes!: {startBlock: number; hash: string}[];
+	protected streamConfigHash!: string;
+
+	protected logEventFetcher!: LogEventFetcher<ABI>;
+
 	protected lastSync: LastSync<ABI> | undefined;
-
-	protected sourceHashes: {startBlock: number; hash: string}[] | undefined;
-	protected configHash: string | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// ACTIONS
@@ -122,34 +102,41 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 
 	constructor(
-		protected provider: EIP1193ProviderWithoutEvents,
+		provider: EIP1193ProviderWithoutEvents,
 		protected processor: EventProcessor<ABI, ProcessResultType>,
-		protected source: IndexingSource<ABI>,
+		source: IndexingSource<ABI>,
 		config: IndexerConfig<ABI> = {}
 	) {
-		this.streamConfig = {...config.stream};
-		this.finality = config.stream?.finality || 12;
-		this.logEventFetcher = new LogEventFetcher(provider, source.contracts, config?.fetch, config.stream?.parse);
-		this.alwaysFetchTimestamps = config.stream?.alwaysFetchTimestamps ? true : false;
-		this.alwaysFetchTransactions = config.stream?.alwaysFetchTransactions ? true : false;
-		this.existingStream = config.keepStream;
+		this.reinit(provider, source, config);
+	}
 
-		this.providerSupportsETHBatch = config.providerSupportsETHBatch as boolean;
+	reinit(provider: EIP1193ProviderWithoutEvents, source: IndexingSource<ABI>, config: IndexerConfig<ABI>) {
+		this.provider = provider;
+		this.source = source;
+		this.config = config;
+		this.finality = this.config.stream?.finality || this.finality;
+		this.logEventFetcher = new LogEventFetcher(this.provider, source.contracts, config?.fetch, config.stream?.parse);
 
-		this.defaultFromBlock = 0;
+		let defaultFromBlock = 0;
 		if (Array.isArray(this.source.contracts)) {
 			for (const contractData of this.source.contracts) {
 				if (contractData.startBlock) {
-					if (this.defaultFromBlock === 0) {
-						this.defaultFromBlock = contractData.startBlock;
-					} else if (contractData.startBlock < this.defaultFromBlock) {
-						this.defaultFromBlock = contractData.startBlock;
+					if (defaultFromBlock === 0) {
+						defaultFromBlock = contractData.startBlock;
+					} else if (contractData.startBlock < defaultFromBlock) {
+						defaultFromBlock = contractData.startBlock;
 					}
 				}
 			}
 		} else {
-			this.defaultFromBlock = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
+			defaultFromBlock = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
 		}
+		(this.defaultFromBlock as any) = defaultFromBlock;
+
+		this.streamConfigHash = hash(this.config.stream);
+
+		// TODO handle history (in reverse order)
+		this.sourceHashes = [{startBlock: 0, hash: hash(this.source)}];
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -227,29 +214,32 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this._index.cancel();
 	}
 
-	async updateSource(source: IndexingSource<ABI>) {
-		// if (!this.lastSync) {
-		// 	return this.reset();
-		// }
-		// // TODO reset if not matching
-		// if (this.indexerMatches(this.lastSync.lastToBlock, source)) {
-		// }
-		// const oldProcessor = this.processor;
-		// this.processor = newProcessor;
-		// if (oldProcessor.getVersionHash() != newProcessor.getVersionHash()) {
-		// 	// reset should close but we need to take care of state
-		// 	await oldProcessor
-		// 		.reset()
-		// 		.then(() => newProcessor.reset())
-		// 		.then(() => {
-		// 			// TODO use counter
-		// 			this._feeding = undefined;
-		// 			this._indexingMore = undefined;
-		// 			this._loading = undefined;
-		// 			this._saving = undefined;
-		// 			this.load();
-		// 		});
-		// }
+	async updateIndexer(update: {
+		provider?: EIP1193ProviderWithoutEvents;
+		source?: IndexingSource<ABI>;
+		streamConfig?: StreamConfig;
+	}) {
+		const newConfigHash = update.streamConfig ? hash(update.streamConfig) : this.streamConfigHash;
+
+		// TODO handle history (in reverse order)
+		const newSourceHashes = update.source ? [{startBlock: 0, hash: hash(update.source)}] : this.sourceHashes;
+		const newProvider = update.provider || this.provider;
+
+		const resetNeeded = !indexerMatches(newSourceHashes, newConfigHash, 0, {
+			source: this.sourceHashes,
+			config: this.streamConfigHash,
+			processor: this.processor.getVersionHash(),
+		});
+
+		this._feed.cancel();
+		this._index.cancel();
+		this._save.cancel();
+		this._load.cancel();
+		this.reinit(newProvider, update.source || this.source, update.streamConfig ? {} : this.config);
+
+		if (resetNeeded) {
+			await this.reset().then(() => this.load());
+		}
 	}
 
 	async updateProcessor(newProcessor: EventProcessor<ABI, ProcessResultType>) {
@@ -293,10 +283,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	}
 
 	protected async promiseToLoad(): Promise<LastSync<ABI>> {
-		this.configHash = await hash(this.streamConfig);
-		// TODO handle history (in reverse order)
-		this.sourceHashes = [{startBlock: 0, hash: await hash(this.source)}];
-
 		const chainId = await this.provider.request({method: 'eth_chainId'});
 		if (parseInt(chainId.slice(2), 16).toString() !== this.source.chainId) {
 			throw new Error(
@@ -325,10 +311,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (!currentLastSync) {
 			currentLastSync = this.freshLastSync(processorHash);
 			// but we might have some stream still valid here
-			if (this.existingStream) {
+			if (this.config.keepStream) {
 				await this.signal('Fetching');
 				// we start from scratch
-				const existingStreamData = await this.existingStream.fetchFrom(
+				const existingStreamData = await this.config.keepStream.fetchFrom(
 					this.source,
 					getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
 				);
@@ -346,25 +332,25 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 						}
 					} else {
 						this.lastSync = currentLastSync;
-						await this.existingStream.clear(this.source);
+						await this.config.keepStream.clear(this.source);
 					}
 				} else {
 					this.lastSync = currentLastSync;
-					await this.existingStream.clear(this.source);
+					await this.config.keepStream.clear(this.source);
 				}
 			} else {
 				this.lastSync = currentLastSync;
 			}
 		} else {
-			if (this.existingStream) {
+			if (this.config.keepStream) {
 				// we still need to clear if it does not matches, as otherwise it will be written as if it contained all logs
-				const existingStreamData = await this.existingStream.fetchFrom(
+				const existingStreamData = await this.config.keepStream.fetchFrom(
 					this.source,
 					getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
 				);
 				const {lastSync: lastSyncFetched} = existingStreamData;
 				if (!this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
-					await this.existingStream.clear(this.source);
+					await this.config.keepStream.clear(this.source);
 				}
 			}
 			this.lastSync = currentLastSync;
@@ -439,7 +425,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 		streamNotYetSaved.push(...eventStream);
 		try {
-			await this.existingStream?.saveNewEvents(source, {
+			await this.config.keepStream?.saveNewEvents(source, {
 				eventStream: streamNotYetSaved,
 				lastSync,
 			});
@@ -485,9 +471,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		let fromBlock = this.defaultFromBlock;
 		if (lastUnconfirmedBlocks.length > 0) {
+			// TODO
 			// this is wrong, we need to take fromBlock from lastSync (+ finality or use fromBlock)
 			fromBlock = lastUnconfirmedBlocks[0].number;
 		} else {
+			// TODO
 			// same this is wrong, there could be reorg missed and event to add
 			// fromBlock / lastSync need to be used and of course depending on lastSync.latestBlock to check finality of that last request
 			if (lastSync.lastToBlock !== 0) {
@@ -528,13 +516,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			let fetchTransaction = false;
 			let fetchBlock = false;
 
-			if (this.alwaysFetchTransactions) {
+			if (this.config.stream?.alwaysFetchTransactions) {
 				if (lastTransactionHash !== event.transactionHash) {
 					fetchTransaction = true;
 				}
 			}
 
-			if (this.alwaysFetchTimestamps) {
+			if (this.config.stream?.alwaysFetchTimestamps) {
 				if (!lastBlock || event.blockNumber > lastBlock) {
 					fetchBlock = true;
 				}
@@ -597,7 +585,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		blockHashes: string[],
 		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
 	): Promise<{timestamp: number}[]> {
-		if (this.providerSupportsETHBatch) {
+		if (this.config.providerSupportsETHBatch) {
 			return getBlockDataFromMultipleHashes(this.provider, blockHashes);
 		} else {
 			const result = [];
@@ -614,7 +602,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		transactionHashes: string[],
 		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
 	): Promise<LogTransactionData[]> {
-		if (this.providerSupportsETHBatch) {
+		if (this.config.providerSupportsETHBatch) {
 			return getTransactionDataFromMultipleHashes(this.provider, transactionHashes);
 		} else {
 			const result = [];
@@ -629,36 +617,15 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	}
 
 	protected indexerMatches(lastToBlock: number, context: ContextIdentifier): boolean {
-		if (!this.sourceHashes || !this.configHash) {
-			throw new Error(`no sourceHashes or configHash computed, please load first`);
-		}
-		if (context.config !== this.configHash) {
-			return false;
-		}
-
-		for (let i = 0; i < this.sourceHashes.length; i++) {
-			const indexerSourceItem = this.sourceHashes[i];
-			const fetchedSourceItem = context.source[i];
-			if (fetchedSourceItem) {
-				if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
-					return false;
-				}
-			} else {
-				if (indexerSourceItem.startBlock <= lastToBlock) {
-					return false;
-				}
-			}
-		}
-		// no mismatch found
-		return true;
+		return indexerMatches(this.sourceHashes, this.streamConfigHash, lastToBlock, context);
 	}
 
 	protected freshLastSync(processorHash: string): LastSync<ABI> {
-		if (!this.sourceHashes || !this.configHash) {
+		if (!this.sourceHashes || !this.streamConfigHash) {
 			throw new Error(`no sourceHashes or configHash computed, please load first`);
 		}
 		return {
-			context: {source: this.sourceHashes, config: this.configHash, processor: processorHash},
+			context: {source: this.sourceHashes, config: this.streamConfigHash, processor: processorHash},
 			lastToBlock: 0,
 			latestBlock: 0,
 			unconfirmedBlocks: [],
@@ -672,4 +639,34 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			} catch (err) {}
 		}
 	}
+}
+
+function indexerMatches(
+	// this is the indexer settings to be applied
+	indexerSourceHashes: {startBlock: number; hash: string}[],
+	indexerConfigHash: string,
+	// this is the stream loaded
+	lastToBlock: number,
+	context: ContextIdentifier
+	// if they do not match the indexer will take over and restart from zero
+): boolean {
+	if (context.config !== indexerConfigHash) {
+		return false;
+	}
+
+	for (let i = 0; i < indexerSourceHashes.length; i++) {
+		const indexerSourceItem = indexerSourceHashes[i];
+		const fetchedSourceItem = context.source[i];
+		if (fetchedSourceItem) {
+			if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
+				return false;
+			}
+		} else {
+			if (indexerSourceItem.startBlock <= lastToBlock) {
+				return false;
+			}
+		}
+	}
+	// no mismatch found
+	return true;
 }

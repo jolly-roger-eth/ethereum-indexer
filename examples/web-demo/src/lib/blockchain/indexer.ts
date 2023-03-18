@@ -2,6 +2,7 @@ import type {EIP1193Provider} from 'eip-1193';
 
 import {
 	createIndexerState,
+	hash,
 	type Abi,
 	type AllContractData,
 	type ContractData,
@@ -10,7 +11,6 @@ import {
 	type LastSync,
 	type LogEvent,
 } from 'ethereum-indexer-browser';
-import {hash} from '../utils/hash';
 
 type StreamData<ABI extends Abi> = {
 	lastSync: LastSync<ABI>;

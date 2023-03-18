@@ -18,7 +18,7 @@ export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, P
 	ProcessResultType
 > & {
 	createInitialState(): ProcessResultType;
-	configure(config: ProcessorConfig): Promise<void>;
+	configure(config: ProcessorConfig): void;
 };
 
 export type EventBlock<ABI extends Abi> = {
