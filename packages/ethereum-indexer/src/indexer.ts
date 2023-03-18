@@ -99,8 +99,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected logEventFetcher: LogEventFetcher<ABI>;
 	protected lastSync: LastSync<ABI> | undefined;
 
-	protected appendedStreamNotYetSaved: LogEvent<ABI>[] = [];
-
 	protected sourceHashes: {startBlock: number; hash: string}[] | undefined;
 	protected configHash: string | undefined;
 
@@ -115,7 +113,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected _load = createAction<LastSync<ABI>>(this.promiseToLoad.bind(this));
 	protected _save = createAction<
 		void,
-		{source: IndexingSource<ABI>; eventStream: LogEvent<ABI>[]; lastSync: LastSync<ABI>}
+		{source: IndexingSource<ABI>; eventStream: LogEvent<ABI>[]; lastSync: LastSync<ABI>},
+		LogEvent<ABI>[]
 	>(this.promiseToSave.bind(this));
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -229,7 +228,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	}
 
 	async updateSource(source: IndexingSource<ABI>) {
-		// TODO reset if not matching
+		// if (!this.lastSync) {
+		// 	return this.reset();
+		// }
+		// // TODO reset if not matching
+		// if (this.indexerMatches(this.lastSync.lastToBlock, source)) {
+		// }
 		// const oldProcessor = this.processor;
 		// this.processor = newProcessor;
 		// if (oldProcessor.getVersionHash() != newProcessor.getVersionHash()) {
@@ -426,13 +430,20 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		lastSync: LastSync<ABI>;
 	}) {
 		const {eventStream, source, lastSync} = params;
-		this.appendedStreamNotYetSaved.push(...eventStream);
+		// we use the promise context to get any non-saved events
+		// this work as long as this is executed synchronously
+		let streamNotYetSaved = this._save.getContext();
+		if (!streamNotYetSaved) {
+			streamNotYetSaved = [];
+			this._save.setContext(streamNotYetSaved);
+		}
+		streamNotYetSaved.push(...eventStream);
 		try {
 			await this.existingStream?.saveNewEvents(source, {
-				eventStream: this.appendedStreamNotYetSaved,
+				eventStream: streamNotYetSaved,
 				lastSync,
 			});
-			this.appendedStreamNotYetSaved.splice(0, this.appendedStreamNotYetSaved.length);
+			streamNotYetSaved.splice(0, streamNotYetSaved.length);
 		} catch (e) {
 			namedLogger.error(`could not save stream, ${e}`);
 			// ignore error

@@ -181,11 +181,12 @@ export type ActionOperations<T> = CancelOperations & {
 	reject: RejectFunction;
 };
 
-export function createAction<T, U = undefined>(
+export function createAction<T, U = undefined, C = undefined>(
 	execute: U extends undefined
 		? (action: ActionOperations<T>) => void | Promise<T>
 		: (args: U, action: ActionOperations<T>) => void | Promise<T>
 ) {
+	let _context: C | undefined;
 	let _promise: CancellablePromise<T> | undefined;
 
 	function _execute(mode: 'queue' | 'wait' | 'force' | 'once' = 'wait', args: U) {
@@ -199,6 +200,7 @@ export function createAction<T, U = undefined>(
 					_promise.cancel();
 				} else if (mode === 'queue') {
 					const p = _promise;
+					// context is preserved in a queue
 					_promise = _promise.then(() => {
 						return createCancellablePromise(
 							(resolve, reject, unlessCancelled, cancel) => {
@@ -218,6 +220,8 @@ export function createAction<T, U = undefined>(
 				}
 			}
 		}
+		// we reset the context for each new promise;
+		_context = undefined;
 		_promise = createCancellablePromise((resolve, reject, unlessCancelled, cancel) => {
 			const promiseAction = {resolve, reject, unlessCancelled, cancel};
 			const result = (execute as any)(args ? args : promiseAction, args ? promiseAction : undefined);
@@ -248,6 +252,12 @@ export function createAction<T, U = undefined>(
 			}
 			return _promise;
 		},
+		setContext(context: C) {
+			_context = context;
+		},
+		getContext(): C | undefined {
+			return _context;
+		},
 	} as unknown as {
 		next: Func<T, U>;
 		ifNotExecuting: Func<T, U>;
@@ -256,6 +266,8 @@ export function createAction<T, U = undefined>(
 		cancel(): void;
 		reset(): void;
 		get executing(): Promise<T> | undefined;
+		setContext(context: C): void;
+		getContext(): C | undefined;
 	};
 }
 
