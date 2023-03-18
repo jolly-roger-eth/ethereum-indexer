@@ -22,7 +22,7 @@ export type SingleEventJSONProcessor<
 > = EventFunctions<ABI, ProcessResultType> & {
 	version?: string;
 	createInitialState(): ProcessResultType;
-	configure(config: ProcessorConfig): Promise<void>;
+	configure(config: ProcessorConfig): void;
 	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void;
 };
 
@@ -61,6 +61,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		this.source = otherProcessor.source;
 		this.config = otherProcessor.config;
 		this.configHash = otherProcessor.configHash;
+		this.singleEventProcessor.configure(this.config as ProcessorConfig);
 	}
 
 	getVersionHash(): string {
@@ -73,7 +74,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 
 	async configure(config: ProcessorConfig) {
 		this.config = config;
-		await this.singleEventProcessor.configure(config);
+		this.singleEventProcessor.configure(config);
 		this.configHash = await hash(this.config);
 	}
 

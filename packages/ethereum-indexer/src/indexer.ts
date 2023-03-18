@@ -203,6 +203,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	indexMore(): Promise<LastSync<ABI>> {
 		// we first check if this valid to be called
 
+		if (this._load.executing) {
+			throw new Error(`loading not complete`);
+		}
+
 		if (this._feed.executing) {
 			throw new Error(`feed is not complete`);
 		}
@@ -255,6 +259,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			if (this._feed.executing) {
 				this._feed.cancel();
 			}
+			this._load.reset();
 
 			await oldProcessor
 				.reset()
@@ -309,7 +314,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				this._onStateUpdated(state);
 			} else {
 				namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
-				// this.processor.clear(); // TODO ?
+				await this.processor.reset();
 			}
 		}
 		// if mismatch found, we get a fresh sync

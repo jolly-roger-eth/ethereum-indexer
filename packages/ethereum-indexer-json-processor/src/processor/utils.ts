@@ -23,7 +23,7 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 	}
 
 	protected config: ProcessorConfig | undefined;
-	async configure(config: ProcessorConfig): Promise<void> {
+	configure(config: ProcessorConfig): void {
 		this.config = config;
 	}
 

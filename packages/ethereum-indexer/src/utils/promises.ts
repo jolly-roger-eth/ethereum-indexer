@@ -116,6 +116,7 @@ export function createCancellablePromise<T>(
 		if (!cancelled) {
 			cancelled = true;
 			cancellable = false;
+			reject(new CancellablePromiseCancelled());
 			if (onCancel) {
 				onCancel();
 			}
