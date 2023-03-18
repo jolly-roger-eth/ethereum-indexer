@@ -1,15 +1,10 @@
 {
 	"compilerOptions": {
-		"outDir": "./dist",
-		"lib": ["es5", "es6"],
+		"moduleResolution": "node",
 		"target": "es6",
 		"declaration": true,
 		"declarationMap": true,
 		"sourceMap": true,
-		"module": "commonjs",
-		"moduleResolution": "node",
-		"esModuleInterop": true,
-		"resolveJsonModule": true
-	},
-	"include": ["./src/**/*", "./src/**/*.json"]
+		"strict": true
+	}
 }

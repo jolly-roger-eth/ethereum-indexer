@@ -23,6 +23,7 @@
 	"scripts": {
 		"eis": "eis",
 		"test": "eis run -p ./dist/index.cjs --disableCache",
-		"build": "tsup-node src/index.ts --dts --format esm,cjs"
+		"build": "tsup src/index.ts --dts --format esm,cjs",
+		"watch": "tsup src/index.ts --dts --format esm,cjs --watch"
 	}
 }
