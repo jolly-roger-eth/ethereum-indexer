@@ -48,6 +48,8 @@ export function getNewToBlockFromError(error: any): number | undefined {
 export class LogFetcher {
 	protected readonly config: InternalLogFetcherConfig;
 	protected numBlocksToFetch: number;
+	protected foundNumBlockToHigh: number | undefined;
+	protected safeNumBlock: number | undefined;
 	constructor(
 		protected provider: EIP1193ProviderWithoutEvents,
 		protected contractAddresses: EIP1193Account[] | null,
@@ -123,6 +125,19 @@ export class LogFetcher {
 					}
 				} else {
 					const totalNumOfBlocksThatWasFetched = toBlock - fromBlock;
+					if (
+						err.code === -32603 &&
+						err.data &&
+						err.data.message &&
+						err.data.message.indexOf('block range is too wide') !== -1
+					) {
+						// found on polygon rpc
+						this.foundNumBlockToHigh = Math.min(
+							this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
+							totalNumOfBlocksThatWasFetched
+						);
+					}
+
 					if (totalNumOfBlocksThatWasFetched > 1) {
 						numBlocksToFetchThisTime = Math.floor(totalNumOfBlocksThatWasFetched / 2);
 					} else {
@@ -132,6 +147,16 @@ export class LogFetcher {
 				// ----------------------------------------------------------------------
 
 				this.numBlocksToFetch = numBlocksToFetchThisTime;
+				if (this.foundNumBlockToHigh && this.foundNumBlockToHigh < this.numBlocksToFetch) {
+					if (this.safeNumBlock) {
+						this.numBlocksToFetch = Math.min(
+							Math.floor((this.foundNumBlockToHigh - this.safeNumBlock) / 2),
+							this.foundNumBlockToHigh - 1
+						);
+					} else {
+						this.numBlocksToFetch = this.foundNumBlockToHigh - 1;
+					}
+				}
 
 				toBlock = fromBlock + this.numBlocksToFetch - 1;
 				const retryPromise = this.getLogs({
@@ -154,13 +179,27 @@ export class LogFetcher {
 				Math.floor((this.config.maxEventsPerFetch * this.config.percentageToReach) / 100)
 			);
 			const totalNumOfBlocksThatWasFetched = toBlock - fromBlock + 1;
-			if (logs.length === 0) {
-				this.numBlocksToFetch = this.config.maxBlocksPerFetch;
+
+			this.safeNumBlock = Math.max(this.safeNumBlock || 0, totalNumOfBlocksThatWasFetched);
+
+			if (this.foundNumBlockToHigh) {
+				if (this.safeNumBlock) {
+					this.numBlocksToFetch = Math.min(
+						this.safeNumBlock + Math.floor((this.foundNumBlockToHigh - this.safeNumBlock) / 2),
+						this.foundNumBlockToHigh - 1
+					);
+				} else {
+					this.numBlocksToFetch = this.foundNumBlockToHigh - 1;
+				}
 			} else {
-				this.numBlocksToFetch = Math.min(
-					this.config.maxBlocksPerFetch,
-					Math.max(1, Math.floor((targetNumberOfLog * totalNumOfBlocksThatWasFetched) / logs.length))
-				);
+				if (logs.length === 0) {
+					this.numBlocksToFetch = this.config.maxBlocksPerFetch;
+				} else {
+					this.numBlocksToFetch = Math.min(
+						this.config.maxBlocksPerFetch,
+						Math.max(1, Math.floor((targetNumberOfLog * totalNumOfBlocksThatWasFetched) / logs.length))
+					);
+				}
 			}
 
 			resolve({logs, toBlockUsed: toBlock});
