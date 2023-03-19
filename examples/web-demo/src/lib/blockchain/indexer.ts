@@ -42,8 +42,8 @@ import {get, set, del} from 'idb-keyval';
 // 	return _db;
 // }
 
-async function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
-	const configHash = config ? await hash(config) : undefined;
+function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
+	const configHash = config ? hash(config) : undefined;
 	return `${name}_${chainId}${configHash ? `_${configHash}` : ''}`;
 }
 
@@ -57,11 +57,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 		trackNumRequests: true,
 		keepState: {
 			fetch: async (context) => {
-				const storageID = await getStorageID(
-					name,
-					context.source.chainId,
-					'config' in context ? context.config : undefined
-				);
+				const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
 				const fromStorage = localStorage.getItem(storageID);
 				if (!fromStorage) {
 					return undefined;
@@ -88,11 +84,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				}
 			},
 			save: async (context, all) => {
-				const storageID = await getStorageID(
-					name,
-					context.source.chainId,
-					'config' in context ? context.config : undefined
-				);
+				const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
 				localStorage.setItem(
 					storageID,
 					JSON.stringify({...all, __VERSION__: context.version}, (_, value) =>
@@ -101,11 +93,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				);
 			},
 			clear: async (context) => {
-				const storageID = await getStorageID(
-					name,
-					context.source.chainId,
-					'config' in context ? context.config : undefined
-				);
+				const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
 				localStorage.removeItem(storageID);
 			},
 		},
