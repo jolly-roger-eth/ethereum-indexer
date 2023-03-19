@@ -74,12 +74,6 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 							return value;
 						}
 					});
-					// no need anymore as this is handled by the indexer and the lastSync.context values
-					// if ((context.version || parsed.__VERSION__) && parsed.__VERSION__ !== context.version) {
-					// 	console.log(`NEW VERSION DETECTED, GET RID OF STATE`);
-					// 	localStorage.removeItem(storageID);
-					// 	return undefined;
-					// }
 					return parsed;
 				}
 			},
@@ -108,13 +102,6 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 							lastSync: existingStream.lastSync,
 					  }
 					: undefined;
-				// TODO use originBlock
-				// return existingStream && existingStream.eventStream[0]?.blockNumber <= fromBlock
-				// 	? {
-				// 			eventStream: existingStream.eventStream.filter((v: any) => v.blockNumber >= fromBlock),
-				// 			lastSync: existingStream.lastSync,
-				// 	  }
-				// 	: undefined;
 			},
 			saveNewEvents: async (source, stream) => {
 				const storageID = `stream_${name}_${source.chainId}`;
@@ -123,20 +110,11 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 
 				if (existingStream && existingStream.eventStream.length > 0) {
 					if (stream.eventStream.length > 0) {
-						// const expectedNextStreamID = existingStream.eventStream[existingStream.eventStream.length - 1].streamID + 1;
-						// if (expectedNextStreamID !== stream.eventStream[0].streamID) {
-						// 	throw new Error(
-						// 		`expect stream to be consecutive, got streamID ${stream.eventStream[0].streamID} while expecting ${expectedNextStreamID}`
-						// 	);
-						// }
 						const eventStreamToSave = existingStream.eventStream.concat(stream.eventStream);
 						await set(storageID, {lastSync: stream.lastSync, eventStream: eventStreamToSave});
 					} else {
 						await set(storageID, {lastSync: stream.lastSync, eventStream: existingStream.eventStream});
 					}
-					// } else if (stream.eventStream.length > 0 && stream.eventStream[0].streamID !== 1) {
-					// 	// throw new Error(`did not save previous events`);
-					// 	await set(storageID, stream);
 				} else {
 					await set(storageID, stream);
 				}
