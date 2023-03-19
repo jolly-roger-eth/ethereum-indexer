@@ -41,7 +41,7 @@ export function loadContracts<ABI extends Abi>(folder: string): IndexingSource<A
 			if (deployment.receipt?.blockNumber) {
 				if (
 					!contractsData[added.index].startBlock ||
-					contractsData[added.index].startBlock > deployment.receipt?.blockNumber
+					(contractsData[added.index].startBlock as number) > deployment.receipt?.blockNumber
 				) {
 					(contractsData[added.index] as any).startBlock = deployment.receipt?.blockNumber;
 				}
@@ -57,7 +57,7 @@ export function loadContracts<ABI extends Abi>(folder: string): IndexingSource<A
 		}
 	}
 
-	if (!chainId || isNaN(chainId)) {
+	if (!chainId || isNaN(parseInt(chainId))) {
 		throw new Error(`invalid chainId: ${chainId}`);
 	}
 	return {

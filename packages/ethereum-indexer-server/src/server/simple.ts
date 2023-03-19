@@ -42,7 +42,7 @@ function bnReplacer(v: any): any {
 				const keys = Object.keys(v);
 				const n = {};
 				for (const key of keys) {
-					n[key] = bnReplacer(v[key]);
+					(n as any)[key] = bnReplacer(v[key]);
 				}
 				return n;
 			}
@@ -71,14 +71,14 @@ type Config = {
 	useFSCache: boolean;
 };
 
-function filterOutFieldsFromObject<T = Object, U = Object>(obj: T, fields: string[]): U {
+function filterOutFieldsFromObject<T extends {} = Object, U extends {} = Object>(obj: T, fields: string[]): U {
 	const keys = Object.keys(obj);
 	const newObj: U = {} as U;
 	for (const key of keys) {
 		if (fields.includes(key)) {
 			continue;
 		}
-		newObj[key] = obj[key];
+		(newObj as any)[key] = (obj as any)[key];
 	}
 	return newObj;
 }
@@ -87,14 +87,14 @@ function formatLastSync<ABI extends Abi>(lastSync: LastSync<ABI>): any {
 	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);
 }
 
-function filterOutUnderscoreFieldsFromObject<T = Object, U = Object>(obj: T): U {
+function filterOutUnderscoreFieldsFromObject<T extends {} = Object, U extends {} = Object>(obj: T): U {
 	const keys = Object.keys(obj);
 	const newObj: U = {} as U;
 	for (const key of keys) {
 		if (key.startsWith('_')) {
 			continue;
 		}
-		newObj[key] = obj[key];
+		(newObj as any)[key] = (obj as any)[key];
 	}
 	return newObj;
 }
@@ -104,16 +104,16 @@ function clean(obj: Object) {
 }
 
 export class SimpleServer<ABI extends Abi> {
-	protected indexer: EthereumIndexer<ABI>;
-	protected app: Koa;
-	protected lastSync: LastSync<ABI>;
+	protected indexer: EthereumIndexer<ABI> | undefined;
+	protected app: Koa | undefined;
+	protected lastSync: LastSync<ABI> | undefined;
 	protected config: Config;
-	protected cache: EventCache<ABI>;
-	protected processor: QueriableEventProcessor<ABI>;
+	protected cache: EventCache<ABI> | undefined;
+	protected processor: QueriableEventProcessor<ABI> | undefined;
 	protected indexing: boolean = false;
 	protected indexingTimeout: NodeJS.Timeout | undefined;
 
-	protected source: IndexingSource<ABI>;
+	protected source: IndexingSource<ABI> | undefined;
 
 	constructor(config: UserConfig<ABI>) {
 		this.config = Object.assign({useCache: false, disableSecurity: false, useFSCache: false}, config);
@@ -153,7 +153,7 @@ export class SimpleServer<ABI extends Abi> {
 
 		const eip1193Provider = new JSONRPCProvider(this.config.nodeURL);
 
-		let contractsData: AllContractData<ABI> | ContractData<ABI>[];
+		let contractsData: AllContractData<ABI> | ContractData<ABI>[] | undefined;
 		if (!this.source) {
 			let chainIDAsDecimal: string | undefined;
 
@@ -183,6 +183,14 @@ export class SimpleServer<ABI extends Abi> {
 			// if (!this.contractsData && processorModule.getContractData) {
 			//   this.contractsData = await processorModule.getContractData();
 			// }
+
+			if (!chainIDAsDecimal) {
+				throw new Error(`no chainId found`);
+			}
+
+			if (!contractsData) {
+				throw new Error(`no contracts data found`);
+			}
 
 			this.source = {
 				chainId: chainIDAsDecimal,
@@ -255,7 +263,7 @@ export class SimpleServer<ABI extends Abi> {
 			console.log(`generated apiKey: ${apiKey}`);
 		}
 
-		function isAuthorized(ctx): boolean {
+		function isAuthorized(ctx: any): boolean {
 			if (self.config.disableSecurity) {
 				return true;
 			}
@@ -264,6 +272,13 @@ export class SimpleServer<ABI extends Abi> {
 		}
 
 		router.get('/', async (ctx, next) => {
+			if (!this.indexer) {
+				throw new Error(`no indexer`);
+			}
+			if (!this.lastSync) {
+				throw new Error(`no lastSync`);
+			}
+
 			const startingBlock = this.indexer.defaultFromBlock;
 			const latestBlock = this.lastSync.latestBlock;
 			const lastToBlock = this.lastSync.lastToBlock;
@@ -297,13 +312,23 @@ export class SimpleServer<ABI extends Abi> {
 		// get is always a kind plus an id
 		// multiple kinds is separate stuff
 		router.get('/get/:id', async (ctx, next) => {
+			if (!this.processor) {
+				throw new Error(`no processor`);
+			}
+
 			const documentID = ctx.params['id'];
 			const response = await this.processor.get(documentID);
-			ctx.body = bnReplacer(clean(response));
+			if (response) {
+				ctx.body = bnReplacer(clean(response));
+			}
+
 			await next();
 		});
 
 		router.post('/query', async (ctx, next) => {
+			if (!this.processor) {
+				throw new Error(`no processor`);
+			}
 			const response = await this.processor.query(ctx.request.body as Query);
 			// TODO clean response ? or force fields to be specified and prevent some (like underscore)
 			ctx.body = bnReplacer(response);
@@ -352,6 +377,9 @@ export class SimpleServer<ABI extends Abi> {
 		});
 
 		router.post('/indexMore', async (ctx, next) => {
+			if (!this.indexer) {
+				throw new Error(`no indexer`);
+			}
 			if (!isAuthorized(ctx)) {
 				ctx.body = {error: {code: 4030, message: 'Forbidden'}};
 			} else {
@@ -367,6 +395,9 @@ export class SimpleServer<ABI extends Abi> {
 		});
 
 		router.post('/feed', async (ctx, next) => {
+			if (!this.indexer) {
+				throw new Error(`no indexer`);
+			}
 			if (!isAuthorized(ctx)) {
 				ctx.body = {error: {code: 4030, message: 'Forbidden'}};
 			} else if (this.indexing) {
@@ -384,6 +415,9 @@ export class SimpleServer<ABI extends Abi> {
 		});
 
 		router.post('/events', async (ctx, next) => {
+			if (!this.cache) {
+				throw new Error(`no cache`);
+			}
 			if (!isAuthorized(ctx)) {
 				ctx.body = {error: {code: 4030, message: 'Forbidden'}};
 			} else {
@@ -413,6 +447,9 @@ export class SimpleServer<ABI extends Abi> {
 	}
 
 	async index() {
+		if (!this.indexer) {
+			throw new Error(`no indexer`);
+		}
 		this.indexing = true;
 		try {
 			namedLogger.info('server indexing more...');

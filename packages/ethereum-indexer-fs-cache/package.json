@@ -15,6 +15,7 @@
 		"node": "18.7.0"
 	},
 	"dependencies": {
+		"@types/fs-extra": "^11.0.1",
 		"ethereum-indexer": "workspace:*",
 		"fs-extra": "^10.1.0",
 		"named-logs": "^0.2.2",

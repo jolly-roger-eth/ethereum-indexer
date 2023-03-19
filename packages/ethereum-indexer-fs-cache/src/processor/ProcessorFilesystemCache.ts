@@ -50,8 +50,15 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 			return undefined;
 		}
 
+		if (!lastSync) {
+			return undefined;
+		}
+
 		// TODO check if source matches old sync
 		const fromProcessor = await this.processor.load(source);
+		if (!fromProcessor) {
+			return undefined;
+		}
 		let lastSyncFromProcessor = fromProcessor.lastSync;
 
 		const files = fs.readdirSync(this.folder);
