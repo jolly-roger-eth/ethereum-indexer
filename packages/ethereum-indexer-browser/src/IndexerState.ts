@@ -196,6 +196,22 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		return lastSync;
 	}
 
+	async function indexMoreAndCatchupIfNeeded(): Promise<LastSync<ABI>> {
+		await setupIndexing();
+		if (!indexer) {
+			throw new Error(`no indexer`);
+		}
+
+		const lastSync = await indexer.indexMore();
+		setLastSync(lastSync);
+
+		if (lastSync.lastToBlock !== lastSync.latestBlock) {
+			return indexToLatest();
+		}
+
+		return lastSync;
+	}
+
 	async function indexToLatest() {
 		let lastSync: LastSync<ABI> = await setupIndexing();
 		setLastSync(lastSync);
@@ -293,6 +309,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		init: init as InitFunction<ABI, ProcessorConfig>,
 		indexToLatest,
 		indexMore,
+		indexMoreAndCatchupIfNeeded,
 		startAutoIndexing,
 		stopAutoIndexing,
 		updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {

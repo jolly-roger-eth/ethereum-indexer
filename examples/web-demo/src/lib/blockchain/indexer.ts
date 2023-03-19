@@ -148,7 +148,108 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 		},
 	});
 
-	const {init, indexToLatest, indexMore, startAutoIndexing} = indexer;
+	const {init, indexToLatest, indexMore, startAutoIndexing, indexMoreAndCatchupIfNeeded} = indexer;
+
+	function oldIndexContinuously(provider: EIP1193Provider) {
+		provider
+			.request({method: 'eth_subscribe', params: ['newHeads']})
+			.then((subscriptionId: unknown) => {
+				if ((provider as any).on) {
+					(provider as any).on('message', (message: {type: string; data: {subscription: `0x${string}`}}) => {
+						if (message.type === 'eth_subscription') {
+							if (message?.data?.subscription === subscriptionId) {
+								indexMore();
+							}
+						}
+					});
+				}
+			})
+			.catch((err) => {
+				console.error(
+					`Error making newHeads subscription: ${err.message}.
+					 Code: ${err.code}. Data: ${err.data}
+					 Falling back on timeout
+					 `
+				);
+				startAutoIndexing();
+			});
+	}
+	function indexContinuously(provider: EIP1193Provider) {
+		let timeout: number | undefined;
+		let currentSubscriptionId: `0x${string}` | undefined;
+
+		function onNewHeads(message: {type: string; data: {subscription: `0x${string}`}}) {
+			if (message.type === 'eth_subscription') {
+				if (message?.data?.subscription === currentSubscriptionId) {
+					reListenOnTimeout();
+					indexMoreAndCatchupIfNeeded();
+				}
+			}
+		}
+
+		async function onTimeout() {
+			console.log(`TIMEOUT for newHeads, subscribe again....`);
+
+			// removing listeners...
+			try {
+				console.log(`unsubscribing.... ${currentSubscriptionId}`);
+				await provider.request({method: 'eth_unsubscribe', params: [currentSubscriptionId]});
+			} catch (err) {
+				console.error(`failed to unsubscribe`);
+			}
+			console.log(`cleared...`);
+			currentSubscriptionId = undefined;
+
+			// indexMore();
+			startAutoIndexing();
+
+			// provider
+			// 	.request({method: 'eth_subscribe', params: ['newHeads']})
+			// 	.then((subscriptionId: `0x${string}`) => listenTo(subscriptionId))
+			// 	.catch((err) => {
+			// 		console.error(
+			// 			`After timeout : Error making newHeads subscription: ${err.message}.
+			// 	 Code: ${err.code}. Data: ${err.data}
+			// 	 Falling back on timeout
+			// 	 `
+			// 		);
+			// 		(provider as any).removeListener('message', onNewHeads);
+			// 		startAutoIndexing();
+			// 	});
+		}
+
+		function reListenOnTimeout() {
+			clearTimeout(timeout);
+			timeout = setTimeout(onTimeout, 20000);
+		}
+
+		function listenTo(subscriptionId: `0x${string}`) {
+			currentSubscriptionId = subscriptionId;
+			console.log(`listenTo : ${currentSubscriptionId}`);
+			reListenOnTimeout();
+		}
+
+		if (provider.on) {
+			provider
+				.request({method: 'eth_subscribe', params: ['newHeads']})
+				.then((subscriptionId: `0x${string}`) => {
+					(provider as any).on('message', onNewHeads);
+					listenTo(subscriptionId);
+				})
+				.catch((err) => {
+					console.error(
+						`Error making newHeads subscription: ${err.message}.
+					 Code: ${err.code}. Data: ${err.data}
+					 Falling back on timeout
+					 `
+					);
+					startAutoIndexing();
+				});
+		} else {
+			startAutoIndexing();
+		}
+	}
+
 	function initialize(
 		connection: {ethereum: EIP1193Provider; accounts: readonly `0x${string}`[]; chainId: string},
 		config?: {
@@ -168,30 +269,8 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 			},
 			config?.processorConfig
 		).then(() => {
-			indexToLatest().then(() => {
-				provider
-					.request({method: 'eth_subscribe', params: ['newHeads']})
-					.then((subscriptionId: unknown) => {
-						if ((provider as any).on) {
-							(provider as any).on('message', (message: {type: string; data: {subscription: `0x${string}`}}) => {
-								if (message.type === 'eth_subscription') {
-									if (message?.data?.subscription === subscriptionId) {
-										indexMore();
-									}
-								}
-							});
-						}
-					})
-					.catch((err) => {
-						console.error(
-							`Error making newHeads subscription: ${err.message}.
-					 Code: ${err.code}. Data: ${err.data}
-					 Falling back on timeout
-					 `
-						);
-						startAutoIndexing();
-					});
-			});
+			indexToLatest().then(() => {});
+			indexContinuously(connection.ethereum);
 		});
 	}
 	(window as any).indexer = indexer;
