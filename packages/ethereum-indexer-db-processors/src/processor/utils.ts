@@ -2,7 +2,7 @@ import {PouchDatabase} from './PouchDatabase';
 import {SingleEventProcessor, EventProcessorOnDatabase} from './EventProcessorOnDatabase';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, PutAndGetDatabase} from './Database';
-import {Abi, EventWithId, LogEvent, UnparsedEventWithId} from 'ethereum-indexer';
+import {Abi, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
 import {EventProcessorWithBatchDBUpdate, SingleEventProcessorWithBatchSupport} from './EventProcessorWithBatchDBUpdate';
 
 export function fromSingleEventProcessor<ABI extends Abi>(
@@ -15,19 +15,19 @@ export function fromSingleEventProcessor<ABI extends Abi>(
 }
 
 export type SingleEventProcessorObject<ABI extends Abi> = {
-	[func: string]: (db: PutAndGetDatabase, event: EventWithId<ABI>) => Promise<void>;
+	[func: string]: (db: PutAndGetDatabase, event: LogEvent<ABI>) => Promise<void>;
 } & {
 	setup?(db: Database): Promise<void>;
-	handleUnparsedEvent?(event: UnparsedEventWithId);
+	handleUnparsedEvent?(event: LogEventWithParsingFailure): void;
 	getVersionHash(): string;
 };
 
 export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEventProcessor<ABI> {
 	constructor(protected obj: SingleEventProcessorObject<ABI>) {}
 
-	async processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void> {
+	async processEvent(db: PutAndGetDatabase, event: LogEvent<ABI>): Promise<void> {
 		if ('decodeError' in event) {
-			if ('handleUnparsedEvent' in this.obj) {
+			if ('handleUnparsedEvent' in this.obj && this.obj.handleUnparsedEvent) {
 				return this.obj.handleUnparsedEvent(event);
 			}
 		} else {
@@ -73,6 +73,6 @@ export function computeArchiveID(id: string, endBlock: number): string {
 	return `archive_${endBlock}_${id}`;
 }
 
-export function computeEventID<ABI extends Abi>(event: EventWithId<ABI>): string {
+export function computeEventID<ABI extends Abi>(event: LogEvent<ABI>): string {
 	return `${event.transactionHash}_${event.logIndex}`;
 }

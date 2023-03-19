@@ -7,7 +7,13 @@ export type DBObjectWithRev = DBObject & {_rev: string};
 
 export type FromDB<T extends JSONObject> = T & {_id: string; _rev?: string};
 
-export type Query = {selector: JSONObject; sort?: string[]; fields?: string[]};
+export type Query = {
+	selector: JSONObject;
+	sort?: string[];
+	fields?: string[];
+	blockNumber?: number;
+	blockHash?: string;
+};
 export type Result = {docs: DBObject[]};
 
 export type ID = string | {_id: string; _rev?: string};

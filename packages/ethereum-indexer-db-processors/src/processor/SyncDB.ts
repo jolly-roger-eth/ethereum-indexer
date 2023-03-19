@@ -1,15 +1,15 @@
 import {DBObjectWithRev, getID, ID, JSONObject, FromDB, DBObject, PutAndGetDatabaseWithBatchSupport} from './Database';
 
 import {logs} from 'named-logs';
-import {Abi, EventWithId} from 'ethereum-indexer';
+import {Abi, LogEvent} from 'ethereum-indexer';
 
 import {computeEventID} from './utils';
 const namedLogger = logs('SyncDB');
 
 export type SyncDB = {
-	put(object: DBObject);
+	put(object: DBObject): void;
 	get<T extends JSONObject>(id: ID): FromDB<T> | null;
-	delete(id: ID);
+	delete(id: ID): void;
 };
 
 // this is also a Revertable DB but without history support, even recent, hence it can only be used for final tx
@@ -18,15 +18,18 @@ export class BasicSyncDB<ABI extends Abi> implements SyncDB {
 	// TODO modifiedObjects and do not reset db
 	protected deletedObjects: {[id: string]: DBObjectWithRev} = {};
 	protected deletedIDs: {[id: string]: string} = {};
-	protected currentEvent: EventWithId<ABI>;
+	protected currentEvent: LogEvent<ABI> | undefined;
 
 	constructor(protected db: PutAndGetDatabaseWithBatchSupport) {}
 
-	prepareEvent(event: EventWithId<ABI>) {
+	prepareEvent(event: LogEvent<ABI>) {
 		this.currentEvent = event;
 	}
 
 	put(object: DBObject) {
+		if (!this.currentEvent) {
+			throw new Error(`no current event provided`);
+		}
 		delete this.deletedObjects[object._id];
 		delete this.deletedIDs[object._id];
 

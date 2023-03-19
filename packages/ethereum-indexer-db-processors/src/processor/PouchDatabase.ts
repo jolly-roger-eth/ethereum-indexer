@@ -76,7 +76,7 @@ export class PouchDatabase implements Database {
 
 		const objectsMissing = await this.batchGet(idsOfObjectMissing);
 
-		const deletions = objects.concat(objectsMissing).map((v: DBObjectWithRev) => ({
+		const deletions = objects.concat(objectsMissing).map((v) => ({
 			_deleted: true,
 			_id: v._id,
 			_rev: v._rev,

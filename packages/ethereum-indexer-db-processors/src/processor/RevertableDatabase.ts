@@ -1,4 +1,4 @@
-import {Abi, EventWithId} from 'ethereum-indexer';
+import {Abi, LogEvent} from 'ethereum-indexer';
 import {
 	getID,
 	ID,
@@ -22,7 +22,7 @@ export type BlockWithOnlyNumber = {number: number};
 export type Block = BlockWithOnlyNumber & {hash: string};
 
 export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWithBatchSupport {
-	protected currentEvent: EventWithId<ABI>;
+	protected currentEvent: LogEvent<ABI> | undefined;
 	constructor(protected db: Database, protected keepAllHistory?: boolean) {}
 
 	async deleteBlock(block: {number: number; hash: string}) {
@@ -52,11 +52,11 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 		}
 	}
 
-	async prepareEvent(event: EventWithId<ABI>) {
+	async prepareEvent(event: LogEvent<ABI>) {
 		this.currentEvent = event;
 	}
 
-	async remove(event: EventWithId<ABI>) {
+	async remove(event: LogEvent<ABI>) {
 		const eventID = computeEventID(event);
 
 		console.info(`RevertableDatabase Removing / and reverting: ${eventID}...`);
@@ -89,6 +89,9 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 	}
 
 	async put(doc: DBObject): Promise<void> {
+		if (!this.currentEvent) {
+			throw new Error(`no current event set`);
+		}
 		console.info(`putting ${doc._id}...`);
 		const latestDoc = await this.db.get<ReversibleDoc>(doc._id);
 		if (latestDoc && latestDoc.startBlock != this.currentEvent.blockNumber) {
@@ -110,9 +113,9 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 		console.info(`DONE`);
 	}
 
-	get<T extends JSONObject>(id: ID): Promise<FromDB<T>> {
+	get<T extends JSONObject>(id: ID): Promise<FromDB<T> | null> {
 		// latest keep its id, so nothing to do here
-		return this.db.get(id);
+		return this.db.get(id) as Promise<FromDB<T>>;
 	}
 
 	async batchGet<T extends JSONObject>(ids: ID[]): Promise<FromDB<T>[]> {
@@ -134,6 +137,9 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 	}
 
 	async delete(id: ID): Promise<void> {
+		if (!this.currentEvent) {
+			throw new Error(`no current event set`);
+		}
 		console.info(`deleting ${id}...`);
 		const latestDoc = await this.db.get<ReversibleDoc>(id);
 		if (latestDoc) {
@@ -157,7 +163,7 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 	}
 
 	async queryAtBlock(query: Query & ({blockHash: string} | {blockNumber: number})): Promise<Result> {
-		let blockNumber;
+		let blockNumber: number | undefined;
 		if ('blockHash' in query) {
 			const block = await this.db.get<BlockWithOnlyNumber>(`block_${query.blockHash}`);
 			if (!block) {
@@ -169,22 +175,31 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 			blockNumber = block.number;
 			delete query.blockHash;
 		}
-		if ('blockNumber' in query) {
+		if ('blockNumber' in query && query.blockNumber) {
 			blockNumber = query.blockNumber;
 			delete query.blockNumber;
 		}
 
 		if (!this.keepAllHistory) {
 			const latestBlock = await this.db.get<Block>(`block`);
-			if (blockNumber < 0) {
-				blockNumber = Math.max(0, latestBlock.number + blockNumber);
+			if (!latestBlock) {
+				return {error: {code: 1111, message: `No block`}} as unknown as Result;
+			}
+			if (!blockNumber || blockNumber < 0) {
+				blockNumber = Math.max(0, latestBlock.number + (blockNumber ? blockNumber : 0));
 			}
 			if (blockNumber < latestBlock.number - 12) {
 				// TODO Error type for Result, or throw ?
 				return {error: {code: 1111, message: `Cannot go that far in the past`}} as unknown as Result;
 			}
-		} else if (blockNumber < 0) {
+		} else if (!blockNumber || blockNumber < 0) {
 			const latestBlock = await this.db.get<Block>(`block`);
+			if (!latestBlock) {
+				return {error: {code: 1111, message: `No block`}} as unknown as Result;
+			}
+			if (!blockNumber || blockNumber < 0) {
+				blockNumber = Math.max(0, latestBlock.number + (blockNumber ? blockNumber : 0));
+			}
 			blockNumber = Math.max(0, latestBlock.number + blockNumber);
 		}
 
@@ -198,7 +213,7 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 		// return {docs: list.filter(v => v.endBlock > block.number)};
 
 		const {docs: list} = await this.db.query(query);
-		return {docs: list.filter((v) => v.startBlock <= blockNumber && v.endBlock >= blockNumber)};
+		return {docs: list.filter((v) => v.startBlock <= (blockNumber as number) && v.endBlock >= (blockNumber as number))};
 		// return { docs: list };
 	}
 }

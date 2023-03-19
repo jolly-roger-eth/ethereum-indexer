@@ -8,4 +8,4 @@ export * from './processor/QueriableEventProcessor';
 export * from './processor/SyncDB';
 export * from './processor/EventProcessorWithBatchDBUpdate';
 export * from './processor/utils';
-export type {EventWithId, LogEvent, LastSync} from 'ethereum-indexer';
+export type {LogEvent, LastSync} from 'ethereum-indexer';

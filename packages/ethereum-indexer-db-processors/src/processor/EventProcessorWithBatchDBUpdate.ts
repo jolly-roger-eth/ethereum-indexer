@@ -1,12 +1,4 @@
-import {
-	IndexingSource,
-	EventProcessor,
-	EventWithId,
-	LastSync,
-	LogEvent,
-	Abi,
-	UnparsedEventWithId,
-} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, LogEventWithParsingFailure} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {JSONObject, Database, FromDB, Query, Result} from './Database';
 import {RevertableDatabase} from './RevertableDatabase';
@@ -43,10 +35,10 @@ export type SingleEventProcessorWithBatchSupport<ABI extends Abi> = {
 	setup?(db: Database): Promise<void>;
 } & {
 	[name: OnFunction]: {
-		dependencies(event: EventWithId<ABI>): Dependency[];
-		processEvent(db: SyncDB, event: EventWithId<ABI>);
+		dependencies(event: LogEvent<ABI>): Dependency[];
+		processEvent(db: SyncDB, event: LogEvent<ABI>): void;
 	};
-	handleUnparsedEvent?(event: UnparsedEventWithId);
+	handleUnparsedEvent?(event: LogEventWithParsingFailure): void;
 	getVersionHash(): string;
 };
 
@@ -74,13 +66,16 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 	}
 
 	async reset() {
-		console.info('EventProcessorOnDatabase reseting...');
-		this.db = await this.db.reset();
 		this.initialization = undefined;
 		await this.init();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void}> {
+	async clear() {
+		this.db = await this.db.reset();
+		return this.reset();
+	}
+
+	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
 		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
@@ -90,9 +85,8 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 		}
 	}
 
-	private lastEventID: number;
-	private processing: boolean;
-	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
+	private processing: boolean | undefined;
+	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
 		if (this.processing) {
 			throw new Error(`processing...`);
 		}
@@ -157,8 +151,9 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 						continue;
 					}
 					const functionName = `on${event.eventName}`;
-					if (this.singleEventProcessor[functionName] && this.singleEventProcessor[functionName].dependencies) {
-						const deps = this.singleEventProcessor[functionName].dependencies(event);
+					const singleEventProcessor = this.singleEventProcessor as any;
+					if (singleEventProcessor[functionName] && singleEventProcessor[functionName].dependencies) {
+						const deps = singleEventProcessor[functionName].dependencies(event);
 						mergeDependenciesIn(dependencies, deps);
 					}
 				}
@@ -174,13 +169,14 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 				for (const event of eventStream) {
 					syncDB.prepareEvent(event);
 					if ('decodeError' in event) {
-						if ('handleUnparsedEvent' in this.singleEventProcessor) {
+						if ('handleUnparsedEvent' in this.singleEventProcessor && this.singleEventProcessor.handleUnparsedEvent) {
 							this.singleEventProcessor.handleUnparsedEvent(event);
 						}
 					} else {
 						const functionName = `on${event.eventName}`;
-						if (this.singleEventProcessor[functionName] && this.singleEventProcessor[functionName].processEvent) {
-							this.singleEventProcessor[functionName].processEvent(syncDB, event);
+						const singleEventProcessor = this.singleEventProcessor as any;
+						if (singleEventProcessor[functionName] && singleEventProcessor[functionName].processEvent) {
+							singleEventProcessor[functionName].processEvent(syncDB, event);
 						}
 					}
 				}
@@ -193,9 +189,6 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 				let lastBlock: number | undefined;
 				let lastBlockDeleted: string | undefined;
 				for (const event of eventStream) {
-					if (this.lastEventID && event.streamID <= this.lastEventID) {
-						continue;
-					}
 					if (event.removed) {
 						console.info(`EventProcessorOnDatabase event removed....`);
 
@@ -227,19 +220,20 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 						syncDB.prepareEvent(event);
 
 						if ('decodeError' in event) {
-							if ('handleUnparsedEvent' in this.singleEventProcessor) {
+							if ('handleUnparsedEvent' in this.singleEventProcessor && this.singleEventProcessor.handleUnparsedEvent) {
 								this.singleEventProcessor.handleUnparsedEvent(event);
 								await syncDB.syncUp();
 							}
 						} else {
 							// could optimize per block
 							const functionName = `on${event.eventName}`;
-							if (this.singleEventProcessor[functionName]) {
-								if (this.singleEventProcessor[functionName].dependencies) {
-									const dependencies: Dependency[] = this.singleEventProcessor[functionName].dependencies(event);
+							const singleEventProcessor = this.singleEventProcessor as any;
+							if (singleEventProcessor[functionName]) {
+								if (singleEventProcessor[functionName].dependencies) {
+									const dependencies: Dependency[] = singleEventProcessor[functionName].dependencies(event);
 									await syncDB.fetch(dependencies);
 								}
-								this.singleEventProcessor[functionName].processEvent(syncDB, event);
+								singleEventProcessor[functionName].processEvent(syncDB, event);
 								await syncDB.syncUp();
 							}
 						}
@@ -250,7 +244,6 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 						await this.revertableDatabase.postBlock(lastBlock);
 					}
 
-					this.lastEventID = event.streamID;
 					if (!this.initialization) {
 						break; // stop
 					}
@@ -265,16 +258,15 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 				_rev: lastLastSync?._rev,
 				...lastSync,
 			};
-			await this.db.put(lastSyncDoc);
+			await this.db.put(lastSyncDoc as any);
 		} finally {
 			this.processing = false;
-			console.info(`EventProcessorOnDatabase streamID: ${lastSync.nextStreamID}`);
 		}
 	}
 
 	query<T>(request: Query | (Query & ({blockHash: string} | {blockNumber: number}))): Promise<Result> {
-		if ('blockHash' in request || 'blockNumber' in request) {
-			return this.revertableDatabase.queryAtBlock(request);
+		if (('blockHash' in request && request.blockHash) || ('blockNumber' in request && request.blockNumber)) {
+			return this.revertableDatabase.queryAtBlock(request as any);
 		}
 		return this.db.query({
 			...request,

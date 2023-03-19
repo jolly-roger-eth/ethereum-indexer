@@ -1,4 +1,4 @@
-import {IndexingSource, EventWithId, LastSync, LogEvent, Abi, UnparsedEventWithId} from 'ethereum-indexer';
+import {IndexingSource, LastSync, LogEvent, Abi, LogEventWithParsingFailure} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, FromDB, JSONObject, PutAndGetDatabase, Query, Result} from './Database';
@@ -8,9 +8,9 @@ const console = logs('EventProcessorOnDatabase');
 
 export interface SingleEventProcessor<ABI extends Abi> {
 	getVersionHash(): string;
-	processEvent(db: PutAndGetDatabase, event: EventWithId<ABI>): Promise<void>;
+	processEvent(db: PutAndGetDatabase, event: LogEvent<ABI>): Promise<void>;
 	setup?(db: Database): Promise<void>;
-	handleUnparsedEvent?(event: UnparsedEventWithId);
+	handleUnparsedEvent?(event: LogEventWithParsingFailure): void;
 }
 
 export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEventProcessor<ABI> {
@@ -36,10 +36,13 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 	}
 
 	async reset() {
-		console.info('EventProcessorOnDatabase reseting...');
-		this.db = await this.db.reset();
 		this.initialization = undefined;
 		await this.init();
+	}
+
+	async clear() {
+		this.db = await this.db.reset();
+		return this.reset();
 	}
 
 	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
@@ -52,9 +55,8 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 		}
 	}
 
-	private lastEventID: number;
-	private processing: boolean;
-	async process(eventStream: EventWithId<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
+	private processing: boolean | undefined;
+	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
 		if (this.processing) {
 			throw new Error(`processing...`);
 		}
@@ -65,9 +67,6 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 			let lastBlock: number | undefined;
 			let lastBlockDeleted: string | undefined;
 			for (const event of eventStream) {
-				if (this.lastEventID && event.streamID <= this.lastEventID) {
-					continue;
-				}
 				if (event.removed) {
 					console.info(`EventProcessorOnDatabase event removed....`);
 
@@ -103,7 +102,6 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 					await this.revertableDatabase.postBlock(lastBlock);
 				}
 
-				this.lastEventID = event.streamID;
 				if (!this.initialization) {
 					break; // stop
 				}
@@ -117,16 +115,15 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 				_rev: lastLastSync?._rev,
 				...lastSync,
 			};
-			await this.db.put(lastSyncDoc);
+			await this.db.put(lastSyncDoc as any);
 		} finally {
 			this.processing = false;
-			console.info(`EventProcessorOnDatabase streamID: ${lastSync.nextStreamID}`);
 		}
 	}
 
 	query<T>(request: Query | (Query & ({blockHash: string} | {blockNumber: number}))): Promise<Result> {
-		if ('blockHash' in request || 'blockNumber' in request) {
-			return this.revertableDatabase.queryAtBlock(request);
+		if (('blockHash' in request && request.blockHash) || ('blockNumber' in request && request.blockNumber)) {
+			return this.revertableDatabase.queryAtBlock(request as any);
 		}
 		return this.db.query({
 			...request,
