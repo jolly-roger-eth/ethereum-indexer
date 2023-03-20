@@ -131,7 +131,7 @@ export class SimpleServer<ABI extends Abi> {
 
 	private async setupIndexing() {
 		const processorModule = await import(this.config.processorPath);
-		const processorFactory = processorModule.processor as (config?: any) => QueriableEventProcessor<ABI>;
+		const processorFactory = processorModule.createProcessor as (config?: any) => QueriableEventProcessor<ABI>;
 
 		if (!processorFactory) {
 			throw new Error(
@@ -166,10 +166,11 @@ export class SimpleServer<ABI extends Abi> {
 					throw err;
 				}
 				chainIDAsDecimal = '' + parseInt(chainIDAsHex.slice(2), 16);
+				namedLogger.info(processorModule.contractsDataPerChain);
 				namedLogger.info({chainIDAsHex, chainIDAsDecimal});
 				contractsData = processorModule.contractsDataPerChain[chainIDAsDecimal];
 			}
-			if (contractsData) {
+			if (!contractsData) {
 				contractsData = processorModule.contractsData;
 				// TODO chainID should be specified or it should be of type AllContractsData
 			}
@@ -267,6 +268,7 @@ export class SimpleServer<ABI extends Abi> {
 			if (self.config.disableSecurity) {
 				return true;
 			}
+			// TODO pass api key in get request ?
 			const apiKeyProvided = ctx.request.header.authorization || ctx.request.body.apiKey;
 			return apiKeys.includes(apiKeyProvided);
 		}
