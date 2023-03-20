@@ -1,4 +1,4 @@
-import {EventProcessorOnJSON} from './EventProcessorOnJSON';
+import {JSObjectEventProcessor} from './JSObjectEventProcessor';
 import {Abi, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
 import {EventFunctions, JSObject} from './types';
 
@@ -49,9 +49,9 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 
 export function fromJSProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig>(
 	v: (() => JSProcessor<ABI, ProcessResultType, ProcessorConfig>) | JSProcessor<ABI, ProcessResultType, ProcessorConfig>
-): () => EventProcessorOnJSON<ABI, ProcessResultType, ProcessorConfig> {
+): () => JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig> {
 	return () => {
-		return new EventProcessorOnJSON<ABI, ProcessResultType, ProcessorConfig>(
+		return new JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig>(
 			new SingleJSONEventProcessorWrapper(typeof v === 'function' ? v() : v)
 		);
 	};

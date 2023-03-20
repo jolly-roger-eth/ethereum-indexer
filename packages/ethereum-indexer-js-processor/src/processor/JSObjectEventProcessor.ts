@@ -13,7 +13,7 @@ import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
 import {EventFunctions, JSObject} from './types';
 
-const namedLogger = logs('EventProcessorOnJSON');
+const namedLogger = logs('JSObjectEventProcessor');
 
 export type SingleEventJSONProcessor<
 	ABI extends Abi,
@@ -26,7 +26,7 @@ export type SingleEventJSONProcessor<
 	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void;
 };
 
-export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
+export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
 	implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
 {
 	protected state: ProcessResultType;
@@ -53,7 +53,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 		this.state = proxifyJSON<ProcessResultType>(data, this.history);
 	}
 
-	copyFrom(otherProcessor: EventProcessorOnJSON<ABI, ProcessResultType, ProcessorConfig>) {
+	copyFrom(otherProcessor: JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig>) {
 		this.state = otherProcessor.state;
 		this._json = otherProcessor._json;
 		this.history = otherProcessor.history;
@@ -83,7 +83,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 	}
 
 	async reset() {
-		namedLogger.info('EventProcessorOnJSON reseting...');
+		namedLogger.info('JSObjectEventProcessor reseting...');
 		if (!this._json.data) {
 			throw new Error(`no data`);
 		}
@@ -173,10 +173,10 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			let lastBlockDeleted: string | undefined;
 			for (const event of eventStream) {
 				if (event.removed) {
-					namedLogger.info(`EventProcessorOnJSON event removed....`);
+					namedLogger.info(`JSObjectEventProcessor event removed....`);
 
 					if (!lastBlockDeleted || event.blockHash != lastBlockDeleted) {
-						namedLogger.info(`EventProcessorOnJSON preparing block...`);
+						namedLogger.info(`JSObjectEventProcessor preparing block...`);
 						this.history.reverseBlock(event.blockNumber, event.blockHash, this._json.data);
 						lastBlockDeleted = event.blockHash;
 					}
@@ -204,7 +204,7 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 			this._json.lastSync = lastSyncDoc;
 
 			if (this.keeper) {
-				// namedLogger.time('EventProcessorOnJSON.stateSaver');
+				// namedLogger.time('JSObjectEventProcessor.stateSaver');
 				try {
 					const config = this.config as ProcessorConfig;
 					const source = this.source as IndexingSource<ABI>;
@@ -218,10 +218,10 @@ export class EventProcessorOnJSON<ABI extends Abi, ProcessResultType extends JSO
 				} catch (e) {
 					namedLogger.error(`failed to save ${e}`);
 				}
-				// namedLogger.timeEnd('EventProcessorOnJSON.stateSaver');
+				// namedLogger.timeEnd('JSObjectEventProcessor.stateSaver');
 			}
 		} finally {
-			// namedLogger.info(`EventProcessorOnJSON streamID: ${lastSync.nextStreamID}`);
+			// namedLogger.info(`JSObjectEventProcessor streamID: ${lastSync.nextStreamID}`);
 		}
 
 		if (!this._json.data) {

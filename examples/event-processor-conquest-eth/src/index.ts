@@ -4,7 +4,6 @@ import {logs} from 'named-logs';
 
 import OuterSpace from './abis/OuterSpace';
 import {Data, Planet, Player} from './types/db';
-import {ExitComplete, FleetArrived, FleetSent, PlanetExit, PlanetStake, PlanetTransfer} from './types/events';
 
 const namedLogger = logs('ConquestEventProcessor');
 
