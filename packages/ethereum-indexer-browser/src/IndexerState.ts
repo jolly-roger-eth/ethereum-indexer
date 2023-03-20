@@ -12,6 +12,7 @@ import type {
 } from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
 import {createRootStore, createStore} from './utils/stores';
+import {ReactHooks, useStores} from 'use-stores';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {formatLastSync} from './utils/format';
 import {logs} from 'named-logs';
@@ -280,7 +281,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	async function _auto_index() {
 		setSyncing({autoIndexing: true});
 		try {
-			const lastSync = await indexMore();
+			const lastSync = await indexMoreAndCatchupIfNeeded();
 			if (lastSync.latestBlock - lastSync.lastToBlock < 1) {
 				// the latestblock fetched is smaller or equal than the last synced blocked
 				// let's wait
@@ -327,6 +328,15 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				throw new Error(`no indexer setup, call init`);
 			}
 			indexer.updateIndexer(update);
+		},
+		withHooks(react: ReactHooks) {
+			const {useReadable} = useStores(react);
+			return {
+				...this,
+				useState: () => useReadable(this.state),
+				useSyncing: () => useReadable(this.syncing),
+				useStatus: () => useReadable(this.status),
+			};
 		},
 	};
 }

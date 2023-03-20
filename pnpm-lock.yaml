@@ -162,10 +162,12 @@ importers:
       sveltore: ^0.0.1
       tsup: ^6.2.1
       typescript: ^4.6.4
+      use-stores: workspace:*
     dependencies:
       ethereum-indexer: link:../ethereum-indexer
       named-logs: 0.2.2
       sveltore: 0.0.1
+      use-stores: link:../use-stores
     devDependencies:
       eip-1193: 0.2.3
       tsup: 6.2.3_typescript@4.8.3
@@ -321,6 +323,14 @@ importers:
       eip-1193: 0.2.3
       tsup: 6.2.3_typescript@4.8.3
       typescript: 4.8.3
+
+  packages/use-stores:
+    specifiers:
+      tsup: ^6.2.1
+      typescript: ^4.6.4
+    devDependencies:
+      tsup: 6.2.3_typescript@4.9.5
+      typescript: 4.9.5
 
 packages:
 

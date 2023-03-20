@@ -1,12 +1,14 @@
 import './App.css';
 import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
 import {createIndexerState} from 'ethereum-indexer-browser';
-import {useReadable} from './utils/stores';
 import {connect} from './utils/web3';
+import react from 'react';
 
 // we need the contract info
 // the abi will be used by the processor to have its type generated, allowing you to get type-safety
 // the adress will be given to the indexer, so it index only this contract
+// the startBlock field allow to tell the indexer to start indexing from that point only
+// here it is the block at which the contract was deployed
 const contract = {
 	abi: [
 		{
@@ -27,7 +29,8 @@ const contract = {
 			type: 'event',
 		},
 	],
-	address: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
+	address: '0x21d366ee3BbF67AB057c517380D37E54fFd9dfC0',
+	startBlock: 3040661,
 } as const;
 
 // the processor is given the type of the ABI as Generic type to get generated
@@ -56,7 +59,9 @@ const processor: JSProcessor<typeof contract.abi, {greetings: {account: `0x${str
 // this setup a set of observable (subscribe pattern)
 // including one for the current state (computed by the processor above)
 // and one for the syncing status
-const {init, state, syncing, indexMoreAndCatchupIfNeeded} = createIndexerState(fromJSProcessor(processor)());
+const {init, useState, useSyncing, useStatus, startAutoIndexing} = createIndexerState(
+	fromJSProcessor(processor)()
+).withHooks(react);
 
 // we now need to get a handle on a ethereum provider
 // for this app we are simply using window.ethereum
@@ -73,32 +78,50 @@ if (ethereum) {
 			blockExplorerUrls: ['https://sepolia.etherscan.io'],
 		},
 	}).then(({ethereum}) => {
-		init({provider: ethereum, source: {chainId: '11155111', contracts: [contract]}}, undefined).then(() => {
-			indexMoreAndCatchupIfNeeded();
+		// we already setup the processor
+		// now we need to initialise the indexer with
+		// - an EIP-1193 provider (window.ethereum here)
+		// - source config which includes the chainId and the list of contracts (abi,address. startBlock)
+		// here we also configure so the indexer uses ABI as global so events defined across contracts will be processed
+		init(
+			{
+				provider: ethereum,
+				source: {chainId: '11155111', contracts: [contract]},
+				config: {stream: {parse: {globalABI: true}}},
+			},
+			undefined
+		).then(() => {
+			// this automatically index on a timer
+			// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
+			// startAutoIndexing is easier but manually calling `indexMore` or `indexMoreAndCatchupIfNeeded` is better
+			// this is because you can call them for every `newHeads` eth_subscribe message
+			startAutoIndexing();
 		});
 	});
 }
 
 function App() {
-	const $state = useReadable(state);
-	const $syncing = useReadable(syncing);
+	// we use the hooks to get the latest state and make sure react update the values as they changes
+	const $state = useState();
+	const $syncing = useSyncing();
 
+	if (!ethereum) {
+		return <p>To test this app, you need to have a ethereum wallet installed</p>;
+	}
 	return (
 		<div className="App">
 			<h1>In-Browser Indexer</h1>
-			{ethereum ? (
-				(() => {
-					if ($syncing.lastSync) {
-						for (const greeting of $state.greetings) {
-							return <p>{greeting.message}</p>;
-						}
-					} else {
-						return <p>Please wait....</p>;
-					}
-				})()
+			<p>{$syncing.lastSync?.syncPercentage || 0}</p>
+			{$syncing.lastSync ? (
+				<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style={{width: '100%'}} />
 			) : (
-				<p>To test this app, you need to have a ethereum wallet installed</p>
+				<p>Please wait...</p>
 			)}
+			<div>
+				{$state.greetings.map((greeting) => (
+					<p key={greeting.account}>{greeting.message}</p>
+				))}
+			</div>
 		</div>
 	);
 }
