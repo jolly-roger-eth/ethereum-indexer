@@ -1,5 +1,5 @@
 {
-	"name": "ethereum-indexer-json-processor",
+	"name": "ethereum-indexer-js-processor",
 	"version": "0.5.6",
 	"description": "",
 	"publishConfig": {

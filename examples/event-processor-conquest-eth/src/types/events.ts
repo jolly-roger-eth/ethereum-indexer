@@ -1,4 +1,4 @@
-import {EventWithId} from 'ethereum-indexer-json-processor';
+import {EventWithId} from 'ethereum-indexer-js-processor';
 
 export type FleetSent = EventWithId<{
 	fleet: string;

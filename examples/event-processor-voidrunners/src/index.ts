@@ -1,4 +1,4 @@
-import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-json-processor';
+import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
 
 import eip721 from './eip721';
 import {Data, Spaceship} from './types';

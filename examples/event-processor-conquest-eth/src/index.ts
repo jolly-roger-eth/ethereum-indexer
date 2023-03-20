@@ -1,4 +1,4 @@
-import {JSProcessor, fromJSProcessor} from 'ethereum-indexer-json-processor';
+import {JSProcessor, fromJSProcessor} from 'ethereum-indexer-js-processor';
 
 import {logs} from 'named-logs';
 

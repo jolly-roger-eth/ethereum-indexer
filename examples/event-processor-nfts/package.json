@@ -12,7 +12,7 @@
 	"license": "ISC",
 	"dependencies": {
 		"dotenv": "^16.0.1",
-		"ethereum-indexer-json-processor": "workspace:*",
+		"ethereum-indexer-js-processor": "workspace:*",
 		"named-logs": "^0.2.2"
 	},
 	"devDependencies": {
