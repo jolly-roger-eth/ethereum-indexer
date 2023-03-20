@@ -4,16 +4,19 @@ import fs from 'fs';
 import {SimpleServer} from './server/simple';
 import {loadContracts} from './utils/contracts';
 
-export function runServer<ABI extends Abi>(args: {
-	deployments?: string;
-	processor: string;
-	nodeURL: string;
-	folder?: string;
-	wait: boolean;
-	disableCache: boolean;
-	disableSecurity: boolean;
-	useFSCache: boolean;
-}) {
+export function runServer<ABI extends Abi>(
+	processor: string,
+	args: {
+		deployments?: string;
+		processor: string;
+		nodeUrl: string;
+		folder?: string;
+		wait: boolean;
+		disableCache: boolean;
+		disableSecurity: boolean;
+		useFSCache: boolean;
+	}
+) {
 	let source: IndexingSource<ABI> | undefined;
 	if (args.deployments) {
 		source = loadContracts(args.deployments);
@@ -26,15 +29,21 @@ export function runServer<ABI extends Abi>(args: {
 		fs.mkdirSync(folder);
 	}
 
-	const processorPath = args.processor.startsWith('.') ? path.resolve(args.processor) : args.processor;
+	const processorPath = processor.startsWith('.') ? path.resolve(processor) : processor;
+
+	let actualPath = processorPath;
+	if (fs.statSync(processorPath).isDirectory()) {
+		const processorPackage = JSON.parse(fs.readFileSync(`${processorPath}/package.json`, 'utf-8'));
+		actualPath = `${processorPath}/${processorPackage.module}`;
+	}
 
 	const server = new SimpleServer({
 		source,
 		folder,
-		processorPath,
+		processorPath: actualPath,
 		useCache: !args.disableCache,
 		useFSCache: args.useFSCache,
-		nodeURL: args.nodeURL,
+		nodeURL: args.nodeUrl,
 		disableSecurity: args.disableSecurity,
 	});
 

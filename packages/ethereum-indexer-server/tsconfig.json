@@ -7,6 +7,8 @@
 		"declarationMap": true,
 		"sourceMap": true,
 		"allowSyntheticDefaultImports": true,
-		"module": "Node16"
+		"resolveJsonModule": true,
+		"module": "ES2022",
+		"strict": true
 	}
 }

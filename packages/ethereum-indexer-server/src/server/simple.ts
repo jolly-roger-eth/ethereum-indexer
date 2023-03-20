@@ -1,5 +1,3 @@
-import 'dotenv/config';
-
 import 'named-logs-console';
 
 import Koa from 'koa';
