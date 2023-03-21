@@ -23,6 +23,8 @@ export type ExtendedLastSync<ABI extends Abi> = LastSync<ABI> & {
 	totalPercentage: number;
 };
 
+export type ErrorCode = string;
+
 export type SyncingState<ABI extends Abi> = {
 	waitingForProvider: boolean;
 	autoIndexing: boolean;
@@ -32,7 +34,7 @@ export type SyncingState<ABI extends Abi> = {
 	catchingUp: boolean;
 	numRequests?: number;
 	lastSync?: ExtendedLastSync<ABI>;
-	error?: {message: string; code: number};
+	error?: {message: string; id: ErrorCode; code?: number};
 };
 
 export type StatusState = {
@@ -181,9 +183,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			setSyncing({loading: false});
 			return lastSync;
 		} finally {
-			// FIXME code should be string, easier to declare inline
-			// then we could refactor to code based on a list of errors
-			setSyncing({loading: false, error: {message: 'Failed to load', code: 1}});
+			setSyncing({loading: false, error: {message: 'Failed to load', id: 'FAILED_TO_LOAD'}});
 		}
 	}
 
