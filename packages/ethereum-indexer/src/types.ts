@@ -43,6 +43,7 @@ export type ContextIdentifier = {source: {startBlock: number; hash: string}[]; c
 export type LastSync<ABI extends Abi> = {
 	context: ContextIdentifier;
 	latestBlock: number;
+	lastFromBlock: number;
 	lastToBlock: number;
 	unconfirmedBlocks: EventBlock<ABI>[];
 };

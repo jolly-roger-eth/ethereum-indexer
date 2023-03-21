@@ -386,9 +386,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (!this.lastSync) {
 			this.lastSync = this.freshLastSync(this.processor.getVersionHash());
 		}
-		const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, newEvents, {
+		const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, this.defaultFromBlock, newEvents, {
 			newLatestBlock: lastSyncFetched.latestBlock,
 			newLastToBlock: lastSyncFetched.lastToBlock,
+			newLastFromBlock: lastSyncFetched.lastFromBlock,
 			finality: this.finality,
 		});
 
@@ -590,9 +591,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		// PROCESS THE STREAM FOR REORG
 		// ----------------------------------------------------------------------------------------
-		const {eventStream, newLastSync} = generateStreamToAppend(lastSync, eventsFetched, {
+		const {eventStream, newLastSync} = generateStreamToAppend(lastSync, this.defaultFromBlock, eventsFetched, {
 			newLatestBlock: latestBlock,
 			newLastToBlock: toBlock,
+			newLastFromBlock: fromBlock,
 			finality: this.finality,
 		});
 		// ----------------------------------------------------------------------------------------
@@ -646,6 +648,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return {
 			context: {source: this.sourceHashes, config: this.streamConfigHash, processor: processorHash},
 			lastToBlock: 0,
+			lastFromBlock: 0,
 			latestBlock: 0,
 			unconfirmedBlocks: [],
 		};

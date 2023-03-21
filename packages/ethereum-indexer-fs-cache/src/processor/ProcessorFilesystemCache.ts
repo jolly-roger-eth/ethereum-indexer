@@ -72,26 +72,36 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 				const eventStream: LogEvent<ABI>[] = JSON.parse(fs.readFileSync(`${this.folder}/${file}`).toString());
 				const maxBatchSize = 128;
 
+				const [_, fromBlockAsString, toBlockAsString] = file.split('_');
+				const fromBlock = parseInt(fromBlockAsString);
+				const toBlock = parseInt(toBlockAsString);
+
+				let lastSubStream: LogEvent<ABI>[] | undefined;
 				if (eventStream.length > maxBatchSize) {
 					namedLogger.info(`eventStream size bigger than ${maxBatchSize} : ${eventStream.length}`);
 					for (let i = 0; i < eventStream.length; i += maxBatchSize) {
 						const subStream: LogEvent<ABI>[] = eventStream.slice(i, i + maxBatchSize);
+
 						namedLogger.info(`sending ${subStream.length} (from ${i} to ${i + maxBatchSize - 1})`);
 
+						// TODO group per block and use the correspondong lastToBlock,
 						lastSyncFromProcessor = {
 							context: lastSync.context,
-							lastToBlock: subStream[subStream.length - 1].blockNumber,
+							lastToBlock: i === eventStream.length - 1 ? toBlock : subStream[subStream.length - 1].blockNumber,
 							latestBlock: lastSync.latestBlock,
+							lastFromBlock: !lastSubStream ? fromBlock : lastSubStream[subStream.length - 1].blockNumber,
 							unconfirmedBlocks: [], // TODO ?
 						};
+						lastSubStream = subStream;
 						namedLogger.info('processing substream...');
 						await this.processor.process(subStream, lastSyncFromProcessor);
 					}
 				} else {
 					lastSyncFromProcessor = {
 						context: lastSync.context,
-						lastToBlock: eventStream[eventStream.length - 1].blockNumber,
+						lastToBlock: toBlock,
 						latestBlock: lastSync.latestBlock,
+						lastFromBlock: fromBlock,
 						unconfirmedBlocks: [], // TODO ?
 					};
 					namedLogger.info('processing stream...');

@@ -92,6 +92,7 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 					console.info(`EventCache replaying batch ${i}...`);
 					await this.processor.process(events, {
 						context: lastSync.context,
+						lastFromBlock: lastSync.lastToBlock + 1,
 						lastToBlock: lastEvent.blockNumber,
 						latestBlock: lastEvent.blockNumber,
 						unconfirmedBlocks: [],

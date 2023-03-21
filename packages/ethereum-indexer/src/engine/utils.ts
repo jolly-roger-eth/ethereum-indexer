@@ -33,17 +33,35 @@ export function groupLogsPerBlock<ABI extends Abi>(logEvents: LogEvent<ABI>[]): 
 
 export function generateStreamToAppend<ABI extends Abi>(
 	lastSync: LastSync<ABI>,
+	defaultFromBlock: number,
 	newEvents: LogEvent<ABI>[],
-	{newLatestBlock, newLastToBlock, finality}: {newLatestBlock: number; newLastToBlock: number; finality: number}
+	{
+		newLatestBlock,
+		newLastFromBlock,
+		newLastToBlock,
+		finality,
+	}: {newLatestBlock: number; newLastFromBlock: number; newLastToBlock: number; finality: number}
 ): {eventStream: LogEvent<ABI>[]; newLastSync: LastSync<ABI>} {
+	const minFromBlock =
+		lastSync.latestBlock === 0 ? defaultFromBlock : Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
+
+	if (newLastFromBlock < minFromBlock) {
+		throw new Error(
+			`too far back, we could trim it automatically, but this is probably an error to send that, so we throw here`
+		);
+	}
+
+	const lastSafeFromBlock =
+		lastSync.latestBlock === 0 ? defaultFromBlock : Math.max(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
+
+	if (newLastFromBlock > lastSafeFromBlock) {
+		throw new Error(`the fromBlock do not consider the potential of reorg, please resend with some block past`);
+	}
+
 	const logEventsGroupedPerBlock = groupLogsPerBlock(newEvents);
 	const eventStream: LogEvent<ABI>[] = [];
 
 	const lastUnconfirmedBlocks = lastSync.unconfirmedBlocks;
-	// assume we are giving a list of event fetch from the same block (lastToBlock - finality)
-	// FIXME check and throw if not
-
-	// FIXME for that: add a fromBlock to the lastSync object ?
 
 	// find reorgs
 	let reorgBlock: EventBlock<ABI> | undefined;
@@ -120,6 +138,7 @@ export function generateStreamToAppend<ABI extends Abi>(
 		eventStream,
 		newLastSync: {
 			context: lastSync.context,
+			lastFromBlock: newLastFromBlock,
 			latestBlock: newLatestBlock,
 			lastToBlock: newLastToBlock,
 			unconfirmedBlocks: newUnconfirmedBlocks,
