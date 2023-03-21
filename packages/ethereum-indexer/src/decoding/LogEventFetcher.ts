@@ -207,10 +207,6 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 						data: log.data,
 						topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
 					});
-					if (!parsed || !parsed.args) {
-						// needed because of this : https://github.com/wagmi-dev/viem/issues/197
-						throw new Error(`did not parse all inputs`);
-					}
 				} catch (err) {
 					parsed = null;
 					(event as LogEventWithParsingFailure).decodeError = `decoding error: ${err}`;

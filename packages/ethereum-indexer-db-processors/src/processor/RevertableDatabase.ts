@@ -221,7 +221,11 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 		// return {docs: list.filter(v => v.endBlock > block.number)};
 
 		const {docs: list} = await this.db.query(query);
-		return {docs: list.filter((v) => v.startBlock <= (blockNumber as number) && v.endBlock >= (blockNumber as number))};
+		return {
+			docs: list.filter(
+				(v) => (v.startBlock as number) <= (blockNumber as number) && (v.endBlock as number) >= (blockNumber as number)
+			),
+		};
 		// return { docs: list };
 	}
 }
