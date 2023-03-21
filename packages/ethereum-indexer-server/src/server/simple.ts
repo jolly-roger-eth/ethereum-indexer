@@ -278,7 +278,12 @@ export class SimpleServer<ABI extends Abi> {
 					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, data});
 				}
 			} else {
-				ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing});
+				const _data = (this.processor as any)._json;
+				if (_data) {
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, _data});
+				} else {
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing});
+				}
 			}
 
 			await next();
