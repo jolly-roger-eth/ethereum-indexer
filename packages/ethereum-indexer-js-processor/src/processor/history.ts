@@ -77,9 +77,17 @@ function applyReversals(json: JSObject | JSType[], reversal: Reversal) {
 export class History {
 	protected blockNumber: number | undefined;
 	protected blockHash: string | undefined;
-	constructor(protected historyJSON: HistoryJSObject, protected finality: number) {}
+	protected finality: number | undefined;
+	constructor(protected historyJSON: HistoryJSObject) {}
+
+	setFinality(finality: number) {
+		this.finality = finality;
+	}
 
 	setBlock(blockNumber: number, blockHash: string) {
+		if (!this.finality) {
+			throw new Error(`finality not set`);
+		}
 		this.blockNumber = blockNumber;
 		this.blockHash = blockHash;
 		for (const key of Object.keys(this.historyJSON.blockHashes)) {

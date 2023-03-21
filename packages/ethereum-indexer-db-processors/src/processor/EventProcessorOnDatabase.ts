@@ -1,4 +1,4 @@
-import {IndexingSource, LastSync, LogEvent, Abi, LogEventWithParsingFailure} from 'ethereum-indexer';
+import {IndexingSource, LastSync, LogEvent, Abi, LogEventWithParsingFailure, UsedStreamConfig} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {QueriableEventProcessor} from './QueriableEventProcessor';
 import {Database, FromDB, JSONObject, PutAndGetDatabase, Query, Result} from './Database';
@@ -45,7 +45,11 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 		return this.reset();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+	async load(
+		source: IndexingSource<ABI>,
+		streamConfig: UsedStreamConfig
+	): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+		this.revertableDatabase.setFinality(streamConfig.finality);
 		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {

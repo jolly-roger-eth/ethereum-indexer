@@ -13,12 +13,15 @@ import {logs} from 'named-logs';
 import type {
 	IndexingSource,
 	EventProcessor,
-	IndexerConfig,
+	ProvidedIndexerConfig,
+	UsedIndexerConfig,
 	LastSync,
 	AllContractData,
 	ContextIdentifier,
+	ProvidedStreamConfig,
+	UsedStreamConfig,
+	LogFetcherConfig,
 	ExistingStream,
-	StreamConfig,
 } from './types';
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
@@ -72,8 +75,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected provider!: EIP1193ProviderWithoutEvents;
 	protected source!: IndexingSource<ABI>;
 
-	protected config!: IndexerConfig<ABI>;
-	protected finality: number = 17;
+	protected config!: UsedIndexerConfig<ABI>;
+	protected finality!: number;
 
 	protected sourceHashes!: {startBlock: number; hash: string}[];
 	protected streamConfigHash!: string;
@@ -104,16 +107,24 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		provider: EIP1193ProviderWithoutEvents,
 		protected processor: EventProcessor<ABI, ProcessResultType>,
 		source: IndexingSource<ABI>,
-		config: IndexerConfig<ABI> = {}
+		config: ProvidedIndexerConfig<ABI> = {}
 	) {
 		this.reinit(provider, source, config);
 	}
 
-	reinit(provider: EIP1193ProviderWithoutEvents, source: IndexingSource<ABI>, config: IndexerConfig<ABI>) {
+	reinit(provider: EIP1193ProviderWithoutEvents, source: IndexingSource<ABI>, config: ProvidedIndexerConfig<ABI>) {
 		this.provider = provider;
+
 		this.source = source;
-		this.config = config;
-		this.finality = this.config.stream?.finality || this.finality;
+		// TODO handle history (in reverse order)
+		this.sourceHashes = [{startBlock: 0, hash: hash(this.source)}];
+
+		const streamConfig: UsedStreamConfig = {finality: 17, ...(config.stream || {})};
+		this.config = {...config, stream: streamConfig};
+
+		this.streamConfigHash = hash(this.config.stream || 'undefined');
+		this.finality = this.config.stream.finality;
+
 		this.logEventFetcher = new LogEventFetcher(this.provider, source.contracts, config?.fetch, config.stream?.parse);
 
 		let defaultFromBlock = 0;
@@ -131,11 +142,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			defaultFromBlock = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
 		}
 		(this.defaultFromBlock as any) = defaultFromBlock;
-
-		this.streamConfigHash = hash(this.config.stream || 'undefined');
-
-		// TODO handle history (in reverse order)
-		this.sourceHashes = [{startBlock: 0, hash: hash(this.source)}];
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -202,7 +208,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	async updateIndexer(update: {
 		provider?: EIP1193ProviderWithoutEvents;
 		source?: IndexingSource<ABI>;
-		streamConfig?: StreamConfig;
+		streamConfig?: ProvidedStreamConfig;
 	}) {
 		this.disableProcessing();
 		const newConfigHash = update.streamConfig ? hash(update.streamConfig) : this.streamConfigHash;
@@ -298,7 +304,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		let currentLastSync: LastSync<ABI> | undefined = undefined;
 		await this.signal('Loading');
 		const processorHash = this.processor.getVersionHash();
-		const loaded = await this.processor.load(this.source);
+		const loaded = await this.processor.load(this.source, this.config.stream);
 		if (loaded) {
 			const {lastSync: loadedLastSync, state} = loaded;
 			if (
@@ -528,13 +534,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			let fetchTransaction = false;
 			let fetchBlock = false;
 
-			if (this.config.stream?.alwaysFetchTransactions) {
+			if (this.config.stream.alwaysFetchTransactions) {
 				if (lastTransactionHash !== event.transactionHash) {
 					fetchTransaction = true;
 				}
 			}
 
-			if (this.config.stream?.alwaysFetchTimestamps) {
+			if (this.config.stream.alwaysFetchTimestamps) {
 				if (!lastBlock || event.blockNumber > lastBlock) {
 					fetchBlock = true;
 				}

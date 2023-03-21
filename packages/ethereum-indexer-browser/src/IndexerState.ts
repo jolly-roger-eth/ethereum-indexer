@@ -1,14 +1,12 @@
 import type {
 	Abi,
 	EventProcessorWithInitialState,
-	ExistingStateFecther,
-	IndexerConfig,
 	IndexingSource,
 	LastSync,
-	StateSaver,
 	ExistingStream,
 	KeepState,
-	StreamConfig,
+	ProvidedStreamConfig,
+	ProvidedIndexerConfig,
 } from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
 import {createRootStore, createStore} from './utils/stores';
@@ -45,13 +43,13 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
 	? (indexerSetup: {
 			provider: EIP1193ProviderWithoutEvents;
 			source: IndexingSource<ABI>;
-			config?: IndexerConfig<ABI>;
+			config?: ProvidedIndexerConfig<ABI>;
 	  }) => Promise<void>
 	: (
 			indexerSetup: {
 				provider: EIP1193ProviderWithoutEvents;
 				source: IndexingSource<ABI>;
-				config?: IndexerConfig<ABI>;
+				config?: ProvidedIndexerConfig<ABI>;
 			},
 			processorConfig: ProcessorConfig
 	  ) => Promise<void>;
@@ -97,7 +95,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		indexerSetup: {
 			provider: EIP1193ProviderWithoutEvents;
 			source: IndexingSource<ABI>;
-			config?: IndexerConfig<ABI>;
+			config?: ProvidedIndexerConfig<ABI>;
 		},
 		processorConfig?: ProcessorConfig
 	) {
@@ -324,7 +322,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		updateIndexer(update: {
 			provider?: EIP1193ProviderWithoutEvents;
 			source?: IndexingSource<ABI>;
-			streamConfig?: StreamConfig;
+			streamConfig?: ProvidedStreamConfig;
 		}) {
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);

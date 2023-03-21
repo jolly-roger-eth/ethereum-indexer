@@ -23,7 +23,12 @@ export type Block = BlockWithOnlyNumber & {hash: string};
 
 export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWithBatchSupport {
 	protected currentEvent: LogEvent<ABI> | undefined;
+	protected finality: number | undefined;
 	constructor(protected db: Database, protected keepAllHistory?: boolean) {}
+
+	setFinality(finality: number) {
+		this.finality = finality;
+	}
 
 	async deleteBlock(block: {number: number; hash: string}) {
 		// delete block
@@ -163,6 +168,9 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 	}
 
 	async queryAtBlock(query: Query & ({blockHash: string} | {blockNumber: number})): Promise<Result> {
+		if (!this.finality) {
+			throw new Error(`no finality setup`);
+		}
 		let blockNumber: number | undefined;
 		if ('blockHash' in query) {
 			const block = await this.db.get<BlockWithOnlyNumber>(`block_${query.blockHash}`);
@@ -188,8 +196,7 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 			if (!blockNumber || blockNumber < 0) {
 				blockNumber = Math.max(0, latestBlock.number + (blockNumber ? blockNumber : 0));
 			}
-			// FIXME finality , get it from the indexer's stream config
-			if (blockNumber < latestBlock.number - 12) {
+			if (blockNumber < latestBlock.number - this.finality) {
 				// TODO Error type for Result, or throw ?
 				return {error: {code: 1111, message: `Cannot go that far in the past`}} as unknown as Result;
 			}

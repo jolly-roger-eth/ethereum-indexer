@@ -1,4 +1,4 @@
-import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, UsedStreamConfig} from 'ethereum-indexer';
 import fs from 'fs';
 import path from 'path';
 import {logs} from 'named-logs';
@@ -40,7 +40,10 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 		}
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+	async load(
+		source: IndexingSource<ABI>,
+		streamConfig: UsedStreamConfig
+	): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
 		let lastSync: LastSync<ABI> | undefined;
 		try {
 			const content = fs.readFileSync(this.folder + `/lastSync.json`, 'utf8');
@@ -55,7 +58,7 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 		}
 
 		// TODO check if source matches old sync
-		const fromProcessor = await this.processor.load(source);
+		const fromProcessor = await this.processor.load(source, streamConfig);
 		if (!fromProcessor) {
 			return undefined;
 		}

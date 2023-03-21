@@ -205,7 +205,8 @@ export async function getLogsWithVariousFilters(
 	let lastAdded: EIP1193Log | undefined;
 	for (const sortedLog of sortedLogs) {
 		if (lastAdded && sortedLog.blockHash === lastAdded.blockHash && sortedLog.logIndex === lastAdded.logIndex) {
-			namedLogger.log(`DUPLICATE LOG`);
+			// since we use multiple filters, there is cases where the same log will appear multiple times
+			// we remove the duplicates
 			continue;
 		}
 		lastAdded = sortedLog;

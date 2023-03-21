@@ -8,7 +8,10 @@ export type {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
 
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	getVersionHash(): string;
-	load: (source: IndexingSource<ABI>) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>} | undefined>;
+	load: (
+		source: IndexingSource<ABI>,
+		streamConfig: UsedStreamConfig
+	) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>} | undefined>;
 	process: (eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
 	clear: () => Promise<void>;
@@ -74,25 +77,33 @@ export type StreamSaver<ABI extends Abi> = (
 ) => Promise<void>;
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
-export type StreamConfig = {
+export type UsedStreamConfig = ProvidedStreamConfig & {
+	finality: number;
+};
+
+export type ProvidedStreamConfig = {
 	finality?: number;
 	alwaysFetchTimestamps?: boolean;
 	alwaysFetchTransactions?: boolean;
 	parse?: LogParseConfig;
 };
 
-export type IndexerConfig<ABI extends Abi> = {
+export type ProvidedIndexerConfig<ABI extends Abi> = {
 	// if this changes do not need a resync
 	fetch?: Omit<LogFetcherConfig, 'filters'>;
 
 	// any change to this stream config should trigger a resync from 0
-	stream?: StreamConfig;
+	stream?: ProvidedStreamConfig;
 
 	// if this changes do not need a resync
 	providerSupportsETHBatch?: boolean;
 
 	// if this changes do not need a resync
 	keepStream?: ExistingStream<ABI>;
+};
+
+export type UsedIndexerConfig<ABI extends Abi> = ProvidedIndexerConfig<ABI> & {
+	stream: UsedStreamConfig;
 };
 
 export type ExistingStream<ABI extends Abi> = {

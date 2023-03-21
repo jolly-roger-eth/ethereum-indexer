@@ -8,6 +8,7 @@ import {
 	ProcessorContext,
 	hash,
 	KeepState,
+	UsedStreamConfig,
 } from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {History, HistoryJSObject, proxifyJSON} from './history';
@@ -37,6 +38,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 	protected config: ProcessorConfig | undefined;
 	protected version: string | undefined;
 	protected configHash: string | undefined;
+	protected finality: number | undefined;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
 		this.version = singleEventProcessor.version;
 		const data = singleEventProcessor.createInitialState();
@@ -49,7 +51,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			lastSync: undefined,
 			history,
 		};
-		this.history = new History(history, 12); // FIXME finality , get it from the indexer's stream config
+		this.history = new History(history);
 		this.state = proxifyJSON<ProcessResultType>(data, this.history);
 	}
 
@@ -102,7 +104,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			lastSync: undefined,
 			history,
 		};
-		this.history = new History(history, 12); // FIXME finality , get it from the indexer's stream config
+		this.history = new History(history);
+		this.finality = undefined;
+		// it will be reloaded
 
 		this.state = proxifyJSON<ProcessResultType>(this._json.data as ProcessResultType, this.history);
 		// return this._json.data;
@@ -119,7 +123,12 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 		return this.reset();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
+	async load(
+		source: IndexingSource<ABI>,
+		streamConfig: UsedStreamConfig
+	): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
+		this.finality = streamConfig.finality;
+		this.history.setFinality(this.finality);
 		this.source = source;
 		if (this.keeper) {
 			const config = this.config as ProcessorConfig;
@@ -161,7 +170,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 
 	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
 		// namedLogger.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
-
+		if (!this.finality) {
+			throw new Error(`finality not set`);
+		}
 		if (!this._json.data) {
 			throw new Error(`no data`);
 		}
@@ -185,7 +196,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 						lastBlockHash = event.blockHash;
 					}
 
-					const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > 12; // FIXME finality , get it from the indexer's stream config
+					const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > this.finality;
 					const state = willNotChange ? this._json.data : this.state;
 					this.singleEventProcessor.processEvent(state, event);
 				}

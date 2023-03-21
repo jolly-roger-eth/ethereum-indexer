@@ -1,4 +1,12 @@
-import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, LogEventWithParsingFailure} from 'ethereum-indexer';
+import {
+	IndexingSource,
+	EventProcessor,
+	LastSync,
+	LogEvent,
+	Abi,
+	LogEventWithParsingFailure,
+	UsedStreamConfig,
+} from 'ethereum-indexer';
 import {logs} from 'named-logs';
 import {JSONObject, Database, FromDB, Query, Result} from './Database';
 import {RevertableDatabase} from './RevertableDatabase';
@@ -46,6 +54,7 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 	private initialization: Promise<void> | undefined;
 	private revertableDatabase: RevertableDatabase<ABI>;
 	private keepAllHistory: boolean;
+	private finality: number | undefined;
 	constructor(private singleEventProcessor: SingleEventProcessorWithBatchSupport<ABI>, protected db: Database) {
 		this.initialization = this.init();
 		this.keepAllHistory = false; // this allow time-travel queries but requires processing and will not scale
@@ -75,7 +84,11 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 		return this.reset();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+	async load(
+		source: IndexingSource<ABI>,
+		streamConfig: UsedStreamConfig
+	): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+		this.finality = streamConfig.finality;
 		// TODO check if source matches old sync
 		const lastSync = await this.db.get('lastSync');
 		if (lastSync) {
@@ -90,11 +103,14 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 		if (this.processing) {
 			throw new Error(`processing...`);
 		}
+		if (!this.finality) {
+			throw new Error(`processor was not loaded`);
+		}
 		this.processing = true;
 		// console.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 
 		try {
-			const revertable = this.keepAllHistory || lastSync.latestBlock - lastSync.lastToBlock <= 12; // FIXME finality , get it from the indexer's stream config
+			const revertable = this.keepAllHistory || lastSync.latestBlock - lastSync.lastToBlock <= this.finality;
 
 			// ----------------------------------------------------------------------------------------------------------------
 			// TODO copy that on all processors
