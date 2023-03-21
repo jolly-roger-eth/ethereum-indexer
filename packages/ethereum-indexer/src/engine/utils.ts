@@ -42,8 +42,7 @@ export function generateStreamToAppend<ABI extends Abi>(
 		finality,
 	}: {newLatestBlock: number; newLastFromBlock: number; newLastToBlock: number; finality: number}
 ): {eventStream: LogEvent<ABI>[]; newLastSync: LastSync<ABI>} {
-	const expectedFromBlock =
-		lastSync.latestBlock === 0 ? defaultFromBlock : Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
+	const expectedFromBlock = getFromBlock(lastSync, defaultFromBlock, finality);
 
 	if (newLastFromBlock !== expectedFromBlock) {
 		let message = `fromBlock (${newLastFromBlock}) not as expected (${expectedFromBlock}).`;
@@ -143,6 +142,12 @@ export function generateStreamToAppend<ABI extends Abi>(
 	};
 }
 
-export function getFromBlock<ABI extends Abi>(lastSync: LastSync<ABI>, finality: number): number {
-	return lastSync.latestBlock === 0 ? 0 : Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
+export function getFromBlock<ABI extends Abi>(
+	lastSync: LastSync<ABI>,
+	defaultFromBlock: number,
+	finality: number
+): number {
+	return lastSync.latestBlock === 0
+		? defaultFromBlock
+		: Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
 }

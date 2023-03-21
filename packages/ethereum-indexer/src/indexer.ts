@@ -20,13 +20,11 @@ import type {
 	ContextIdentifier,
 	ProvidedStreamConfig,
 	UsedStreamConfig,
-	LogFetcherConfig,
-	ExistingStream,
 } from './types';
 import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
 import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './engine/utils';
-import {ActionOperations, CancelOperations, createAction, hash} from './utils';
+import {CancelOperations, createAction, hash} from './utils';
 
 const namedLogger = logs('ethereum-indexer');
 
@@ -120,7 +118,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.sourceHashes = [{startBlock: 0, hash: hash(this.source)}];
 
 		const streamConfig: UsedStreamConfig = {finality: 17, ...(config.stream || {})};
-		this.config = {...config, stream: streamConfig};
+		this.config = {feedBatchSize: 300, ...config, stream: streamConfig};
 
 		this.streamConfigHash = hash(this.config.stream || 'undefined');
 		this.finality = this.config.stream.finality;
@@ -325,14 +323,16 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			if (this.config.keepStream) {
 				await this.signal('Fetching');
 				// we start from scratch
-				const existingStreamData = await this.config.keepStream.fetchFrom(
-					this.source,
-					getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
-				);
+				const fromBlock = this.defaultFromBlock;
+				const existingStreamData = await this.config.keepStream.fetchFrom(this.source, fromBlock);
 
 				// we assume the stream is correct and start from the requested number
 				if (existingStreamData) {
 					const {eventStream: eventsFetched, lastSync: lastSyncFetched} = existingStreamData;
+					// we assign the lastFromBlock as we fetched from that
+					// NOTE save shoudl probably do it itself, really, but here we deal even if it did not
+					lastSyncFetched.lastFromBlock = fromBlock;
+
 					if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
 						// we update the processorHash in case it was changed
 						currentLastSync.context.processor = processorHash;
@@ -357,7 +357,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				// we still need to clear if it does not matches, as otherwise it will be written as if it contained all logs
 				const existingStreamData = await this.config.keepStream.fetchFrom(
 					this.source,
-					getFromBlock(currentLastSync, this.finality) // this is 0 as we found a mistmatch, we need all logs
+					getFromBlock(currentLastSync, this.defaultFromBlock, this.finality)
 				);
 				const {lastSync: lastSyncFetched} = existingStreamData;
 				if (!this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
@@ -377,15 +377,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		},
 		{unlessCancelled}: CancelOperations
 	): Promise<LastSync<ABI>> {
-		// assume lastSyncFetched is newer
-		// TODO throw otherwise ?
-
 		const newEvents = params.newEvents;
 		const lastSyncFetched = params.lastSyncFetched;
 
 		if (!this.lastSync) {
 			this.lastSync = this.freshLastSync(this.processor.getVersionHash());
 		}
+
 		const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, this.defaultFromBlock, newEvents, {
 			newLatestBlock: lastSyncFetched.latestBlock,
 			newLastToBlock: lastSyncFetched.lastToBlock,
@@ -394,8 +392,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		});
 
 		const eventsInGroups = groupLogsPerBlock(eventStream);
-		// FIXME config batchSize
-		const batchSize = 300;
+		const batchSize = this.config.feedBatchSize;
 		let currentLastSync = {...newLastSync};
 		while (eventsInGroups.length > 0) {
 			const list: LogEvent<ABI>[] = [];
@@ -488,10 +485,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		// COMPUTE fromBlock
 		// ----------------------------------------------------------------------------------------
-		const fromBlock =
-			lastSync.latestBlock === 0
-				? this.defaultFromBlock
-				: Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - this.finality);
+		const fromBlock = getFromBlock(lastSync, this.defaultFromBlock, this.finality);
 
 		// ----------------------------------------------------------------------------------------
 

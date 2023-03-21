@@ -100,11 +100,15 @@ export type ProvidedIndexerConfig<ABI extends Abi> = {
 	providerSupportsETHBatch?: boolean;
 
 	// if this changes do not need a resync
+	feedBatchSize?: number;
+
+	// if this changes do not need a resync
 	keepStream?: ExistingStream<ABI>;
 };
 
 export type UsedIndexerConfig<ABI extends Abi> = ProvidedIndexerConfig<ABI> & {
 	stream: UsedStreamConfig;
+	feedBatchSize: number;
 };
 
 export type ExistingStream<ABI extends Abi> = {
