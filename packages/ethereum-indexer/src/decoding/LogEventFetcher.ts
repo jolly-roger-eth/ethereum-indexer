@@ -7,6 +7,7 @@ import {decodeEventLog, encodeEventTopics} from 'viem';
 import {deepEqual} from '../utils/compae';
 import {IncludedEIP1193Log, LogParseConfig} from '../types';
 import {normalizeAddress} from '../utils/address';
+import {UnlessCancelledFunction} from '../utils';
 
 function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
 	if (!map) {
@@ -169,15 +170,13 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		this.abiEventPerTopic = _abiEventPerTopic;
 	}
 
-	getLogEvents(options: {fromBlock: number; toBlock: number; retry?: number}): ParsedLogsPromise<ABI> {
-		const logsPromise = this.getLogs(options);
-		const promise = logsPromise.then(({logs, toBlockUsed}) => {
-			const events = this.parse(logs);
-			return {events, toBlockUsed};
-		});
-
-		(promise as ParsedLogsPromise<ABI>).stopRetrying = logsPromise.stopRetrying;
-		return promise as ParsedLogsPromise<ABI>;
+	async getLogEvents(
+		options: {fromBlock: number; toBlock: number; retry?: number},
+		unlessCancelled: UnlessCancelledFunction
+	): Promise<ParsedLogsResult<ABI>> {
+		const {logs, toBlockUsed} = await this.getLogs(options, unlessCancelled);
+		const events = this.parse(logs);
+		return {events, toBlockUsed};
 	}
 
 	parse(logs: IncludedEIP1193Log[]): LogEvent<ABI>[] {

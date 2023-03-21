@@ -79,7 +79,7 @@ export class CancellablePromiseCancelled extends Error {
 // type OnePromiseArgFn<T> = T extends void ? () => void : (arg: Promise<T>) => void;
 // type UnlessCancelledFunction = <U>(...a: Parameters<OnePromiseArgFn<U>>) => U extends undefined ? void : Promise<U>;
 
-type UnlessCancelledFunction = <T>(arg: Promise<T>) => Promise<T>;
+export type UnlessCancelledFunction = <T>(arg: Promise<T>) => Promise<T>;
 
 export function createCancellablePromise<T>(
 	executor: (

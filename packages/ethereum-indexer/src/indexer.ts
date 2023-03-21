@@ -514,11 +514,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			return {lastSync, eventStream: []};
 		}
 
-		const {events: eventsFetched, toBlockUsed: newToBlock} = await unlessCancelled(
-			this.logEventFetcher.getLogEvents({
+		const {events: eventsFetched, toBlockUsed: newToBlock} = await this.logEventFetcher.getLogEvents(
+			{
 				fromBlock,
 				toBlock: toBlock,
-			})
+			},
+			unlessCancelled
 		);
 		toBlock = newToBlock;
 

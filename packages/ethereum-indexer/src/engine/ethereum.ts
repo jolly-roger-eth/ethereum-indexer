@@ -10,6 +10,7 @@ import {
 
 import {logs} from 'named-logs';
 import {IncludedEIP1193Log} from '../types';
+import {UnlessCancelledFunction} from '../utils';
 const namedLogger = logs('ethereum-utils');
 
 /**
@@ -164,7 +165,8 @@ export async function getLogsWithVariousFilters(
 	contractAddresses: EIP1193Account[] | null,
 	eventNameTopics: EIP1193DATA[] | null,
 	filters: ExtraFilters | null,
-	options: {fromBlock: number; toBlock: number}
+	options: {fromBlock: number; toBlock: number},
+	unlessCancelled: UnlessCancelledFunction
 ): Promise<IncludedEIP1193Log[]> {
 	if (!eventNameTopics) {
 		return getLogs(provider, contractAddresses, eventNameTopics ? [eventNameTopics] : null, options);
@@ -177,7 +179,7 @@ export async function getLogsWithVariousFilters(
 
 	const logs: IncludedEIP1193Log[] = [];
 	for (const request of requestList) {
-		const tmpLogs = await getLogs(provider, request.contractAddresses, request.topics, options);
+		const tmpLogs = await unlessCancelled(getLogs(provider, request.contractAddresses, request.topics, options));
 		logs.push(...tmpLogs);
 	}
 
