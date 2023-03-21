@@ -28,7 +28,7 @@ import {CancelOperations, createAction, hash} from './utils';
 
 const namedLogger = logs('ethereum-indexer');
 
-export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Done';
+export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Loaded';
 
 // PROPOSAL FOR STATE ANCHORS
 // we can have state anchor that get provided by the processor
@@ -366,7 +366,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 			this.lastSync = currentLastSync;
 		}
-		await this.signal('Done');
+		await this.signal('Loaded');
 		return this.lastSync;
 	}
 

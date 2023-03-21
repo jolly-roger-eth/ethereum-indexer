@@ -38,7 +38,7 @@ export type SyncingState<ABI extends Abi> = {
 };
 
 export type StatusState = {
-	state: 'Idle' | 'Loading' | 'Fetching' | 'Processing' | 'Done';
+	state: 'Idle' | 'Loading' | 'Fetching' | 'Processing' | 'Loaded';
 };
 
 type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfig extends undefined
@@ -165,7 +165,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				if (lastSync) {
 					setLastSync(lastSync);
 				}
-			} else if (loadingState === 'Done') {
+			} else if (loadingState === 'Loaded') {
 				setSyncing({processingFetchedLogs: false});
 				if (lastSync) {
 					setLastSync(lastSync);
