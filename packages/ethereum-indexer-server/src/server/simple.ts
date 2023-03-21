@@ -16,13 +16,21 @@ import {
 	AllContractData,
 	ContractData,
 	Abi,
+	ExistingStream,
 } from 'ethereum-indexer';
 import {JSONRPCProvider} from 'ethereum-indexer-utils';
 import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
 
 import {logs} from 'named-logs';
 
-import {bnReplacer, EventCache, PouchDatabase, QueriableEventProcessor, Query} from 'ethereum-indexer-db-utils';
+import {
+	bnReplacer,
+	EventCache,
+	PouchDatabase,
+	QueriableEventProcessor,
+	Query,
+	setupCache,
+} from 'ethereum-indexer-db-utils';
 import {adminPage} from '../pages';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 
@@ -79,13 +87,13 @@ function clean(obj: Object) {
 	return filterOutUnderscoreFieldsFromObject(obj);
 }
 
-export class SimpleServer<ABI extends Abi> {
-	protected indexer: EthereumIndexer<ABI> | undefined;
+export class SimpleServer<ABI extends Abi, ProcessResultType> {
+	protected indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;
 	protected app: Koa | undefined;
 	protected lastSync: LastSync<ABI> | undefined;
 	protected config: Config;
-	protected cache: EventCache<ABI> | undefined;
-	protected processor: QueriableEventProcessor<ABI> | undefined;
+	protected cache: EventCache<ABI, ProcessResultType> | undefined;
+	protected processor: QueriableEventProcessor<ABI, ProcessResultType> | undefined;
 	protected indexing: boolean = false;
 	protected indexingTimeout: NodeJS.Timeout | undefined;
 
@@ -107,7 +115,9 @@ export class SimpleServer<ABI extends Abi> {
 
 	private async setupIndexing() {
 		const processorModule = await import(this.config.processorPath);
-		const processorFactory = processorModule.createProcessor as (config?: any) => QueriableEventProcessor<ABI>;
+		const processorFactory = processorModule.createProcessor as (
+			config?: any
+		) => QueriableEventProcessor<ABI, ProcessResultType>;
 
 		if (!processorFactory) {
 			throw new Error(
@@ -180,12 +190,14 @@ export class SimpleServer<ABI extends Abi> {
 			);
 		}
 
-		let rootProcessor: EventProcessor<ABI> = this.processor;
+		let rootProcessor: EventProcessor<ABI, ProcessResultType> = this.processor;
+		let streamKeeper: ExistingStream<Abi> | undefined;
 		if (this.config.useCache) {
-			// const eventCacheDB = new PouchDatabase(`${this.config.folder}/event-stream.db`);
-			// this.cache = new EventCache(this.processor, eventCacheDB);
-			// rootProcessor = this.cache;
-			throw new Error(`event cache is currently disabled, it needs to be reworked.`);
+			const eventCacheDB = new PouchDatabase(`${this.config.folder}/event-stream.db`);
+			this.cache = new EventCache(this.processor, eventCacheDB);
+			rootProcessor = this.cache;
+			// streamKeeper option ?
+			// streamKeeper = await setupCache(new PouchDatabase(`${this.config.folder}/event-stream.db`));
 		}
 
 		if (this.config.useFSCache) {
@@ -198,6 +210,7 @@ export class SimpleServer<ABI extends Abi> {
 			this.source,
 			{
 				providerSupportsETHBatch: true,
+				keepStream: streamKeeper,
 			}
 		);
 

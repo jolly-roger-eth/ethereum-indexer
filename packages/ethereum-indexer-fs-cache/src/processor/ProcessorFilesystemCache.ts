@@ -9,9 +9,11 @@ function identity(arg: any): any {
 	return arg;
 }
 
-export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor<ABI, void> {
+export class ProcessorFilesystemCache<ABI extends Abi, ProcessResultType>
+	implements EventProcessor<ABI, ProcessResultType>
+{
 	protected folder: string;
-	constructor(protected processor: EventProcessor<ABI, void>, folder: string) {
+	constructor(protected processor: EventProcessor<ABI, ProcessResultType>, folder: string) {
 		this.folder = path.join(folder, 'logs');
 		try {
 			fs.mkdirSync(this.folder, {recursive: true});
@@ -43,7 +45,7 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 	async load(
 		source: IndexingSource<ABI>,
 		streamConfig: UsedStreamConfig
-	): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+	): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
 		let lastSync: LastSync<ABI> | undefined;
 		try {
 			const content = fs.readFileSync(this.folder + `/lastSync.json`, 'utf8');
@@ -62,6 +64,7 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 		if (!fromProcessor) {
 			return undefined;
 		}
+		let lastOutcome: ProcessResultType = fromProcessor.state;
 		let lastSyncFromProcessor = fromProcessor.lastSync;
 
 		const files = fs.readdirSync(this.folder);
@@ -105,16 +108,16 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 						unconfirmedBlocks: [], // TODO ?
 					};
 					namedLogger.info('processing stream...');
-					await this.processor.process(eventStream, lastSyncFromProcessor);
+					lastOutcome = await this.processor.process(eventStream, lastSyncFromProcessor);
 				}
 			}
 		}
 
-		return {lastSync, state: undefined};
+		return {lastSync, state: lastOutcome};
 	}
 
-	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
-		await this.processor.process(eventStream, lastSync);
+	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
+		const outcome = await this.processor.process(eventStream, lastSync);
 		if (eventStream.length > 0) {
 			// TODO
 			// use lastSync to get an equivalent stream ID ?
@@ -124,5 +127,6 @@ export class ProcessorFilesystemCache<ABI extends Abi> implements EventProcessor
 			// fs.writeFileSync(this.folder + `/${filename}`, JSON.stringify(eventStream, null, 2));
 		}
 		fs.writeFileSync(this.folder + `/lastSync.json`, JSON.stringify(lastSync));
+		return outcome;
 	}
 }

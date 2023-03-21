@@ -5,7 +5,7 @@ import {EventProcessorWithBatchDBUpdate, SingleEventProcessorWithBatchSupport} f
 
 export function fromSingleEventProcessor<ABI extends Abi>(
 	v: SingleEventProcessor<ABI> | (() => SingleEventProcessor<ABI>)
-): (config?: {folder: string}) => QueriableEventProcessor<ABI> {
+): (config?: {folder: string}) => QueriableEventProcessor<ABI, void> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorOnDatabase(typeof v === 'function' ? v() : v, db);
@@ -48,7 +48,7 @@ export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEvent
 
 export function fromSingleEventProcessorObject<ABI extends Abi>(
 	v: SingleEventProcessorObject<ABI> | (() => SingleEventProcessorObject<ABI>)
-): (config?: {folder: string}) => QueriableEventProcessor<ABI> {
+): (config?: {folder: string}) => QueriableEventProcessor<ABI, void> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorOnDatabase(
@@ -60,7 +60,7 @@ export function fromSingleEventProcessorObject<ABI extends Abi>(
 
 export function fromSingleEventProcessorWithBatchSupportObject<ABI extends Abi>(
 	v: SingleEventProcessorWithBatchSupport<ABI> | (() => SingleEventProcessorWithBatchSupport<ABI>)
-): (config?: {folder: string}) => QueriableEventProcessor<ABI> {
+): (config?: {folder: string}) => QueriableEventProcessor<ABI, void> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorWithBatchDBUpdate(typeof v === 'function' ? v() : v, db);

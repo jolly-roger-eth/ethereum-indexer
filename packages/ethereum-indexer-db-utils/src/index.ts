@@ -6,3 +6,4 @@ export * from './db/SyncDB';
 export * from './db/PouchDatabase';
 export * from './processor/EventCache';
 export * from './utils';
+export * from './cache/StreamDBCache';

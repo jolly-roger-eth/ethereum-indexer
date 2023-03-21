@@ -7,10 +7,10 @@ function lexicographicNumber15(num: number): string {
 	return num.toString().padStart(15, '0');
 }
 
-export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
+export class EventCache<ABI extends Abi, ProcessResultType> implements EventProcessor<ABI, ProcessResultType> {
 	protected eventDB: Database;
 	protected initialization: Promise<void> | undefined;
-	constructor(protected processor: EventProcessor<ABI, void>, database: Database) {
+	constructor(protected processor: EventProcessor<ABI, ProcessResultType>, database: Database) {
 		this.eventDB = database;
 		this.initialization = this.init();
 	}
@@ -21,7 +21,7 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 
 	protected init(): Promise<void> {
 		this.initialization = this.eventDB.setup({
-			indexes: [{fields: ['batch']}], // 'blockNumber', 'blockHash', 'address', 'transactionHash', 'name', 'signature', 'topic'
+			indexes: [{fields: ['batch', 'blockNumber', 'logIndex']}], // 'blockNumber', 'blockHash', 'address', 'transactionHash', 'name', 'signature', 'topic'
 		});
 		return this.initialization;
 	}
@@ -43,29 +43,33 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 	async load(
 		source: IndexingSource<ABI>,
 		streamConfig: UsedStreamConfig
-	): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+	): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
 		const lastSyncFromProcessor = await this.processor.load(source, streamConfig);
 		if (lastSyncFromProcessor) {
 			return lastSyncFromProcessor;
 		}
-		// TODO cache shoudl be a eventFetcher/Saver
 		try {
 			const lastSync = await this.eventDB.get<LastSync<ABI> & {batch: number}>('lastSync');
 			if (!lastSync) {
 				return undefined;
 			}
 			this.batchCounter = lastSync.batch;
-			return {
-				lastSync: lastSync as unknown as LastSync<ABI>,
-				state: undefined,
-			};
+
+			const outcome = await this.replay();
+			if (outcome) {
+				return {lastSync, state: outcome};
+			} else {
+				return undefined;
+			}
 		} catch (err) {
 			return undefined;
 		}
 	}
 
 	protected _replaying: boolean | undefined;
-	async replay() {
+	async replay(): Promise<ProcessResultType | undefined> {
+		let lastOutcome: ProcessResultType | undefined;
+
 		if (this._replaying) {
 			throw new Error(`already replaying`);
 		}
@@ -84,15 +88,35 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 					2
 				)
 			);
+
 			for (let i = 0; i < lastSync.batch; i++) {
 				const events = (
 					await this.eventDB.query({
 						selector: {
 							batch: i,
 						},
-						sort: ['_id'],
 					})
-				).docs.filter((v) => v._id !== 'lastSync') as unknown as LogEvent<ABI>[];
+				).docs
+					.filter((v) => v._id !== 'lastSync')
+					.sort((a, b) => {
+						const aT = a.blockNumber;
+						const bT = b.blockNumber;
+						if (aT > bT) {
+							return 1;
+						} else if (aT < bT) {
+							return -1;
+						} else {
+							const aL = a.logIndex;
+							const bL = b.logIndex;
+							if (aL > bL) {
+								return 1;
+							} else if (aL < bL) {
+								return -1;
+							} else {
+								return 0;
+							}
+						}
+					}) as unknown as LogEvent<ABI>[];
 				if (events.length > 0) {
 					// TODO allow replay to fetch timestamp if missing
 					for (const event of events) {
@@ -104,7 +128,7 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 
 					const lastEvent = events[events.length - 1];
 					console.info(`EventCache replaying batch ${i}...`);
-					await this.processor.process(events, {
+					lastOutcome = await this.processor.process(events, {
 						context: lastSync.context,
 						lastFromBlock: lastSync.lastToBlock + 1,
 						lastToBlock: lastEvent.blockNumber,
@@ -121,10 +145,11 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 		}
 
 		this._replaying = false;
+		return lastOutcome;
 	}
 
 	protected batchCounter = 0;
-	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<void> {
+	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
 		console.info(`EventCache enter processing.`);
 		await this.initialization;
 
@@ -132,7 +157,7 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 			throw new Error(`please wait while replaying is taking place`);
 		}
 		console.info(`EventCache processing...`);
-		await this.processor.process(eventStream, lastSync);
+		const outcome = await this.processor.process(eventStream, lastSync);
 		if (eventStream.length > 0) {
 			for (const event of eventStream) {
 				await this.eventDB.put({
@@ -171,6 +196,8 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 		// console.log(`lastSync document`)
 		// console.log(JSON.stringify(lastSyncDoc, null, 2))
 		await this.eventDB.put(lastSyncDoc as any);
+
+		return outcome;
 	}
 
 	query<T>(request: Query | (Query & ({blockHash: string} | {blockNumber: number}))): Promise<Result> {

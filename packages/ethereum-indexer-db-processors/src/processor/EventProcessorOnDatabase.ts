@@ -20,7 +20,7 @@ export interface SingleEventProcessor<ABI extends Abi> {
 	handleUnparsedEvent?(event: LogEventWithParsingFailure): void;
 }
 
-export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEventProcessor<ABI> {
+export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEventProcessor<ABI, void> {
 	private initialization: Promise<void> | undefined;
 	private revertableDatabase: RevertableDatabase<ABI>;
 	constructor(private singleEventProcessor: SingleEventProcessor<ABI>, protected db: Database) {

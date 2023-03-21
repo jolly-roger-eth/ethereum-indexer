@@ -68,7 +68,7 @@ export type IndexingSource<ABI extends Abi> = {
 export type StreamFecther<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	fromBlock: number
-) => Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]}>;
+) => Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]} | undefined>;
 export type StreamSaver<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	stream: {

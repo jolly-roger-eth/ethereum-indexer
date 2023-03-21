@@ -35,7 +35,7 @@ export function bnReviver(v: any): any {
 		(v.startsWith('-') ? !isNaN(parseInt(v.charAt(1))) : !isNaN(parseInt(v.charAt(0)))) &&
 		v.charAt(v.length - 1) === 'n'
 	) {
-		return BigInt(v.slice(-1));
+		return BigInt(v.slice(0, -1));
 	} else {
 		if (typeof v === 'object') {
 			if (Array.isArray(v)) {

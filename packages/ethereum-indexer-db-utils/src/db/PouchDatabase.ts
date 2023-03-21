@@ -115,6 +115,6 @@ export class PouchDatabase implements Database {
 	}
 
 	async query(query: {selector: JSONObject; sort?: string[]; fields?: string[]}): Promise<Result> {
-		return this.pouchDB.find(query) as unknown as Result;
+		return this.pouchDB.find(query).then(bnReviver) as unknown as Result;
 	}
 }

@@ -351,9 +351,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					this.source,
 					getFromBlock(currentLastSync, this.defaultFromBlock, this.finality)
 				);
-				const {lastSync: lastSyncFetched} = existingStreamData;
-				if (!this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
-					await this.config.keepStream.clear(this.source);
+				if (existingStreamData) {
+					const {lastSync: lastSyncFetched} = existingStreamData;
+					if (!this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
+						await this.config.keepStream.clear(this.source);
+					}
 				}
 			}
 			this.lastSync = currentLastSync;

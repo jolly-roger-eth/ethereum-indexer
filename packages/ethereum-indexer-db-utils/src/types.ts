@@ -7,4 +7,5 @@ export type Queriable = {
 	get<T extends JSONObject>(id: string): Promise<FromDB<T> | null>;
 };
 
-export type QueriableEventProcessor<ABI extends Abi> = EventProcessor<ABI> & Queriable;
+export type QueriableEventProcessor<ABI extends Abi, ProcessResultType> = EventProcessor<ABI, ProcessResultType> &
+	Queriable;
