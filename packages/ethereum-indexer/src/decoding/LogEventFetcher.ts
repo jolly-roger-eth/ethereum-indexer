@@ -196,7 +196,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				logIndex: parseInt(log.logIndex.slice(2), 16),
 			};
 			const correspondingABI: AbiEvent[] | undefined =
-				this.abiPerAddress.size == 0 || this.parseConfig?.globalABI
+				this.abiPerAddress.size === 0 || !this.parseConfig?.onlyParseEventsAssignedInRespectiveContracts
 					? this.allABIEvents
 					: this.abiPerAddress.get(eventAddress);
 			if (correspondingABI) {

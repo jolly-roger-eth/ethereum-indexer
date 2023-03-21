@@ -118,7 +118,7 @@ export type ExistingStream<ABI extends Abi> = {
 };
 
 export type LogParseConfig = {
-	globalABI?: boolean;
+	onlyParseEventsAssignedInRespectiveContracts?: boolean;
 	filters?: {
 		// for each event name we can specify a list of filter
 		// each filter is an array of (topic or topic[])
