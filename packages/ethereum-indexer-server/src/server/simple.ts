@@ -182,9 +182,10 @@ export class SimpleServer<ABI extends Abi> {
 
 		let rootProcessor: EventProcessor<ABI> = this.processor;
 		if (this.config.useCache) {
-			const eventCacheDB = new PouchDatabase(`${this.config.folder}/event-stream.db`);
-			this.cache = new EventCache(this.processor, eventCacheDB);
-			rootProcessor = this.cache;
+			// const eventCacheDB = new PouchDatabase(`${this.config.folder}/event-stream.db`);
+			// this.cache = new EventCache(this.processor, eventCacheDB);
+			// rootProcessor = this.cache;
+			throw new Error(`event cache is currently disabled, it needs to be reworked.`);
 		}
 
 		if (this.config.useFSCache) {
