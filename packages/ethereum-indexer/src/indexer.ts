@@ -488,19 +488,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		// COMPUTE fromBlock
 		// ----------------------------------------------------------------------------------------
-		let fromBlock = this.defaultFromBlock;
-		if (lastUnconfirmedBlocks.length > 0) {
-			// FIXME
-			// this is wrong, we need to take fromBlock from lastSync (+ finality or use fromBlock)
-			fromBlock = lastUnconfirmedBlocks[0].number;
-		} else {
-			// FIXME
-			// same this is wrong, there could be reorg missed and event to add
-			// fromBlock / lastSync need to be used and of course depending on lastSync.latestBlock to check finality of that last request
-			if (lastSync.lastToBlock !== 0) {
-				fromBlock = lastSync.lastToBlock + 1;
-			}
-		}
+		const fromBlock =
+			lastSync.latestBlock === 0
+				? this.defaultFromBlock
+				: Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - this.finality);
+
 		// ----------------------------------------------------------------------------------------
 
 		// ----------------------------------------------------------------------------------------
