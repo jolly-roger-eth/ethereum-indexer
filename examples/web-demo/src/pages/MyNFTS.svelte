@@ -27,7 +27,14 @@
 	);
 
 	let runningProcessor = initialProcessor;
+	let firstTime = true;
 	processorFactory.subscribe(async (v) => {
+		if (firstTime) {
+			// skip first as we do not care and the processor is not ready by then
+			// TODO throw if processor not ready ?
+			firstTime = false;
+			return;
+		}
 		try {
 			const newProcessor = v();
 			(newProcessor as any).copyFrom && (newProcessor as any).copyFrom(runningProcessor);

@@ -64,6 +64,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 		this.config = otherProcessor.config;
 		this.configHash = otherProcessor.configHash;
 		this.singleEventProcessor.configure(this.config as ProcessorConfig);
+		this.finality = otherProcessor.finality; // this will be discarded on load
 	}
 
 	getVersionHash(): string {

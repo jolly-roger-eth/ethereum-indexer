@@ -42,20 +42,17 @@ export function generateStreamToAppend<ABI extends Abi>(
 		finality,
 	}: {newLatestBlock: number; newLastFromBlock: number; newLastToBlock: number; finality: number}
 ): {eventStream: LogEvent<ABI>[]; newLastSync: LastSync<ABI>} {
-	const minFromBlock =
+	const expectedFromBlock =
 		lastSync.latestBlock === 0 ? defaultFromBlock : Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
 
-	if (newLastFromBlock < minFromBlock) {
-		throw new Error(
-			`too far back, we could trim it automatically, but this is probably an error to send that, so we throw here`
-		);
-	}
-
-	const lastSafeFromBlock =
-		lastSync.latestBlock === 0 ? defaultFromBlock : Math.max(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
-
-	if (newLastFromBlock > lastSafeFromBlock) {
-		throw new Error(`the fromBlock do not consider the potential of reorg, please resend with some block past`);
+	if (newLastFromBlock !== expectedFromBlock) {
+		let message = `fromBlock (${newLastFromBlock}) not as expected (${expectedFromBlock}).`;
+		if (newLastFromBlock > expectedFromBlock) {
+			message += `\nThis is too far back, we could trim it automatically, but this is probably an error to send that, so we throw here`;
+		} else {
+			message += `\nThe fromBlock do not consider the potential of reorg, the only safe fromBlock is ${expectedFromBlock}`;
+		}
+		throw new Error(message);
 	}
 
 	const logEventsGroupedPerBlock = groupLogsPerBlock(newEvents);

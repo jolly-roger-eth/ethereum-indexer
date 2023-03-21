@@ -17,6 +17,8 @@ export function _asNewModule(set: any) {
 if (import.meta.hot) {
 	import.meta.hot.accept((newModule) => {
 		newModule?._asNewModule(_setFactory);
-		_setFactory(newModule?.initialFactory);
+		if (_setFactory) {
+			_setFactory(newModule?.initialFactory);
+		}
 	});
 }
