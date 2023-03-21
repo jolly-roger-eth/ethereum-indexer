@@ -42,19 +42,19 @@ export type StatusState = {
 };
 
 type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfig extends undefined
-	? (
+	? (indexerSetup: {
+			provider: EIP1193ProviderWithoutEvents;
+			source: IndexingSource<ABI>;
+			config?: IndexerConfig<ABI>;
+	  }) => Promise<void>
+	: (
 			indexerSetup: {
 				provider: EIP1193ProviderWithoutEvents;
 				source: IndexingSource<ABI>;
 				config?: IndexerConfig<ABI>;
 			},
 			processorConfig: ProcessorConfig
-	  ) => Promise<void>
-	: (indexerSetup: {
-			provider: EIP1193ProviderWithoutEvents;
-			source: IndexingSource<ABI>;
-			config?: IndexerConfig<ABI>;
-	  }) => Promise<void>;
+	  ) => Promise<void>;
 
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
@@ -183,7 +183,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			setSyncing({loading: false});
 			return lastSync;
 		} finally {
-			setSyncing({loading: false, error: {message: 'Failed to load', code: 1}}); // TODO code})
+			// FIXME code should be string, easier to declare inline
+			// then we could refactor to code based on a list of errors
+			setSyncing({loading: false, error: {message: 'Failed to load', code: 1}});
 		}
 	}
 
@@ -333,9 +335,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			const {useReadable} = useStores(react);
 			return {
 				...this,
-				useState: () => useReadable(this.state),
-				useSyncing: () => useReadable(this.syncing),
-				useStatus: () => useReadable(this.status),
+				useState: () => useReadable(this.state, false),
+				useSyncing: () => useReadable(this.syncing, false),
+				useStatus: () => useReadable(this.status, false),
 			};
 		},
 	};

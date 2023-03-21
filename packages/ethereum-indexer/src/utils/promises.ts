@@ -1,3 +1,5 @@
+// FIXME make it a library
+
 type ResolveFunction<T> = (value: T | PromiseLike<T>) => void;
 type RejectFunction = (reason?: any) => void;
 

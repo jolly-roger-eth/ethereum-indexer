@@ -209,7 +209,6 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					const config = this.config as ProcessorConfig;
 					const source = this.source as IndexingSource<ABI>;
 					const version = this.version;
-					// TODO why do we need the `as` ?
 					const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
 					if (!this._json.data || !this._json.lastSync || !this._json.history) {
 						throw new Error(`empty _json`);

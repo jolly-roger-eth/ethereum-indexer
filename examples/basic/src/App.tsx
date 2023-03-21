@@ -33,9 +33,13 @@ const contract = {
 	startBlock: 3040661,
 } as const;
 
+// we define the type of the state computed by the processor
+// we can also declare it inline in the generic type of JSProcessor
+type State = {greetings: {account: `0x${string}`; message: string}[]};
+
 // the processor is given the type of the ABI as Generic type to get generated
 // it also specify the type which represent the current state
-const processor: JSProcessor<typeof contract.abi, {greetings: {account: `0x${string}`; message: string}[]}> = {
+const processor: JSProcessor<typeof contract.abi, State> = {
 	construct() {
 		return {greetings: []};
 	},
@@ -59,9 +63,9 @@ const processor: JSProcessor<typeof contract.abi, {greetings: {account: `0x${str
 // this setup a set of observable (subscribe pattern)
 // including one for the current state (computed by the processor above)
 // and one for the syncing status
-const {init, useState, useSyncing, useStatus, startAutoIndexing} = createIndexerState(
-	fromJSProcessor(processor)()
-).withHooks(react);
+const {init, useState, useSyncing, startAutoIndexing} = createIndexerState(fromJSProcessor(processor)()).withHooks(
+	react
+);
 
 // we now need to get a handle on a ethereum provider
 // for this app we are simply using window.ethereum
@@ -83,14 +87,11 @@ if (ethereum) {
 		// - an EIP-1193 provider (window.ethereum here)
 		// - source config which includes the chainId and the list of contracts (abi,address. startBlock)
 		// here we also configure so the indexer uses ABI as global so events defined across contracts will be processed
-		init(
-			{
-				provider: ethereum,
-				source: {chainId: '11155111', contracts: [contract]},
-				config: {stream: {parse: {globalABI: true}}},
-			},
-			undefined
-		).then(() => {
+		init({
+			provider: ethereum,
+			source: {chainId: '11155111', contracts: [contract]},
+			// config: {stream: {parse: {globalABI: true}}},
+		}).then(() => {
 			// this automatically index on a timer
 			// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
 			// startAutoIndexing is easier but manually calling `indexMore` or `indexMoreAndCatchupIfNeeded` is better

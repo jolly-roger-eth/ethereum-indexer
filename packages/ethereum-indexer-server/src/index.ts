@@ -1,7 +1,7 @@
 #! /usr/bin/env node
 import * as dotenv from 'dotenv';
 import * as dotenvExpand from 'dotenv-expand';
-// TODO if (mode)
+// TODO handle process.env.MODE to get the correct path to read
 const localEnv = dotenv.config({path: './.env.local'});
 dotenvExpand.expand(localEnv);
 const defaultEnv = dotenv.config({path: './.env'});

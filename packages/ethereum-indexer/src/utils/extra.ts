@@ -3,6 +3,7 @@ import {EIP1193Account, EIP1193DATA, EIP1193Provider, EIP1193QUANTITY} from 'eip
 import {decodeFunctionResult, encodeFunctionData} from 'viem';
 import {JSONType, LogEventFetcher} from '../decoding/LogEventFetcher';
 import {LogEvent} from '../types';
+import {normalizeAddress} from './address';
 
 const multicallInterface = [
 	{
@@ -114,9 +115,10 @@ export function createER721Filter<ABI extends Abi>(
 		}
 
 		for (const event of eventsFetched) {
-			if (!erc721Contracts[event.address.toLowerCase()] && !addressesMap[event.address.toLowerCase()]) {
+			const eventAddress = normalizeAddress(event.address);
+			if (!erc721Contracts[eventAddress] && !addressesMap[eventAddress]) {
 				addressesToCheck.push(event.address);
-				addressesMap[event.address.toLowerCase()] = true;
+				addressesMap[eventAddress] = true;
 			}
 		}
 		if (addressesToCheck.length > 0) {
@@ -128,7 +130,8 @@ export function createER721Filter<ABI extends Abi>(
 
 		const events = [];
 		for (const event of eventsFetched) {
-			const inCache = erc721Contracts[event.address.toLowerCase()];
+			const eventAddress = normalizeAddress(event.address);
+			const inCache = erc721Contracts[eventAddress];
 			if (inCache === true) {
 				events.push(event);
 				continue;
@@ -181,16 +184,13 @@ export function createER721TokenURIFetcher<ABI extends Abi>(
 		if (!('args' in event)) {
 			return undefined;
 		}
-		if (
-			!event.args['tokenId'] ||
-			!event.args['from'] ||
-			event.args['from'] !== '0x0000000000000000000000000000000000000000'
-		) {
+		const args = event.args as {[name: string]: any};
+		if (!args['tokenId'] || !args['from'] || args['from'] !== '0x0000000000000000000000000000000000000000') {
 			return undefined;
 		}
 
 		try {
-			const uri = await tokenURI(provider, event.address as EIP1193Account, event.args['tokenId'], event.blockHash);
+			const uri = await tokenURI(provider, event.address as EIP1193Account, args['tokenId'], event.blockHash);
 			if (uri) {
 				return {
 					tokenURIAtMint: uri,

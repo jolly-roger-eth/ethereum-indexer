@@ -4,12 +4,16 @@ export type ReactHooks = {useState: UseState; useEffect: UseEffect};
 
 const unset: any = Symbol();
 
-function reactiveReadable(react: ReactHooks): <T>(store: Readable<T>) => T {
-	return function <T>(store: Readable<T>) {
+function reactiveReadable(react: ReactHooks): <T>(store: Readable<T>, immutable?: boolean) => T {
+	return function <T>(store: Readable<T>, immutable = true) {
 		const [value, set] = react.useState<T>(unset as unknown as T);
 		react.useEffect(
 			() =>
 				store.subscribe((v) => {
+					if (immutable) {
+						return v;
+					}
+					// as v might be a mutated value we do the following:
 					// for array and object we ensure a new object is created so react detect the changes
 					if (Array.isArray(v)) {
 						return set([...v] as T);
@@ -30,16 +34,18 @@ function reactiveReadable(react: ReactHooks): <T>(store: Readable<T>) => T {
 	};
 }
 
-function reactiveWriteable(react: ReactHooks): <T>(store: Writable<T>) => [T, StoreSetter<T>, StoreUpdater<T>] {
-	return <T>(store: Writable<T>) => {
-		const value = reactiveReadable(react)(store);
+function reactiveWriteable(
+	react: ReactHooks
+): <T>(store: Writable<T>, immutable?: boolean) => [T, StoreSetter<T>, StoreUpdater<T>] {
+	return <T>(store: Writable<T>, immutable = true) => {
+		const value = reactiveReadable(react)(store, immutable);
 		return [value, store.set, store.update];
 	};
 }
 
 export function useStores(react: ReactHooks): {
-	useWriteable<T>(store: Writable<T>): [T, StoreSetter<T>, StoreUpdater<T>];
-	useReadable<T>(store: Readable<T>): T;
+	useWriteable<T>(store: Writable<T>, immutable?: boolean): [T, StoreSetter<T>, StoreUpdater<T>];
+	useReadable<T>(store: Readable<T>, immutable?: boolean): T;
 } {
 	return {
 		useReadable: reactiveReadable(react),

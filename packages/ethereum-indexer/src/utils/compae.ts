@@ -12,12 +12,12 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 			return false;
 		}
 		for (const key in a) {
-			if (!(key in b) || !deepEqual(a[key], b[key])) {
+			if (!(key in b) || !deepEqual((a as any)[key], (b as any)[key])) {
 				return false;
 			}
 		}
 		for (const key in b) {
-			if (!(key in a) || !deepEqual(b[key], a[key])) {
+			if (!(key in a) || !deepEqual((b as any)[key], (a as any)[key])) {
 				return false;
 			}
 		}

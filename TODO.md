@@ -1,4 +1,1 @@
-- [ ] simplify ethereum-indexer to not handle save and fetch
-- [ ] pass state saver and state fetcher in constructor via config, as oposed to save it
-- [ ] test state-saver
-- [ ] allow to detect when a reconstruction from beginning is needed (hash of processor ? version ?)
+- [] NumberifiedLog / LogEvent could have fields removed, configuration on config.stream

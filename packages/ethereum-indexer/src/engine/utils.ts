@@ -41,9 +41,9 @@ export function generateStreamToAppend<ABI extends Abi>(
 
 	const lastUnconfirmedBlocks = lastSync.unconfirmedBlocks;
 	// assume we are giving a list of event fetch from the same block (lastToBlock - finality)
-	// TODO check and throw if not
+	// FIXME check and throw if not
 
-	// TODO for that: add a fromBlock to the lastSync object ?
+	// FIXME for that: add a fromBlock to the lastSync object ?
 
 	// find reorgs
 	let reorgBlock: EventBlock<ABI> | undefined;
@@ -67,9 +67,8 @@ export function generateStreamToAppend<ABI extends Abi>(
 		for (let i = reorgedBlockIndex; i < lastUnconfirmedBlocks.length; i++) {
 			for (const event of lastUnconfirmedBlocks[i].events) {
 				eventStream.push({
-					...event, // TODO delete that ?
-					removed: true, // delete that ?
-					// removedStreamID: event.streamID, // TODO ?
+					...event,
+					removed: true,
 				});
 			}
 		}

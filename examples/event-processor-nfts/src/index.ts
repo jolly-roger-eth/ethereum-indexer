@@ -26,8 +26,7 @@ const NFTEventProcessor: JSProcessor<typeof eip721, Data, {account: `0x${string}
 		}
 
 		if (!nft) {
-			// TODO agree on format
-			if (to.toLowerCase() === config.account.toLowerCase()) {
+			if (to === config.account) {
 				nft = {
 					tokenID,
 					tokenAddress: event.address,
@@ -37,7 +36,7 @@ const NFTEventProcessor: JSProcessor<typeof eip721, Data, {account: `0x${string}
 				// never add
 			}
 		} else {
-			if (to.toLowerCase() !== config.account.toLowerCase()) {
+			if (to !== config.account) {
 				data.nfts.splice(nftIndex, 1);
 				return;
 			}

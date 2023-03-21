@@ -6,6 +6,7 @@ import type {DecodeEventLogReturnType} from 'viem';
 import {decodeEventLog, encodeEventTopics} from 'viem';
 import {deepEqual} from '../utils/compae';
 import {IncludedEIP1193Log, LogParseConfig} from '../types';
+import {normalizeAddress} from '../utils/address';
 
 function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
 	if (!map) {
@@ -39,19 +40,19 @@ interface Result extends ReadonlyArray<any> {
 }
 
 interface NumberifiedLog {
-	blockNumber: number; // TODO option to remove from saved data
-	blockHash: `0x${string}`; // TODO option to remove from saved data
-	transactionIndex: number; // TODO option to remove from saved data
+	blockNumber: number;
+	blockHash: `0x${string}`;
+	transactionIndex: number;
 
-	removed: boolean; // // TODO option to remove from saved data, we should always be able to remove these by removing the corresponding cancelled event
+	removed: boolean;
 
-	address: `0x${string}`; // TODO option to remove from saved data
-	data: `0x${string}`; // TODO remove from parsed event
+	address: `0x${string}`;
+	data: `0x${string}`;
 
-	topics: Array<`0x${string}`>; // TODO remove from parsed event
+	topics: Array<`0x${string}`>;
 
-	transactionHash: `0x${string}`; // TODO remove from saved data
-	logIndex: number; // TODO option to remove from saved data
+	transactionHash: `0x${string}`;
+	logIndex: number;
 }
 
 export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
@@ -98,11 +99,12 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		if (Array.isArray(contractsData)) {
 			contractAddresses = [];
 			for (const contract of contractsData as ContractList<ABI>) {
+				const contractAddress = normalizeAddress(contract.address);
 				const contractEventsABI: AbiEvent[] = contract.abi.filter((item) => item.type === 'event') as AbiEvent[];
-				const abiAtThatAddress = _abiPerAddress.get(contract.address);
+				const abiAtThatAddress = _abiPerAddress.get(contractAddress);
 				if (!abiAtThatAddress) {
-					_abiPerAddress.set(contract.address, contractEventsABI);
-					contractAddresses.push(contract.address);
+					_abiPerAddress.set(contractAddress, contractEventsABI);
+					contractAddresses.push(contractAddress);
 				} else {
 					abiAtThatAddress.push(...contractEventsABI);
 					deleteDuplicateEvents(abiAtThatAddress);
@@ -114,8 +116,8 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 					if (list.length === 0) {
 						_eventNameToContractAddresses.set(event.name, list);
 					}
-					if (list.indexOf(contract.address) === -1) {
-						list.push(contract.address);
+					if (list.indexOf(contractAddress) === -1) {
+						list.push(contractAddress);
 					}
 				}
 			}
@@ -182,13 +184,13 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		const events: LogEvent<ABI>[] = [];
 		for (let i = 0; i < logs.length; i++) {
 			const log = logs[i];
-			const eventAddress = log.address.toLowerCase() as `0x${string}`;
+			const eventAddress = normalizeAddress(log.address);
 			const event: NumberifiedLog = {
 				blockNumber: parseInt(log.blockNumber.slice(2), 16),
 				blockHash: log.blockHash,
 				transactionIndex: parseInt(log.transactionIndex.slice(2), 16),
 				removed: log.removed ? true : false,
-				address: log.address,
+				address: eventAddress,
 				data: log.data,
 				topics: log.topics,
 				transactionHash: log.transactionHash,

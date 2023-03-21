@@ -71,8 +71,10 @@ export class LogFetcher {
 
 	getLogs(options: {fromBlock: number; toBlock: number; retry?: number}): LogsPromise {
 		let retry = options.retry !== undefined ? options.retry : this.config.numRetry;
+
+		// FIXME remove stopRetrying and use unlessCancelled
 		let _stopRetrying: () => void | undefined;
-		// TODO stop fetching let logsProm: Promise<any>
+		// FIXME stop fetching let logsProm: Promise<any>
 		const stopRetrying = () => {
 			if (_stopRetrying) {
 				_stopRetrying();
@@ -86,7 +88,7 @@ export class LogFetcher {
 			let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
 			try {
 				if (this.conf.filters) {
-					// TODO cancel on stopRetrying and make it throw
+					// FIXME cancel on stopRetrying and make it throw
 					const logsProm = getLogsWithVariousFilters(
 						this.provider,
 						this.contractAddresses,

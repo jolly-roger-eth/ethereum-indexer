@@ -219,7 +219,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		});
 
 		// TODO remove, this is the responsibility of the developer to ensure it pass correct data when indexer context changes
-		// for now we do a minimu check of chainId
+		// for now we do a minimum check of chainId
 		// if this has been updated but the source remain unchanged, then the developer must have forgot to send a different source
 		if (!resetNeeded) {
 			const newChainIdAsHex = await newProvider.request({method: 'eth_chainId'});
@@ -387,7 +387,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		});
 
 		const eventsInGroups = groupLogsPerBlock(eventStream);
-		// TODO config batchSize
+		// FIXME config batchSize
 		const batchSize = 300;
 		let currentLastSync = {...newLastSync};
 		while (eventsInGroups.length > 0) {
@@ -400,7 +400,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 
 			if (list.length > 0) {
-				await this.signal('Processing'); // TODO call it "Feeding"
+				await this.signal('Processing'); // FIXME call it "Feeding" Also FIXME: revamp the signaling, use subscribe ?
 				currentLastSync.lastToBlock = list[list.length - 1].blockNumber;
 				const outcome = await unlessCancelled(this.processor.process(list, currentLastSync));
 				this.lastSync = currentLastSync;
@@ -483,11 +483,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		let fromBlock = this.defaultFromBlock;
 		if (lastUnconfirmedBlocks.length > 0) {
-			// TODO
+			// FIXME
 			// this is wrong, we need to take fromBlock from lastSync (+ finality or use fromBlock)
 			fromBlock = lastUnconfirmedBlocks[0].number;
 		} else {
-			// TODO
+			// FIXME
 			// same this is wrong, there could be reorg missed and event to add
 			// fromBlock / lastSync need to be used and of course depending on lastSync.latestBlock to check finality of that last request
 			if (lastSync.lastToBlock !== 0) {
