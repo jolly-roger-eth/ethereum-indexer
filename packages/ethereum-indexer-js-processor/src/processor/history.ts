@@ -195,7 +195,7 @@ function arrayGetter(
 					const values = target.slice(start, deleteCount);
 					history.setReversal(fieldPath, {
 						__action__: 'ArraySet',
-						actions: [{index: target.length, values}], // TODO deepCopy
+						actions: [{index: target.length, values: structuredClone(values)}],
 					});
 					return values;
 				};
@@ -230,7 +230,7 @@ function setter(
 	return (target, property, value) => {
 		history.setReversal([...fieldPath, property], {
 			__action__: 'ValueSet',
-			value: (target as any)[property], // TODO deepCopy
+			value: structuredClone((target as any)[property]),
 		});
 		(target as any)[property] = value;
 		return true;
@@ -240,7 +240,7 @@ function deleter(fieldPath: string[], history: History): (target: JSObject, prop
 	return (target, property) => {
 		history.setReversal([...fieldPath, property], {
 			__action__: 'ValueSet',
-			value: target[property], // TODO deepCopy
+			value: structuredClone(target[property]),
 		});
 		delete target[property];
 		return true;

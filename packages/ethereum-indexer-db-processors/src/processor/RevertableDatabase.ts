@@ -188,6 +188,7 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 			if (!blockNumber || blockNumber < 0) {
 				blockNumber = Math.max(0, latestBlock.number + (blockNumber ? blockNumber : 0));
 			}
+			// FIXME finality , get it from the indexer's stream config
 			if (blockNumber < latestBlock.number - 12) {
 				// TODO Error type for Result, or throw ?
 				return {error: {code: 1111, message: `Cannot go that far in the past`}} as unknown as Result;

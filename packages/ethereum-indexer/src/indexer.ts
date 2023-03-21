@@ -73,7 +73,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected source!: IndexingSource<ABI>;
 
 	protected config!: IndexerConfig<ABI>;
-	protected finality: number = 16;
+	protected finality: number = 17;
 
 	protected sourceHashes!: {startBlock: number; hash: string}[];
 	protected streamConfigHash!: string;

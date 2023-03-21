@@ -94,7 +94,7 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 		// console.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 
 		try {
-			const revertable = this.keepAllHistory || lastSync.latestBlock - lastSync.lastToBlock <= 12; // TODO finality from indexer
+			const revertable = this.keepAllHistory || lastSync.latestBlock - lastSync.lastToBlock <= 12; // FIXME finality , get it from the indexer's stream config
 
 			// ----------------------------------------------------------------------------------------------------------------
 			// TODO copy that on all processors

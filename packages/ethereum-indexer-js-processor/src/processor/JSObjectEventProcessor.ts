@@ -49,7 +49,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			lastSync: undefined,
 			history,
 		};
-		this.history = new History(history, 12); // TODO finality
+		this.history = new History(history, 12); // FIXME finality , get it from the indexer's stream config
 		this.state = proxifyJSON<ProcessResultType>(data, this.history);
 	}
 
@@ -102,7 +102,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			lastSync: undefined,
 			history,
 		};
-		this.history = new History(history, 12); // TODO finality
+		this.history = new History(history, 12); // FIXME finality , get it from the indexer's stream config
 
 		this.state = proxifyJSON<ProcessResultType>(this._json.data as ProcessResultType, this.history);
 		// return this._json.data;
@@ -113,7 +113,6 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			const config = this.config as ProcessorConfig;
 			const source = this.source as IndexingSource<ABI>;
 			const version = this.version;
-			// TODO why do we need the `as` ?
 			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
 			await this.keeper.clear(context);
 		}
@@ -125,7 +124,6 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 		if (this.keeper) {
 			const config = this.config as ProcessorConfig;
 			const version = this.version;
-			// TODO why do we need the `as` ?
 			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
 			const existingStateData = await this.keeper.fetch(context);
 			if (existingStateData) {
@@ -187,7 +185,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 						lastBlockHash = event.blockHash;
 					}
 
-					const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > 16; // TODO finality
+					const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > 12; // FIXME finality , get it from the indexer's stream config
 					const state = willNotChange ? this._json.data : this.state;
 					this.singleEventProcessor.processEvent(state, event);
 				}

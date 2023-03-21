@@ -170,7 +170,6 @@ export class SimpleServer<ABI extends Abi> {
 			}
 			if (!contractsData) {
 				contractsData = processorModule.contractsData;
-				// TODO chainID should be specified or it should be of type AllContractsData
 			}
 
 			if (processorModule.contractsDataPerChain && !contractsData) {
