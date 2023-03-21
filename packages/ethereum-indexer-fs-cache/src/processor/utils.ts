@@ -53,7 +53,14 @@ export function exportEvents<ABI extends Abi>(
 	if (config.overrideLastSync) {
 		const parsed: LastSync<ABI> = JSON.parse(lastSyncContent);
 		parsed.lastToBlock = eventStream[eventStream.length - 1].blockNumber;
-		fs.writeFileSync(lastSyncPath, JSON.stringify(parsed, null, 2));
+		fs.writeFileSync(
+			lastSyncPath,
+			JSON.stringify(
+				parsed,
+				(_, value) => (typeof value === 'bigint' ? value.toString() : value), // return everything else unchanged)}
+				2
+			)
+		);
 	}
 }
 

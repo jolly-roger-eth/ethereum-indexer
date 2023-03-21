@@ -1,5 +1,7 @@
 import {Abi, LogEvent} from 'ethereum-indexer';
 import {
+	computeEventID,
+	computeArchiveID,
 	getID,
 	ID,
 	Database,
@@ -9,9 +11,7 @@ import {
 	PutAndGetDatabaseWithBatchSupport,
 	Query,
 	Result,
-} from './Database';
-
-import {computeEventID, computeArchiveID} from './utils';
+} from 'ethereum-indexer-db-utils';
 
 import {logs} from 'named-logs';
 const console = logs('RevertableDatabase');

@@ -1,7 +1,14 @@
 import {IndexingSource, LastSync, LogEvent, Abi, LogEventWithParsingFailure, UsedStreamConfig} from 'ethereum-indexer';
+import {
+	QueriableEventProcessor,
+	Database,
+	FromDB,
+	JSONObject,
+	PutAndGetDatabase,
+	Query,
+	Result,
+} from 'ethereum-indexer-db-utils';
 import {logs} from 'named-logs';
-import {QueriableEventProcessor} from './QueriableEventProcessor';
-import {Database, FromDB, JSONObject, PutAndGetDatabase, Query, Result} from './Database';
 import {RevertableDatabase} from './RevertableDatabase';
 
 const console = logs('EventProcessorOnDatabase');

@@ -5,6 +5,7 @@ import PouchDBFindPlugin from 'pouchdb-find';
 PouchDB.plugin(PouchDBFindPlugin);
 
 import {logs} from 'named-logs';
+import {bnReplacer, bnReviver} from '../utils';
 const console = logs('PouchDatabase');
 
 export class PouchDatabase implements Database {
@@ -28,27 +29,28 @@ export class PouchDatabase implements Database {
 
 	async put(object: DBObject): Promise<void> {
 		if (object._rev) {
-			await this.pouchDB.put(object);
+			await this.pouchDB.put(bnReplacer(object));
 		} else {
 			await this.pouchDB
 				.get(object._id)
+				.then(bnReviver)
 				.then((d) => {
 					console.info(`PouchDatabase: got object before put`);
 					(object as any)._rev = d._rev;
-					return this.pouchDB.put(object).then((v) => {
+					return this.pouchDB.put(bnReplacer(object)).then((v) => {
 						console.info(`PouchDatabase: put DONE`);
 						return v;
 					});
 				})
 				.catch((e) => {
-					return this.pouchDB.put(object);
+					return this.pouchDB.put(bnReplacer(object));
 				});
 		}
 	}
 	async get<T extends JSONObject>(id: ID): Promise<FromDB<T> | null> {
 		let result: T | null;
 		try {
-			result = await this.pouchDB.get(getID(id));
+			result = await this.pouchDB.get(getID(id)).then(bnReviver);
 		} catch (e) {
 			result = null;
 		}
@@ -57,11 +59,17 @@ export class PouchDatabase implements Database {
 
 	async batchGet<T extends JSONObject>(ids: string[]): Promise<FromDB<T>[]> {
 		const {rows} = await this.pouchDB.allDocs({keys: ids, include_docs: true});
-		return rows.filter((v) => !v.value?.deleted).map((v) => v.doc) as unknown as FromDB<T>[];
+		return rows.filter((v) => !v.value?.deleted).map((v) => bnReviver(v.doc)) as unknown as FromDB<T>[];
 	}
 	async batchPut(objects: FromDB<JSONObject>[]): Promise<void> {
-		const response = await this.pouchDB.bulkDocs(objects);
-		console.info(JSON.stringify(response, null, 2));
+		const response = await this.pouchDB.bulkDocs(bnReplacer(objects));
+		console.info(
+			JSON.stringify(
+				response,
+				(_, value) => (typeof value === 'bigint' ? value.toString() : value), // return everything else unchanged)}
+				2
+			)
+		);
 	}
 	async batchDelete(ids: ID[]): Promise<void> {
 		const objects: FromDB<JSONObject>[] = [];
@@ -86,16 +94,22 @@ export class PouchDatabase implements Database {
 
 	async delete(id: ID) {
 		if (typeof id === 'string') {
-			await this.pouchDB.get(id).then((d) => {
-				return this.pouchDB.remove(d);
-			});
+			await this.pouchDB
+				.get(id)
+				.then(bnReviver)
+				.then((d) => {
+					return this.pouchDB.remove(d);
+				});
 		} else {
 			if ('_rev' in id) {
 				await this.pouchDB.remove(id as DBObjectWithRev);
 			} else {
-				await this.pouchDB.get(getID(id)).then((d) => {
-					return this.pouchDB.remove(d);
-				});
+				await this.pouchDB
+					.get(getID(id))
+					.then(bnReviver)
+					.then((d) => {
+						return this.pouchDB.remove(d);
+					});
 			}
 		}
 	}

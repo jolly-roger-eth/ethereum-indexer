@@ -64,8 +64,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 
 	public readonly defaultFromBlock!: number;
-	public onLoad: ((state: LoadingState, lastSync?: LastSync<ABI>) => Promise<void>) | undefined;
+	public onLoad: ((state: LoadingState) => Promise<void>) | undefined;
 	public onStateUpdated: ((state: ProcessResultType) => void) | undefined;
+	public onLastSyncUpdated: ((lastSync: LastSync<ABI>) => void) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
@@ -283,13 +284,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected async save(source: IndexingSource<ABI>, eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) {
 		return this._save.next({source, eventStream, lastSync});
 	}
-	protected async signal(state: LoadingState) {
-		if (this.onLoad) {
-			namedLogger.info(`onLoad ${state}...`);
-			await this.onLoad(state, this.lastSync);
-			namedLogger.info(`...onLoad ${state}`);
-		}
-	}
 
 	protected async promiseToLoad(): Promise<LastSync<ABI>> {
 		const chainId = await this.provider.request({method: 'eth_chainId'});
@@ -300,7 +294,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 
 		let currentLastSync: LastSync<ABI> | undefined = undefined;
-		await this.signal('Loading');
+		await this._onLoad('Loading');
 		const processorHash = this.processor.getVersionHash();
 		const loaded = await this.processor.load(this.source, this.config.stream);
 		if (loaded) {
@@ -319,9 +313,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// if mismatch found, we get a fresh sync
 		if (!currentLastSync) {
 			currentLastSync = this.freshLastSync(processorHash);
+			this.lastSync = currentLastSync;
+			this._onLastSyncUpdated();
+
 			// but we might have some stream still valid here
 			if (this.config.keepStream) {
-				await this.signal('Fetching');
+				await this._onLoad('Fetching');
 				// we start from scratch
 				const fromBlock = this.defaultFromBlock;
 				const existingStreamData = await this.config.keepStream.fetchFrom(this.source, fromBlock);
@@ -336,21 +333,16 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
 						// we update the processorHash in case it was changed
 						currentLastSync.context.processor = processorHash;
-						this.lastSync = currentLastSync;
 						if (eventsFetched.length > 0) {
-							await this.signal('Processing');
+							await this._onLoad('Processing');
 							await this.feed(eventsFetched, lastSyncFetched);
 						}
 					} else {
-						this.lastSync = currentLastSync;
 						await this.config.keepStream.clear(this.source);
 					}
 				} else {
-					this.lastSync = currentLastSync;
 					await this.config.keepStream.clear(this.source);
 				}
-			} else {
-				this.lastSync = currentLastSync;
 			}
 		} else {
 			if (this.config.keepStream) {
@@ -365,8 +357,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				}
 			}
 			this.lastSync = currentLastSync;
+			this._onLastSyncUpdated();
 		}
-		await this.signal('Loaded');
+		await this._onLoad('Loaded');
 		return this.lastSync;
 	}
 
@@ -382,6 +375,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		if (!this.lastSync) {
 			this.lastSync = this.freshLastSync(this.processor.getVersionHash());
+			this._onLastSyncUpdated();
 		}
 
 		const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, this.defaultFromBlock, newEvents, {
@@ -404,10 +398,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 
 			if (list.length > 0) {
-				await this.signal('Processing'); // FIXME call it "Feeding" Also FIXME: revamp the signaling, use subscribe ?
 				currentLastSync.lastToBlock = list[list.length - 1].blockNumber;
 				const outcome = await unlessCancelled(this.processor.process(list, currentLastSync));
 				this.lastSync = currentLastSync;
+				this._onLastSyncUpdated();
 
 				this._onStateUpdated(outcome);
 
@@ -469,9 +463,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// TODO timeout ?
 		await this.save(this.source, eventStream, newLastSync);
 
+		this.lastSync = newLastSync;
+		this._onLastSyncUpdated();
 		this._onStateUpdated(outcome);
 
-		this.lastSync = newLastSync;
 		return this.lastSync;
 		// ----------------------------------------------------------------------------------------
 	}
@@ -644,7 +639,23 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (this.onStateUpdated) {
 			try {
 				this.onStateUpdated(outcome);
-			} catch (err) {}
+			} catch {}
+		}
+	}
+
+	protected _onLastSyncUpdated() {
+		if (this.lastSync && this.onLastSyncUpdated) {
+			try {
+				this.onLastSyncUpdated(this.lastSync);
+			} catch {}
+		}
+	}
+
+	protected async _onLoad(state: LoadingState) {
+		if (this.onLoad) {
+			try {
+				await this.onLoad(state);
+			} catch {}
 		}
 	}
 }

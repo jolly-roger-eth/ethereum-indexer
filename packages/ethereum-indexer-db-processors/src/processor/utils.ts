@@ -1,8 +1,6 @@
-import {PouchDatabase} from './PouchDatabase';
-import {SingleEventProcessor, EventProcessorOnDatabase} from './EventProcessorOnDatabase';
-import {QueriableEventProcessor} from './QueriableEventProcessor';
-import {Database, PutAndGetDatabase} from './Database';
 import {Abi, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
+import {PouchDatabase, QueriableEventProcessor, PutAndGetDatabase, Database} from 'ethereum-indexer-db-utils';
+import {SingleEventProcessor, EventProcessorOnDatabase} from './EventProcessorOnDatabase';
 import {EventProcessorWithBatchDBUpdate, SingleEventProcessorWithBatchSupport} from './EventProcessorWithBatchDBUpdate';
 
 export function fromSingleEventProcessor<ABI extends Abi>(
@@ -67,12 +65,4 @@ export function fromSingleEventProcessorWithBatchSupportObject<ABI extends Abi>(
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorWithBatchDBUpdate(typeof v === 'function' ? v() : v, db);
 	};
-}
-
-export function computeArchiveID(id: string, endBlock: number): string {
-	return `archive_${endBlock}_${id}`;
-}
-
-export function computeEventID<ABI extends Abi>(event: LogEvent<ABI>): string {
-	return `${event.transactionHash}_${event.logIndex}`;
 }

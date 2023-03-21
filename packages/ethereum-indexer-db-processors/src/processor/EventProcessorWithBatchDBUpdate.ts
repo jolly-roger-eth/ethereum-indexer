@@ -7,10 +7,9 @@ import {
 	LogEventWithParsingFailure,
 	UsedStreamConfig,
 } from 'ethereum-indexer';
+import {JSONObject, Database, FromDB, Query, Result, BasicSyncDB, SyncDB} from 'ethereum-indexer-db-utils';
 import {logs} from 'named-logs';
-import {JSONObject, Database, FromDB, Query, Result} from './Database';
 import {RevertableDatabase} from './RevertableDatabase';
-import {BasicSyncDB, SyncDB} from './SyncDB';
 
 const console = logs('EventProcessorWithBatchDBUpdate');
 

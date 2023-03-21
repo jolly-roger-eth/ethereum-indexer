@@ -5,6 +5,7 @@ const outDir = 'dist';
 
 export default defineConfig({
 	outDir,
+	sourcemap: true,
 	async onSuccess() {
 		fs.copySync('templates/', 'dist/');
 	},

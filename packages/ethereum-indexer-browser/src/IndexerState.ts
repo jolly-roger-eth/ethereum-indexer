@@ -155,23 +155,21 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		if (!indexer) {
 			throw new Error(`no indexer`);
 		}
-		indexer.onLoad = async (loadingState, lastSync) => {
+		indexer.onLoad = async (loadingState) => {
 			setStatus({state: loadingState});
 			if (loadingState === 'Loading') {
 			} else if (loadingState === 'Fetching') {
 				setSyncing({fetchingLogs: true});
 			} else if (loadingState === 'Processing') {
 				setSyncing({fetchingLogs: false, processingFetchedLogs: true});
-				if (lastSync) {
-					setLastSync(lastSync);
-				}
 			} else if (loadingState === 'Loaded') {
 				setSyncing({processingFetchedLogs: false});
-				if (lastSync) {
-					setLastSync(lastSync);
-				}
 			}
 			await wait(0.001); // allow propagation if the whole proces is synchronous
+		};
+		indexer.onLastSyncUpdated = (lastSync) => {
+			// should we also wait ?
+			setLastSync(lastSync);
 		};
 		indexer.onStateUpdated = (state) => {
 			setState(state);

@@ -3,7 +3,7 @@ import {DBObjectWithRev, getID, ID, JSONObject, FromDB, DBObject, PutAndGetDatab
 import {logs} from 'named-logs';
 import {Abi, LogEvent} from 'ethereum-indexer';
 
-import {computeEventID} from './utils';
+import {computeEventID} from '../utils';
 const namedLogger = logs('SyncDB');
 
 export type SyncDB = {
@@ -88,7 +88,12 @@ export class BasicSyncDB<ABI extends Abi> implements SyncDB {
 		namedLogger.info(`deleting: ${allToDelete}...`);
 		await this.db.batchDelete(allToDelete);
 
-		namedLogger.info(`updating/creating: ${JSON.stringify(objectsToPut)}...`);
+		namedLogger.info(
+			`updating/creating: ${JSON.stringify(
+				objectsToPut,
+				(_, value) => (typeof value === 'bigint' ? value.toString() : value) // return everything else unchanged)}
+			)}...`
+		);
 		await this.db.batchPut(objectsToPut);
 
 		namedLogger.info(`syncing up DONE)`);

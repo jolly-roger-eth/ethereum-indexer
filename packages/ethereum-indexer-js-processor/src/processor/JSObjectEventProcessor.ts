@@ -106,8 +106,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			history,
 		};
 		this.history = new History(history);
-		this.finality = undefined;
-		// it will be reloaded
+		if (this.finality) {
+			this.history.setFinality(this.finality);
+		}
 
 		this.state = proxifyJSON<ProcessResultType>(this._json.data as ProcessResultType, this.history);
 		// return this._json.data;

@@ -1,6 +1,6 @@
-import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, UsedStreamConfig} from 'ethereum-indexer';
 import {logs} from 'named-logs';
-import {Database, FromDB, JSONObject, Query, Result} from './Database';
+import {Database, FromDB, JSONObject, Query, Result} from '../db/Database';
 const console = logs('EventCache');
 
 function lexicographicNumber15(num: number): string {
@@ -40,8 +40,15 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 		await this.init();
 	}
 
-	async load(source: IndexingSource<ABI>): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
-		// TODO check if source matches old sync
+	async load(
+		source: IndexingSource<ABI>,
+		streamConfig: UsedStreamConfig
+	): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
+		const lastSyncFromProcessor = await this.processor.load(source, streamConfig);
+		if (lastSyncFromProcessor) {
+			return lastSyncFromProcessor;
+		}
+		// TODO cache shoudl be a eventFetcher/Saver
 		try {
 			const lastSync = await this.eventDB.get<LastSync<ABI> & {batch: number}>('lastSync');
 			if (!lastSync) {
@@ -69,7 +76,14 @@ export class EventCache<ABI extends Abi> implements EventProcessor<ABI, void> {
 			console.info('EventChache ...done');
 
 			const lastSync = (await this.eventDB.get('lastSync')) as LastSync<ABI> & {batch: number};
-			console.info(`EventCache lastSync`, JSON.stringify(lastSync, null, 2));
+			console.info(
+				`EventCache lastSync`,
+				JSON.stringify(
+					lastSync,
+					(_, value) => (typeof value === 'bigint' ? value.toString() : value), // return everything else unchanged)}
+					2
+				)
+			);
 			for (let i = 0; i < lastSync.batch; i++) {
 				const events = (
 					await this.eventDB.query({

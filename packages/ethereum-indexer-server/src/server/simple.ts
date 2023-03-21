@@ -22,33 +22,11 @@ import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
 
 import {logs} from 'named-logs';
 
-// TODO We should move EventCache, PouchDatabase and QueriableEventProcessor in a separate low-level module so server does not need to import 'ethereum-indexer-db-processors';
-import {EventCache, PouchDatabase, QueriableEventProcessor, Query} from 'ethereum-indexer-db-processors';
+import {bnReplacer, EventCache, PouchDatabase, QueriableEventProcessor, Query} from 'ethereum-indexer-db-utils';
 import {adminPage} from '../pages';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 const namedLogger = logs('ethereum-index-server');
-
-function bnReplacer(v: any): any {
-	if (typeof v === 'bigint') {
-		return v.toString() + 'n';
-	} else {
-		if (typeof v === 'object') {
-			if (Array.isArray(v)) {
-				return v.map((v) => bnReplacer(v));
-			} else {
-				const keys = Object.keys(v);
-				const n = {};
-				for (const key of keys) {
-					(n as any)[key] = bnReplacer(v[key]);
-				}
-				return n;
-			}
-		} else {
-			return v;
-		}
-	}
-}
 
 export type UserConfig<ABI extends Abi> = {
 	nodeURL: string;

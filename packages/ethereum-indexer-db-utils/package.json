@@ -1,5 +1,5 @@
 {
-	"name": "ethereum-indexer-db-processors",
+	"name": "ethereum-indexer-db-utils",
 	"version": "0.5.6",
 	"description": "",
 	"publishConfig": {
@@ -17,7 +17,6 @@
 	},
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
-		"ethereum-indexer-db-utils": "workspace:*",
 		"named-logs": "^0.2.2",
 		"pouchdb": "^8.0.1",
 		"pouchdb-find": "^8.0.1"
