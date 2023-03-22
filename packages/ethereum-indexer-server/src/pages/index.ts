@@ -4,10 +4,10 @@ import fs from 'fs';
 import {dirname} from 'path';
 import {fileURLToPath} from 'url';
 
-const __dirname = globalThis.__dirname || dirname(fileURLToPath(import.meta.url));
+const _dirname = dirname(fileURLToPath(import.meta.url));
 
 function page(name: string): string {
-	return fs.readFileSync(path.join(__dirname, '../templates', name), 'utf-8');
+	return fs.readFileSync(path.join(_dirname, '../templates', name), 'utf-8');
 }
 
 export const adminPage = page('admin.html');

@@ -162,12 +162,12 @@ importers:
       sveltore: ^0.0.2
       tsup: ^6.7.0
       typescript: ^4.9.5
-      use-stores: workspace:*
+      use-stores: ^0.1.0
     dependencies:
       ethereum-indexer: link:../ethereum-indexer
       named-logs: 0.2.2
       sveltore: 0.0.2
-      use-stores: link:../use-stores
+      use-stores: 0.1.0
     devDependencies:
       eip-1193: 0.2.3
       tsup: 6.7.0_typescript@4.9.5
@@ -342,14 +342,6 @@ importers:
       named-logs: 0.2.2
     devDependencies:
       eip-1193: 0.2.3
-      tsup: 6.7.0_typescript@4.9.5
-      typescript: 4.9.5
-
-  packages/use-stores:
-    specifiers:
-      tsup: ^6.7.0
-      typescript: ^4.9.5
-    devDependencies:
       tsup: 6.7.0_typescript@4.9.5
       typescript: 4.9.5
 
@@ -4972,6 +4964,10 @@ packages:
     dependencies:
       querystringify: 2.2.0
       requires-port: 1.0.0
+    dev: false
+
+  /use-stores/0.1.0:
+    resolution: {integrity: sha512-tOrRU5GZlkU5NWsSplQo1oQpmS4Yh5AXOJBnR7Rku/ocpfa1qUZGy1gr+CGyC7NHcggA6ARs9jvkDTv3B9Ks1Q==}
     dev: false
 
   /util-deprecate/1.0.2:
