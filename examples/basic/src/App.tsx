@@ -1,6 +1,6 @@
 import './App.css';
 import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
-import {createIndexerState} from 'ethereum-indexer-browser';
+import {createIndexerState, keepStateOnIndexedDB} from 'ethereum-indexer-browser';
 import {connect} from './utils/web3';
 import react from 'react';
 
@@ -40,6 +40,12 @@ type State = {greetings: {account: `0x${string}`; message: string}[]};
 // the processor is given the type of the ABI as Generic type to get generated
 // it also specify the type which represent the current state
 const processor: JSProcessor<typeof contract.abi, State> = {
+	// you can set a version, ideally you would generate it so that it changes for each change
+	// when a version changes, the indexer will detect that and clear the state
+	// if it has the event stream cached, it will repopulate the state automatically
+	version: '1.0.1',
+	// this function set the starting state
+	// this allow the app to always have access to a state, no undefined needed
 	construct() {
 		return {greetings: []};
 	},
@@ -63,9 +69,9 @@ const processor: JSProcessor<typeof contract.abi, State> = {
 // this setup a set of observable (subscribe pattern)
 // including one for the current state (computed by the processor above)
 // and one for the syncing status
-const {init, useState, useSyncing, startAutoIndexing} = createIndexerState(fromJSProcessor(processor)()).withHooks(
-	react
-);
+const {init, useState, useSyncing, startAutoIndexing} = createIndexerState(fromJSProcessor(processor)(), {
+	keepState: keepStateOnIndexedDB('basic') as any,
+}).withHooks(react);
 
 // we now need to get a handle on a ethereum provider
 // for this app we are simply using window.ethereum
@@ -92,7 +98,6 @@ function start() {
 			init({
 				provider: ethereum,
 				source: {chainId: '11155111', contracts: [contract]},
-				// config: {stream: {parse: {globalABI: true}}},
 			}).then(() => {
 				// this automatically index on a timer
 				// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
