@@ -1,6 +1,13 @@
 name: Documentation
 
-on: [push, pull_request]
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
   generate_docs:
