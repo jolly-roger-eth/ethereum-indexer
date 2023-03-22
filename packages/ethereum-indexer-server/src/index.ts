@@ -57,7 +57,4 @@ program
 
 const options = program.opts();
 
-if (!options.nodeUrl) {
-}
-
 runServer(options.processor, options as any);
