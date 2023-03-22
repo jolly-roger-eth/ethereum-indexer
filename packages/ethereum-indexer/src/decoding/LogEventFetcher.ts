@@ -40,25 +40,20 @@ interface Result extends ReadonlyArray<any> {
 	readonly [key: string]: any;
 }
 
-interface NumberifiedLog {
+export interface NumberifiedLog {
 	blockNumber: number;
 	blockHash: `0x${string}`;
 	transactionIndex: number;
-
 	removed: boolean;
-
 	address: `0x${string}`;
 	data: `0x${string}`;
-
 	topics: Array<`0x${string}`>;
-
 	transactionHash: `0x${string}`;
 	logIndex: number;
 }
 
 export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
 export type BaseLogEvent<Extra extends JSONObject | undefined = undefined> = NumberifiedLog & {
-	removed: true;
 	removedStreamID?: number;
 } & {
 	extra: Extra;
@@ -221,7 +216,21 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 			} else {
 				(event as LogEventWithParsingFailure).decodeError = `event triggered at a different address`;
 			}
-			events.push(event as LogEvent<ABI>);
+
+			if (this.parseConfig?.logValues) {
+				const eventWithFilteredValues: LogEvent<ABI> = {} as LogEvent<ABI>;
+				if ((event as any).args) {
+					(eventWithFilteredValues as any).args = (event as any).args;
+				}
+				for (const key of Object.keys(this.parseConfig.logValues)) {
+					if (typeof (event as any)[key] !== 'undefined') {
+						(eventWithFilteredValues as any)[key] = (event as any)[key];
+					}
+				}
+				events.push(eventWithFilteredValues);
+			} else {
+				events.push(event as LogEvent<ABI>);
+			}
 		}
 		return events;
 	}

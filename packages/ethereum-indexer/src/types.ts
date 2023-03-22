@@ -1,6 +1,6 @@
 import {Abi} from 'abitype';
 import {EIP1193DATA, EIP1193Log, EIP1193QUANTITY} from 'eip-1193';
-import {LogEvent} from './decoding/LogEventFetcher';
+import {LogEvent, NumberifiedLog} from './decoding/LogEventFetcher';
 import {LogFetcherConfig} from './engine/LogFetcher';
 
 export type {LogFetcher, LogFetcherConfig} from './engine/LogFetcher';
@@ -78,6 +78,20 @@ export type StreamSaver<ABI extends Abi> = (
 ) => Promise<void>;
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
+type OptionsFlags<Type> = {
+	[Property in keyof Type]: boolean;
+};
+type LogValuesFlags = OptionsFlags<NumberifiedLog>;
+
+// type OptionsTypes<Flags, Type extends Flags> = {
+// 	[Property in keyof Flags]: Type[Property];
+// };
+
+// type AllTrue<Type> = {
+// 	[Property in keyof Type]: true;
+// };
+// type DefaultExpectedValues = AllTrue<OptionsFlags<NumberifiedLog>>;
+
 export type UsedStreamConfig = ProvidedStreamConfig & {
 	finality: number;
 };
@@ -119,6 +133,7 @@ export type ExistingStream<ABI extends Abi> = {
 
 export type LogParseConfig = {
 	onlyParseEventsAssignedInRespectiveContracts?: boolean;
+	logValues?: LogValuesFlags;
 	filters?: {
 		// for each event name we can specify a list of filter
 		// each filter is an array of (topic or topic[])

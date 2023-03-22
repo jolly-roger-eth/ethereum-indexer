@@ -21,7 +21,7 @@ import type {
 	ProvidedStreamConfig,
 	UsedStreamConfig,
 } from './types';
-import {LogEvent, LogEventFetcher, ParsedLogsPromise, ParsedLogsResult} from './decoding/LogEventFetcher';
+import {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
 import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './engine/utils';
 import {CancelOperations, createAction, hash} from './utils';
@@ -58,6 +58,8 @@ export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Loaded';
 // but we could still have filter capabilties managed by another pass/process or has part of the indexer config
 // and this one would slim down the event stream
 
+// TODO add types for logValues to get better type safety when logValues setting is set
+// ExpectedEventValues extends OptionsFlags<NumberifiedLog> = DefaultExpectedValues,
 export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC VARIABLES
