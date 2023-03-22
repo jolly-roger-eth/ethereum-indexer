@@ -1,0 +1,10 @@
+{
+  "entryPointStrategy": "packages",
+  "entryPoints": [
+    "packages/ethereum-indexer",
+    "packages/ethereum-indexer-browser",
+    "packages/ethereum-indexer-js-processor"
+  ],
+
+  "out": "docs"
+}
