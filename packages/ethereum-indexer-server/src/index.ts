@@ -19,11 +19,12 @@ console.log(`------------------------------------------------`);
 
 const program = new Command();
 
-// const example = `eis ../../etherplay/conquest-event-processor/dist/index.js -d ../../etherplay/conquest-eth/contracts/deployments/localhost -n http://localhost:8545`;
+// const example = `eis -p ../../etherplay/conquest-event-processor/dist/index.js -d ../../etherplay/conquest-eth/contracts/deployments/localhost -n http://localhost:8545`;
 
 program
 	.name('eis')
 	.version(pkg.version)
+	.usage(`eis -p <processor's path> [-d <deployment folder> -n http://localhost:8545]`)
 	.description('Run The Indexer as Server')
 	.requiredOption(
 		'-p, --processor <path>',
