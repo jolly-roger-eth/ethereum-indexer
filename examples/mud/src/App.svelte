@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './App.css';
 	import {fromJSProcessor, type JSProcessor} from 'ethereum-indexer-js-processor';
 	import {createIndexerState} from 'ethereum-indexer-browser';
 	import {connect} from './lib/utils/web3';
@@ -114,11 +115,11 @@
 {#if !ethereum}
 	<p>To test this app, you need to have a ethereum wallet installed</p>
 {:else}
-	<div>
+	<div class="App">
 		<h1>In-Browser Indexer</h1>
 		<p>{$syncing.lastSync?.syncPercentage || 0}</p>
 		{#if $syncing.lastSync}
-			<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style="width: '100%';" />
+			<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style="width: 100%" />
 		{:else}
 			<p>Please wait...</p>
 		{/if}

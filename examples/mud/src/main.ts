@@ -1,4 +1,4 @@
-// import './app.css';
+import './index.css';
 import 'named-logs-console';
 import App from './App.svelte';
 
