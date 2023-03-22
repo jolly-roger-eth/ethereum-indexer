@@ -1,4 +1,4 @@
-name: Documentation
+name: Generate Documentation
 
 permissions:
   contents: write
