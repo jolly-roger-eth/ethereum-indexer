@@ -3,14 +3,14 @@ name: Documentation
 on: [push, pull_request]
 
 jobs:
-  build_and_lint:
+  generate_docs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
-      - uses: actions/checkout@v3
+        uses: actions/checkout@v3
 
       - name: Setup pnpm
-      - uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v2
         with:
           version: 7
 
