@@ -18,6 +18,7 @@
 	},
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
+		"idb-keyval": "^6.2.0",
 		"named-logs": "^0.2.2",
 		"sveltore": "^0.0.2",
 		"use-stores": "^0.1.0"

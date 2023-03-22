@@ -155,7 +155,6 @@ importers:
       event-processor-conquest-eth: workspace:*
       event-processor-nfts: workspace:*
       event-processor-voidrunners: workspace:*
-      idb-keyval: ^6.2.0
       named-logs: ^0.2.2
       named-logs-console: ^0.2.3
       prettier: ^2.8.6
@@ -176,7 +175,6 @@ importers:
       event-processor-conquest-eth: link:../event-processor-conquest-eth
       event-processor-nfts: link:../event-processor-nfts
       event-processor-voidrunners: link:../event-processor-voidrunners
-      idb-keyval: 6.2.0
       named-logs: 0.2.2
       named-logs-console: 0.2.3
       svelte-json-tree: 1.0.0
@@ -217,6 +215,7 @@ importers:
     specifiers:
       eip-1193: ^0.2.3
       ethereum-indexer: workspace:*
+      idb-keyval: ^6.2.0
       named-logs: ^0.2.2
       sveltore: ^0.0.2
       tsup: ^6.7.0
@@ -224,6 +223,7 @@ importers:
       use-stores: ^0.1.0
     dependencies:
       ethereum-indexer: link:../ethereum-indexer
+      idb-keyval: 6.2.0
       named-logs: 0.2.2
       sveltore: 0.0.2
       use-stores: 0.1.0

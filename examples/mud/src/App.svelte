@@ -81,42 +81,47 @@
 	// for this app we are simply using window.ethereum
 	const ethereum = (window as any).ethereum;
 
-	if (ethereum) {
-		// here we first connect it to the chain of our choice and then initialise the indexer
-		connect(ethereum, {
-			chain: {
-				chainId,
-				chainName: 'lattice testnet',
-				rpcUrls: ['https://follower.testnet-chain.linfra.xyz'],
-				nativeCurrency: {name: 'Ether', symbol: 'ETH', decimals: 18},
-				blockExplorerUrls: null, //[],
-			},
-		}).then(({ethereum}) => {
-			// we already setup the processor
-			// now we need to initialise the indexer with
-			// - an EIP-1193 provider (window.ethereum here)
-			// - source config which includes the chainId and the list of contracts (abi,address. startBlock)
-			// here we also configure so the indexer uses ABI as global so events defined across contracts will be processed
-			init({
-				provider: ethereum,
-				source: {chainId, contracts: [contract]},
-				// config: {stream: {parse: {globalABI: true}}},
-			}).then(() => {
-				// this automatically index on a timer
-				// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
-				// startAutoIndexing is easier but manually calling `indexMore` or `indexMoreAndCatchupIfNeeded` is better
-				// this is because you can call them for every `newHeads` eth_subscribe message
-				startAutoIndexing();
+	// but to not trigger a metamask popup right away we wrap that in a function to be called via a click of a button
+	function start() {
+		if (ethereum) {
+			// here we first connect it to the chain of our choice and then initialise the indexer
+			connect(ethereum, {
+				chain: {
+					chainId,
+					chainName: 'lattice testnet',
+					rpcUrls: ['https://follower.testnet-chain.linfra.xyz'],
+					nativeCurrency: {name: 'Ether', symbol: 'ETH', decimals: 18},
+					blockExplorerUrls: null, //[],
+				},
+			}).then(({ethereum}) => {
+				// we already setup the processor
+				// now we need to initialise the indexer with
+				// - an EIP-1193 provider (window.ethereum here)
+				// - source config which includes the chainId and the list of contracts (abi,address. startBlock)
+				// here we also configure so the indexer uses ABI as global so events defined across contracts will be processed
+				init({
+					provider: ethereum,
+					source: {chainId, contracts: [contract]},
+					// config: {stream: {parse: {globalABI: true}}},
+				}).then(() => {
+					// this automatically index on a timer
+					// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
+					// startAutoIndexing is easier but manually calling `indexMore` or `indexMoreAndCatchupIfNeeded` is better
+					// this is because you can call them for every `newHeads` eth_subscribe message
+					startAutoIndexing();
+				});
 			});
-		});
+		}
 	}
 </script>
 
-{#if !ethereum}
-	<p>To test this app, you need to have a ethereum wallet installed</p>
-{:else}
-	<div class="App">
-		<h1>In-Browser Indexer</h1>
+<div class="App">
+	<h1>Indexing a <a href="https://mud.dev" target="_blank" rel="noreferrer">MUD</a> World</h1>
+	{#if !ethereum}
+		<p>To test this app, you need to have a ethereum wallet installed</p>
+	{:else if $syncing.waitingForProvider}
+		<button on:click={start} style="background-color: #45ffbb; color: black;">Start</button>
+	{:else}
 		<p>{$syncing.lastSync?.syncPercentage || 0}</p>
 		{#if $syncing.lastSync}
 			<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style="width: 100%" />
@@ -128,5 +133,5 @@
 				<p>{entity.id} has {entity.components.length} components</p>
 			{/each}
 		</div>
-	</div>
-{/if}
+	{/if}
+</div>

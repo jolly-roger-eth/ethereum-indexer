@@ -71,34 +71,37 @@ const {init, useState, useSyncing, startAutoIndexing} = createIndexerState(fromJ
 // for this app we are simply using window.ethereum
 const ethereum = (window as any).ethereum;
 
-if (ethereum) {
-	// here we first connect it to the chain of our choice and then initialise the indexer
-	connect(ethereum, {
-		chain: {
-			chainId: '11155111',
-			chainName: 'Sepolia',
-			rpcUrls: ['https://rpc.sepolia.org'],
-			nativeCurrency: {name: 'Sepolia Ether', symbol: 'SEP', decimals: 18},
-			blockExplorerUrls: ['https://sepolia.etherscan.io'],
-		},
-	}).then(({ethereum}) => {
-		// we already setup the processor
-		// now we need to initialise the indexer with
-		// - an EIP-1193 provider (window.ethereum here)
-		// - source config which includes the chainId and the list of contracts (abi,address. startBlock)
-		// here we also configure so the indexer uses ABI as global so events defined across contracts will be processed
-		init({
-			provider: ethereum,
-			source: {chainId: '11155111', contracts: [contract]},
-			// config: {stream: {parse: {globalABI: true}}},
-		}).then(() => {
-			// this automatically index on a timer
-			// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
-			// startAutoIndexing is easier but manually calling `indexMore` or `indexMoreAndCatchupIfNeeded` is better
-			// this is because you can call them for every `newHeads` eth_subscribe message
-			startAutoIndexing();
+// but to not trigger a metamask popup right away we wrap that in a function to be called via a click of a button
+function start() {
+	if (ethereum) {
+		// here we first connect it to the chain of our choice and then initialise the indexer
+		connect(ethereum, {
+			chain: {
+				chainId: '11155111',
+				chainName: 'Sepolia',
+				rpcUrls: ['https://rpc.sepolia.org'],
+				nativeCurrency: {name: 'Sepolia Ether', symbol: 'SEP', decimals: 18},
+				blockExplorerUrls: ['https://sepolia.etherscan.io'],
+			},
+		}).then(({ethereum}) => {
+			// we already setup the processor
+			// now we need to initialise the indexer with
+			// - an EIP-1193 provider (window.ethereum here)
+			// - source config which includes the chainId and the list of contracts (abi,address. startBlock)
+			// here we also configure so the indexer uses ABI as global so events defined across contracts will be processed
+			init({
+				provider: ethereum,
+				source: {chainId: '11155111', contracts: [contract]},
+				// config: {stream: {parse: {globalABI: true}}},
+			}).then(() => {
+				// this automatically index on a timer
+				// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
+				// startAutoIndexing is easier but manually calling `indexMore` or `indexMoreAndCatchupIfNeeded` is better
+				// this is because you can call them for every `newHeads` eth_subscribe message
+				startAutoIndexing();
+			});
 		});
-	});
+	}
 }
 
 function App() {
@@ -107,11 +110,27 @@ function App() {
 	const $syncing = useSyncing();
 
 	if (!ethereum) {
-		return <p>To test this app, you need to have a ethereum wallet installed</p>;
+		return (
+			<div className="App">
+				<h1>Indexing a basic example</h1>
+				<p>To test this app, you need to have a ethereum wallet installed</p>
+			</div>
+		);
 	}
+	if ($syncing.waitingForProvider) {
+		return (
+			<div className="App">
+				<h1>Indexing a basic example</h1>
+				<button onClick={start} style={{backgroundColor: '#45ffbb', color: 'black'}}>
+					Start
+				</button>
+			</div>
+		);
+	}
+
 	return (
 		<div className="App">
-			<h1>In-Browser Indexer</h1>
+			<h1>Indexing a basic example</h1>
 			<p>{$syncing.lastSync?.syncPercentage || 0}</p>
 			{$syncing.lastSync ? (
 				<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style={{width: '100%'}} />

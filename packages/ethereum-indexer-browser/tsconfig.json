@@ -1,8 +1,8 @@
 {
 	"compilerOptions": {
 		"moduleResolution": "node",
-		"lib": ["DOM", "ES6", "DOM.Iterable", "ScriptHost"],
-		"target": "ES6",
+		"lib": ["DOM", "ES2020", "DOM.Iterable", "ScriptHost"],
+		"target": "ES2020",
 		"declaration": true,
 		"declarationMap": true,
 		"sourceMap": true,

@@ -2,50 +2,14 @@ import type {EIP1193Provider} from 'eip-1193';
 
 import {
 	createIndexerState,
-	hash,
 	type Abi,
 	type AllContractData,
 	type ContractData,
 	type LogParseConfig,
 	type EventProcessorWithInitialState,
-	type LastSync,
-	type LogEvent,
+	keepStateOnLocalStorage,
+	keepStreamOnIndexedDB,
 } from 'ethereum-indexer-browser';
-
-type StreamData<ABI extends Abi> = {
-	lastSync: LastSync<ABI>;
-	eventStream: LogEvent<ABI, undefined>[];
-};
-
-import {get, set, del} from 'idb-keyval';
-// import type {IDBPDatabase, DBSchema} from 'idb';
-// import {openDB} from 'idb';
-
-// interface MyDB<ABI extends Abi> extends DBSchema {
-// 	keyval: {
-// 		key: string;
-// 		value: {
-// 			lastSync: LastSync<ABI>;
-// 			eventStream: EventWithId<ABI, undefined>[];
-// 		};
-// 	};
-// }
-// let _db: IDBPDatabase<MyDB<Abi>> | undefined;
-// async function getDB<ABI extends Abi>(): Promise<IDBPDatabase<MyDB<ABI>>> {
-// 	if (!_db) {
-// 		_db = await openDB('INDEXER', 1, {
-// 			upgrade(db) {
-// 				db.createObjectStore('keyval');
-// 			},
-// 		});
-// 	}
-// 	return _db;
-// }
-
-function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
-	const configHash = config ? hash(config) : undefined;
-	return `${name}_${chainId}${configHash ? `_${configHash}` : ''}`;
-}
 
 export function createIndexeInitializer<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	name: string,
@@ -55,75 +19,8 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 ) {
 	const indexer = createIndexerState(processor, {
 		trackNumRequests: true,
-		keepState: {
-			fetch: async (context) => {
-				const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
-				const fromStorage = localStorage.getItem(storageID);
-				if (!fromStorage) {
-					return undefined;
-				} else {
-					const parsed = JSON.parse(fromStorage, (_, value) => {
-						if (typeof value === 'string' && value.endsWith('n')) {
-							try {
-								const bn = BigInt(value.slice(0, -1));
-								return bn;
-							} catch (err) {
-								return value;
-							}
-						} else {
-							return value;
-						}
-					});
-					return parsed;
-				}
-			},
-			save: async (context, all) => {
-				const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
-				localStorage.setItem(
-					storageID,
-					JSON.stringify({...all, __VERSION__: context.version}, (_, value) =>
-						typeof value === 'bigint' ? value.toString() + 'n' : value
-					)
-				);
-			},
-			clear: async (context) => {
-				const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
-				localStorage.removeItem(storageID);
-			},
-		},
-		keepStream: {
-			fetchFrom: async (source, fromBlock) => {
-				const storageID = `stream_${name}_${source.chainId}`;
-
-				const existingStream = await get<StreamData<ABI>>(storageID);
-				return existingStream
-					? {
-							eventStream: existingStream.eventStream.filter((v: any) => v.blockNumber >= fromBlock),
-							lastSync: existingStream.lastSync,
-					  }
-					: undefined;
-			},
-			saveNewEvents: async (source, stream) => {
-				const storageID = `stream_${name}_${source.chainId}`;
-
-				const existingStream = await get<StreamData<ABI>>(storageID);
-
-				if (existingStream && existingStream.eventStream.length > 0) {
-					if (stream.eventStream.length > 0) {
-						const eventStreamToSave = existingStream.eventStream.concat(stream.eventStream);
-						await set(storageID, {lastSync: stream.lastSync, eventStream: eventStreamToSave});
-					} else {
-						await set(storageID, {lastSync: stream.lastSync, eventStream: existingStream.eventStream});
-					}
-				} else {
-					await set(storageID, stream);
-				}
-			},
-			async clear(source) {
-				const storageID = `stream_${name}_${source.chainId}`;
-				await del(storageID, undefined);
-			},
-		},
+		keepState: keepStateOnLocalStorage(name),
+		keepStream: keepStreamOnIndexedDB(name),
 	});
 
 	const {init, indexToLatest, indexMore, startAutoIndexing, indexMoreAndCatchupIfNeeded} = indexer;
