@@ -1,8 +1,12 @@
 import fetch from 'isomorphic-unfetch';
-import {EIP1193ProviderWithoutEvents, EIP1193Request} from 'eip-1193';
+import {EIP1193Request} from 'eip-1193';
 
 let counter = 0;
-export async function ethereum_send<U extends any, T>(endpoint: string, method: string, params?: U): Promise<T> {
+export async function ethereum_request<U extends any, T>(
+	endpoint: string,
+	req: {method: string; params?: U}
+): Promise<T> {
+	const {method, params} = req;
 	// NOTE: special case to allow batch request via EIP-1193
 	if (method === 'eth_batch') {
 		if (params && (params as any[]).length === 0) {
@@ -23,11 +27,9 @@ export async function ethereum_send<U extends any, T>(endpoint: string, method: 
 			body: JSON.stringify(requests),
 		});
 
-		// console.info(await response.clone().text());
 		const jsonArray = (await response.json()) as {result?: T; error?: any}[];
 		for (const response of jsonArray) {
 			if (response.error || !response.result) {
-				// console.info(endpoint, JSON.stringify(requests, null, 2));
 				throw response.error || {code: 5000, message: 'No Result'};
 			}
 		}
@@ -55,10 +57,11 @@ export async function ethereum_send<U extends any, T>(endpoint: string, method: 
 	}
 }
 
-export class JSONRPCProvider {
+export class JSONRPCHTTPProvider {
+	supportsETHBatch: true;
 	constructor(protected endpoint: string) {}
 
-	request<T>(args: EIP1193Request): Promise<T> {
-		return ethereum_send(this.endpoint, args.method, (args as any).params);
+	request<T, Request extends EIP1193Request = EIP1193Request>(args: Request): Promise<T> {
+		return ethereum_request<any, T>(this.endpoint, args);
 	}
 }

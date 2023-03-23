@@ -18,7 +18,7 @@ import {
 	Abi,
 	ExistingStream,
 } from 'ethereum-indexer';
-import {JSONRPCProvider} from 'ethereum-indexer-utils';
+import {JSONRPCHTTPProvider} from 'ethereum-indexer-utils';
 import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
 
 import {logs} from 'named-logs';
@@ -137,7 +137,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			this.processor = processorFactory;
 		}
 
-		const eip1193Provider = new JSONRPCProvider(this.config.nodeURL);
+		const eip1193Provider = new JSONRPCHTTPProvider(this.config.nodeURL);
 
 		let contractsData: AllContractData<ABI> | ContractData<ABI>[] | undefined;
 		if (!this.source) {

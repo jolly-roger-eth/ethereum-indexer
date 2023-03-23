@@ -1,1 +1,1 @@
-export * from './JSONRPCProvider';
+export * from './JSONRPCHTTPProvider';
