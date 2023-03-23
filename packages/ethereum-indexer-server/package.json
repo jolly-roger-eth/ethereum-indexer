@@ -21,8 +21,7 @@
 	"dependencies": {
 		"@ethersproject/bignumber": "^5.7.0",
 		"commander": "^10.0.0",
-		"dotenv": "^16.0.3",
-		"dotenv-expand": "^10.0.0",
+		"dotenv-set": "^0.1.1",
 		"ethereum-indexer": "workspace:*",
 		"ethereum-indexer-db-utils": "workspace:*",
 		"ethereum-indexer-fs-cache": "workspace:*",

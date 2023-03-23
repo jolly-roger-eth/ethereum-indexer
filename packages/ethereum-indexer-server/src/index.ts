@@ -1,11 +1,6 @@
 #! /usr/bin/env node
-import * as dotenv from 'dotenv';
-import * as dotenvExpand from 'dotenv-expand';
-// TODO handle process.env.MODE to get the correct path to read
-const localEnv = dotenv.config({path: './.env.local'});
-dotenvExpand.expand(localEnv);
-const defaultEnv = dotenv.config({path: './.env'});
-dotenvExpand.expand(defaultEnv);
+import lotadEnv from 'dotenv-set';
+lotadEnv();
 
 import {runServer} from './server';
 import {Command} from 'commander';

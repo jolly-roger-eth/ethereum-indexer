@@ -325,8 +325,7 @@ importers:
       '@types/node': ^18.15.5
       '@types/pouchdb': ^6.4.0
       commander: ^10.0.0
-      dotenv: ^16.0.3
-      dotenv-expand: ^10.0.0
+      dotenv-set: ^0.1.1
       eip-1193: ^0.2.3
       ethereum-indexer: workspace:*
       ethereum-indexer-db-utils: workspace:*
@@ -349,8 +348,7 @@ importers:
     dependencies:
       '@ethersproject/bignumber': 5.7.0
       commander: 10.0.0
-      dotenv: 16.0.3
-      dotenv-expand: 10.0.0
+      dotenv-set: 0.1.1
       ethereum-indexer: link:../ethereum-indexer
       ethereum-indexer-db-utils: link:../ethereum-indexer-db-utils
       ethereum-indexer-fs-cache: link:../ethereum-indexer-fs-cache
@@ -2380,6 +2378,14 @@ packages:
   /dotenv-expand/10.0.0:
     resolution: {integrity: sha512-GopVGCpVS1UKH75VKHGuQFqS1Gusej0z4FyQkPdwjil2gNIv+LNsqBlboOzpJFZKVT95GkCyWJbBSdFEFUWI2A==}
     engines: {node: '>=12'}
+    dev: false
+
+  /dotenv-set/0.1.1:
+    resolution: {integrity: sha512-xtf7/fZl795ykyp9ffcwAUropLnktyjrGnjSAV6mmui3xPqiUuRjjJQ8dAFANd6qKV14+rGpk1/d6hTDPJ2yxA==}
+    hasBin: true
+    dependencies:
+      dotenv: 16.0.3
+      dotenv-expand: 10.0.0
     dev: false
 
   /dotenv/16.0.3:
