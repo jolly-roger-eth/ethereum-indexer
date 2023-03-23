@@ -58,7 +58,7 @@ export async function ethereum_request<U extends any, T>(
 }
 
 export class JSONRPCHTTPProvider {
-	supportsETHBatch: true;
+	supportsETHBatch = true;
 	constructor(protected endpoint: string) {}
 
 	request<T, Request extends EIP1193Request = EIP1193Request>(args: Request): Promise<T> {
