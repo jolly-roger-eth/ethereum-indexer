@@ -1,4 +1,4 @@
-# ethereum-indexer-js-processor
+# ethereum-indexer-db-utils
 
 ## 0.6.0
 

@@ -1,5 +1,12 @@
 # event-processor-voidrunners
 
+## 0.0.26
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.0
+
 ## 0.0.25
 
 ### Patch Changes
