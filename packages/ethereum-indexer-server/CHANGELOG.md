@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.6.1
+
+### Patch Changes
+
+- make use of eip-1993-json-provider
+
 ## 0.6.0
 
 ### Minor Changes
