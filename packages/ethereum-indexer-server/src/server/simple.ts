@@ -18,7 +18,7 @@ import {
 	Abi,
 	ExistingStream,
 } from 'ethereum-indexer';
-import {JSONRPCHTTPProvider} from 'ethereum-indexer-utils';
+import {JSONRPCHTTPProvider} from 'eip-1193-json-provider';
 import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
 
 import {logs} from 'named-logs';

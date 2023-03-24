@@ -22,8 +22,8 @@ importers:
       '@types/react-dom': ^18.0.11
       '@vitejs/plugin-react': ^3.1.0
       eip-1193: ^0.2.3
-      ethereum-indexer-browser: workspace:^0.5.6
-      ethereum-indexer-js-processor: workspace:^0.5.6
+      ethereum-indexer-browser: workspace:^0.6.0
+      ethereum-indexer-js-processor: workspace:^0.6.0
       react: ^18.2.0
       react-dom: ^18.2.0
       typescript: ^4.9.5
@@ -327,10 +327,10 @@ importers:
       commander: ^10.0.0
       dotenv-set: ^0.1.1
       eip-1193: ^0.2.3
+      eip-1193-json-provider: ^0.1.0
       ethereum-indexer: workspace:*
       ethereum-indexer-db-utils: workspace:*
       ethereum-indexer-fs-cache: workspace:*
-      ethereum-indexer-utils: workspace:*
       figlet: ^1.5.2
       fs-extra: ^11.1.1
       koa: ^2.14.1
@@ -349,10 +349,10 @@ importers:
       '@ethersproject/bignumber': 5.7.0
       commander: 10.0.0
       dotenv-set: 0.1.1
+      eip-1193-json-provider: 0.1.0
       ethereum-indexer: link:../ethereum-indexer
       ethereum-indexer-db-utils: link:../ethereum-indexer-db-utils
       ethereum-indexer-fs-cache: link:../ethereum-indexer-fs-cache
-      ethereum-indexer-utils: link:../ethereum-indexer-utils
       figlet: 1.5.2
       koa: 2.14.1
       koa-bodyparser: 4.4.0
@@ -376,21 +376,6 @@ importers:
       eip-1193: 0.2.3
       fs-extra: 11.1.1
       tslib: 2.5.0
-      tsup: 6.7.0_typescript@4.9.5
-      typescript: 4.9.5
-
-  packages/ethereum-indexer-utils:
-    specifiers:
-      eip-1193: ^0.2.3
-      isomorphic-unfetch: ^4.0.2
-      named-logs: ^0.2.2
-      tsup: ^6.7.0
-      typescript: ^4.9.5
-    dependencies:
-      isomorphic-unfetch: 4.0.2
-      named-logs: 0.2.2
-    devDependencies:
-      eip-1193: 0.2.3
       tsup: 6.7.0_typescript@4.9.5
       typescript: 4.9.5
 
@@ -2242,6 +2227,13 @@ packages:
 
   /ee-first/1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
+
+  /eip-1193-json-provider/0.1.0:
+    resolution: {integrity: sha512-fRpN30UODsmzTfMssF68Kcrz8627U8MPSqe0WsWGXsc5pF46y8gHrsaWj3pSzA5lFo7P9pq/EGaWQ81skUALgA==}
+    dependencies:
+      isomorphic-unfetch: 4.0.2
+      named-logs: 0.2.2
+    dev: false
 
   /eip-1193/0.2.3:
     resolution: {integrity: sha512-3LC3e+f1Tq5uYtDrjc0lmsKIx+Vk9cP+z2XNqwMpkOri+hv237naXzcdqcZp88UOS3Ap+5XXQey/bgXt9YGSSw==}
