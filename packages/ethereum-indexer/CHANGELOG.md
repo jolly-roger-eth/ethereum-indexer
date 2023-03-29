@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.1
+
+### Patch Changes
+
+- cleanup exports
+
 ## 0.6.0
 
 ### Minor Changes
