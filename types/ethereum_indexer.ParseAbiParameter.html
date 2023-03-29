@@ -21,10 +21,10 @@
 
 <h3>Returns</h3><p>Parsed <a href="ethereum_indexer.AbiParameter.html">AbiParameter</a></p>
 
-<h3>Example</h3><pre><code class="language-ts"><span class="hl-0">type</span><span class="hl-1"> </span><span class="hl-4">Result</span><span class="hl-1"> = </span><span class="hl-4">ParseAbiParameter</span><span class="hl-1">&lt;</span><span class="hl-2">&#39;address from&#39;</span><span class="hl-1">&gt;</span><br/><span class="hl-7">//   ^? type Result = { type: &quot;address&quot;; name: &quot;from&quot;; }</span>
+<h3>Example</h3><pre><code class="language-ts"><span class="hl-5">type</span><span class="hl-1"> </span><span class="hl-8">Result</span><span class="hl-1"> = </span><span class="hl-8">ParseAbiParameter</span><span class="hl-1">&lt;</span><span class="hl-3">&#39;address from&#39;</span><span class="hl-1">&gt;</span><br/><span class="hl-4">//   ^? type Result = { type: &quot;address&quot;; name: &quot;from&quot;; }</span>
 </code></pre>
 
-<h3>Example</h3><pre><code class="language-ts"><span class="hl-0">type</span><span class="hl-1"> </span><span class="hl-4">Result</span><span class="hl-1"> = </span><span class="hl-4">ParseAbiParameter</span><span class="hl-1">&lt;</span><br/><span class="hl-1">  </span><span class="hl-7">// ^? type Result = { type: &quot;tuple&quot;; components: [{ type: &quot;string&quot;; name:...</span><br/><span class="hl-1">  [</span><span class="hl-2">&#39;Baz bar&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;struct Baz { string name; }&#39;</span><span class="hl-1">]</span><br/><span class="hl-1">&gt;</span>
+<h3>Example</h3><pre><code class="language-ts"><span class="hl-5">type</span><span class="hl-1"> </span><span class="hl-8">Result</span><span class="hl-1"> = </span><span class="hl-8">ParseAbiParameter</span><span class="hl-1">&lt;</span><br/><span class="hl-1">  </span><span class="hl-4">// ^? type Result = { type: &quot;tuple&quot;; components: [{ type: &quot;string&quot;; name:...</span><br/><span class="hl-1">  [</span><span class="hl-3">&#39;Baz bar&#39;</span><span class="hl-1">, </span><span class="hl-3">&#39;struct Baz { string name; }&#39;</span><span class="hl-1">]</span><br/><span class="hl-1">&gt;</span>
 </code></pre>
 </div>
 <section class="tsd-panel tsd-type-parameters">
