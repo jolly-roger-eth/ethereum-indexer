@@ -1,10 +1,33 @@
 import {Abi} from 'abitype';
 import {EIP1193DATA, EIP1193Log, EIP1193QUANTITY} from 'eip-1193';
-import {LogEvent, NumberifiedLog} from './decoding/LogEventFetcher';
-import {LogFetcherConfig} from './engine/LogFetcher';
+import {DecodeEventLogReturnType} from 'viem';
+import {NumberifiedLog} from './internal/decoding/LogEventFetcher';
+import {LogTransactionData} from './internal/engine/ethereum';
+import {LogFetcherConfig} from './internal/engine/LogFetcher';
+import {JSONObject} from './internal/types';
 
-export type {LogFetcher, LogFetcherConfig} from './engine/LogFetcher';
-export type {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
+export type EventBlock<ABI extends Abi> = {
+	number: number;
+	hash: string;
+	events: LogEvent<ABI>[]; //this could be replacec by start: number;end: number but we would need access to the old coreresponding events
+};
+
+export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
+export type BaseLogEvent<Extra extends JSONObject | undefined = undefined> = NumberifiedLog & {
+	removedStreamID?: number;
+} & {
+	extra: Extra;
+	blockTimestamp?: number;
+	transaction?: LogTransactionData;
+};
+export type ParsedLogEvent<ABI extends Abi, Extra extends JSONObject | undefined = undefined> = BaseLogEvent<Extra> &
+	LogParsedData<ABI>;
+export type LogEventWithParsingFailure<Extra extends JSONObject | undefined = undefined> = BaseLogEvent<Extra> & {
+	decodeError: string;
+};
+export type LogEvent<ABI extends Abi, Extra extends JSONObject | undefined = undefined> =
+	| ParsedLogEvent<ABI, Extra>
+	| LogEventWithParsingFailure<Extra>;
 
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	getVersionHash(): string;
@@ -23,12 +46,6 @@ export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, P
 > & {
 	createInitialState(): ProcessResultType;
 	configure(config: ProcessorConfig): void;
-};
-
-export type EventBlock<ABI extends Abi> = {
-	number: number;
-	hash: string;
-	events: LogEvent<ABI>[]; //this could be replacec by start: number;end: number but we would need access to the old coreresponding events
 };
 
 export type IncludedEIP1193Log = EIP1193Log & {
@@ -83,15 +100,6 @@ type OptionsFlags<Type> = {
 };
 type LogValuesFlags = OptionsFlags<NumberifiedLog>;
 
-// type OptionsTypes<Flags, Type extends Flags> = {
-// 	[Property in keyof Flags]: Type[Property];
-// };
-
-// type AllTrue<Type> = {
-// 	[Property in keyof Type]: true;
-// };
-// type DefaultExpectedValues = AllTrue<OptionsFlags<NumberifiedLog>>;
-
 export type UsedStreamConfig = ProvidedStreamConfig & {
 	finality: number;
 };
@@ -103,20 +111,13 @@ export type ProvidedStreamConfig = {
 	parse?: LogParseConfig;
 };
 
+export type FetchConfig = Omit<LogFetcherConfig, 'filters'>;
+
 export type ProvidedIndexerConfig<ABI extends Abi> = {
-	// if this changes do not need a resync
-	fetch?: Omit<LogFetcherConfig, 'filters'>;
-
-	// any change to this stream config should trigger a resync from 0
+	fetch?: FetchConfig;
 	stream?: ProvidedStreamConfig;
-
-	// if this changes do not need a resync
 	providerSupportsETHBatch?: boolean;
-
-	// if this changes do not need a resync
 	feedBatchSize?: number;
-
-	// if this changes do not need a resync
 	keepStream?: ExistingStream<ABI>;
 };
 

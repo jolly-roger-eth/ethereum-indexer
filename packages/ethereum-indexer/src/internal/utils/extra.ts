@@ -1,8 +1,8 @@
 import {Abi} from 'abitype';
 import {EIP1193Account, EIP1193DATA, EIP1193Provider, EIP1193QUANTITY} from 'eip-1193';
 import {decodeFunctionResult, encodeFunctionData} from 'viem';
-import {JSONType, LogEventFetcher} from '../decoding/LogEventFetcher';
-import {LogEvent} from '../types';
+import {JSONType} from '../types';
+import {LogEvent} from '../../types';
 import {normalizeAddress} from './address';
 
 const multicallInterface = [

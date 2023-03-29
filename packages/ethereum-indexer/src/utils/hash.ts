@@ -18,7 +18,7 @@ function normalizeAsArray(obj: object): any {
 		return obj;
 	}
 }
-export function hash(obj: any): string {
+export function simple_hash(obj: any): string {
 	const str = typeof obj === 'string' ? obj : JSON.stringify(normalizeAsArray(obj as object)).replace(/\s+/g, '');
 	let hash = 0;
 	for (let i = 0; i < str.length; i++) {

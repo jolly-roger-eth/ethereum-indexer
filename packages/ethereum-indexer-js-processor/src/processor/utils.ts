@@ -57,10 +57,10 @@ export function fromJSProcessor<ABI extends Abi, ProcessResultType extends JSObj
 	};
 }
 
-export function computeArchiveID(id: string, endBlock: number): string {
-	return `archive_${endBlock}_${id}`;
-}
+// export function computeArchiveID(id: string, endBlock: number): string {
+// 	return `archive_${endBlock}_${id}`;
+// }
 
-export function computeEventID<ABI extends Abi>(event: LogEvent<ABI>): string {
-	return `${event.transactionHash}_${event.logIndex}`;
-}
+// export function computeEventID<ABI extends Abi>(event: LogEvent<ABI>): string {
+// 	return `${event.transactionHash}_${event.logIndex}`;
+// }

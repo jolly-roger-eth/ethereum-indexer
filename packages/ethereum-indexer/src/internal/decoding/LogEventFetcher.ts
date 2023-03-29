@@ -1,13 +1,13 @@
-import {EIP1193Account, EIP1193DATA, EIP1193Log, EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {ExtraFilters, LogTransactionData} from '../engine/ethereum';
+import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {ExtraFilters} from '../engine/ethereum';
 import {LogFetcher, LogFetcherConfig} from '../engine/LogFetcher';
 import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
 import {decodeEventLog, encodeEventTopics} from 'viem';
-import {deepEqual} from '../utils/compae';
-import {IncludedEIP1193Log, LogParseConfig} from '../types';
+import {deepEqual} from '../utils/compare';
+import {IncludedEIP1193Log, LogEvent, LogEventWithParsingFailure, LogParseConfig, ParsedLogEvent} from '../../types';
 import {normalizeAddress} from '../utils/address';
-import {UnlessCancelledFunction} from '../utils';
+import {UnlessCancelledFunction} from '../utils/promises';
 
 function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
 	if (!map) {
@@ -30,16 +30,6 @@ function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) 
 	}
 }
 
-export type JSONObject = {
-	[key: string]: JSONType;
-};
-
-export type JSONType = string | number | boolean | JSONType[] | JSONObject;
-
-interface Result extends ReadonlyArray<any> {
-	readonly [key: string]: any;
-}
-
 export interface NumberifiedLog {
 	blockNumber: number;
 	blockHash: `0x${string}`;
@@ -51,23 +41,6 @@ export interface NumberifiedLog {
 	transactionHash: `0x${string}`;
 	logIndex: number;
 }
-
-export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
-export type BaseLogEvent<Extra extends JSONObject | undefined = undefined> = NumberifiedLog & {
-	removedStreamID?: number;
-} & {
-	extra: Extra;
-	blockTimestamp?: number;
-	transaction?: LogTransactionData;
-};
-export type ParsedLogEvent<ABI extends Abi, Extra extends JSONObject | undefined = undefined> = BaseLogEvent<Extra> &
-	LogParsedData<ABI>;
-export type LogEventWithParsingFailure<Extra extends JSONObject | undefined = undefined> = BaseLogEvent<Extra> & {
-	decodeError: string;
-};
-export type LogEvent<ABI extends Abi, Extra extends JSONObject | undefined = undefined> =
-	| ParsedLogEvent<ABI, Extra>
-	| LogEventWithParsingFailure<Extra>;
 
 export type ParsedLogsResult<ABI extends Abi> = {events: LogEvent<ABI>[]; toBlockUsed: number};
 export type ParsedLogsPromise<ABI extends Abi> = Promise<ParsedLogsResult<ABI>> & {stopRetrying(): void};

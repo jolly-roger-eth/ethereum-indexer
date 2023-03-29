@@ -1,5 +1,5 @@
 import {Abi} from 'abitype';
-import {EventBlock, LastSync, LogEvent} from '../types';
+import {EventBlock, LastSync, LogEvent} from '../../types';
 
 export function wait(seconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, seconds * 1000));

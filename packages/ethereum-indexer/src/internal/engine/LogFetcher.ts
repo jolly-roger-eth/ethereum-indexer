@@ -1,6 +1,6 @@
-import {EIP1193Account, EIP1193DATA, EIP1193Log, EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {IncludedEIP1193Log} from '../types';
-import {CancellablePromise, createCancellablePromise, UnlessCancelledFunction} from '../utils';
+import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {IncludedEIP1193Log} from '../../types';
+import {UnlessCancelledFunction} from '../utils/promises';
 import {ExtraFilters, getLogs, getLogsWithVariousFilters} from './ethereum';
 
 type InternalLogFetcherConfig = {

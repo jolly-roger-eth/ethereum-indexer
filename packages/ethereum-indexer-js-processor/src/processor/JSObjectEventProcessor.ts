@@ -6,7 +6,7 @@ import {
 	EventProcessorWithInitialState,
 	AllData,
 	ProcessorContext,
-	hash,
+	simple_hash,
 	KeepState,
 	UsedStreamConfig,
 } from 'ethereum-indexer';
@@ -78,7 +78,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 	configure(config: ProcessorConfig) {
 		this.config = config;
 		this.singleEventProcessor.configure(config);
-		this.configHash = hash(this.config);
+		this.configHash = simple_hash(this.config);
 	}
 
 	keepState(keeper: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>) {

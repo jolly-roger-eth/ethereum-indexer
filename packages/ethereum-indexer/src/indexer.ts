@@ -5,7 +5,7 @@ import {
 	getTransactionData,
 	getTransactionDataFromMultipleHashes,
 	LogTransactionData,
-} from './engine/ethereum';
+} from './internal/engine/ethereum';
 
 import {EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 
@@ -20,11 +20,13 @@ import type {
 	ContextIdentifier,
 	ProvidedStreamConfig,
 	UsedStreamConfig,
+	LogEvent,
 } from './types';
-import {LogEvent, LogEventFetcher} from './decoding/LogEventFetcher';
+import {LogEventFetcher} from './internal/decoding/LogEventFetcher';
 import type {Abi} from 'abitype';
-import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './engine/utils';
-import {CancelOperations, createAction, hash} from './utils';
+import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './internal/engine/utils';
+import {CancelOperations, createAction} from './internal/utils/promises';
+import {simple_hash} from './utils';
 
 const namedLogger = logs('ethereum-indexer');
 
@@ -118,12 +120,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		this.source = source;
 		// TODO handle history (in reverse order)
-		this.sourceHashes = [{startBlock: 0, hash: hash(this.source)}];
+		this.sourceHashes = [{startBlock: 0, hash: simple_hash(this.source)}];
 
 		const streamConfig: UsedStreamConfig = {finality: 17, ...(config.stream || {})};
 		this.config = {feedBatchSize: 300, ...config, stream: streamConfig};
 
-		this.streamConfigHash = hash(this.config.stream || 'undefined');
+		this.streamConfigHash = simple_hash(this.config.stream || 'undefined');
 		this.finality = this.config.stream.finality;
 
 		this.logEventFetcher = new LogEventFetcher(this.provider, source.contracts, config?.fetch, config.stream?.parse);
@@ -212,10 +214,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		streamConfig?: ProvidedStreamConfig;
 	}) {
 		this.disableProcessing();
-		const newConfigHash = update.streamConfig ? hash(update.streamConfig) : this.streamConfigHash;
+		const newConfigHash = update.streamConfig ? simple_hash(update.streamConfig) : this.streamConfigHash;
 
 		// TODO handle history (in reverse order)
-		const newSourceHashes = update.source ? [{startBlock: 0, hash: hash(update.source)}] : this.sourceHashes;
+		const newSourceHashes = update.source ? [{startBlock: 0, hash: simple_hash(update.source)}] : this.sourceHashes;
 		const newProvider = update.provider || this.provider;
 		const oldSource = this.source;
 

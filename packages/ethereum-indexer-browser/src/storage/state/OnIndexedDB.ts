@@ -1,8 +1,8 @@
-import {Abi, AllData, hash, LastSync, ProcessorContext} from 'ethereum-indexer';
+import {Abi, AllData, simple_hash, LastSync, ProcessorContext} from 'ethereum-indexer';
 import {get, set, del} from 'idb-keyval';
 
 function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
-	const configHash = config ? hash(config) : undefined;
+	const configHash = config ? simple_hash(config) : undefined;
 	return `${name}_${chainId}${configHash ? `_${configHash}` : ''}`;
 }
 

@@ -9,8 +9,8 @@ import {
 } from 'eip-1193';
 
 import {logs} from 'named-logs';
-import {IncludedEIP1193Log} from '../types';
-import {UnlessCancelledFunction} from '../utils';
+import {IncludedEIP1193Log} from '../../types';
+import {UnlessCancelledFunction} from '../utils/promises';
 const namedLogger = logs('ethereum-utils');
 
 /**

@@ -5,6 +5,6 @@
     "packages/ethereum-indexer-browser",
     "packages/ethereum-indexer-js-processor"
   ],
-
+  "media": "media",
   "out": "docs"
 }
