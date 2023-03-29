@@ -2,6 +2,8 @@
 
 A modular indexer system for [ethereum](https://ethereum.org) and other blockchain following the same [RPC standard](https://ethereum.org/en/developers/docs/apis/json-rpc/).
 
+You can find some demoes in the [examples folder](./examples/)
+
 ## Main features:
 
 - written in typescript, run both in a browser context and node

@@ -37,7 +37,7 @@ jobs:
         run: pnpm gen-docs
 
       - name: Copy demo in docs
-        run: cp -R examples/web-demo/dist docs/demos
+        run: cp -R examples/web-demo/dist docs/examples
 
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@4.1.4
