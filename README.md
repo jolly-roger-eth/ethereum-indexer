@@ -46,7 +46,7 @@ install `ethereum-indexer-browser`
 npm i ethereum-indexer-browser
 ```
 
-If you use react, here is an example from [App.tsx](https://github.com/jolly-roger-eth/ethereum-indexer/blob/main/examples/basic/src/App.tsx)
+If you use react, here is a mostly self-contained example from [App.tsx](https://github.com/jolly-roger-eth/ethereum-indexer/blob/main/examples/basic/src/App.tsx)
 
 ```tsx
 import "./App.css";
@@ -106,6 +106,7 @@ const processor: JSProcessor<typeof contract.abi, State> = {
   // each event has an associated on<EventName> function which is given both the current state and the typed event
   // each event's argument can be accessed via the `args` field
   // it then modify the state as it wishes
+  // behind the scene, the JSProcessor will handle reorg by reverting and applying new events automatically
   onMessageChanged(state, event) {
     const greetingFound = state.greetings.find(
       (v) => v.account === event.args.user
@@ -124,7 +125,8 @@ const processor: JSProcessor<typeof contract.abi, State> = {
 // we setup the indexer via a call to `createIndexerState`
 // this setup a set of observable (subscribe pattern)
 // including one for the current state (computed by the processor above)
-// and one for the syncing status
+// and one for the syncing
+// we then call `.withHooks(react)` to transform these observable in react hooks ready to be used.
 const { init, useState, useSyncing, startAutoIndexing } = createIndexerState(
   fromJSProcessor(processor)(),
   {
@@ -140,6 +142,7 @@ const ethereum = (window as any).ethereum;
 function start() {
   if (ethereum) {
     // here we first connect it to the chain of our choice and then initialise the indexer
+    // see ./utils/web3
     connect(ethereum, {
       chain: {
         chainId: "11155111",
@@ -153,7 +156,6 @@ function start() {
       // now we need to initialise the indexer with
       // - an EIP-1193 provider (window.ethereum here)
       // - source config which includes the chainId and the list of contracts (abi,address. startBlock)
-      // here we also configure so the indexer uses ABI as global so events defined across contracts will be processed
       init({
         provider: ethereum,
         source: { chainId: "11155111", contracts: [contract] },
@@ -181,6 +183,8 @@ function App() {
       </div>
     );
   }
+  // we have various variable to check the status of the indexer
+  // here we can act on whether the indexer is still waiting to be provided an EIP-1193 provider
   if ($syncing.waitingForProvider) {
     return (
       <div className="App">
@@ -195,6 +199,7 @@ function App() {
     );
   }
 
+  // here we add a progress bar indicating the progress of the indexer
   return (
     <div className="App">
       <h1>Indexing a basic example</h1>
