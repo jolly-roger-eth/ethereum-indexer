@@ -28,7 +28,7 @@
 		"ethereum-indexer-browser": "workspace:*",
 		"event-processor-conquest-eth": "workspace:*",
 		"event-processor-nfts": "workspace:*",
-		"event-processor-voidrunners": "workspace:*",
+		"event-processor-bleeps": "workspace:*",
 		"named-logs": "^0.2.2",
 		"named-logs-console": "^0.2.3",
 		"svelte-json-tree": "^1.0.0",

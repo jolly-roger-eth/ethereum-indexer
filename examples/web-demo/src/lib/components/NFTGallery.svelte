@@ -1,5 +1,6 @@
 <script lang="ts">
 	export let state: Readable<Data>;
+	export let title: string | undefined = undefined;
 
 	import type {Data} from 'event-processor-nfts';
 	import type {EIP1193Provider} from 'eip-1193';
@@ -26,7 +27,9 @@
 			showStepOptions={true}
 			on:setPage={(e) => (currentPage = e.detail.page)}
 		/>
-		<h2 class="heading-text">Your <span>NFTs</span></h2>
+		<h2 class="heading-text">
+			{#if title}{title}{:else}Your <span>NFTs</span>{/if}
+		</h2>
 		<ul class="image-gallery">
 			{#each items as nft (nft.tokenAddress + '_' + nft.tokenID)}
 				<LoadingNft {etherscanURL} {provider} tokenAddress={nft.tokenAddress} tokenID={nft.tokenID} />

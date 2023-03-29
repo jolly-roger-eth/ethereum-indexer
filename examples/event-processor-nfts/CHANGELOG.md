@@ -1,4 +1,4 @@
-# event-processor-voidrunners
+# event-processor-nfts
 
 ## 0.0.26
 

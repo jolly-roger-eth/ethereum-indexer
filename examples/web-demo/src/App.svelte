@@ -2,7 +2,7 @@
 	import Conquest from './pages/Conquest.svelte';
 	import Home from './pages/Home.svelte';
 	import MyNfts from './pages/MyNFTS.svelte';
-	import Voidrunners from './pages/Voidrunners.svelte';
+	import Bleeps from './pages/Bleeps.svelte';
 
 	function getPage() {
 		const page = document.location.hash;
@@ -22,7 +22,7 @@
 	<ul>
 		<li><a href="#home">Home</a></li>
 		<li><a href="#conquest">Conquest</a></li>
-		<li><a href="#voidrunners">Voidrunners</a></li>
+		<li><a href="#bleeps">Bleeps</a></li>
 		<li><a href="#mynfts">My NFTS</a></li>
 	</ul>
 </nav>
@@ -30,8 +30,8 @@
 	<Home />
 {:else if page === '#conquest'}
 	<Conquest />
-{:else if page === '#voidrunners'}
-	<Voidrunners />
+{:else if page === '#bleeps'}
+	<Bleeps />
 {:else if page === '#mynfts'}
 	<MyNfts />
 {:else}

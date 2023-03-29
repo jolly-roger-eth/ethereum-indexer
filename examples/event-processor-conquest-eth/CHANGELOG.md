@@ -1,4 +1,4 @@
-# event-processor-voidrunners
+# event-processor-conquest-eth
 
 ## 0.0.26
 

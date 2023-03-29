@@ -41,6 +41,23 @@ importers:
       typescript: 4.9.5
       vite: 4.2.1
 
+  examples/event-processor-bleeps:
+    specifiers:
+      dotenv: ^16.0.3
+      ethereum-indexer-js-processor: workspace:*
+      ethereum-indexer-server: workspace:*
+      named-logs: ^0.2.2
+      tsup: ^6.7.0
+      typescript: ^4.9.5
+    dependencies:
+      dotenv: 16.0.3
+      ethereum-indexer-js-processor: link:../../packages/ethereum-indexer-js-processor
+      named-logs: 0.2.2
+    devDependencies:
+      ethereum-indexer-server: link:../../packages/ethereum-indexer-server
+      tsup: 6.7.0_typescript@4.9.5
+      typescript: 4.9.5
+
   examples/event-processor-conquest-eth:
     specifiers:
       dotenv: ^16.0.3
@@ -75,23 +92,6 @@ importers:
       tsup: 6.7.0_typescript@4.9.5
       typescript: 4.9.5
 
-  examples/event-processor-voidrunners:
-    specifiers:
-      dotenv: ^16.0.3
-      ethereum-indexer-js-processor: workspace:*
-      ethereum-indexer-server: workspace:*
-      named-logs: ^0.2.2
-      tsup: ^6.7.0
-      typescript: ^4.9.5
-    dependencies:
-      dotenv: 16.0.3
-      ethereum-indexer-js-processor: link:../../packages/ethereum-indexer-js-processor
-      named-logs: 0.2.2
-    devDependencies:
-      ethereum-indexer-server: link:../../packages/ethereum-indexer-server
-      tsup: 6.7.0_typescript@4.9.5
-      typescript: 4.9.5
-
   examples/mud:
     specifiers:
       '@sveltejs/vite-plugin-svelte': ^2.0.2
@@ -100,9 +100,9 @@ importers:
       ethereum-indexer: workspace:*
       ethereum-indexer-browser: workspace:*
       ethereum-indexer-js-processor: workspace:*
+      event-processor-bleeps: workspace:*
       event-processor-conquest-eth: workspace:*
       event-processor-nfts: workspace:*
-      event-processor-voidrunners: workspace:*
       idb-keyval: ^6.2.0
       named-logs: ^0.2.2
       named-logs-console: ^0.2.3
@@ -122,9 +122,9 @@ importers:
       ethereum-indexer: link:../../packages/ethereum-indexer
       ethereum-indexer-browser: link:../../packages/ethereum-indexer-browser
       ethereum-indexer-js-processor: link:../../packages/ethereum-indexer-js-processor
+      event-processor-bleeps: link:../event-processor-bleeps
       event-processor-conquest-eth: link:../event-processor-conquest-eth
       event-processor-nfts: link:../event-processor-nfts
-      event-processor-voidrunners: link:../event-processor-voidrunners
       idb-keyval: 6.2.0
       named-logs: 0.2.2
       named-logs-console: 0.2.3
@@ -152,9 +152,9 @@ importers:
       eip-1193: ^0.2.3
       ethereum-indexer: workspace:*
       ethereum-indexer-browser: workspace:*
+      event-processor-bleeps: workspace:*
       event-processor-conquest-eth: workspace:*
       event-processor-nfts: workspace:*
-      event-processor-voidrunners: workspace:*
       named-logs: ^0.2.2
       named-logs-console: ^0.2.3
       prettier: ^2.8.6
@@ -172,9 +172,9 @@ importers:
     dependencies:
       ethereum-indexer: link:../../packages/ethereum-indexer
       ethereum-indexer-browser: link:../../packages/ethereum-indexer-browser
+      event-processor-bleeps: link:../event-processor-bleeps
       event-processor-conquest-eth: link:../event-processor-conquest-eth
       event-processor-nfts: link:../event-processor-nfts
-      event-processor-voidrunners: link:../event-processor-voidrunners
       named-logs: 0.2.2
       named-logs-console: 0.2.3
       svelte-json-tree: 1.0.0
