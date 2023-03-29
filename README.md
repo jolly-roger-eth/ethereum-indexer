@@ -40,10 +40,10 @@ It is also worth noting that for an indexer to work, it needs to index all event
 
 ## Usage
 
-install `ethereum-indexer-browser`
+install `ethereum-indexer-browser` and `ethereum-indexer-js-processor`
 
 ```
-npm i ethereum-indexer-browser
+npm i ethereum-indexer-browser ethereum-indexer-js-processor
 ```
 
 If you use react, here is a mostly self-contained example from [App.tsx](https://github.com/jolly-roger-eth/ethereum-indexer/blob/main/examples/basic/src/App.tsx)
