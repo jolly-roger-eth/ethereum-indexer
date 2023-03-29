@@ -8,11 +8,11 @@
 	import IndexerButton from '../lib/components/IndexerButton.svelte';
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
+	import {getAddress} from 'viem';
 
 	let accountsToUse: `0x${string}` | boolean = true;
 	onMount(() => {
 		accountsToUse = (params['account'] as `0x${string}`) || true;
-		console.log({accountsToUse});
 	});
 	const latestContractsData = {
 		...contractsData,
@@ -23,7 +23,7 @@
 		'mynfts',
 		initialProcessor,
 		latestContractsData,
-		undefined
+		undefined // work on all chainId
 	);
 
 	let runningProcessor = initialProcessor;
@@ -69,7 +69,8 @@
 					Transfer: [[accountAs32Bytes], [null, accountAs32Bytes]],
 				},
 			},
-			processorConfig: {account: connection.accounts[0]},
+			// getAddress to ensure we get a checksum address that the processor use for string comparison
+			processorConfig: {account: getAddress(connection.accounts[0])},
 		});
 	}
 </script>

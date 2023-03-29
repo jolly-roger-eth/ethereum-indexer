@@ -71,9 +71,13 @@ async function start(
 				const newCainIdAsHex = await ethereum.request({method: 'eth_chainId'});
 				const newChainId = parseInt(newCainIdAsHex.slice(2), 16).toString();
 
+				console.log({chainId: newChainId});
+
 				if (newChainId !== expectedChainId) {
 					setError('Failed to change to chain ');
 				}
+			} else {
+				console.log({chainId});
 			}
 
 			let accounts = [];
@@ -89,6 +93,8 @@ async function start(
 						setError('Failed to get accounts');
 					}
 				}
+
+				console.log({account: accounts[0]});
 			}
 
 			store.set({state: 'Ready'});
