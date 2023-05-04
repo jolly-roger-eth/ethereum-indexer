@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.2
+
+### Patch Changes
+
+- fix fromBlock negative
+
 ## 0.6.1
 
 ### Patch Changes
