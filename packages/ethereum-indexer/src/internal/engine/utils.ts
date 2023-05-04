@@ -149,5 +149,5 @@ export function getFromBlock<ABI extends Abi>(
 ): number {
 	return lastSync.latestBlock === 0
 		? defaultFromBlock
-		: Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality);
+		: Math.max(Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality), 0);
 }
