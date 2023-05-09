@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.3
+
+### Patch Changes
+
+- further chainId check
+
 ## 0.6.2
 
 ### Patch Changes
