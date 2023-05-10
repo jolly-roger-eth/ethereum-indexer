@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.6.6
+
+### Patch Changes
+
+- forgot to build before release
+
 ## 0.6.5
 
 ### Patch Changes
