@@ -430,9 +430,6 @@ importers:
       commander:
         specifier: ^10.0.0
         version: 10.0.0
-      dotenv-set:
-        specifier: ^0.1.1
-        version: 0.1.1
       eip-1193-json-provider:
         specifier: ^0.1.0
         version: 0.1.0
@@ -463,6 +460,9 @@ importers:
       koa-router:
         specifier: ^12.0.0
         version: 12.0.0
+      ldenv:
+        specifier: ^0.3.0
+        version: 0.3.0
       named-logs:
         specifier: ^0.2.2
         version: 0.2.2
@@ -2348,14 +2348,6 @@ packages:
     engines: {node: '>=12'}
     dev: false
 
-  /dotenv-set@0.1.1:
-    resolution: {integrity: sha512-xtf7/fZl795ykyp9ffcwAUropLnktyjrGnjSAV6mmui3xPqiUuRjjJQ8dAFANd6qKV14+rGpk1/d6hTDPJ2yxA==}
-    hasBin: true
-    dependencies:
-      dotenv: 16.0.3
-      dotenv-expand: 10.0.0
-    dev: false
-
   /dotenv@16.0.3:
     resolution: {integrity: sha512-7GO6HghkA5fYG9TYnNxi14/7K9f5occMlp3zXAuSxn7CKCxt9xbNWG7yF8hTCSUchlfWSe3uLmlPfigevRItzQ==}
     engines: {node: '>=12'}
@@ -3495,6 +3487,14 @@ packages:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
+
+  /ldenv@0.3.0:
+    resolution: {integrity: sha512-u/+fouL8UKWk2wZraN0zH9gPjcotGzKyB/fMy70N37lBTZFN/A2Z/wnmgRPUGoxqs+Gr5YP/Xb9q4iC+aSg3jA==}
+    hasBin: true
+    dependencies:
+      dotenv: 16.0.3
+      dotenv-expand: 10.0.0
+    dev: false
 
   /level-codec@9.0.2:
     resolution: {integrity: sha512-UyIwNb1lJBChJnGfjmO0OR+ezh2iVu1Kas3nvBS/BzGnx79dv6g7unpKIDNPMhfdTEGoc7mC8uAu51XEtX+FHQ==}

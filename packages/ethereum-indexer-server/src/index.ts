@@ -1,6 +1,6 @@
 #! /usr/bin/env node
-import lotadEnv from 'dotenv-set';
-lotadEnv();
+import {loadEnv} from 'ldenv';
+loadEnv();
 
 import {runServer} from './server';
 import {Command} from 'commander';
