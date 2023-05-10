@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.6.5
+
+### Patch Changes
+
+- use ldenv
+
 ## 0.6.4
 
 ### Patch Changes
