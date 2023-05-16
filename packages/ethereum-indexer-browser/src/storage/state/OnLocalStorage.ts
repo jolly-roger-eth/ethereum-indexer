@@ -31,7 +31,7 @@ export function keepStateOnLocalStorage<ABI extends Abi, ProcessResultType, Proc
 		save: async (
 			context: ProcessorContext<ABI, ProcessorConfig>,
 			all: {
-				data: ProcessResultType;
+				state: ProcessResultType;
 				lastSync: LastSync<ABI>;
 			}
 		) => {

@@ -156,7 +156,7 @@ export type ProcessorContext<ABI extends Abi, ProcessorConfig> = ProcessorConfig
 	  };
 
 export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
-	data: ProcessResultType;
+	state: ProcessResultType;
 	lastSync: LastSync<ABI>;
 } & Extra;
 

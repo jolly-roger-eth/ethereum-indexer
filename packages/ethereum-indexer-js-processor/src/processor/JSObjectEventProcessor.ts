@@ -41,18 +41,18 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 	protected finality: number | undefined;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
 		this.version = singleEventProcessor.version;
-		const data = singleEventProcessor.createInitialState();
+		const state = singleEventProcessor.createInitialState();
 		const history = {
 			blockHashes: {},
 			reversals: {},
 		};
 		this._json = {
-			data,
+			state,
 			lastSync: undefined,
 			history,
 		};
 		this.history = new History(history);
-		this.state = proxifyJSON<ProcessResultType>(data, this.history);
+		this.state = proxifyJSON<ProcessResultType>(state, this.history);
 	}
 
 	copyFrom(otherProcessor: JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig>) {
@@ -87,21 +87,21 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 
 	async reset() {
 		namedLogger.info('JSObjectEventProcessor reseting...');
-		if (!this._json.data) {
+		if (!this._json.state) {
 			throw new Error(`no data`);
 		}
-		const keys = Object.keys(this._json.data);
+		const keys = Object.keys(this._json.state);
 		for (const key of keys) {
-			delete this._json.data[key];
+			delete this._json.state[key];
 		}
-		const data = this.singleEventProcessor.createInitialState();
+		const state = this.singleEventProcessor.createInitialState();
 		this.version = this.singleEventProcessor.version;
 		const history = {
 			blockHashes: {},
 			reversals: {},
 		};
 		this._json = {
-			data,
+			state,
 			lastSync: undefined,
 			history,
 		};
@@ -110,8 +110,8 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			this.history.setFinality(this.finality);
 		}
 
-		this.state = proxifyJSON<ProcessResultType>(this._json.data as ProcessResultType, this.history);
-		// return this._json.data;
+		this.state = proxifyJSON<ProcessResultType>(this._json.state as ProcessResultType, this.history);
+		// return this._json.state;
 	}
 
 	async clear() {
@@ -138,7 +138,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
 			const existingStateData = await this.keeper.fetch(context);
 			if (existingStateData) {
-				const {lastSync: lastSyncFromExistingState, data, history} = existingStateData;
+				const {lastSync: lastSyncFromExistingState, state, history} = existingStateData;
 				if (
 					!this._json.lastSync?.lastToBlock ||
 					// TODO configure 100
@@ -147,16 +147,16 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					this._json.history = history;
 					this.history.setBlock(0, '0x0000');
 
-					if (!this._json.data) {
+					if (!this._json.state) {
 						throw new Error(`no data`);
 					}
-					const keys = Object.keys(this._json.data);
+					const keys = Object.keys(this._json.state);
 					for (const key of keys) {
-						delete this._json.data[key];
+						delete this._json.state[key];
 					}
-					this._json.data = data;
+					this._json.state = state;
 					this._json.lastSync = lastSyncFromExistingState;
-					this.state = proxifyJSON<ProcessResultType>(this._json.data, this.history);
+					this.state = proxifyJSON<ProcessResultType>(this._json.state, this.history);
 				}
 			}
 		}
@@ -164,10 +164,10 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 		if (!this._json.lastSync) {
 			return undefined;
 		}
-		if (!this._json.data) {
+		if (!this._json.state) {
 			throw new Error(`no data`);
 		}
-		return {lastSync: this._json.lastSync, state: this._json.data};
+		return {lastSync: this._json.lastSync, state: this._json.state};
 	}
 
 	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
@@ -175,7 +175,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 		if (!this.finality) {
 			throw new Error(`finality not set`);
 		}
-		if (!this._json.data) {
+		if (!this._json.state) {
 			throw new Error(`no data`);
 		}
 		try {
@@ -188,7 +188,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 
 					if (!lastBlockDeleted || event.blockHash != lastBlockDeleted) {
 						namedLogger.info(`JSObjectEventProcessor preparing block...`);
-						this.history.reverseBlock(event.blockNumber, event.blockHash, this._json.data);
+						this.history.reverseBlock(event.blockNumber, event.blockHash, this._json.state);
 						lastBlockDeleted = event.blockHash;
 					}
 				} else {
@@ -199,7 +199,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					}
 
 					const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > this.finality;
-					const state = willNotChange ? this._json.data : this.state;
+					const state = willNotChange ? this._json.state : this.state;
 					this.singleEventProcessor.processEvent(state, event);
 				}
 			}
@@ -221,7 +221,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					const source = this.source as IndexingSource<ABI>;
 					const version = this.version;
 					const context = {source, config, version} as ProcessorContext<ABI, ProcessorConfig>;
-					if (!this._json.data || !this._json.lastSync || !this._json.history) {
+					if (!this._json.state || !this._json.lastSync || !this._json.history) {
 						throw new Error(`empty _json`);
 					}
 					await this.keeper.save(context, this._json as AllData<ABI, ProcessResultType, {history: HistoryJSObject}>);
@@ -234,9 +234,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			// namedLogger.info(`JSObjectEventProcessor streamID: ${lastSync.nextStreamID}`);
 		}
 
-		if (!this._json.data) {
+		if (!this._json.state) {
 			throw new Error(`empty _json`);
 		}
-		return this._json.data;
+		return this._json.state;
 	}
 }

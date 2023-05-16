@@ -22,7 +22,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 		save: async (
 			context: ProcessorContext<ABI, ProcessorConfig>,
 			all: {
-				data: ProcessResultType;
+				state: ProcessResultType;
 				lastSync: LastSync<ABI>;
 			}
 		) => {

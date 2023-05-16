@@ -62,7 +62,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 				const content = fs.readFileSync(options.file, 'utf-8');
 				const json = JSON.parse(content, bnReviver);
 				return {
-					data: json.state,
+					state: json.state,
 					lastSync: json.lastSync,
 					history: json.history,
 				};
@@ -71,7 +71,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 			}
 		},
 		save: async (context, all) => {
-			const data = {lastSync: all.lastSync, state: all.data, history: all.history};
+			const data = {lastSync: all.lastSync, state: all.state, history: all.history};
 			fs.writeFileSync(options.file, JSON.stringify(data, bnReplacer, 2));
 		},
 		clear: async () => {},
