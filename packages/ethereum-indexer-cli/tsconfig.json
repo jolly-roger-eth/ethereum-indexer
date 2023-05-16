@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"outDir": "dist",
+		"moduleResolution": "node",
+		"target": "ES2022",
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"module": "ES2022",
+		"strict": true
+	}
+}
