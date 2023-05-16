@@ -1,5 +1,12 @@
 # ethereum-indexer-db-utils
 
+## 0.6.4
+
+### Patch Changes
+
+- Updated dependencies [c81fb4d]
+  - ethereum-indexer@0.6.4
+
 ## 0.6.3
 
 ### Patch Changes

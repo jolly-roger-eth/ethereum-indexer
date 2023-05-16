@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.4
+
+### Patch Changes
+
+- c81fb4d: use state field name instead of data
+
 ## 0.6.3
 
 ### Patch Changes
