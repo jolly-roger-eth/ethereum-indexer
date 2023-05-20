@@ -297,13 +297,22 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 
 	return {
 		syncing: {
-			...readableSyncing,
+			subscribe: readableSyncing.subscribe,
+			get $state() {
+				return readableSyncing.$state;
+			},
 		},
 		state: {
-			...readableState,
+			subscribe: readableState.subscribe,
+			get $state() {
+				return readableState.$state;
+			},
 		},
 		status: {
-			...readableStatus,
+			subscribe: readableStatus.subscribe,
+			get $state() {
+				return readableStatus.$state;
+			},
 		},
 		init: init as InitFunction<ABI, ProcessorConfig>,
 		indexToLatest,
