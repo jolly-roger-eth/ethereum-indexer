@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.5
+
+### Patch Changes
+
+- fix state direct access
+
 ## 0.6.4
 
 ### Patch Changes
