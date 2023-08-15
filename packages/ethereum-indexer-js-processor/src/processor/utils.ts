@@ -1,6 +1,10 @@
 import {JSObjectEventProcessor} from './JSObjectEventProcessor';
-import {Abi, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
-import {EventFunctions, JSObject} from './types';
+import {Abi, ExtractAbiEvent, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
+import {EventFunctions, InputValues, JSObject} from './types';
+
+export type EventWithArgs<ABI extends Abi, Property extends string> = LogEvent<ABI> & {
+	args: InputValues<ExtractAbiEvent<ABI, Property>>;
+};
 
 export type JSProcessor<
 	ABI extends Abi,

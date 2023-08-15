@@ -1,5 +1,13 @@
 # web-demo
 
+## 0.1.29
+
+### Patch Changes
+
+- event-processor-bleeps@0.0.31
+- event-processor-conquest-eth@0.0.31
+- event-processor-nfts@0.0.31
+
 ## 0.1.28
 
 ### Patch Changes
