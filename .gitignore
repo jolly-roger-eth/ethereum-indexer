@@ -9,4 +9,11 @@ lerna-debug.log*
 
 node_modules
 .vscode/
-docs/
+
+/docs/.vitepress/*
+!/docs/.vitepress/config.mts
+/docs/api
+
+# this need to be copied in
+/docs/examples 
+/docs/media
