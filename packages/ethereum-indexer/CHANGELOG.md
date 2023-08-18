@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.5
+
+### Patch Changes
+
+- fix duplicate event name issue
+
 ## 0.6.4
 
 ### Patch Changes
