@@ -1,5 +1,13 @@
 # event-processor-nfts
 
+## 0.0.35
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.9
+
 ## 0.0.34
 
 ### Patch Changes

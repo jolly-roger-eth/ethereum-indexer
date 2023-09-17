@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.8
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+
 ## 0.6.7
 
 ### Patch Changes

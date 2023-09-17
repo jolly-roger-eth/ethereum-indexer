@@ -1,6 +1,6 @@
 {
 	"name": "ethereum-indexer-db-utils",
-	"version": "0.6.7",
+	"version": "0.6.8",
 	"description": "",
 	"publishConfig": {
 		"access": "public"
@@ -11,7 +11,7 @@
 	"types": "dist/index.d.ts",
 	"keywords": [],
 	"author": "",
-	"license": "ISC",
+	"license": "MIT",
 	"volta": {
 		"node": "18.7.0"
 	},

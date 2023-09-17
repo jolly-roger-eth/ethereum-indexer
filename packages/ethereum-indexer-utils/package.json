@@ -1,5 +1,5 @@
 {
-	"name": "ethereum-indexer-db-processors",
+	"name": "ethereum-indexer-utils",
 	"version": "0.6.8",
 	"description": "",
 	"publishConfig": {
@@ -16,14 +16,11 @@
 		"node": "18.7.0"
 	},
 	"dependencies": {
-		"ethereum-indexer": "workspace:*",
-		"ethereum-indexer-db-utils": "workspace:*",
-		"named-logs": "^0.2.2",
-		"pouchdb": "^8.0.1",
-		"pouchdb-find": "^8.0.1"
+		"named-logs": "^0.2.2"
 	},
 	"devDependencies": {
-		"@types/pouchdb": "^6.4.0",
+		"@types/node": "^18.15.5",
+		"ethereum-indexer": "workspace:*",
 		"tsup": "^6.7.0",
 		"typescript": "^4.9.5"
 	},

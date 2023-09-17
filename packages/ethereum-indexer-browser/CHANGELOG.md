@@ -1,5 +1,13 @@
 # ethereum-indexer-browser
 
+## 0.6.9
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer@0.6.8
+
 ## 0.6.8
 
 ### Patch Changes

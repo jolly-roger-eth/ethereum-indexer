@@ -2,7 +2,7 @@ import {Abi, IndexingSource} from 'ethereum-indexer';
 import path from 'path';
 import fs from 'fs';
 import {SimpleServer} from './server/simple';
-import {loadContracts} from './utils/contracts';
+import {loadContracts} from 'ethereum-indexer-utils';
 
 export function runServer<ABI extends Abi>(
 	processor: string,

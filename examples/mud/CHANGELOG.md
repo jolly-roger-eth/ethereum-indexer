@@ -1,5 +1,18 @@
 # web-demo
 
+## 0.1.33
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.9
+  - event-processor-conquest-eth@0.0.35
+  - ethereum-indexer-browser@0.6.9
+  - event-processor-bleeps@0.0.35
+  - event-processor-nfts@0.0.35
+  - ethereum-indexer@0.6.8
+
 ## 0.1.32
 
 ### Patch Changes

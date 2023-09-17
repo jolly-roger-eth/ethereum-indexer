@@ -1,5 +1,5 @@
 {
-	"name": "ethereum-indexer-server",
+	"name": "ethereum-indexer-streams",
 	"version": "0.6.13",
 	"description": "",
 	"keywords": [],
@@ -13,33 +13,25 @@
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"bin": {
-		"eis": "dist/index.js"
+		"ei-streams": "dist/index.js"
 	},
 	"volta": {
 		"node": "18.7.0"
 	},
 	"dependencies": {
-		"@ethersproject/bignumber": "^5.7.0",
 		"commander": "^10.0.0",
 		"ldenv": "^0.3.0",
-		"eip-1193-json-provider": "^0.1.0",
 		"ethereum-indexer": "workspace:*",
-		"ethereum-indexer-db-utils": "workspace:*",
-		"ethereum-indexer-fs-cache": "workspace:*",
 		"ethereum-indexer-utils": "workspace:*",
-		"figlet": "^1.5.2",
 		"koa": "^2.14.1",
 		"koa-bodyparser": "^4.4.0",
 		"koa-json": "^2.0.2",
 		"koa-logger": "^3.2.1",
 		"koa-router": "^12.0.0",
 		"named-logs": "^0.2.2",
-		"named-logs-console": "^0.2.3",
-		"pouchdb": "^8.0.1",
-		"pouchdb-find": "^8.0.1"
+		"named-logs-console": "^0.2.3"
 	},
 	"devDependencies": {
-		"@types/figlet": "^1.5.5",
 		"@types/fs-extra": "^11.0.1",
 		"@types/koa": "^2.13.5",
 		"@types/koa-bodyparser": "^4.3.10",
@@ -47,7 +39,6 @@
 		"@types/koa-logger": "^3.1.2",
 		"@types/koa-router": "^7.4.4",
 		"@types/node": "^18.15.5",
-		"@types/pouchdb": "^6.4.0",
 		"eip-1193": "^0.2.3",
 		"fs-extra": "^11.1.1",
 		"tslib": "^2.5.0",

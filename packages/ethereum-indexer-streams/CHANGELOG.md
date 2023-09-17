@@ -6,8 +6,6 @@
 
 - reorg + add streams server (wip)
 - Updated dependencies
-  - ethereum-indexer-db-utils@0.6.8
-  - ethereum-indexer-fs-cache@0.6.8
   - ethereum-indexer@0.6.8
   - ethereum-indexer-utils@0.6.8
 

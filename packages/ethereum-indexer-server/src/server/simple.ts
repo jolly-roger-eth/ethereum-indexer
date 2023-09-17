@@ -34,6 +34,7 @@ import {
 import {adminPage} from '../pages';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {createRequire} from 'module';
+import {clean, formatLastSync, removeUndefinedValuesFromObject} from 'ethereum-indexer-utils';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -57,43 +58,6 @@ type Config = {
 	useFSCache: boolean;
 	port: number;
 };
-
-function filterOutFieldsFromObject<T extends {} = Object, U extends {} = Object>(obj: T, fields: string[]): U {
-	const keys = Object.keys(obj);
-	const newObj: U = {} as U;
-	for (const key of keys) {
-		if (fields.includes(key)) {
-			continue;
-		}
-		(newObj as any)[key] = (obj as any)[key];
-	}
-	return newObj;
-}
-
-function formatLastSync<ABI extends Abi>(lastSync: LastSync<ABI>): any {
-	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);
-}
-
-function filterOutUnderscoreFieldsFromObject<T extends {} = Object, U extends {} = Object>(obj: T): U {
-	const keys = Object.keys(obj);
-	const newObj: U = {} as U;
-	for (const key of keys) {
-		if (key.startsWith('_')) {
-			continue;
-		}
-		(newObj as any)[key] = (obj as any)[key];
-	}
-	return newObj;
-}
-
-function clean(obj: Object) {
-	return filterOutUnderscoreFieldsFromObject(obj);
-}
-
-function removeUndefinedValuesFromObject(obj: any) {
-	Object.keys(obj).forEach((key) => (obj[key] === undefined ? delete obj[key] : {}));
-	return obj;
-}
 
 export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	protected indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;

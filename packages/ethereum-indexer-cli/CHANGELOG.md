@@ -1,5 +1,14 @@
 # ethereum-indexer-cli
 
+## 0.6.8
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer@0.6.8
+  - ethereum-indexer-utils@0.6.8
+
 ## 0.6.7
 
 ### Patch Changes

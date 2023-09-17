@@ -13,7 +13,7 @@ import {logs} from 'named-logs';
 import {JSONRPCHTTPProvider} from 'eip-1193-json-provider';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import fs from 'fs';
-import {loadContracts} from './utils/contracts';
+import {loadContracts} from 'ethereum-indexer-utils';
 import {bnReplacer, bnReviver} from './utils/bn';
 import {createRequire} from 'module';
 

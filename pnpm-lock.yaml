@@ -87,7 +87,7 @@ importers:
         version: link:../../packages/ethereum-indexer-server
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -109,7 +109,7 @@ importers:
         version: link:../../packages/ethereum-indexer-server
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -131,7 +131,7 @@ importers:
         version: link:../../packages/ethereum-indexer-server
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -299,7 +299,7 @@ importers:
         version: 0.2.3
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -327,7 +327,7 @@ importers:
         version: 0.2.3
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -343,6 +343,9 @@ importers:
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
+      ethereum-indexer-utils:
+        specifier: workspace:*
+        version: link:../ethereum-indexer-utils
       ldenv:
         specifier: ^0.3.0
         version: 0.3.0
@@ -367,7 +370,7 @@ importers:
         version: 11.1.1
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -395,7 +398,7 @@ importers:
         version: 6.4.0
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -420,7 +423,7 @@ importers:
         version: 6.4.0
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -473,7 +476,7 @@ importers:
     devDependencies:
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -498,6 +501,9 @@ importers:
       ethereum-indexer-fs-cache:
         specifier: workspace:*
         version: link:../ethereum-indexer-fs-cache
+      ethereum-indexer-utils:
+        specifier: workspace:*
+        version: link:../ethereum-indexer-utils
       figlet:
         specifier: ^1.5.2
         version: 1.5.2
@@ -570,7 +576,99 @@ importers:
         version: 2.5.0
       tsup:
         specifier: ^6.7.0
-        version: 6.7.0(ts-node@10.9.1)(typescript@4.9.5)
+        version: 6.7.0(typescript@4.9.5)
+      typescript:
+        specifier: ^4.9.5
+        version: 4.9.5
+
+  packages/ethereum-indexer-streams:
+    dependencies:
+      commander:
+        specifier: ^10.0.0
+        version: 10.0.0
+      ethereum-indexer:
+        specifier: workspace:*
+        version: link:../ethereum-indexer
+      ethereum-indexer-utils:
+        specifier: workspace:*
+        version: link:../ethereum-indexer-utils
+      koa:
+        specifier: ^2.14.1
+        version: 2.14.1
+      koa-bodyparser:
+        specifier: ^4.4.0
+        version: 4.4.0
+      koa-json:
+        specifier: ^2.0.2
+        version: 2.0.2
+      koa-logger:
+        specifier: ^3.2.1
+        version: 3.2.1
+      koa-router:
+        specifier: ^12.0.0
+        version: 12.0.0
+      ldenv:
+        specifier: ^0.3.0
+        version: 0.3.0
+      named-logs:
+        specifier: ^0.2.2
+        version: 0.2.2
+      named-logs-console:
+        specifier: ^0.2.3
+        version: 0.2.3
+    devDependencies:
+      '@types/fs-extra':
+        specifier: ^11.0.1
+        version: 11.0.1
+      '@types/koa':
+        specifier: ^2.13.5
+        version: 2.13.5
+      '@types/koa-bodyparser':
+        specifier: ^4.3.10
+        version: 4.3.10
+      '@types/koa-json':
+        specifier: ^2.0.20
+        version: 2.0.20
+      '@types/koa-logger':
+        specifier: ^3.1.2
+        version: 3.1.2
+      '@types/koa-router':
+        specifier: ^7.4.4
+        version: 7.4.4
+      '@types/node':
+        specifier: ^18.15.5
+        version: 18.15.5
+      eip-1193:
+        specifier: ^0.2.3
+        version: 0.2.3
+      fs-extra:
+        specifier: ^11.1.1
+        version: 11.1.1
+      tslib:
+        specifier: ^2.5.0
+        version: 2.5.0
+      tsup:
+        specifier: ^6.7.0
+        version: 6.7.0(typescript@4.9.5)
+      typescript:
+        specifier: ^4.9.5
+        version: 4.9.5
+
+  packages/ethereum-indexer-utils:
+    dependencies:
+      named-logs:
+        specifier: ^0.2.2
+        version: 0.2.2
+    devDependencies:
+      '@types/node':
+        specifier: ^18.15.5
+        version: 18.15.5
+      ethereum-indexer:
+        specifier: workspace:*
+        version: link:../ethereum-indexer
+      tsup:
+        specifier: ^6.7.0
+        version: 6.7.0(typescript@4.9.5)
       typescript:
         specifier: ^4.9.5
         version: 4.9.5
@@ -6067,6 +6165,42 @@ packages:
     engines: {node: '>=0.6.x'}
 
   /tsup@6.7.0(ts-node@10.9.1)(typescript@4.9.5):
+    resolution: {integrity: sha512-L3o8hGkaHnu5TdJns+mCqFsDBo83bJ44rlK7e6VdanIvpea4ArPcU3swWGsLVbXak1PqQx/V+SSmFPujBK+zEQ==}
+    engines: {node: '>=14.18'}
+    hasBin: true
+    peerDependencies:
+      '@swc/core': ^1
+      postcss: ^8.4.12
+      typescript: '>=4.1.0'
+    peerDependenciesMeta:
+      '@swc/core':
+        optional: true
+      postcss:
+        optional: true
+      typescript:
+        optional: true
+    dependencies:
+      bundle-require: 4.0.1(esbuild@0.17.12)
+      cac: 6.7.14
+      chokidar: 3.5.3
+      debug: 4.3.4
+      esbuild: 0.17.12
+      execa: 5.1.1
+      globby: 11.1.0
+      joycon: 3.1.1
+      postcss-load-config: 3.1.4(ts-node@10.9.1)
+      resolve-from: 5.0.0
+      rollup: 3.28.0
+      source-map: 0.8.0-beta.0
+      sucrase: 3.30.0
+      tree-kill: 1.2.2
+      typescript: 4.9.5
+    transitivePeerDependencies:
+      - supports-color
+      - ts-node
+    dev: true
+
+  /tsup@6.7.0(typescript@4.9.5):
     resolution: {integrity: sha512-L3o8hGkaHnu5TdJns+mCqFsDBo83bJ44rlK7e6VdanIvpea4ArPcU3swWGsLVbXak1PqQx/V+SSmFPujBK+zEQ==}
     engines: {node: '>=14.18'}
     hasBin: true
