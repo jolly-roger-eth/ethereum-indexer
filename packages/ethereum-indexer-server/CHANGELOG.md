@@ -1,5 +1,15 @@
 # ethereum-indexer-server
 
+## 0.6.10
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - ethereum-indexer-db-utils@0.6.7
+  - ethereum-indexer-fs-cache@0.6.7
+  - ethereum-indexer@0.6.7
+
 ## 0.6.9
 
 ### Patch Changes

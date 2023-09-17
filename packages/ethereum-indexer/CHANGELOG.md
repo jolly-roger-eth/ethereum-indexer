@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.7
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+
 ## 0.6.6
 
 ### Patch Changes

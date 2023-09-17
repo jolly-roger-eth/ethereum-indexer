@@ -1,5 +1,13 @@
 # ethereum-indexer-cli
 
+## 0.6.7
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - ethereum-indexer@0.6.7
+
 ## 0.6.6
 
 ### Patch Changes

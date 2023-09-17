@@ -37,13 +37,15 @@ export function loadContracts<ABI extends Abi>(folder: string): IndexingSource<A
 			continue;
 		}
 		const added = contractsAdded[deployment.address];
+		const startBlock = deployment.receipt?.blockNumber
+			? typeof deployment.receipt?.blockNumber === 'string'
+				? parseInt(deployment.receipt?.blockNumber.slice(2), 16)
+				: deployment.receipt?.blockNumber
+			: undefined;
 		if (added) {
-			if (deployment.receipt?.blockNumber) {
-				if (
-					!contractsData[added.index].startBlock ||
-					(contractsData[added.index].startBlock as number) > deployment.receipt?.blockNumber
-				) {
-					(contractsData[added.index] as any).startBlock = deployment.receipt?.blockNumber;
+			if (startBlock) {
+				if (!contractsData[added.index].startBlock || (contractsData[added.index].startBlock as number) > startBlock) {
+					(contractsData[added.index] as any).startBlock = startBlock;
 				}
 			}
 			(contractsData[added.index] as any).abi = mergeABIs((contractsData[added.index] as any).abi, deployment.abi);
@@ -51,7 +53,7 @@ export function loadContracts<ABI extends Abi>(folder: string): IndexingSource<A
 			contractsData.push({
 				address: deployment.address,
 				abi: deployment.abi,
-				startBlock: deployment.receipt?.blockNumber,
+				startBlock,
 			});
 			contractsAdded[deployment.address] = {index: contractsData.length - 1};
 		}

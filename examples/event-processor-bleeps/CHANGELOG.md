@@ -1,5 +1,13 @@
 # event-processor-bleeps
 
+## 0.0.34
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.8
+
 ## 0.0.33
 
 ### Patch Changes

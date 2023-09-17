@@ -15,6 +15,7 @@ import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import fs from 'fs';
 import {loadContracts} from './utils/contracts';
 import {bnReplacer, bnReviver} from './utils/bn';
+import {createRequire} from 'module';
 
 const logger = logs('ei');
 
@@ -31,7 +32,12 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 		source = loadContracts(options.deployments);
 	}
 
-	const processorModule = await import(options.processor);
+	let processorModule: any | undefined;
+	try {
+		processorModule = await import(options.processor);
+	} catch (err: any) {
+		processorModule = await import(createRequire(`${process.cwd()}/node_modules/`).resolve(options.processor));
+	}
 	const processorFactory = processorModule.createProcessor as (config?: any) => EventProcessor<ABI, ProcessResultType>;
 
 	if (!processorFactory) {

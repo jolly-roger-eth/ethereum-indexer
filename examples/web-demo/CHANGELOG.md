@@ -1,5 +1,17 @@
 # web-demo
 
+## 0.1.32
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - event-processor-conquest-eth@0.0.34
+  - ethereum-indexer-browser@0.6.8
+  - event-processor-bleeps@0.0.34
+  - event-processor-nfts@0.0.34
+  - ethereum-indexer@0.6.7
+
 ## 0.1.31
 
 ### Patch Changes
