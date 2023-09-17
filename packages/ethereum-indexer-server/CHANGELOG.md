@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.6.12
+
+### Patch Changes
+
+- fixes for ethereum-indexer-server port handling
+
 ## 0.6.11
 
 ### Patch Changes

@@ -15,7 +15,7 @@ export function runServer<ABI extends Abi>(
 		disableCache: boolean;
 		disableSecurity: boolean;
 		useFSCache: boolean;
-		port?: number;
+		port?: string;
 	}
 ) {
 	let source: IndexingSource<ABI> | undefined;
@@ -46,7 +46,7 @@ export function runServer<ABI extends Abi>(
 		useFSCache: args.useFSCache,
 		nodeURL: args.nodeUrl,
 		disableSecurity: args.disableSecurity,
-		port: args.port,
+		port: args.port ? parseInt(args.port) : undefined,
 	});
 
 	server.start({autoIndex: !args.wait});

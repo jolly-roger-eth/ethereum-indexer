@@ -90,6 +90,11 @@ function clean(obj: Object) {
 	return filterOutUnderscoreFieldsFromObject(obj);
 }
 
+function removeUndefinedValuesFromObject(obj: any) {
+	Object.keys(obj).forEach((key) => (obj[key] === undefined ? delete obj[key] : {}));
+	return obj;
+}
+
 export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	protected indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;
 	protected app: Koa | undefined;
@@ -103,7 +108,10 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	protected source: IndexingSource<ABI> | undefined;
 
 	constructor(config: UserConfig<ABI>) {
-		this.config = Object.assign({useCache: false, disableSecurity: false, useFSCache: false, port: 14385}, config);
+		this.config = Object.assign(
+			{useCache: false, disableSecurity: false, useFSCache: false, port: 14385},
+			removeUndefinedValuesFromObject(config)
+		);
 		this.source = config.source;
 	}
 
@@ -445,8 +453,9 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		this.app.use(router.routes()).use(router.allowedMethods());
 
-		this.app.listen(this.config.port, () => {
-			console.log(`server started on port: ${this.config.port}`);
+		const port = this.config.port;
+		this.app.listen(port, () => {
+			console.log(`server started on port: ${port}`);
 		});
 	}
 
