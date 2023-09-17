@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.6.11
+
+### Patch Changes
+
+- add port config
+
 ## 0.6.10
 
 ### Patch Changes

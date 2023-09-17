@@ -45,6 +45,7 @@ export type UserConfig<ABI extends Abi> = {
 	useCache?: boolean;
 	disableSecurity?: boolean;
 	useFSCache?: boolean;
+	port?: number;
 };
 
 type Config = {
@@ -54,6 +55,7 @@ type Config = {
 	useCache: boolean;
 	disableSecurity: boolean;
 	useFSCache: boolean;
+	port: number;
 };
 
 function filterOutFieldsFromObject<T extends {} = Object, U extends {} = Object>(obj: T, fields: string[]): U {
@@ -101,7 +103,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	protected source: IndexingSource<ABI> | undefined;
 
 	constructor(config: UserConfig<ABI>) {
-		this.config = Object.assign({useCache: false, disableSecurity: false, useFSCache: false}, config);
+		this.config = Object.assign({useCache: false, disableSecurity: false, useFSCache: false, port: 14385}, config);
 		this.source = config.source;
 	}
 
@@ -443,10 +445,8 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		this.app.use(router.routes()).use(router.allowedMethods());
 
-		const port = 14385;
-
-		this.app.listen(port, () => {
-			namedLogger.info(`server started on port: ${port}`);
+		this.app.listen(this.config.port, () => {
+			console.log(`server started on port: ${this.config.port}`);
 		});
 	}
 
