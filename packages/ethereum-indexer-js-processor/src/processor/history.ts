@@ -200,7 +200,7 @@ function arrayGetter(
 					if (items && items.length > 0) {
 						throw new Error(`splice in proxy do not support items to add yet...`);
 					}
-					const values = target.slice(start, deleteCount);
+					const values = target.splice(start, deleteCount);
 					history.setReversal(fieldPath, {
 						__action__: 'ArraySet',
 						actions: [{index: target.length, values: structuredClone(values)}],
