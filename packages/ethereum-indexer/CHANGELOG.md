@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.9
+
+### Patch Changes
+
+- fix history splice
+
 ## 0.6.8
 
 ### Patch Changes

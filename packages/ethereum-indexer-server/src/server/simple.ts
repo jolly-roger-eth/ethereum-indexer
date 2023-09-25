@@ -35,6 +35,7 @@ import {adminPage} from '../pages';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {createRequire} from 'module';
 import {clean, formatLastSync, removeUndefinedValuesFromObject} from 'ethereum-indexer-utils';
+import path from 'path';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -90,13 +91,18 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 	private async setupIndexing() {
 		let processorModule: any | undefined;
-		try {
+		if (path.isAbsolute(this.config.processorPath)) {
 			processorModule = await import(this.config.processorPath);
-		} catch (err: any) {
-			processorModule = await import(
-				createRequire(`${process.cwd()}/node_modules/`).resolve(this.config.processorPath)
-			);
+		} else {
+			try {
+				processorModule = await import(path.join(process.cwd(), this.config.processorPath));
+			} catch (err: any) {
+				processorModule = await import(
+					createRequire(`${process.cwd()}/node_modules/`).resolve(this.config.processorPath)
+				);
+			}
 		}
+
 		const processorFactory = processorModule.createProcessor as (
 			config?: any
 		) => QueriableEventProcessor<ABI, ProcessResultType>;
