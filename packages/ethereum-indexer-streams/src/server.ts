@@ -1,20 +1,7 @@
-import {Abi, IndexingSource} from 'ethereum-indexer';
 import fs from 'fs';
 import {MultiStreamServer} from './server/multiStreams';
-import {loadContracts} from 'ethereum-indexer-utils';
 
-export function runServer<ABI extends Abi>(args: {
-	deployments?: string;
-	folder?: string;
-	wait: boolean;
-	disableSecurity: boolean;
-	port?: string;
-}) {
-	let source: IndexingSource<ABI> | undefined;
-	if (args.deployments) {
-		source = loadContracts(args.deployments);
-	}
-
+export function runServer(args: {folder?: string; wait: boolean; disableSecurity: boolean; port?: string}) {
 	const folder = args.folder ? args.folder : 'ethereum-indexer-data';
 
 	if (!fs.existsSync(folder)) {
@@ -23,7 +10,6 @@ export function runServer<ABI extends Abi>(args: {
 	}
 
 	const server = new MultiStreamServer({
-		source,
 		folder,
 		disableSecurity: args.disableSecurity,
 		port: args.port ? parseInt(args.port) : undefined,
