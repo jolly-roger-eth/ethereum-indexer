@@ -1,4 +1,4 @@
-import {Patch, applyPatches} from 'immer';
+import {Patch, applyPatches} from './immer';
 import {JSObject} from './types';
 
 export type HistoryJSObject = {

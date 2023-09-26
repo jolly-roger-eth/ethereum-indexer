@@ -13,7 +13,7 @@ import {
 import {logs} from 'named-logs';
 import {History, HistoryJSObject} from './history';
 import {EventFunctions, JSObject} from './types';
-import {Draft, createDraft, finishDraft} from 'immer';
+import {Draft, createDraft, finishDraft} from './immer';
 
 const namedLogger = logs('JSObjectEventProcessor');
 
