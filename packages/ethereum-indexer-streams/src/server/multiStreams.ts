@@ -15,11 +15,10 @@ import {logs} from 'named-logs';
 import {adminPage} from '../pages';
 import {removeUndefinedValuesFromObject} from 'ethereum-indexer-utils';
 
-const namedLogger = logs('ethereum-index-server');
+const namedLogger = logs('ethereum-index-streams');
 
-export type UserConfig<ABI extends Abi> = {
+export type UserConfig = {
 	folder: string;
-	source?: IndexingSource<ABI>;
 	disableSecurity?: boolean;
 	port?: number;
 };
@@ -30,13 +29,14 @@ type Config = {
 	port: number;
 };
 
-export class MultiStreamServer<ABI extends Abi> {
+export class MultiStreamServer {
 	protected app: Koa | undefined;
 	protected config: Config;
 	protected indexing: boolean = false;
 	protected indexingTimeout: NodeJS.Timeout | undefined;
+	protected sources: IndexingSource<Abi>[] = [];
 
-	constructor(config: UserConfig<ABI>) {
+	constructor(config: UserConfig) {
 		this.config = Object.assign(
 			{useCache: false, disableSecurity: false, useFSCache: false, port: 14385},
 			removeUndefinedValuesFromObject(config)
@@ -54,6 +54,7 @@ export class MultiStreamServer<ABI extends Abi> {
 
 	private async setupIndexing() {
 		// TODO for each source
+		// get all current source
 	}
 
 	private startIndexing(): boolean {
