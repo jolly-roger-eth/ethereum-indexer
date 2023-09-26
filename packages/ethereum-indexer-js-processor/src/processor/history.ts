@@ -2,7 +2,7 @@ import {Patch, applyPatches} from './immer';
 import {JSObject} from './types';
 
 export type HistoryJSObject = {
-	reversals: {[blockHash: string]: Patch[]};
+	reversals: {[blockHash: string]: Patch[][]};
 	blockHashes: {[blockNumber: number]: string};
 };
 
@@ -38,11 +38,13 @@ export class History {
 		}
 
 		const patches = this.historyJSON.reversals[blockHash];
-		const newJSON = applyPatches(json, patches);
+		for (let i = patches.length - 1; i <= 0; i--) {
+			json = applyPatches(json, patches[i]);
+		}
 
 		delete this.historyJSON.reversals[blockHash];
 		delete this.historyJSON.blockHashes[blockNumber];
-		return newJSON;
+		return json;
 	}
 
 	setReversal(patches: Patch[]) {
@@ -50,7 +52,7 @@ export class History {
 			throw new Error(`no blockhash set`);
 		}
 		this.historyJSON.reversals[this.blockHash] = this.historyJSON.reversals[this.blockHash] || [];
-		this.historyJSON.reversals[this.blockHash].push(...patches);
+		this.historyJSON.reversals[this.blockHash].push(patches);
 	}
 }
 

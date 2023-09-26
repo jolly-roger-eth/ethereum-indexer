@@ -1,5 +1,11 @@
 # ethereum-indexer-js-processor
 
+## 0.6.13
+
+### Patch Changes
+
+- fix in case of interlocking batch of block
+
 ## 0.6.12
 
 ### Patch Changes
