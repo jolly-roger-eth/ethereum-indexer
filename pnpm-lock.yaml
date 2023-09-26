@@ -492,6 +492,9 @@ importers:
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
+      immer:
+        specifier: ^10.0.2
+        version: 10.0.2
       named-logs:
         specifier: ^0.2.2
         version: 0.2.2
@@ -3785,6 +3788,10 @@ packages:
 
   /immediate@3.3.0:
     resolution: {integrity: sha512-HR7EVodfFUdQCTIeySw+WDRFJlPcLOJbXfwwZ7Oom6tjsvZ3bOkCDJHehQC3nxJrv7+f9XecwazynjU8e4Vw3Q==}
+    dev: false
+
+  /immer@10.0.2:
+    resolution: {integrity: sha512-Rx3CqeqQ19sxUtYV9CU911Vhy8/721wRFnJv3REVGWUmoAcIwzifTsdmJte/MV+0/XpM35LZdQMBGkRIoLPwQA==}
     dev: false
 
   /import-fresh@3.3.0:

@@ -1,5 +1,11 @@
 # ethereum-indexer-js-processor
 
+## 0.6.11
+
+### Patch Changes
+
+- use immer
+
 ## 0.6.10
 
 ### Patch Changes
