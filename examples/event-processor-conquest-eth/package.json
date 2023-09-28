@@ -22,7 +22,7 @@
   },
   "scripts": {
     "eis": "eis",
-    "test": "eis run -p ./dist/index.cjs --disable-cache",
+    "test": "eis run -p ./dist/index.js --disable-cache",
     "build": "tsup-node src/index.ts --dts --format esm,cjs"
   }
 }

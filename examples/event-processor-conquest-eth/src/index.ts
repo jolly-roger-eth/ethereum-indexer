@@ -116,20 +116,38 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		};
 	},
 	onPlanetStake(data, event) {
-		getOrCreatePlayer(data, event.args.acquirer);
+		const player = getOrCreatePlayer(data, event.args.acquirer);
 		const planet = getOrCreatePlanet(data, event.args.location.toString());
+		planet.active = true;
 		planet.owner = event.args.acquirer;
+		player.currentStake += event.args.stake;
+		planet.stakeDeposited = event.args.stake;
 	},
 	onPlanetTransfer(data, event) {
-		// getPlayer(data, event.args.previousOwner);
-		getOrCreatePlayer(data, event.args.newOwner);
+		// TODO const previousOwner = getPlayer(data, event.args.previousOwner);
+
 		const planet = getPlanet(data, event.args.location.toString());
 		planet.owner = event.args.newOwner;
+		if (planet.active && planet.exitTime == 0) {
+			const previousOwner = getOrCreatePlayer(data, event.args.previousOwner);
+			const newOwner = getOrCreatePlayer(data, event.args.newOwner);
+			previousOwner.currentStake -= planet.stakeDeposited;
+			// TODO remove
+			if (previousOwner.currentStake == 0n) {
+				delete data.players[event.args.previousOwner];
+			}
+			newOwner.currentStake += planet.stakeDeposited;
+		}
 	},
 	onPlanetExit(data, event) {
-		// getPlayer(data, event.args.owner);
+		const player = getPlayer(data, event.args.owner);
 		const planet = getPlanet(data, event.args.location.toString());
 		planet.exitTime = event.blockNumber; // TODO block timestamp
+		player.currentStake -= planet.stakeDeposited;
+		// TODO remove
+		if (player.currentStake == 0n) {
+			delete data.players[event.args.owner];
+		}
 	},
 	// TODO
 	// onTravelingUpkeepRefund(data: Data, event: TravelingUpkeepRefund) {
@@ -138,6 +156,8 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 	onExitComplete(data, event) {
 		const planet = getPlanet(data, event.args.location.toString());
 		planet.exitTime = 0;
+		planet.active = false;
+		planet.stakeDeposited = 0n;
 		planet.owner = undefined;
 	},
 	onFleetSent(data, event) {
@@ -161,9 +181,23 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		const fleet = data.fleets[event.args.fleet.toString()];
 		fleet.resolveTransaction = event.transactionHash;
 		// TODO result
-		if (event.args.won) {
+
+		if (planet.active && event.args.won) {
 			planet.owner = event.args.fleetOwner;
-			planet.exitTime = 0;
+			if (planet.exitTime != 0) {
+				planet.exitTime = 0;
+				const winner = getOrCreatePlayer(data, event.args.fleetOwner);
+				winner.currentStake += planet.stakeDeposited;
+			} else {
+				const loser = getOrCreatePlayer(data, event.args.destinationOwner);
+				loser.currentStake -= planet.stakeDeposited;
+				// TODO remove
+				if (loser.currentStake == 0n) {
+					delete data.players[event.args.destinationOwner];
+				}
+				const winner = getOrCreatePlayer(data, event.args.fleetOwner);
+				winner.currentStake += planet.stakeDeposited;
+			}
 		}
 	},
 };
