@@ -21,7 +21,7 @@ export type StakedPlanet = {
 	owner: string;
 	flagTime: number;
 	stakeDeposited: bigint;
-	exitTime?: number;
+	exitTime: number;
 };
 
 export type Player = {
@@ -57,6 +57,8 @@ export type Fleet = {
 
 export type Data = {
 	totalStakeOverTime: bigint;
+	currentStake: bigint;
+	currentStakeMinusPendingExit: bigint;
 	totalFreePlayTransferedInOverTime: bigint;
 	totalPlayTransferedInOverTime: bigint;
 	space: Space;
@@ -64,6 +66,7 @@ export type Data = {
 	planets: {[location: string]: Planet};
 	players: {[address: string]: Player};
 	fleets: {[fleetId: string]: Fleet};
+	playersWithWithdrawalNeeded: {[address: string]: {freeplay: bigint; play: bigint}};
 };
 
 export type Space = {

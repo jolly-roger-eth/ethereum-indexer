@@ -72,6 +72,7 @@ function getOrCreateStakedPlanet(data: Data, location: string): StakedPlanet {
 			owner: undefined,
 			flagTime: 0,
 			stakeDeposited: 0n,
+			exitTime: 0,
 		};
 		data.stakedPlanets[planetID] = planet;
 	}
@@ -131,6 +132,9 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 			totalStakeOverTime: 0n,
 			totalFreePlayTransferedInOverTime: 0n,
 			totalPlayTransferedInOverTime: 0n,
+			currentStake: 0n,
+			currentStakeMinusPendingExit: 0n,
+			playersWithWithdrawalNeeded: {},
 			space: {
 				address: '', // TODO
 				expansionDelta: 0,
@@ -159,6 +163,8 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		stakedPlanet.flagTime = event.args.freegift ? 1 : 0;
 
 		data.totalStakeOverTime += event.args.stake;
+		data.currentStake += event.args.stake;
+		data.currentStakeMinusPendingExit += event.args.stake;
 	},
 	onTransfer(data, event) {
 		if (event.address.toLowerCase() === '0x8d82B1900bc77fACdf6f2209869E4f816E4fbcB2'.toLowerCase()) {
@@ -214,11 +220,29 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 
 		const stakedPlanet = getStakedPlanet(data, event.args.location.toString());
 		stakedPlanet.exitTime = event.blockNumber;
+		data.currentStakeMinusPendingExit -= stakedPlanet.stakeDeposited;
+		console.log(`planet ${locationToXYID(event.args.location.toString())} exiting... ${stakedPlanet.stakeDeposited}`);
 	},
 	// TODO
 	// onTravelingUpkeepRefund(data: Data, event: TravelingUpkeepRefund) {
 
 	// },
+	onStakeToWithdraw(data, event) {
+		let p = data.playersWithWithdrawalNeeded[event.args.owner];
+		if (!p) {
+			p = {freeplay: 0n, play: 0n};
+			data.playersWithWithdrawalNeeded[event.args.owner] = p;
+		}
+		if (event.args.freegift) {
+			p.freeplay = event.args.newStake;
+		} else {
+			p.play = event.args.newStake;
+		}
+
+		if (p.play === 0n && p.freeplay === 0n) {
+			delete data.playersWithWithdrawalNeeded[event.args.owner];
+		}
+	},
 	onExitComplete(data, event) {
 		const planet = getPlanet(data, event.args.location.toString());
 		planet.exitTime = 0;
@@ -229,7 +253,9 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		if (!stakedPlanet.exitTime || stakedPlanet.exitTime <= 0) {
 			throw new Error(`no exitTime for ExitComplete`);
 		}
-		delete data.stakedPlanets[event.args.location.toString()];
+		delete data.stakedPlanets[locationToXYID(event.args.location.toString())];
+
+		data.currentStake -= event.args.stake;
 	},
 	onFleetSent(data, event) {
 		data.fleets[event.args.fleet.toString()] = {
@@ -255,6 +281,14 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 
 		if (planet.active && event.args.won) {
 			const stakedPlanet = getStakedPlanet(data, event.args.destination.toString());
+			if (stakedPlanet.exitTime > 0) {
+				console.log(
+					`planet ${locationToXYID(event.args.destination.toString())} exit is interupted... ${
+						stakedPlanet.stakeDeposited
+					}`
+				);
+				data.currentStakeMinusPendingExit += stakedPlanet.stakeDeposited;
+			}
 			stakedPlanet.owner = event.args.fleetOwner;
 			stakedPlanet.exitTime = 0;
 		}
