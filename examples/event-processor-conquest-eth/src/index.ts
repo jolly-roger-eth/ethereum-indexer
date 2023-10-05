@@ -3,7 +3,8 @@ import {JSProcessor, fromJSProcessor} from 'ethereum-indexer-js-processor';
 import {logs} from 'named-logs';
 
 import OuterSpace from './abis/OuterSpace';
-import {Data, Planet, Player} from './types/db';
+import erc20 from './abis/erc20';
+import {Data, Planet, Player, StakedPlanet} from './types/db';
 
 const namedLogger = logs('ConquestEventProcessor');
 
@@ -61,6 +62,31 @@ function getOrCreatePlanet(data: Data, location: string): Planet {
 	return planet;
 }
 
+function getOrCreateStakedPlanet(data: Data, location: string): StakedPlanet {
+	const planetID = locationToXYID(location);
+	// namedLogger.info(`PlanetStaked: ${planetID}`);
+	let planet = data.stakedPlanets[planetID];
+	if (!planet) {
+		planet = {
+			location,
+			owner: undefined,
+			flagTime: 0,
+			stakeDeposited: 0n,
+		};
+		data.stakedPlanets[planetID] = planet;
+	}
+	return planet;
+}
+
+function getStakedPlanet(data: Data, location: string): StakedPlanet {
+	const planetID = locationToXYID(location);
+	const planet = data.stakedPlanets[planetID];
+	if (!planet) {
+		throw new Error(`StakedPlanet expected to exist`);
+	}
+	return planet;
+}
+
 function getPlanet(data: Data, location: string): Planet {
 	const planetID = locationToXYID(location);
 	const planet = data.planets[planetID];
@@ -102,6 +128,9 @@ function getPlayer(data: Data, address: string): Player {
 const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 	construct(): Data {
 		return {
+			totalStakeOverTime: 0n,
+			totalFreePlayTransferedInOverTime: 0n,
+			totalPlayTransferedInOverTime: 0n,
 			space: {
 				address: '', // TODO
 				expansionDelta: 0,
@@ -111,6 +140,7 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 				minY: 0,
 			},
 			players: {},
+			stakedPlanets: {},
 			planets: {},
 			fleets: {},
 		};
@@ -122,6 +152,34 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		planet.owner = event.args.acquirer;
 		player.currentStake += event.args.stake;
 		planet.stakeDeposited = event.args.stake;
+
+		const stakedPlanet = getOrCreateStakedPlanet(data, event.args.location.toString());
+		stakedPlanet.owner = event.args.acquirer;
+		stakedPlanet.stakeDeposited = event.args.stake;
+		stakedPlanet.flagTime = event.args.freegift ? 1 : 0;
+
+		data.totalStakeOverTime += event.args.stake;
+	},
+	onTransfer(data, event) {
+		if (event.address.toLowerCase() === '0x8d82B1900bc77fACdf6f2209869E4f816E4fbcB2'.toLowerCase()) {
+			// free play token
+			if (event.args.to.toLowerCase() === '0x7ed5118E042F22DA546C9aaA9540D515A6F776E9'.toLowerCase()) {
+				data.totalFreePlayTransferedInOverTime += (event.args as any).amount;
+			}
+			if (
+				event.args.from.toLowerCase() === '0x7ed5118E042F22DA546C9aaA9540D515A6F776E9'.toLowerCase() &&
+				event.args.to.toLowerCase() === '0x0000000000000000000000000000000000000000'.toLowerCase()
+			) {
+				data.totalFreePlayTransferedInOverTime -= (event.args as any).amount;
+			}
+		} else if (event.address.toLowerCase() === '0x1874F6326eEbcCe664410a93a5217741a977D14A'.toLowerCase()) {
+			// play token
+			if (event.args.to.toLowerCase() === '0x7ed5118E042F22DA546C9aaA9540D515A6F776E9'.toLowerCase()) {
+				data.totalPlayTransferedInOverTime += (event.args as any).amount;
+			}
+		} else if (event.address.toLowerCase() === '0x7ed5118E042F22DA546C9aaA9540D515A6F776E9'.toLowerCase()) {
+			// erc721
+		}
 	},
 	onPlanetTransfer(data, event) {
 		// TODO const previousOwner = getPlayer(data, event.args.previousOwner);
@@ -138,6 +196,11 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 			}
 			newOwner.currentStake += planet.stakeDeposited;
 		}
+
+		if (planet.active) {
+			const stakedPlanet = getStakedPlanet(data, event.args.location.toString());
+			stakedPlanet.owner = event.args.newOwner;
+		}
 	},
 	onPlanetExit(data, event) {
 		const player = getPlayer(data, event.args.owner);
@@ -148,6 +211,9 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		if (player.currentStake == 0n) {
 			delete data.players[event.args.owner];
 		}
+
+		const stakedPlanet = getStakedPlanet(data, event.args.location.toString());
+		stakedPlanet.exitTime = event.blockNumber;
 	},
 	// TODO
 	// onTravelingUpkeepRefund(data: Data, event: TravelingUpkeepRefund) {
@@ -159,6 +225,11 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		planet.active = false;
 		planet.stakeDeposited = 0n;
 		planet.owner = undefined;
+		const stakedPlanet = getStakedPlanet(data, event.args.location.toString());
+		if (!stakedPlanet.exitTime || stakedPlanet.exitTime <= 0) {
+			throw new Error(`no exitTime for ExitComplete`);
+		}
+		delete data.stakedPlanets[event.args.location.toString()];
 	},
 	onFleetSent(data, event) {
 		data.fleets[event.args.fleet.toString()] = {
@@ -181,6 +252,12 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		const fleet = data.fleets[event.args.fleet.toString()];
 		fleet.resolveTransaction = event.transactionHash;
 		// TODO result
+
+		if (planet.active && event.args.won) {
+			const stakedPlanet = getStakedPlanet(data, event.args.destination.toString());
+			stakedPlanet.owner = event.args.fleetOwner;
+			stakedPlanet.exitTime = 0;
+		}
 
 		if (planet.active && event.args.won) {
 			planet.owner = event.args.fleetOwner;
@@ -208,6 +285,16 @@ const contractsDataonGnosis = [
 	{
 		abi: OuterSpace,
 		address: '0x7ed5118E042F22DA546C9aaA9540D515A6F776E9',
+		startBlock: 21704746,
+	},
+	{
+		abi: erc20,
+		address: '0x8d82B1900bc77fACdf6f2209869E4f816E4fbcB2', // free play token
+		startBlock: 21704746,
+	},
+	{
+		abi: erc20,
+		address: '0x1874F6326eEbcCe664410a93a5217741a977D14A', // play token
 		startBlock: 21704746,
 	},
 ] as const;

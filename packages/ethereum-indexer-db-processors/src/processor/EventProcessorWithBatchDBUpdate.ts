@@ -11,7 +11,7 @@ import {JSONObject, Database, FromDB, Query, Result, BasicSyncDB, SyncDB} from '
 import {logs} from 'named-logs';
 import {RevertableDatabase} from './RevertableDatabase';
 
-const console = logs('EventProcessorWithBatchDBUpdate');
+const logger = logs('EventProcessorWithBatchDBUpdate');
 
 export type Dependency = string | {id: string; nextID: (entity: any) => string};
 
@@ -106,7 +106,7 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 			throw new Error(`processor was not loaded`);
 		}
 		this.processing = true;
-		// console.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
+		// logger.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 
 		try {
 			const revertable = this.keepAllHistory || lastSync.latestBlock - lastSync.lastToBlock <= this.finality;
@@ -145,7 +145,7 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 
 				// copied from before
 				// if (!lastBlockDeleted || event.blockHash != lastBlockDeleted) {
-				//   console.info(`EventProcessorOnDatabase preparing block...`);
+				//   logger.info(`EventProcessorOnDatabase preparing block...`);
 				//   await this.revertableDatabase.deleteBlock({ hash: event.blockHash, number: event.blockNumber });
 				//   lastBlockDeleted = event.blockHash;
 				// }
@@ -205,10 +205,10 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 				let lastBlockDeleted: string | undefined;
 				for (const event of eventStream) {
 					if (event.removed) {
-						console.info(`EventProcessorOnDatabase event removed....`);
+						logger.info(`EventProcessorOnDatabase event removed....`);
 
 						if (!lastBlockDeleted || event.blockHash != lastBlockDeleted) {
-							console.info(`EventProcessorOnDatabase preparing block...`);
+							logger.info(`EventProcessorOnDatabase preparing block...`);
 							await this.revertableDatabase.deleteBlock({hash: event.blockHash, number: event.blockNumber});
 							lastBlockDeleted = event.blockHash;
 						}
@@ -223,14 +223,14 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 							// TODO only update if not already up to date, TODO Database api for this
 							await this.db.put({_id: `block`, number: event.blockNumber, hash: event.blockHash});
 
-							console.info(`EventProcessorOnDatabase preparing block...`);
+							logger.info(`EventProcessorOnDatabase preparing block...`);
 							await this.revertableDatabase.prepareBlock({hash: event.blockHash, number: event.blockNumber});
 							lastBlock = event.blockNumber;
 						}
 
-						console.info(`EventProcessorOnDatabase preparing event...`);
+						logger.info(`EventProcessorOnDatabase preparing event...`);
 						await this.revertableDatabase.prepareEvent(event);
-						console.info(`EventProcessorOnDatabase processing event...`);
+						logger.info(`EventProcessorOnDatabase processing event...`);
 
 						syncDB.prepareEvent(event);
 
@@ -252,7 +252,7 @@ export class EventProcessorWithBatchDBUpdate<ABI extends Abi> implements EventPr
 								await syncDB.syncUp();
 							}
 						}
-						console.info(`EventProcessorOnDatabase DONE`);
+						logger.info(`EventProcessorOnDatabase DONE`);
 					}
 
 					if (lastBlock) {

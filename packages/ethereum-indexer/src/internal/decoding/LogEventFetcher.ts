@@ -162,10 +162,10 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				transactionHash: log.transactionHash,
 				logIndex: parseInt(log.logIndex.slice(2), 16),
 			};
-			const correspondingABI: AbiEvent[] | undefined =
-				this.abiPerAddress.size === 0 || !this.parseConfig?.onlyParseEventsAssignedInRespectiveContracts
-					? this.allABIEvents
-					: this.abiPerAddress.get(eventAddress);
+			const useAllABIEvents = this.abiPerAddress.size === 0 || this.parseConfig?.parseAllEventsIrrespectiveOfAddresses;
+			const correspondingABI: AbiEvent[] | undefined = useAllABIEvents
+				? this.allABIEvents
+				: this.abiPerAddress.get(eventAddress);
 			if (correspondingABI) {
 				let parsed: DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`> | null = null;
 				try {
