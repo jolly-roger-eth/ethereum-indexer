@@ -110,6 +110,7 @@ function getOrCreatePlayer(data: Data, address: string): Player {
 			playTokenBalance: 0n,
 			freePlayTokenBalance: 0n,
 			tokenToWithdraw: 0n,
+			stakedPlanets: [],
 		};
 		data.players[playerID] = player;
 	}
@@ -155,6 +156,7 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		planet.active = true;
 		planet.owner = event.args.acquirer;
 		player.currentStake += event.args.stake;
+		player.stakedPlanets.push(event.args.location.toString());
 		planet.stakeDeposited = event.args.stake;
 
 		const stakedPlanet = getOrCreateStakedPlanet(data, event.args.location.toString());
@@ -196,11 +198,14 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 			const previousOwner = getOrCreatePlayer(data, event.args.previousOwner);
 			const newOwner = getOrCreatePlayer(data, event.args.newOwner);
 			previousOwner.currentStake -= planet.stakeDeposited;
+			const index = previousOwner.stakedPlanets.indexOf(event.args.location.toString());
+			previousOwner.stakedPlanets.splice(index, 1);
 			// TODO remove
 			if (previousOwner.currentStake == 0n) {
 				delete data.players[event.args.previousOwner];
 			}
 			newOwner.currentStake += planet.stakeDeposited;
+			newOwner.stakedPlanets.push(event.args.location.toString());
 		}
 
 		if (planet.active) {
@@ -213,6 +218,8 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 		const planet = getPlanet(data, event.args.location.toString());
 		planet.exitTime = event.blockNumber; // TODO block timestamp
 		player.currentStake -= planet.stakeDeposited;
+		const index = player.stakedPlanets.indexOf(event.args.location.toString());
+		player.stakedPlanets.splice(index, 1);
 		// TODO remove
 		if (player.currentStake == 0n) {
 			delete data.players[event.args.owner];
@@ -299,15 +306,19 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 				planet.exitTime = 0;
 				const winner = getOrCreatePlayer(data, event.args.fleetOwner);
 				winner.currentStake += planet.stakeDeposited;
+				winner.stakedPlanets.push(event.args.destination.toString());
 			} else {
 				const loser = getOrCreatePlayer(data, event.args.destinationOwner);
 				loser.currentStake -= planet.stakeDeposited;
+				const index = loser.stakedPlanets.indexOf(event.args.destination.toString());
+				loser.stakedPlanets.splice(index, 1);
 				// TODO remove
 				if (loser.currentStake == 0n) {
 					delete data.players[event.args.destinationOwner];
 				}
 				const winner = getOrCreatePlayer(data, event.args.fleetOwner);
 				winner.currentStake += planet.stakeDeposited;
+				winner.stakedPlanets.push(event.args.destination.toString());
 			}
 		}
 	},

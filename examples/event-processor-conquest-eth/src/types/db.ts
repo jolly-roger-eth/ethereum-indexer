@@ -32,6 +32,7 @@ export type Player = {
 	playTokenBalance: bigint;
 	freePlayTokenBalance: bigint;
 	tokenToWithdraw: bigint;
+	stakedPlanets: string[];
 };
 
 export type Fleet = {
