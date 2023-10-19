@@ -1,5 +1,66 @@
 # ethereum-indexer-server
 
+## 0.6.14
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.9
+  - ethereum-indexer-db-utils@0.6.9
+  - ethereum-indexer-fs-cache@0.6.9
+  - ethereum-indexer-utils@0.6.8
+
+## 0.6.13
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer-db-utils@0.6.8
+  - ethereum-indexer-fs-cache@0.6.8
+  - ethereum-indexer@0.6.8
+  - ethereum-indexer-utils@0.6.8
+
+## 0.6.12
+
+### Patch Changes
+
+- fixes for ethereum-indexer-server port handling
+
+## 0.6.11
+
+### Patch Changes
+
+- add port config
+
+## 0.6.10
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - ethereum-indexer-db-utils@0.6.7
+  - ethereum-indexer-fs-cache@0.6.7
+  - ethereum-indexer@0.6.7
+
+## 0.6.9
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.6
+  - ethereum-indexer-db-utils@0.6.6
+  - ethereum-indexer-fs-cache@0.6.6
+
+## 0.6.8
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.5
+  - ethereum-indexer-db-utils@0.6.5
+  - ethereum-indexer-fs-cache@0.6.5
+
 ## 0.6.7
 
 ### Patch Changes

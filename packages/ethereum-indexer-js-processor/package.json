@@ -1,6 +1,6 @@
 {
 	"name": "ethereum-indexer-js-processor",
-	"version": "0.6.5",
+	"version": "0.6.13",
 	"description": "",
 	"keywords": [],
 	"author": "",
@@ -24,6 +24,7 @@
 	},
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
+		"immer": "^10.0.2",
 		"named-logs": "^0.2.2"
 	},
 	"scripts": {

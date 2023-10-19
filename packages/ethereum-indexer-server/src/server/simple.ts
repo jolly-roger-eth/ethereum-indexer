@@ -33,6 +33,9 @@ import {
 } from 'ethereum-indexer-db-utils';
 import {adminPage} from '../pages';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {createRequire} from 'module';
+import {clean, formatLastSync, removeUndefinedValuesFromObject} from 'ethereum-indexer-utils';
+import path from 'path';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -44,6 +47,7 @@ export type UserConfig<ABI extends Abi> = {
 	useCache?: boolean;
 	disableSecurity?: boolean;
 	useFSCache?: boolean;
+	port?: number;
 };
 
 type Config = {
@@ -53,39 +57,8 @@ type Config = {
 	useCache: boolean;
 	disableSecurity: boolean;
 	useFSCache: boolean;
+	port: number;
 };
-
-function filterOutFieldsFromObject<T extends {} = Object, U extends {} = Object>(obj: T, fields: string[]): U {
-	const keys = Object.keys(obj);
-	const newObj: U = {} as U;
-	for (const key of keys) {
-		if (fields.includes(key)) {
-			continue;
-		}
-		(newObj as any)[key] = (obj as any)[key];
-	}
-	return newObj;
-}
-
-function formatLastSync<ABI extends Abi>(lastSync: LastSync<ABI>): any {
-	return filterOutFieldsFromObject(lastSync, ['_rev', '_id', 'batch']);
-}
-
-function filterOutUnderscoreFieldsFromObject<T extends {} = Object, U extends {} = Object>(obj: T): U {
-	const keys = Object.keys(obj);
-	const newObj: U = {} as U;
-	for (const key of keys) {
-		if (key.startsWith('_')) {
-			continue;
-		}
-		(newObj as any)[key] = (obj as any)[key];
-	}
-	return newObj;
-}
-
-function clean(obj: Object) {
-	return filterOutUnderscoreFieldsFromObject(obj);
-}
 
 export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	protected indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;
@@ -100,7 +73,10 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	protected source: IndexingSource<ABI> | undefined;
 
 	constructor(config: UserConfig<ABI>) {
-		this.config = Object.assign({useCache: false, disableSecurity: false, useFSCache: false}, config);
+		this.config = Object.assign(
+			{useCache: false, disableSecurity: false, useFSCache: false, port: 14385},
+			removeUndefinedValuesFromObject(config)
+		);
 		this.source = config.source;
 	}
 
@@ -114,7 +90,19 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	}
 
 	private async setupIndexing() {
-		const processorModule = await import(this.config.processorPath);
+		let processorModule: any | undefined;
+		if (path.isAbsolute(this.config.processorPath)) {
+			processorModule = await import(this.config.processorPath);
+		} else {
+			try {
+				processorModule = await import(path.join(process.cwd(), this.config.processorPath));
+			} catch (err: any) {
+				processorModule = await import(
+					createRequire(`${process.cwd()}/node_modules/`).resolve(this.config.processorPath)
+				);
+			}
+		}
+
 		const processorFactory = processorModule.createProcessor as (
 			config?: any
 		) => QueriableEventProcessor<ABI, ProcessResultType>;
@@ -435,10 +423,9 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		this.app.use(router.routes()).use(router.allowedMethods());
 
-		const port = 14385;
-
+		const port = this.config.port;
 		this.app.listen(port, () => {
-			namedLogger.info(`server started on port: ${port}`);
+			console.log(`server started on port: ${port}`);
 		});
 	}
 

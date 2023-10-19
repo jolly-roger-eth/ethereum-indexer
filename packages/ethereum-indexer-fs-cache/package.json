@@ -1,6 +1,6 @@
 {
   "name": "ethereum-indexer-fs-cache",
-  "version": "0.6.4",
+  "version": "0.6.9",
   "description": "",
   "publishConfig": {
     "access": "public"
@@ -10,7 +10,7 @@
   "types": "dist/index.d.ts",
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "volta": {
     "node": "18.7.0"
   },

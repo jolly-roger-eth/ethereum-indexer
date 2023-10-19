@@ -2,7 +2,7 @@ import {Abi, IndexingSource} from 'ethereum-indexer';
 import path from 'path';
 import fs from 'fs';
 import {SimpleServer} from './server/simple';
-import {loadContracts} from './utils/contracts';
+import {loadContracts} from 'ethereum-indexer-utils';
 
 export function runServer<ABI extends Abi>(
 	processor: string,
@@ -15,6 +15,7 @@ export function runServer<ABI extends Abi>(
 		disableCache: boolean;
 		disableSecurity: boolean;
 		useFSCache: boolean;
+		port?: string;
 	}
 ) {
 	let source: IndexingSource<ABI> | undefined;
@@ -29,22 +30,23 @@ export function runServer<ABI extends Abi>(
 		fs.mkdirSync(folder);
 	}
 
-	const processorPath = processor.startsWith('.') ? path.resolve(processor) : processor;
+	// const processorPath = processor.startsWith('.') ? path.resolve(processor) : processor;
 
-	let actualPath = processorPath;
-	if (fs.statSync(processorPath).isDirectory()) {
-		const processorPackage = JSON.parse(fs.readFileSync(`${processorPath}/package.json`, 'utf-8'));
-		actualPath = `${processorPath}/${processorPackage.module}`;
-	}
+	// let actualPath = processorPath;
+	// if (fs.statSync(processorPath).isDirectory()) {
+	// 	const processorPackage = JSON.parse(fs.readFileSync(`${processorPath}/package.json`, 'utf-8'));
+	// 	actualPath = `${processorPath}/${processorPackage.module}`;
+	// }
 
 	const server = new SimpleServer({
 		source,
 		folder,
-		processorPath: actualPath,
+		processorPath: processor,
 		useCache: !args.disableCache,
 		useFSCache: args.useFSCache,
 		nodeURL: args.nodeUrl,
 		disableSecurity: args.disableSecurity,
+		port: args.port ? parseInt(args.port) : undefined,
 	});
 
 	server.start({autoIndex: !args.wait});

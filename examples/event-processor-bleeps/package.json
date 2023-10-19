@@ -1,7 +1,7 @@
 {
 	"name": "event-processor-bleeps",
 	"private": true,
-	"version": "0.0.31",
+	"version": "0.0.39",
 	"description": "",
 	"type": "module",
 	"main": "dist/index.cjs",
@@ -9,7 +9,7 @@
 	"types": "dist/index.d.ts",
 	"keywords": [],
 	"author": "",
-	"license": "ISC",
+	"license": "MIT",
 	"dependencies": {
 		"dotenv": "^16.0.3",
 		"ethereum-indexer-js-processor": "workspace:*",

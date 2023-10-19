@@ -1,5 +1,60 @@
 # event-processor-nfts
 
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.13
+
+## 0.0.38
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.12
+
+## 0.0.37
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.11
+
+## 0.0.36
+
+### Patch Changes
+
+- ethereum-indexer-js-processor@0.6.10
+
+## 0.0.35
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.9
+
+## 0.0.34
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.8
+
+## 0.0.33
+
+### Patch Changes
+
+- ethereum-indexer-js-processor@0.6.7
+
+## 0.0.32
+
+### Patch Changes
+
+- ethereum-indexer-js-processor@0.6.6
+
 ## 0.0.31
 
 ### Patch Changes

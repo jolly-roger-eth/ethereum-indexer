@@ -1,5 +1,47 @@
 # ethereum-indexer-db-processors
 
+## 0.6.9
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.9
+  - ethereum-indexer-db-utils@0.6.9
+
+## 0.6.8
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer-db-utils@0.6.8
+  - ethereum-indexer@0.6.8
+
+## 0.6.7
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - ethereum-indexer-db-utils@0.6.7
+  - ethereum-indexer@0.6.7
+
+## 0.6.6
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.6
+  - ethereum-indexer-db-utils@0.6.6
+
+## 0.6.5
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.5
+  - ethereum-indexer-db-utils@0.6.5
+
 ## 0.6.4
 
 ### Patch Changes

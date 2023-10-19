@@ -133,7 +133,7 @@ export type ExistingStream<ABI extends Abi> = {
 };
 
 export type LogParseConfig = {
-	onlyParseEventsAssignedInRespectiveContracts?: boolean;
+	parseAllEventsIrrespectiveOfAddresses?: boolean;
 	logValues?: LogValuesFlags;
 	filters?: {
 		// for each event name we can specify a list of filter

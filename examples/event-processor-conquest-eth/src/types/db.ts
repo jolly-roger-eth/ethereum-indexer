@@ -16,6 +16,14 @@ export type Planet = {
 	// currentExit: PlanetExitEvent
 };
 
+export type StakedPlanet = {
+	location: string;
+	owner: string;
+	flagTime: number;
+	stakeDeposited: bigint;
+	exitTime: number;
+};
+
 export type Player = {
 	address: string;
 	totalStaked: bigint;
@@ -24,6 +32,7 @@ export type Player = {
 	playTokenBalance: bigint;
 	freePlayTokenBalance: bigint;
 	tokenToWithdraw: bigint;
+	stakedPlanets: string[];
 };
 
 export type Fleet = {
@@ -48,10 +57,17 @@ export type Fleet = {
 };
 
 export type Data = {
+	totalStakeOverTime: bigint;
+	currentStake: bigint;
+	currentStakeMinusPendingExit: bigint;
+	totalFreePlayTransferedInOverTime: bigint;
+	totalPlayTransferedInOverTime: bigint;
 	space: Space;
+	stakedPlanets: {[location: string]: StakedPlanet};
 	planets: {[location: string]: Planet};
 	players: {[address: string]: Player};
 	fleets: {[fleetId: string]: Fleet};
+	playersWithWithdrawalNeeded: {[address: string]: {freeplay: bigint; play: bigint}};
 };
 
 export type Space = {

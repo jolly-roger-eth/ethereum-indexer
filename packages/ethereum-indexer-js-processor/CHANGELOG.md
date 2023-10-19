@@ -1,5 +1,60 @@
 # ethereum-indexer-js-processor
 
+## 0.6.13
+
+### Patch Changes
+
+- fix in case of interlocking batch of block
+
+## 0.6.12
+
+### Patch Changes
+
+- immer.enablePatches
+
+## 0.6.11
+
+### Patch Changes
+
+- use immer
+
+## 0.6.10
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.9
+
+## 0.6.9
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - ethereum-indexer@0.6.8
+
+## 0.6.8
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - ethereum-indexer@0.6.7
+
+## 0.6.7
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.6
+
+## 0.6.6
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.5
+
 ## 0.6.5
 
 ### Patch Changes

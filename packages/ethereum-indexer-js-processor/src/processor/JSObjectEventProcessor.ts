@@ -11,8 +11,9 @@ import {
 	UsedStreamConfig,
 } from 'ethereum-indexer';
 import {logs} from 'named-logs';
-import {History, HistoryJSObject, proxifyJSON} from './history';
+import {History, HistoryJSObject} from './history';
 import {EventFunctions, JSObject} from './types';
+import {Draft, createDraft, finishDraft} from './immer';
 
 const namedLogger = logs('JSObjectEventProcessor');
 
@@ -30,7 +31,6 @@ export type SingleEventJSONProcessor<
 export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
 	implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
 {
-	protected state: ProcessResultType;
 	protected _json: Partial<AllData<ABI, ProcessResultType, {history: HistoryJSObject}>>;
 	protected history: History;
 	protected keeper?: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
@@ -52,11 +52,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			history,
 		};
 		this.history = new History(history);
-		this.state = proxifyJSON<ProcessResultType>(state, this.history);
 	}
 
 	copyFrom(otherProcessor: JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig>) {
-		this.state = otherProcessor.state;
 		this._json = otherProcessor._json;
 		this.history = otherProcessor.history;
 		this.keeper = otherProcessor.keeper;
@@ -110,7 +108,6 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			this.history.setFinality(this.finality);
 		}
 
-		this.state = proxifyJSON<ProcessResultType>(this._json.state as ProcessResultType, this.history);
 		// return this._json.state;
 	}
 
@@ -156,7 +153,6 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					}
 					this._json.state = state;
 					this._json.lastSync = lastSyncFromExistingState;
-					this.state = proxifyJSON<ProcessResultType>(this._json.state, this.history);
 				}
 			}
 		}
@@ -171,6 +167,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 	}
 
 	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<ProcessResultType> {
+		let draft: Draft<ProcessResultType> | undefined;
 		// namedLogger.log(`processing stream (nextStreamID: ${lastSync.nextStreamID})`)
 		if (!this.finality) {
 			throw new Error(`finality not set`);
@@ -178,31 +175,52 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 		if (!this._json.state) {
 			throw new Error(`no data`);
 		}
+		const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > this.finality;
 		try {
 			let lastBlock: number | undefined;
 			let lastBlockHash: string | undefined;
 			let lastBlockDeleted: string | undefined;
+
 			for (const event of eventStream) {
 				if (event.removed) {
 					namedLogger.info(`JSObjectEventProcessor event removed....`);
 
 					if (!lastBlockDeleted || event.blockHash != lastBlockDeleted) {
 						namedLogger.info(`JSObjectEventProcessor preparing block...`);
-						this.history.reverseBlock(event.blockNumber, event.blockHash, this._json.state);
+						this._json.state = this.history.reverseBlock(event.blockNumber, event.blockHash, this._json.state);
 						lastBlockDeleted = event.blockHash;
 					}
 				} else {
-					if (!lastBlockHash || event.blockHash != lastBlockHash) {
-						this.history.setBlock(event.blockNumber, event.blockHash);
-						lastBlock = event.blockNumber;
-						lastBlockHash = event.blockHash;
-					}
+					if (willNotChange) {
+						this.singleEventProcessor.processEvent(this._json.state, event);
+					} else {
+						if (!lastBlockHash || event.blockHash != lastBlockHash) {
+							if (draft as any) {
+								const finalizedDraft = finishDraft(draft as any, (_, reversePatches) => {
+									this.history.setReversal(reversePatches);
+								}) as ProcessResultType;
+								this._json.state = finalizedDraft as unknown as ProcessResultType;
+							}
 
-					const willNotChange = lastSync.latestBlock - lastSync.lastToBlock > this.finality;
-					const state = willNotChange ? this._json.state : this.state;
-					this.singleEventProcessor.processEvent(state, event);
+							this.history.setBlock(event.blockNumber, event.blockHash);
+							lastBlock = event.blockNumber;
+							lastBlockHash = event.blockHash;
+
+							draft = createDraft(this._json.state) as Draft<ProcessResultType>;
+						}
+
+						this.singleEventProcessor.processEvent(draft as any, event);
+					}
 				}
 			}
+
+			if (draft as any) {
+				const finalizedDraft = finishDraft(draft as any, (_, reversePatches) => {
+					this.history.setReversal(reversePatches);
+				}) as ProcessResultType;
+				this._json.state = finalizedDraft;
+			}
+
 			let lastLastSync;
 			try {
 				lastLastSync = this._json.lastSync;

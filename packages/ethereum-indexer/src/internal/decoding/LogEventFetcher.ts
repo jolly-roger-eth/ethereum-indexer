@@ -9,19 +9,19 @@ import {IncludedEIP1193Log, LogEvent, LogEventWithParsingFailure, LogParseConfig
 import {normalizeAddress} from '../utils/address';
 import {UnlessCancelledFunction} from '../utils/promises';
 
-function deleteDuplicateEvents(events: AbiEvent[], map?: Map<string, AbiEvent>) {
-	if (!map) {
-		map = new Map();
-	}
+function deleteDuplicateEvents(events: AbiEvent[], failOnIdenticalNameButDifferentInputs: boolean) {
+	const map = new Map();
 	for (let i = 0; i < events.length; i++) {
 		const event = events[i];
 		const namedEvent = map.get(event.name);
 		if (!namedEvent) {
 			map.set(event.name, event);
 		} else {
-			if (!deepEqual(event.inputs, namedEvent.inputs)) {
-				// {a: event, b: namedEvent}
-				throw new Error(`two events with same name but different inputs`);
+			if (failOnIdenticalNameButDifferentInputs) {
+				if (!deepEqual(event.inputs, namedEvent.inputs)) {
+					// {a: event, b: namedEvent}
+					throw new Error(`two events with same name but different inputs`);
+				}
 			}
 			// delete
 			events.splice(i, 1);
@@ -76,7 +76,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 					contractAddresses.push(contractAddress);
 				} else {
 					abiAtThatAddress.push(...contractEventsABI);
-					deleteDuplicateEvents(abiAtThatAddress);
+					deleteDuplicateEvents(abiAtThatAddress, true);
 				}
 				_allABIEvents.push(...contractEventsABI);
 
@@ -95,8 +95,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 			_allABIEvents.push(...(allContractsData.abi.filter((item) => item.type === 'event') as AbiEvent[]));
 		}
 
-		const _abiEventPerName: Map<string, AbiEvent> = new Map();
-		deleteDuplicateEvents(_allABIEvents, _abiEventPerName);
+		deleteDuplicateEvents(_allABIEvents, false);
 
 		const eventNameTopics: EIP1193DATA[] = [];
 		for (const item of _allABIEvents) {
@@ -163,10 +162,10 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				transactionHash: log.transactionHash,
 				logIndex: parseInt(log.logIndex.slice(2), 16),
 			};
-			const correspondingABI: AbiEvent[] | undefined =
-				this.abiPerAddress.size === 0 || !this.parseConfig?.onlyParseEventsAssignedInRespectiveContracts
-					? this.allABIEvents
-					: this.abiPerAddress.get(eventAddress);
+			const useAllABIEvents = this.abiPerAddress.size === 0 || this.parseConfig?.parseAllEventsIrrespectiveOfAddresses;
+			const correspondingABI: AbiEvent[] | undefined = useAllABIEvents
+				? this.allABIEvents
+				: this.abiPerAddress.get(eventAddress);
 			if (correspondingABI) {
 				let parsed: DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`> | null = null;
 				try {

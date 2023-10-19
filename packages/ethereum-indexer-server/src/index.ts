@@ -49,6 +49,7 @@ program
 	)
 	.option('--disable-security', 'ALLOW ANYONE TO CALL ADMIN FUNCTIONS')
 	.option('--use-fs-cache', 'use fs cache to store event stream')
+	.option('--port <value>', 'port number to attach the server on')
 	.parse(process.argv);
 
 const options = program.opts();

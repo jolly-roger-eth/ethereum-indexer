@@ -1,5 +1,86 @@
 # web-demo
 
+## 0.1.37
+
+### Patch Changes
+
+- event-processor-bleeps@0.0.39
+- event-processor-conquest-eth@0.0.39
+- event-processor-nfts@0.0.39
+
+## 0.1.36
+
+### Patch Changes
+
+- event-processor-bleeps@0.0.38
+- event-processor-conquest-eth@0.0.38
+- event-processor-nfts@0.0.38
+
+## 0.1.35
+
+### Patch Changes
+
+- event-processor-bleeps@0.0.37
+- event-processor-conquest-eth@0.0.37
+- event-processor-nfts@0.0.37
+
+## 0.1.34
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.9
+  - ethereum-indexer-browser@0.6.10
+  - event-processor-bleeps@0.0.36
+  - event-processor-conquest-eth@0.0.36
+  - event-processor-nfts@0.0.36
+
+## 0.1.33
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+- Updated dependencies
+  - event-processor-conquest-eth@0.0.35
+  - ethereum-indexer-browser@0.6.9
+  - event-processor-bleeps@0.0.35
+  - event-processor-nfts@0.0.35
+  - ethereum-indexer@0.6.8
+
+## 0.1.32
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+- Updated dependencies
+  - event-processor-conquest-eth@0.0.34
+  - ethereum-indexer-browser@0.6.8
+  - event-processor-bleeps@0.0.34
+  - event-processor-nfts@0.0.34
+  - ethereum-indexer@0.6.7
+
+## 0.1.31
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.6
+  - ethereum-indexer-browser@0.6.7
+  - event-processor-bleeps@0.0.33
+  - event-processor-conquest-eth@0.0.33
+  - event-processor-nfts@0.0.33
+
+## 0.1.30
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.5
+  - ethereum-indexer-browser@0.6.6
+  - event-processor-bleeps@0.0.32
+  - event-processor-conquest-eth@0.0.32
+  - event-processor-nfts@0.0.32
+
 ## 0.1.29
 
 ### Patch Changes

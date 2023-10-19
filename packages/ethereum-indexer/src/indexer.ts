@@ -451,9 +451,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			await this.load();
 		}
 
-    // as precautious measure, we check chainId in case the provider is now pointing to a new chain
-    // while this is valid use, it is important to warn the indexer as soon as possible via chainChanged event
-    // and pausing the call to index until the correct chain is connected again
+		// as precautious measure, we check chainId in case the provider is now pointing to a new chain
+		// while this is valid use, it is important to warn the indexer as soon as possible via chainChanged event
+		// and pausing the call to index until the correct chain is connected again
 		const before_fetch_chainIdAsHex = await unlessCancelled(this.provider.request({method: 'eth_chainId'}));
 		const before_fetch_chainId = parseInt(before_fetch_chainIdAsHex.slice(2), 16).toString();
 		if (before_fetch_chainId !== this.source.chainId) {
@@ -481,7 +481,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		this.lastSync = newLastSync;
 		this._onLastSyncUpdated();
-		this._onStateUpdated(outcome);
+
+		if (eventStream.length > 0) {
+			// state should not be updated if there is zero events
+			this._onStateUpdated(outcome);
+		}
 
 		return this.lastSync;
 		// ----------------------------------------------------------------------------------------

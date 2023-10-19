@@ -86,6 +86,25 @@ export default [
 		anonymous: false,
 		inputs: [
 			{
+				indexed: false,
+				internalType: 'uint256',
+				name: 'block',
+				type: 'uint256',
+			},
+			{
+				indexed: false,
+				internalType: 'uint256',
+				name: 'timestamp',
+				type: 'uint256',
+			},
+		],
+		name: 'BlockTime',
+		type: 'event',
+	},
+	{
+		anonymous: false,
+		inputs: [
+			{
 				indexed: true,
 				internalType: 'address',
 				name: 'owner',
@@ -272,6 +291,32 @@ export default [
 			},
 		],
 		name: 'FleetSent',
+		type: 'event',
+	},
+	{
+		anonymous: false,
+		inputs: [
+			{
+				indexed: false,
+				internalType: 'address',
+				name: 'newGeneratorAdmin',
+				type: 'address',
+			},
+		],
+		name: 'GeneratorAdminChanged',
+		type: 'event',
+	},
+	{
+		anonymous: false,
+		inputs: [
+			{
+				indexed: false,
+				internalType: 'address',
+				name: 'newGenerator',
+				type: 'address',
+			},
+		],
+		name: 'GeneratorChanged',
 		type: 'event',
 	},
 	{
@@ -628,19 +673,40 @@ export default [
 		type: 'function',
 	},
 	{
-		inputs: [
+		inputs: [],
+		name: 'generator',
+		outputs: [
 			{
-				internalType: 'uint256',
-				name: 'location',
-				type: 'uint256',
-			},
-			{
-				internalType: 'address',
-				name: 'sponsor',
+				internalType: 'contract IOnStakeChange',
+				name: '',
 				type: 'address',
 			},
 		],
-		name: 'addReward',
+		stateMutability: 'view',
+		type: 'function',
+	},
+	{
+		inputs: [],
+		name: 'generatorAdmin',
+		outputs: [
+			{
+				internalType: 'address',
+				name: '',
+				type: 'address',
+			},
+		],
+		stateMutability: 'view',
+		type: 'function',
+	},
+	{
+		inputs: [
+			{
+				internalType: 'contract IOnStakeChange',
+				name: 'newGenerator',
+				type: 'address',
+			},
+		],
+		name: 'setGenerator',
 		outputs: [],
 		stateMutability: 'nonpayable',
 		type: 'function',
@@ -648,25 +714,12 @@ export default [
 	{
 		inputs: [
 			{
-				internalType: 'uint256',
-				name: 'location',
-				type: 'uint256',
+				internalType: 'address',
+				name: 'newAdmin',
+				type: 'address',
 			},
 		],
-		name: 'debug_reset_exitStartTime',
-		outputs: [],
-		stateMutability: 'nonpayable',
-		type: 'function',
-	},
-	{
-		inputs: [
-			{
-				internalType: 'uint256',
-				name: 'location',
-				type: 'uint256',
-			},
-		],
-		name: 'resetPlanet',
+		name: 'setGeneratorAdmin',
 		outputs: [],
 		stateMutability: 'nonpayable',
 		type: 'function',
@@ -841,6 +894,19 @@ export default [
 		name: 'sendFor',
 		outputs: [],
 		stateMutability: 'nonpayable',
+		type: 'function',
+	},
+	{
+		inputs: [],
+		name: 'contractURI',
+		outputs: [
+			{
+				internalType: 'string',
+				name: '',
+				type: 'string',
+			},
+		],
+		stateMutability: 'pure',
 		type: 'function',
 	},
 	{
@@ -1098,6 +1164,19 @@ export default [
 		type: 'function',
 	},
 	{
+		inputs: [],
+		name: 'name',
+		outputs: [
+			{
+				internalType: 'string',
+				name: '_name',
+				type: 'string',
+			},
+		],
+		stateMutability: 'pure',
+		type: 'function',
+	},
+	{
 		inputs: [
 			{
 				internalType: 'uint256',
@@ -1225,6 +1304,38 @@ export default [
 		name: 'setApprovalForAllIfNeededAndCall',
 		outputs: [],
 		stateMutability: 'nonpayable',
+		type: 'function',
+	},
+	{
+		inputs: [],
+		name: 'symbol',
+		outputs: [
+			{
+				internalType: 'string',
+				name: '_symbol',
+				type: 'string',
+			},
+		],
+		stateMutability: 'pure',
+		type: 'function',
+	},
+	{
+		inputs: [
+			{
+				internalType: 'uint256',
+				name: '_tokenId',
+				type: 'uint256',
+			},
+		],
+		name: 'tokenURI',
+		outputs: [
+			{
+				internalType: 'string',
+				name: 'uri',
+				type: 'string',
+			},
+		],
+		stateMutability: 'view',
 		type: 'function',
 	},
 	{
@@ -1567,6 +1678,81 @@ export default [
 		type: 'function',
 	},
 	{
+		inputs: [
+			{
+				internalType: 'uint256',
+				name: 'location',
+				type: 'uint256',
+			},
+		],
+		name: 'addReward',
+		outputs: [],
+		stateMutability: 'nonpayable',
+		type: 'function',
+	},
+	{
+		inputs: [
+			{
+				internalType: 'address',
+				name: 'sponsor',
+				type: 'address',
+			},
+		],
+		name: 'getPrevRewardIds',
+		outputs: [
+			{
+				internalType: 'uint256',
+				name: '',
+				type: 'uint256',
+			},
+		],
+		stateMutability: 'view',
+		type: 'function',
+	},
+	{
+		inputs: [
+			{
+				internalType: 'uint256',
+				name: 'location',
+				type: 'uint256',
+			},
+		],
+		name: 'getRewardId',
+		outputs: [
+			{
+				internalType: 'uint256',
+				name: '',
+				type: 'uint256',
+			},
+		],
+		stateMutability: 'view',
+		type: 'function',
+	},
+	{
+		inputs: [
+			{
+				internalType: 'address',
+				name: 'player',
+				type: 'address',
+			},
+			{
+				internalType: 'uint256',
+				name: 'fullRewardId',
+				type: 'uint256',
+			},
+		],
+		name: 'hasRewardGoalBeenAchieved',
+		outputs: [
+			{
+				internalType: 'bool',
+				name: '',
+				type: 'bool',
+			},
+		],
+		stateMutability: 'view',
+		type: 'function',
+	},
+	{
 		anonymous: false,
 		inputs: [
 			{
@@ -1764,6 +1950,25 @@ export default [
 				internalType: 'struct IDiamondLoupe.Facet[]',
 				name: 'facets_',
 				type: 'tuple[]',
+			},
+		],
+		stateMutability: 'view',
+		type: 'function',
+	},
+	{
+		inputs: [
+			{
+				internalType: 'bytes4',
+				name: '_interfaceId',
+				type: 'bytes4',
+			},
+		],
+		name: 'supportsInterface',
+		outputs: [
+			{
+				internalType: 'bool',
+				name: '',
+				type: 'bool',
 			},
 		],
 		stateMutability: 'view',

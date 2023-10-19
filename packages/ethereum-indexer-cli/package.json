@@ -1,10 +1,10 @@
 {
   "name": "ethereum-indexer-cli",
-  "version": "0.6.4",
+  "version": "0.6.9",
   "description": "",
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
@@ -20,6 +20,7 @@
     "ldenv": "^0.3.0",
     "eip-1193-json-provider": "^0.1.0",
     "ethereum-indexer": "workspace:*",
+    "ethereum-indexer-utils": "workspace:*",
     "named-logs": "^0.2.2",
     "named-logs-console": "^0.2.3"
   },

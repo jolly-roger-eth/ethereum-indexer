@@ -1,5 +1,35 @@
 # ethereum-indexer
 
+## 0.6.9
+
+### Patch Changes
+
+- fix history splice
+
+## 0.6.8
+
+### Patch Changes
+
+- reorg + add streams server (wip)
+
+## 0.6.7
+
+### Patch Changes
+
+- improve processor import to work in pnpm + startBlock fix
+
+## 0.6.6
+
+### Patch Changes
+
+- do not trigger subscribe when zero event stream
+
+## 0.6.5
+
+### Patch Changes
+
+- fix duplicate event name issue
+
 ## 0.6.4
 
 ### Patch Changes

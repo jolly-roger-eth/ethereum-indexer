@@ -26,6 +26,10 @@
 		undefined // work on all chainId
 	);
 
+	if (typeof window !== "undefined") {
+		(window as any).mynfts = state;
+	}
+
 	let runningProcessor = initialProcessor;
 	let firstTime = true;
 	processorFactory.subscribe(async (v) => {
