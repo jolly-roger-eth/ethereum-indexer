@@ -15,8 +15,8 @@ importers:
         specifier: 4.2.1-ipfs.2
         version: 4.2.1-ipfs.2
       set-defaults:
-        specifier: ^0.0.1
-        version: 0.0.1
+        specifier: ^0.0.2
+        version: 0.0.2
       syncpack:
         specifier: ^9.8.4
         version: 9.8.4
@@ -5640,8 +5640,8 @@ packages:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
     dev: true
 
-  /set-defaults@0.0.1:
-    resolution: {integrity: sha512-HXaanWD2lh36xRErVIwwVvzoAfG8EJTMid3gWieSX1p9VO4KkyRQ97zsonNuE9oIuiTlpThBKUpGUyi85JSzBA==}
+  /set-defaults@0.0.2:
+    resolution: {integrity: sha512-xPlIV4pUxF9BDOXqds9RL6BxJmzDfywBl98qHPD4D9rJjBGpLosYJerfI3xU0HY7BDmHTUkfHAplfdN7PamBFA==}
     hasBin: true
     dependencies:
       commander: 10.0.0
