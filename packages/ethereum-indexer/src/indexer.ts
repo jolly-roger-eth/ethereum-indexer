@@ -134,11 +134,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (Array.isArray(this.source.contracts)) {
 			for (const contractData of this.source.contracts) {
 				if (contractData.startBlock) {
-					if (fromBlockFromContracts === undefined) {
-						fromBlockFromContracts = contractData.startBlock || 0;
-					} else if (contractData.startBlock < fromBlockFromContracts) {
+					if (fromBlockFromContracts === undefined || contractData.startBlock < fromBlockFromContracts) {
 						fromBlockFromContracts = contractData.startBlock;
 					}
+				} else {
+					fromBlockFromContracts = 0;
 				}
 			}
 		} else {

@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.11
+
+### Patch Changes
+
+- fix fromBlockFromContracts
+
 ## 0.6.10
 
 ### Patch Changes

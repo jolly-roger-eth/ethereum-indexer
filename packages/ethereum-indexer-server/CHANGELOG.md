@@ -1,5 +1,15 @@
 # ethereum-indexer-server
 
+## 0.6.16
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.11
+  - ethereum-indexer-db-utils@0.6.11
+  - ethereum-indexer-fs-cache@0.6.11
+  - ethereum-indexer-utils@0.6.8
+
 ## 0.6.15
 
 ### Patch Changes
