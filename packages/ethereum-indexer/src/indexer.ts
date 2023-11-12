@@ -130,21 +130,21 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		this.logEventFetcher = new LogEventFetcher(this.provider, source.contracts, config?.fetch, config.stream?.parse);
 
-		let defaultFromBlock = 0;
+		let fromBlockFromContracts: undefined | number;
 		if (Array.isArray(this.source.contracts)) {
 			for (const contractData of this.source.contracts) {
 				if (contractData.startBlock) {
-					if (defaultFromBlock === 0) {
-						defaultFromBlock = contractData.startBlock;
-					} else if (contractData.startBlock < defaultFromBlock) {
-						defaultFromBlock = contractData.startBlock;
+					if (fromBlockFromContracts === undefined) {
+						fromBlockFromContracts = contractData.startBlock || 0;
+					} else if (contractData.startBlock < fromBlockFromContracts) {
+						fromBlockFromContracts = contractData.startBlock;
 					}
 				}
 			}
 		} else {
-			defaultFromBlock = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
+			fromBlockFromContracts = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
 		}
-		(this.defaultFromBlock as any) = defaultFromBlock;
+		(this.defaultFromBlock as any) = fromBlockFromContracts || 0;
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------

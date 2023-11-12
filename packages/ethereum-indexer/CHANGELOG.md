@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.10
+
+### Patch Changes
+
+- fix fromBlock computation
+
 ## 0.6.9
 
 ### Patch Changes
