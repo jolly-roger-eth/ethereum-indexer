@@ -1,6 +1,4 @@
-# ethereum-indexer
-
-![Indexing Anywhere](/media/images/preview.jpg)
+![Indexing Anywhere](/preview.png)
 
 A modular indexer system for [ethereum](https://ethereum.org) and other blockchain following the same [RPC standard](https://ethereum.org/en/developers/docs/apis/json-rpc/).
 

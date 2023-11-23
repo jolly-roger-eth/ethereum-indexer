@@ -1,0 +1,16 @@
+{
+	"name": "ethereum-indexer",
+	"title": "ethereum-indexer",
+	"description": "A modular indexer system for ethereum and other blockchain following the same RPC standard.",
+	"canonicalURL": "https://ethereum-indexer.dev",
+	"themeColor": "#000000",
+	"appleStatusBarStyle": "black-translucent",
+	"icon": "public/icon.svg",
+	"maskableIcons": [
+		{
+			"src": "../maskable_icon_512x512.png",
+			"type": "image/png",
+			"sizes": "512x512"
+		}
+	]
+}

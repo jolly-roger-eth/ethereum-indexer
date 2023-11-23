@@ -5,6 +5,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.26.0",
     "ipfs-gateway-emulator": "4.2.1-ipfs.2",
+    "pwag": "^0.1.0",
     "set-defaults": "^0.0.2",
     "syncpack": "^9.8.4",
     "typedoc": "^0.24.8",
@@ -22,8 +23,8 @@
     "sync-deps": "syncpack fix-mismatches",
     "publish-typedoc": "typedoc --options typedoc.json ",
     "serve-docs": "ipfs-emulator --only -d docs -p 8080",
-    "docs:dev": "npm run publish-typedoc && vitepress dev docs",
-    "docs:build": "npm run publish-typedoc && vitepress build docs",
+    "docs:dev": "pwag docs/public/icon.svg docs/web-config.json -o docs/public && npm run publish-typedoc && vitepress dev docs",
+    "docs:build": "pwag docs/public/icon.svg docs/web-config.json -o docs/public && npm run publish-typedoc && vitepress build docs",
     "docs:preview": "vitepress preview docs"
   }
 }
