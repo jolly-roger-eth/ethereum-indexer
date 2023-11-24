@@ -85,6 +85,10 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 		},
 		save: async (context, all) => {
 			const data = {lastSync: all.lastSync, state: all.state, history: all.history};
+			const dirname = path.dirname(options.file);
+			if (!fs.existsSync(dirname)) {
+				fs.mkdirSync(dirname, {recursive: true});
+			}
 			fs.writeFileSync(options.file, JSON.stringify(data, bnReplacer, 2));
 		},
 		clear: async () => {},

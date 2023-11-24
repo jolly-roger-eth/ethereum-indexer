@@ -1,5 +1,11 @@
 # ethereum-indexer-cli
 
+## 0.6.13
+
+### Patch Changes
+
+- mkdir for cli
+
 ## 0.6.12
 
 ### Patch Changes
