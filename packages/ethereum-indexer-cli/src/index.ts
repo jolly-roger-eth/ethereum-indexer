@@ -97,7 +97,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 	logger.info({
 		nodeUrl: options.nodeUrl,
 	});
-	const eip1193Provider = new JSONRPCHTTPProvider(options.nodeUrl);
+	const eip1193Provider = new JSONRPCHTTPProvider(options.nodeUrl, {requestsPerSecond: options.rps});
 
 	let contractsData: AllContractData<ABI> | ContractData<ABI>[] | undefined;
 	if (!source) {

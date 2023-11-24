@@ -1,5 +1,11 @@
 # ethereum-indexer-cli
 
+## 0.6.17
+
+### Patch Changes
+
+- add rps for cli
+
 ## 0.6.16
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "ethereum-indexer-cli",
-  "version": "0.6.16",
+  "version": "0.6.17",
   "description": "",
   "keywords": [],
   "author": "",
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "commander": "^11.1.0",
-    "eip-1193-json-provider": "^0.2.0",
+    "eip-1193-json-provider": "^0.2.1",
     "ethereum-indexer": "workspace:*",
     "ethereum-indexer-utils": "workspace:*",
     "ldenv": "^0.3.7",

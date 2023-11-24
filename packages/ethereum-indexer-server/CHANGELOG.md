@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.6.20
+
+### Patch Changes
+
+- add rps for cli
+
 ## 0.6.19
 
 ### Patch Changes

@@ -3,4 +3,5 @@ export type Options = {
 	nodeUrl: string;
 	file: string;
 	deployments?: string;
+	rps?: number;
 };

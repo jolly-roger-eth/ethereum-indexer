@@ -22,6 +22,10 @@ program
 	.option(
 		'-d, --deployments <value>',
 		"path the folder containing contract deployments, use hardhat-deploy format, optional if processor's module provide it"
+	)
+	.option(
+		'--rps <value>',
+		"request per seconds"
 	);
 
 if (process.env.ETHEREUM_NODE) {

@@ -363,8 +363,8 @@ importers:
         specifier: ^11.1.0
         version: 11.1.0
       eip-1193-json-provider:
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.2.1
+        version: 0.2.1
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
@@ -518,8 +518,8 @@ importers:
         specifier: ^11.1.0
         version: 11.1.0
       eip-1193-json-provider:
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.2.1
+        version: 0.2.1
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
@@ -3682,10 +3682,11 @@ packages:
   /ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  /eip-1193-json-provider@0.2.0:
-    resolution: {integrity: sha512-6ShTn8Vdf+kYw16DX++H5x7MUsVLNrGQ8Uas/eELzUPwJnWIiicaHVFSkLqir4OBcppvlZ70oCkhLTgm+vRpFQ==}
+  /eip-1193-json-provider@0.2.1:
+    resolution: {integrity: sha512-yFwMx0LpNFgpktSXtXJyoDnQOllPfjvleJyIiHYZi/ZFWdlgTglevLT+Th6dmgE0IT1E4UFtxZqZ+Jr9vNK5qA==}
     dependencies:
       named-logs: 0.2.2
+      promise-throttle: 1.1.2
     dev: false
 
   /eip-1193@0.4.7:
@@ -6373,6 +6374,10 @@ packages:
     resolution: {integrity: sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A==}
     engines: {node: '>= 0.6.0'}
     dev: true
+
+  /promise-throttle@1.1.2:
+    resolution: {integrity: sha512-dij7vjyXNewuuN/gyr+TX2KRjw48mbV5FEtgyXaIoJjGYAKT0au23/voNvy9eS4UNJjx2KUdEcO5Yyfc1h7vWQ==}
+    dev: false
 
   /prompts@2.4.2:
     resolution: {integrity: sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==}
