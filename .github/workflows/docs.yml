@@ -50,12 +50,11 @@ jobs:
       - name: Build all
         run: pnpm build
 
+      - name: Copy demo in docs
+        run: cp -R examples/web-demo/dist docs/public/examples
+
       - name: Build with VitePress
         run: pnpm run docs:build
-
-
-      - name: Copy demo in docs
-        run: cp -R examples/web-demo/dist docs/.vitepress/dist/examples
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
