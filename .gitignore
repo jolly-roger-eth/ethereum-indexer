@@ -13,6 +13,7 @@ node_modules
 /docs/.vitepress/*
 !/docs/.vitepress/config.mts
 /docs/api
+/docs/public/examples
 
 # this need to be copied in
 /docs/examples 

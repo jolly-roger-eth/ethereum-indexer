@@ -1,10 +1,10 @@
-![Indexing Anywhere](/preview.png)
+![Indexing Anywhere](/preview-grey.png)
 
 A modular indexer system for [ethereum](https://ethereum.org) and other blockchain following the same [RPC standard](https://ethereum.org/en/developers/docs/apis/json-rpc/).
 
 Git Repo: https://github.com/jolly-roger-eth/ethereum-indexer
 
-You can find some demoes in the [examples folder](/examples/)
+You can find some demoes in the [examples folder](/examples/#home)
 
 And here is the [Documentation Website](https://jolly-roger-eth.github.io/ethereum-indexer/)
 
