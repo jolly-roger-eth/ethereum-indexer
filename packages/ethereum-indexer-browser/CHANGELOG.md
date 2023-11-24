@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.13
+
+### Patch Changes
+
+- allow reading from file for deployments
+
 ## 0.6.12
 
 ### Patch Changes

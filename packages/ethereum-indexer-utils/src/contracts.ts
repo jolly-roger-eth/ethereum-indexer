@@ -18,7 +18,34 @@ function mergeABIs(abi1: any[], abi2: any[]): any[] {
 	return newABI;
 }
 
-export function loadContracts<ABI extends Abi>(folder: string): IndexingSource<ABI> {
+export function loadContracts<ABI extends Abi>(folderOrFile: string): IndexingSource<ABI> {
+	if (fs.statSync(folderOrFile).isDirectory()) {
+		return loadContractsFromFolder(folderOrFile);
+	} else {
+		return loadContractsFromFile(folderOrFile)
+	}
+}
+
+
+export function loadContractsFromFile<ABI extends Abi>(file: string): IndexingSource<ABI> {
+
+	let contractSTR = fs.readFileSync(file, 'utf-8');
+	if (contractSTR.startsWith('export default {') && contractSTR.endsWith('} as const;')) {
+		contractSTR = contractSTR.slice(15, -10);
+	}
+	const contracts = JSON.parse(contractSTR);
+
+	return {
+		chainId: contracts.chainId,
+			contracts: Object.keys(contracts.contracts).map(
+				(name) => (contracts as any).contracts[name],
+			),
+	}
+}
+
+
+
+export function loadContractsFromFolder<ABI extends Abi>(folder: string): IndexingSource<ABI> {
 	const contractsAdded: {[address: string]: {index: number}} = {};
 	const contractsData: ContractData<ABI>[] = [];
 	const files = fs.readdirSync(folder);

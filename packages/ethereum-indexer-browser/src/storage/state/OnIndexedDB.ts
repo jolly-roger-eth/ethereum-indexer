@@ -8,14 +8,29 @@ function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string
 
 type StateData<ABI extends Abi, ProcessResultType, Extra> = AllData<ABI, ProcessResultType, Extra>;
 
-export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, ProcessorConfig>(name: string) {
+export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, ProcessorConfig>(name: string, remote?: string) {
 	return {
 		fetch: async (context: ProcessorContext<ABI, ProcessorConfig>) => {
 			const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
 			const existingState = await get<StateData<ABI, ProcessResultType, unknown>>(storageID);
+
+			let remoteState: StateData<ABI, ProcessResultType, unknown> | undefined; 
+			if (remote) {
+				try {
+					const response = await fetch(remote);
+					const json = await response.json();
+					remoteState = json;
+				} catch(err) {
+					console.error(`failed to fetch remote-state`, err);
+				}
+			}
+			
 			if (!existingState) {
-				return undefined;
+				return remoteState;
 			} else {
+				if (remoteState && remoteState.lastSync.lastToBlock >= existingState.lastSync.lastToBlock) {
+					return remoteState;
+				}
 				return existingState;
 			}
 		},
