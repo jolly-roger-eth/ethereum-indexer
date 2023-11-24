@@ -1,5 +1,11 @@
 # ethereum-indexer-cli
 
+## 0.6.16
+
+### Patch Changes
+
+- use latest deps
+
 ## 0.6.15
 
 ### Patch Changes

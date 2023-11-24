@@ -1,5 +1,11 @@
 # ethereum-indexer-server
 
+## 0.6.19
+
+### Patch Changes
+
+- use latest deps
+
 ## 0.6.18
 
 ### Patch Changes
