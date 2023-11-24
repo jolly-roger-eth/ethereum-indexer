@@ -13,6 +13,7 @@ import {logs} from 'named-logs';
 import {JSONRPCHTTPProvider} from 'eip-1193-json-provider';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import fs from 'fs';
+import path from 'path';
 import {loadContracts} from 'ethereum-indexer-utils';
 import {bnReplacer, bnReviver} from './utils/bn';
 import {createRequire} from 'module';
@@ -33,10 +34,16 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 	}
 
 	let processorModule: any | undefined;
-	try {
+	if (path.isAbsolute(options.processor)) {
 		processorModule = await import(options.processor);
-	} catch (err: any) {
-		processorModule = await import(createRequire(`${process.cwd()}/node_modules/`).resolve(options.processor));
+	} else {
+		try {
+			processorModule = await import(path.join(process.cwd(), options.processor));
+		} catch (err: any) {
+			processorModule = await import(
+				createRequire(`${process.cwd()}/node_modules/`).resolve(options.processor)
+			);
+		}
 	}
 	const processorFactory = processorModule.createProcessor as (config?: any) => EventProcessor<ABI, ProcessResultType>;
 

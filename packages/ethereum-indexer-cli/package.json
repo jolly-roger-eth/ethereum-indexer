@@ -1,6 +1,6 @@
 {
   "name": "ethereum-indexer-cli",
-  "version": "0.6.11",
+  "version": "0.6.12",
   "description": "",
   "keywords": [],
   "author": "",
@@ -35,6 +35,7 @@
   "scripts": {
     "build": "tsup --entry src/index.ts --entry src/cli.ts --dts --format esm,cjs",
     "dev": "tsup --entry src/index.ts --entry src/cli.ts --dts --watch --format esm,cjs",
+    "cli": "node ./dist/cli.cjs",
     "test": "ldenv -m localhost node ./dist/cli.cjs -p ../../../../../wighawag/jolly-roger/indexer/dist/index.cjs -n @@RPC_URL_:DEPLOYMENT_CONTEXT,RPC_URL -f output.json -d ../../../../wighawag/jolly-roger/contracts/deployments/@@DEPLOYMENT_CONTEXT @@"
   }
 }

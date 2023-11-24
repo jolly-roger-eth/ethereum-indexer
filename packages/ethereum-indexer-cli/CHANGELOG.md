@@ -1,5 +1,11 @@
 # ethereum-indexer-cli
 
+## 0.6.12
+
+### Patch Changes
+
+- fix import
+
 ## 0.6.11
 
 ### Patch Changes
