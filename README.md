@@ -4,7 +4,7 @@ A modular indexer system for [ethereum](https://ethereum.org) and other blockcha
 
 Git Repo: https://github.com/jolly-roger-eth/ethereum-indexer
 
-You can find some demoes in the [examples folder](https://jolly-roger-eth.github.io/ethereum-indexer/examples/#home)
+You can find some demoes in the <a href="examples/" target="_blank">examples folder</a>
 
 And here is the [Documentation Website](https://jolly-roger-eth.github.io/ethereum-indexer/)
 
