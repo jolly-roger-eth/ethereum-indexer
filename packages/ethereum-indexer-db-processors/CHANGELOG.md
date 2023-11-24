@@ -1,5 +1,14 @@
 # ethereum-indexer-db-processors
 
+## 0.6.12
+
+### Patch Changes
+
+- latest deps
+- Updated dependencies
+  - ethereum-indexer-db-utils@0.6.12
+  - ethereum-indexer@0.6.12
+
 ## 0.6.11
 
 ### Patch Changes

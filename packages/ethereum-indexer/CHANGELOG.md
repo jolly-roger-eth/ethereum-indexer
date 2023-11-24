@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.12
+
+### Patch Changes
+
+- latest deps
+
 ## 0.6.11
 
 ### Patch Changes

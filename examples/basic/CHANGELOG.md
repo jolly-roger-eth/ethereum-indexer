@@ -1,5 +1,14 @@
 # basic
 
+## 0.0.2
+
+### Patch Changes
+
+- latest deps
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.16
+  - ethereum-indexer-browser@0.6.14
+
 ## 0.0.1
 
 ### Patch Changes

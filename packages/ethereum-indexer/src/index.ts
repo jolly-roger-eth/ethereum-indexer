@@ -35,7 +35,7 @@ export type {
 	TypedDataType,
 } from 'abitype';
 
-export type {Config, DefaultConfig, ResolvedConfig} from 'abitype';
+export { Register, DefaultRegister, ResolvedRegister } from 'abitype'
 
 export type {
 	AbiParameterToPrimitiveType,

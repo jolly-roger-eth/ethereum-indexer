@@ -1,5 +1,18 @@
 # web-demo
 
+## 0.1.41
+
+### Patch Changes
+
+- latest deps
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.16
+  - event-processor-conquest-eth@0.0.42
+  - ethereum-indexer-browser@0.6.14
+  - event-processor-bleeps@0.0.42
+  - event-processor-nfts@0.0.42
+  - ethereum-indexer@0.6.12
+
 ## 0.1.40
 
 ### Patch Changes

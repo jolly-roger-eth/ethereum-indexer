@@ -102,7 +102,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 			const topics = encodeEventTopics({
 				abi: _allABIEvents,
 				eventName: item.name as ExtractAbiEventNames<ABI>,
-			});
+			} as any); // TODO types ?
 			if (topics.length > 0) {
 				_nameToTopic.set(item.name, topics[0]);
 			}
@@ -167,7 +167,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				? this.allABIEvents
 				: this.abiPerAddress.get(eventAddress);
 			if (correspondingABI) {
-				let parsed: DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`> | null = null;
+				let parsed: DecodeEventLogReturnType<AbiEvent[]> | null = null;
 				try {
 					parsed = decodeEventLog({
 						abi: correspondingABI,
@@ -180,7 +180,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				}
 
 				if (parsed) {
-					(event as ParsedLogEvent<ABI>).args = parsed.args;
+					(event as ParsedLogEvent<ABI>).args = parsed.args as any;
 					(event as ParsedLogEvent<ABI>).eventName = parsed.eventName;
 				} else {
 					(event as LogEventWithParsingFailure).decodeError = `parsing did not return any results`;

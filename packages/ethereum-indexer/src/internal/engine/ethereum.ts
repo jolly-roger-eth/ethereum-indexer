@@ -54,6 +54,9 @@ export async function getBlockData(
 	hash: EIP1193DATA
 ): Promise<{timestamp: number}> {
 	const blockWithHexStringFields = await provider.request({method: 'eth_getBlockByHash', params: [hash, false]});
+	if (!blockWithHexStringFields) {
+		throw new Error(`could not fetch block`);
+	}
 	return {
 		timestamp: parseInt(blockWithHexStringFields.timestamp.slice(2), 16),
 	};
@@ -89,6 +92,10 @@ export async function getTransactionData(
 		method: 'eth_getTransactionReceipt',
 		params: [hash],
 	});
+
+	if (!transactionReceiptWithHexStringFields) {
+		throw new Error(`could not fetch receipt`);
+	}
 
 	return {
 		from: transactionReceiptWithHexStringFields.from,

@@ -12,7 +12,7 @@ export type EventBlock<ABI extends Abi> = {
 	events: LogEvent<ABI>[]; //this could be replacec by start: number;end: number but we would need access to the old coreresponding events
 };
 
-export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI, string, `0x${string}`[], `0x${string}`>;
+export type LogParsedData<ABI extends Abi> = DecodeEventLogReturnType<ABI>;
 export type BaseLogEvent<Extra extends JSONObject | undefined = undefined> = NumberifiedLog & {
 	removedStreamID?: number;
 } & {

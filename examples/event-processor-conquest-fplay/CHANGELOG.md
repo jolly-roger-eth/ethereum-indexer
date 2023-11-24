@@ -1,5 +1,13 @@
 # event-processor-conquest-fplay
 
+## 0.0.42
+
+### Patch Changes
+
+- latest deps
+- Updated dependencies
+  - ethereum-indexer-js-processor@0.6.16
+
 ## 0.0.41
 
 ### Patch Changes

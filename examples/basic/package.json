@@ -1,7 +1,7 @@
 {
   "name": "basic",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,17 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "ethereum-indexer-browser": "workspace:^0.6.0",
-    "ethereum-indexer-js-processor": "workspace:^0.6.0",
+    "ethereum-indexer-browser": "workspace:^0.6.14",
+    "ethereum-indexer-js-processor": "workspace:^0.6.16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/react": "^18.0.28",
-    "@types/react-dom": "^18.0.11",
-    "@vitejs/plugin-react": "^3.1.0",
-    "eip-1193": "^0.2.3",
-    "typescript": "^4.9.5",
+    "@types/react": "^18.2.38",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.0",
+    "eip-1193": "^0.4.7",
+    "typescript": "^5.3.2",
     "vite": "^4.2.1"
   }
 }

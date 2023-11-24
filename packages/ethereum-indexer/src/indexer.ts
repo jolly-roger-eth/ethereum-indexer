@@ -592,7 +592,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		// PROCESS THE STREAM FOR REORG
 		// ----------------------------------------------------------------------------------------
-		const {eventStream, newLastSync} = generateStreamToAppend(lastSync, this.defaultFromBlock, eventsFetched, {
+		const {eventStream, newLastSync} = generateStreamToAppend(lastSync, this.defaultFromBlock, eventsFetched as LogEvent<ABI>[], { // TODO investigate: why need to type it here ?
 			newLatestBlock: latestBlock,
 			newLastToBlock: toBlock,
 			newLastFromBlock: fromBlock,

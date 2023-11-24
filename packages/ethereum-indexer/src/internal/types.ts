@@ -1,5 +1,3 @@
-import {Abi} from 'abitype';
-import {LogEvent} from '../types';
 
 export type JSONObject = {
 	[key: string]: JSONType;

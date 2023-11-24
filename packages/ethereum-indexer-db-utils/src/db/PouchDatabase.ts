@@ -59,7 +59,7 @@ export class PouchDatabase implements Database {
 
 	async batchGet<T extends JSONObject>(ids: string[]): Promise<FromDB<T>[]> {
 		const {rows} = await this.pouchDB.allDocs({keys: ids, include_docs: true});
-		return rows.filter((v) => !v.value?.deleted).map((v) => bnReviver(v.doc)) as unknown as FromDB<T>[];
+		return rows.filter((v) => !('error' in v) && !v.value.deleted).map((v) => bnReviver((v as any).doc)) as unknown as FromDB<T>[];
 	}
 	async batchPut(objects: FromDB<JSONObject>[]): Promise<void> {
 		const response = await this.pouchDB.bulkDocs(bnReplacer(objects));
