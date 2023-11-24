@@ -107,4 +107,5 @@ export default defineConfig({
 			provider: 'local',
 		},
 	},
+	base: 'ethereum-indexer'
 });
