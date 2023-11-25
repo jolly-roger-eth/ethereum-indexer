@@ -111,51 +111,55 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 
 		let provider: EIP1193ProviderWithoutEvents = indexerSetup.provider;
 
-		
-			if (options?.trackNumRequests && !options.logRequests) {
-				// only trackNumRequest
-				provider = new Proxy(indexerSetup.provider, {
-					get(target, p, receiver) {
-						if (p === 'request') {
-							return (args: {method: string; params?: readonly unknown[]}) => {
-								if (options.trackNumRequests) {
-									setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
-								}
-								return target[p](args as any);
-							};
-						}
-						return (target as any)[p];
-					},
-			  })
-			} else if (options?.logRequests) {
-				provider = new Proxy(indexerSetup.provider, {
-					get(target, p, receiver) {
-						if (p === 'request') {
-							return async (args: {method: string; params?: readonly unknown[]}) => {
-								if (options.trackNumRequests) {
-									setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
-								}
-								if (options.logRequests) {
-									console.log(JSON.stringify(args));
-								}
-								let response;
-								try {
-									response = await target[p](args as any);
-									console.log(`  =>`, JSON.stringify(response))
-								} catch(err) {
-									console.error(`  error:`, err);
-									throw err;
-								}
-								return response;
-							};
-						}
-						return (target as any)[p];
-					},
-			  })
-			}
+		if (options?.trackNumRequests && !options.logRequests) {
+			// only trackNumRequest
+			provider = new Proxy(indexerSetup.provider, {
+				get(target, p, receiver) {
+					if (p === 'request') {
+						return (args: {method: string; params?: readonly unknown[]}) => {
+							if (options.trackNumRequests) {
+								setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
+							}
+							return target[p](args as any);
+						};
+					}
+					return (target as any)[p];
+				},
+			})
+		} else if (options?.logRequests) {
+			provider = new Proxy(indexerSetup.provider, {
+				get(target, p, receiver) {
+					if (p === 'request') {
+						return async (args: {method: string; params?: readonly unknown[]}) => {
+							if (options.trackNumRequests) {
+								setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
+							}
+							if (options.logRequests) {
+								console.log(JSON.stringify(args));
+							}
+							let response;
+							try {
+								response = await target[p](args as any);
+								console.log(`  =>`, JSON.stringify(response))
+							} catch(err) {
+								console.error(`  error:`, err);
+								throw err;
+							}
+							return response;
+						};
+					}
+					return (target as any)[p];
+				},
+			})
+		}
+
+		const before_configure_frozen = Object.isFrozen(initialState);
+		console.log({before_configure_frozen});
 		if (processor.configure && processorConfig) {
 			processor.configure(processorConfig);
 		}
+		const after_configure_frozen = Object.isFrozen(initialState);
+		console.log({after_configure_frozen});
 		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, config);
 		setSyncing({waitingForProvider: false});
 	}
@@ -185,6 +189,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	}
 
 	async function setupIndexing(): Promise<LastSync<ABI>> {
+		const setupIndexing_frozen = Object.isFrozen(initialState);
+		console.log({setupIndexing_frozen});
 		if ($syncing.lastSync) {
 			return $syncing.lastSync;
 		}
@@ -207,6 +213,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			await wait(0.001); // allow propagation if the whole proces is synchronous
 		};
 		indexer.onLastSyncUpdated = (lastSync) => {
+			const onLastSyncUpdated_frozen = Object.isFrozen(initialState);
+			console.log({onLastSyncUpdated_frozen});
 			// should we also wait ?
 			setLastSync(lastSync);
 		};
