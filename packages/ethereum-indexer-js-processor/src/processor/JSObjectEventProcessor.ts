@@ -89,6 +89,8 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 	async reset() {
 		namedLogger.info('JSObjectEventProcessor reseting...');
 		const state = this.singleEventProcessor.createInitialState();
+		const reset_frozen = Object.isFrozen(state);
+		console.log({reset_frozen});
 		this.version = this.singleEventProcessor.version;
 		const history = {
 			blockHashes: {},
@@ -146,6 +148,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			}
 		}
 
+		const loaded_frozen = Object.isFrozen(this._json.state);
+		console.log({loaded_frozen});
+
 		if (!this._json.lastSync) {
 			return undefined;
 		}
@@ -177,6 +182,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					if (!lastBlockDeleted || event.blockHash != lastBlockDeleted) {
 						namedLogger.info(`JSObjectEventProcessor preparing block...`);
 						this._json.state = this.history.reverseBlock(event.blockNumber, event.blockHash, this._json.state);
+
+						const removed_frozen = Object.isFrozen(this._json.state);
+						console.log({removed_frozen});
 						lastBlockDeleted = event.blockHash;
 					}
 				} else {
@@ -189,6 +197,8 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 									this.history.setReversal(reversePatches);
 								}) as ProcessResultType;
 								this._json.state = finalizedDraft as unknown as ProcessResultType;
+								const finalized_frozen = Object.isFrozen(this._json.state);
+								console.log({finalized_frozen});
 							}
 
 							this.history.setBlock(event.blockNumber, event.blockHash);
@@ -208,6 +218,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					this.history.setReversal(reversePatches);
 				}) as ProcessResultType;
 				this._json.state = finalizedDraft;
+
+				const final_finalized_frozen = Object.isFrozen(this._json.state);
+				console.log({final_finalized_frozen});
 			}
 
 			let lastLastSync;

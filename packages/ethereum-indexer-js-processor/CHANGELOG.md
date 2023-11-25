@@ -1,5 +1,11 @@
 # ethereum-indexer-js-processor
 
+## 0.6.23
+
+### Patch Changes
+
+- tmp: add frozen logs
+
 ## 0.6.22
 
 ### Patch Changes
