@@ -45,6 +45,8 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
 		this.version = singleEventProcessor.version;
 		const state = singleEventProcessor.createInitialState();
+		const initial_frozen = Object.isFrozen(state);
+		console.log({initial_frozen});
 		const history = {
 			blockHashes: {},
 			reversals: {},
@@ -55,6 +57,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			history,
 		};
 		this.history = new History(history);
+
+		const constructor_frozen = Object.isFrozen(this._json.state);
+		console.log({constructor_frozen});
 	}
 
 	copyFrom(otherProcessor: JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig>) {
@@ -144,6 +149,9 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 
 					this._json.state = state;
 					this._json.lastSync = lastSyncFromExistingState;
+
+					const fetched_frozen = Object.isFrozen(this._json.state);
+					console.log({fetched_frozen});
 				}
 			}
 		}
