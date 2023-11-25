@@ -88,7 +88,11 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	const initialState = processor.createInitialState();
 
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
+	const initialState_frozen = Object.isFrozen(initialState);
+	console.log({initialState_frozen});
 	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(initialState);
+	const initialState_store_frozen = Object.isFrozen(initialState);
+	console.log({initialState_store_frozen});
 
 	let indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;
 	let indexingTimeout: number | undefined;

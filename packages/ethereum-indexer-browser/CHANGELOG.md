@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.22
+
+### Patch Changes
+
+- tmp : forzen in browser state handler
+
 ## 0.6.21
 
 ### Patch Changes
