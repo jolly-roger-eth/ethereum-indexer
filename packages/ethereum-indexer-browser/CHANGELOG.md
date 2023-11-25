@@ -1,5 +1,12 @@
 # ethereum-indexer-browser
 
+## 0.6.17
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.14
+
 ## 0.6.16
 
 ### Patch Changes

@@ -7,7 +7,7 @@ import {
 	LogTransactionData,
 } from './internal/engine/ethereum';
 
-import {EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {EIP1193Block, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 import {logs} from 'named-logs';
 import type {
@@ -297,12 +297,20 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			);
 		}
 		if (this.source.genesisHash) {
-			const genesisHash = await this.provider.request({method: 'eth_getBlockByNumber'});
+			const genesisBlock = await this.provider.request({method: 'eth_getBlockByNumber', parans: ['earliest', false]}) as EIP1193Block | undefined;
+			if (!genesisBlock) {
+				throw new Error(
+					`Cannot fetch genesis Hash. Expected genesisHash === ${this.source.genesisHash}`
+				);
+			} else {
+				const genesisHash = genesisBlock.hash;
 			if (genesisHash !== this.source.genesisHash) {
 				throw new Error(
 					`Connected to a different chain (genesisHash: ${genesisHash}). Expected genesisHash === ${this.source.genesisHash}`
 				);
 			}	
+			}
+			
 		}
 
 		let currentLastSync: LastSync<ABI> | undefined = undefined;

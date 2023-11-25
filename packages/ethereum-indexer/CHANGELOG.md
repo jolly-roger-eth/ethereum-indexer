@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.14
+
+### Patch Changes
+
+- fix genesisHash fetch
+
 ## 0.6.13
 
 ### Patch Changes
