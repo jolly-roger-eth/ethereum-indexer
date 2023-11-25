@@ -80,6 +80,7 @@ export type AllContractData<ABI extends Abi> = {
 export type IndexingSource<ABI extends Abi> = {
 	readonly contracts: readonly ContractData<ABI>[] | AllContractData<ABI>;
 	readonly chainId: string;
+	readonly genesisHash?: `0x${string}`;
 };
 
 export type StreamFecther<ABI extends Abi> = (

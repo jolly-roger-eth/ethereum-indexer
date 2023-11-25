@@ -296,6 +296,14 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				`Connected to a different chain (chainId : ${chainId}). Expected chainId === ${this.source.chainId}`
 			);
 		}
+		if (this.source.genesisHash) {
+			const genesisHash = await this.provider.request({method: 'eth_getBlockByNumber'});
+			if (genesisHash !== this.source.genesisHash) {
+				throw new Error(
+					`Connected to a different chain (genesisHash: ${genesisHash}). Expected genesisHash === ${this.source.genesisHash}`
+				);
+			}	
+		}
 
 		let currentLastSync: LastSync<ABI> | undefined = undefined;
 		await this._onLoad('Loading');

@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.13
+
+### Patch Changes
+
+- let specify genesisHash as source param, useful for local chain
+
 ## 0.6.12
 
 ### Patch Changes

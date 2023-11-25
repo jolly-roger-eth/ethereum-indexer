@@ -40,6 +40,7 @@ export function loadContractsFromFile<ABI extends Abi>(file: string): IndexingSo
 			contracts: Object.keys(contracts.contracts).map(
 				(name) => (contracts as any).contracts[name],
 			),
+		genesisHash: contracts.genesisHash
 	}
 }
 
@@ -49,10 +50,18 @@ export function loadContractsFromFolder<ABI extends Abi>(folder: string): Indexi
 	const contractsAdded: {[address: string]: {index: number}} = {};
 	const contractsData: ContractData<ABI>[] = [];
 	const files = fs.readdirSync(folder);
-	let chainId = undefined;
+	let genesisHash: `0x${string}` | undefined = undefined;
+	let chainId: string | undefined = undefined;
 	for (const file of files) {
 		if (file === '.chainId') {
 			chainId = fs.readFileSync(path.join(folder, file), 'utf8');
+			continue;
+		}
+		if (file === '.chain') {
+			const str = fs.readFileSync(path.join(folder, file), 'utf8');
+			const {chainId: chainIdFromFile, genesisHash: genesisHashFromFile} = JSON.parse(str);
+			chainId = chainIdFromFile;
+			genesisHash = genesisHashFromFile;
 			continue;
 		}
 		if (!file.endsWith('.json')) {
@@ -92,5 +101,6 @@ export function loadContractsFromFolder<ABI extends Abi>(folder: string): Indexi
 	return {
 		chainId,
 		contracts: contractsData,
+		genesisHash
 	};
 }
