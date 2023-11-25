@@ -60,6 +60,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
 		trackNumRequests?: boolean;
+		logRequests?: boolean;
 		keepState?: KeepState<ABI, ProcessResultType, unknown, ProcessorConfig>;
 		keepStream?: ExistingStream<ABI>;
 	}
@@ -104,12 +105,17 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		const config = {...{}, keepStream: options?.keepStream, ...(indexerSetup.config || {})};
 		const source = indexerSetup.source;
 
-		const provider = options?.trackNumRequests
+		const provider = options?.trackNumRequests || options?.logRequests
 			? new Proxy(indexerSetup.provider, {
 					get(target, p, receiver) {
 						if (p === 'request') {
 							return (args: {method: string; params?: readonly unknown[]}) => {
-								setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
+								if (options.trackNumRequests) {
+									setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
+								}
+								if (options.logRequests) {
+									console.log(JSON.stringify(args));
+								}
 								return target[p](args as any);
 							};
 						}

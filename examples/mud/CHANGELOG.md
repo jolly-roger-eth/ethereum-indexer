@@ -1,5 +1,12 @@
 # web-demo
 
+## 0.1.44
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer-browser@0.6.16
+
 ## 0.1.43
 
 ### Patch Changes

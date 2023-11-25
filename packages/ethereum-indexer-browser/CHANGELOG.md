@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.16
+
+### Patch Changes
+
+- option to log all requests
+
 ## 0.6.15
 
 ### Patch Changes
