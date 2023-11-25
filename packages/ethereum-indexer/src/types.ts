@@ -120,6 +120,7 @@ export type ProvidedIndexerConfig<ABI extends Abi> = {
 	providerSupportsETHBatch?: boolean;
 	feedBatchSize?: number;
 	keepStream?: ExistingStream<ABI>;
+	skipGenesisCheck?: boolean;
 };
 
 export type UsedIndexerConfig<ABI extends Abi> = ProvidedIndexerConfig<ABI> & {

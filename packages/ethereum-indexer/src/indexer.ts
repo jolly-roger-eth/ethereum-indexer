@@ -296,7 +296,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				`Connected to a different chain (chainId : ${chainId}). Expected chainId === ${this.source.chainId}`
 			);
 		}
-		if (this.source.genesisHash) {
+		if (this.source.genesisHash && !this.config.skipGenesisCheck) {
 			const genesisBlock = await this.provider.request({method: 'eth_getBlockByNumber', params: ['earliest', false]});
 			if (!genesisBlock) {
 				throw new Error(
