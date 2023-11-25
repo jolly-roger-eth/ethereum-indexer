@@ -105,16 +105,17 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		const config = {...{}, keepStream: options?.keepStream, ...(indexerSetup.config || {})};
 		const source = indexerSetup.source;
 
-		const provider = options?.trackNumRequests || options?.logRequests
-			? new Proxy(indexerSetup.provider, {
+		let provider: EIP1193ProviderWithoutEvents = indexerSetup.provider;
+
+		
+			if (options?.trackNumRequests && !options.logRequests) {
+				// only trackNumRequest
+				provider = new Proxy(indexerSetup.provider, {
 					get(target, p, receiver) {
 						if (p === 'request') {
 							return (args: {method: string; params?: readonly unknown[]}) => {
 								if (options.trackNumRequests) {
 									setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
-								}
-								if (options.logRequests) {
-									console.log(JSON.stringify(args));
 								}
 								return target[p](args as any);
 							};
@@ -122,7 +123,32 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 						return (target as any)[p];
 					},
 			  })
-			: indexerSetup.provider;
+			} else if (options?.logRequests) {
+				provider = new Proxy(indexerSetup.provider, {
+					get(target, p, receiver) {
+						if (p === 'request') {
+							return async (args: {method: string; params?: readonly unknown[]}) => {
+								if (options.trackNumRequests) {
+									setSyncing({numRequests: ($syncing.numRequests || 0) + 1});
+								}
+								if (options.logRequests) {
+									console.log(JSON.stringify(args));
+								}
+								let response;
+								try {
+									response = await target[p](args as any);
+									console.log(`  =>`, JSON.stringify(response))
+								} catch(err) {
+									console.error(`  error:`, err);
+									throw err;
+								}
+								return response;
+							};
+						}
+						return (target as any)[p];
+					},
+			  })
+			}
 		if (processor.configure && processorConfig) {
 			processor.configure(processorConfig);
 		}

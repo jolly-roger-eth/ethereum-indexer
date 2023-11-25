@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.20
+
+### Patch Changes
+
+- show response/error when logRequests == true
+
 ## 0.6.19
 
 ### Patch Changes
