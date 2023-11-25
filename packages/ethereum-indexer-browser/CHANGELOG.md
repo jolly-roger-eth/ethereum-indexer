@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.25
+
+### Patch Changes
+
+- tmp: forgot to build
+
 ## 0.6.24
 
 ### Patch Changes
