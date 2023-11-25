@@ -297,7 +297,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			);
 		}
 		if (this.source.genesisHash) {
-			const genesisBlock = await this.provider.request({method: 'eth_getBlockByNumber', parans: ['earliest', false]}) as EIP1193Block | undefined;
+			const genesisBlock = await this.provider.request({method: 'eth_getBlockByNumber', params: ['earliest', false]});
 			if (!genesisBlock) {
 				throw new Error(
 					`Cannot fetch genesis Hash. Expected genesisHash === ${this.source.genesisHash}`

@@ -1,5 +1,13 @@
 # ethereum-indexer-cli
 
+## 0.6.20
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.15
+  - ethereum-indexer-utils@0.6.11
+
 ## 0.6.19
 
 ### Patch Changes

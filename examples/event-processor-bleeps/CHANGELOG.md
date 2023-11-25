@@ -1,5 +1,11 @@
 # event-processor-bleeps
 
+## 0.0.46
+
+### Patch Changes
+
+- ethereum-indexer-js-processor@0.6.20
+
 ## 0.0.45
 
 ### Patch Changes
