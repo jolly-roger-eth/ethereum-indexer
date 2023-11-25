@@ -134,7 +134,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			if (processorModule.contractsDataPerChain) {
 				let chainIDAsHex;
 				try {
-					chainIDAsHex = await eip1193Provider.request<string>({method: 'eth_chainId'});
+					chainIDAsHex = await eip1193Provider.request({method: 'eth_chainId'}) as `0x${string}`;
 				} catch (err) {
 					console.error(`could not fetch chainID`);
 					throw err;
