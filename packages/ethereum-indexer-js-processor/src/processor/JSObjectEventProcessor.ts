@@ -13,7 +13,10 @@ import {
 import {logs} from 'named-logs';
 import {History, HistoryJSObject} from './history';
 import {EventFunctions, JSObject} from './types';
-import {Draft, createDraft, finishDraft} from './immer';
+import {Draft, Immer} from './immer';
+
+// we do not auto freeze so we can reuse the raw state and modifiy it when needed (if events are known to be immutably included)
+const immer = new Immer({autoFreeze: false});
 
 const namedLogger = logs('JSObjectEventProcessor');
 
@@ -85,13 +88,6 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 
 	async reset() {
 		namedLogger.info('JSObjectEventProcessor reseting...');
-		if (!this._json.state) {
-			throw new Error(`no data`);
-		}
-		const keys = Object.keys(this._json.state);
-		for (const key of keys) {
-			delete this._json.state[key];
-		}
 		const state = this.singleEventProcessor.createInitialState();
 		this.version = this.singleEventProcessor.version;
 		const history = {
@@ -144,13 +140,6 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					this._json.history = history;
 					this.history.setBlock(0, '0x0000');
 
-					if (!this._json.state) {
-						throw new Error(`no data`);
-					}
-					const keys = Object.keys(this._json.state);
-					for (const key of keys) {
-						delete this._json.state[key];
-					}
 					this._json.state = state;
 					this._json.lastSync = lastSyncFromExistingState;
 				}
@@ -196,7 +185,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					} else {
 						if (!lastBlockHash || event.blockHash != lastBlockHash) {
 							if (draft as any) {
-								const finalizedDraft = finishDraft(draft as any, (_, reversePatches) => {
+								const finalizedDraft = immer.finishDraft(draft as any, (_, reversePatches) => {
 									this.history.setReversal(reversePatches);
 								}) as ProcessResultType;
 								this._json.state = finalizedDraft as unknown as ProcessResultType;
@@ -206,7 +195,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 							lastBlock = event.blockNumber;
 							lastBlockHash = event.blockHash;
 
-							draft = createDraft(this._json.state) as Draft<ProcessResultType>;
+							draft = immer.createDraft(this._json.state) as Draft<ProcessResultType>;
 						}
 
 						this.singleEventProcessor.processEvent(draft as any, event);
@@ -215,7 +204,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 			}
 
 			if (draft as any) {
-				const finalizedDraft = finishDraft(draft as any, (_, reversePatches) => {
+				const finalizedDraft = immer.finishDraft(draft as any, (_, reversePatches) => {
 					this.history.setReversal(reversePatches);
 				}) as ProcessResultType;
 				this._json.state = finalizedDraft;

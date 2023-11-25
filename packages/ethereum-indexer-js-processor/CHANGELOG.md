@@ -1,5 +1,11 @@
 # ethereum-indexer-js-processor
 
+## 0.6.17
+
+### Patch Changes
+
+- use Immer instance with autofreeze disabled
+
 ## 0.6.16
 
 ### Patch Changes
