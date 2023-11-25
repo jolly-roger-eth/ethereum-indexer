@@ -221,12 +221,14 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		const newProvider = update.provider || this.provider;
 		const oldSource = this.source;
 
+		const processorVersionHash = this.processor.getVersionHash();
 		const resetNeeded = !indexerMatches(newSourceHashes, newConfigHash, 0, {
 			source: this.sourceHashes,
 			config: this.streamConfigHash,
-			processor: this.processor.getVersionHash(),
+			processor: processorVersionHash,
 		});
 
+		
 		// TODO remove, this is the responsibility of the developer to ensure it pass correct data when indexer context changes
 		// for now we do a minimum check of chainId
 		// if this has been updated but the source remain unchanged, then the developer must have forgot to send a different source
@@ -241,6 +243,16 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					Did you forget to pass some new source?
 					`
 				);
+			}
+		} else {
+			if (this.config?.logLevel && this.config.logLevel >= 1) {
+				console.log(`updateIndexer: Reset needed, Indexer do not match`, {
+					newSourceHashes,
+					newConfigHash,
+					sourceHashes: this.sourceHashes,
+					streamConfigHash: this.streamConfigHash,
+					processorVersionHash
+				});
 			}
 		}
 
@@ -327,6 +339,16 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				this._onStateUpdated(state);
 			} else {
 				namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
+				if (this.config?.logLevel && this.config.logLevel >= 1) {
+					console.log(`State Discarded: processor changed`, JSON.stringify({
+						sourceHashes: this.sourceHashes,
+						loadedSourceHashes: loaded.lastSync.context.source,
+						streamConfigHash: this.streamConfigHash,
+						loadedStreamConfigHash: loaded.lastSync.context.config,
+						processorHash,
+						loadedProcessorHash: loadedLastSync.context.processor
+					}, null, 2));
+				}
 				await this.processor.clear();
 			}
 		}

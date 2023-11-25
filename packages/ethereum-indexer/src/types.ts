@@ -121,6 +121,7 @@ export type ProvidedIndexerConfig<ABI extends Abi> = {
 	feedBatchSize?: number;
 	keepStream?: ExistingStream<ABI>;
 	skipGenesisCheck?: boolean;
+	logLevel?: number;
 };
 
 export type UsedIndexerConfig<ABI extends Abi> = ProvidedIndexerConfig<ABI> & {

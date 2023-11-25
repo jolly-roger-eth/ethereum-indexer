@@ -1,6 +1,6 @@
 {
 	"name": "ethereum-indexer-db-utils",
-	"version": "0.6.16",
+	"version": "0.6.17",
 	"description": "",
 	"publishConfig": {
 		"access": "public"

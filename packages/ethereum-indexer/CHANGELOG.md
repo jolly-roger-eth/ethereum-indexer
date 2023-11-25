@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.17
+
+### Patch Changes
+
+- log when reset logLevel
+
 ## 0.6.16
 
 ### Patch Changes
