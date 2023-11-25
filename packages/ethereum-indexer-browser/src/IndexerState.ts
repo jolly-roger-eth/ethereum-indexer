@@ -192,6 +192,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no indexer`);
 		}
 		indexer.onLoad = async (loadingState) => {
+			const onload_frozen = Object.isFrozen(initialState);
+			console.log({onload_frozen});
+
 			setStatus({state: loadingState});
 			if (loadingState === 'Loading') {
 			} else if (loadingState === 'Fetching') {
@@ -208,6 +211,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			setLastSync(lastSync);
 		};
 		indexer.onStateUpdated = (state) => {
+			const onStateUpdated_frozen = Object.isFrozen(state);
+			console.log({onStateUpdated_frozen});
 			setState(state);
 		};
 
