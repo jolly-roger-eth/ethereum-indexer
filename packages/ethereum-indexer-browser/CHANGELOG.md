@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.26
+
+### Patch Changes
+
+- tmp: copy before store
+
 ## 0.6.25
 
 ### Patch Changes

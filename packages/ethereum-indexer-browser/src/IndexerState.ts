@@ -90,7 +90,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
 	const initialState_frozen = Object.isFrozen(initialState);
 	console.log({initialState_frozen});
-	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(initialState);
+	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>({...initialState});
 	const initialState_store_frozen = Object.isFrozen(initialState);
 	console.log({initialState_store_frozen});
 
