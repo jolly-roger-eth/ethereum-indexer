@@ -1,5 +1,11 @@
 # ethereum-indexer-js-processor
 
+## 0.6.25
+
+### Patch Changes
+
+- revert freeze logs
+
 ## 0.6.24
 
 ### Patch Changes

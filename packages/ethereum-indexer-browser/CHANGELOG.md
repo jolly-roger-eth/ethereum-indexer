@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.6.27
+
+### Patch Changes
+
+- revert freeze logs
+
 ## 0.6.26
 
 ### Patch Changes

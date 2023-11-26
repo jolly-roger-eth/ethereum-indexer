@@ -48,9 +48,6 @@ export class History {
 	}
 
 	setReversal(patches: Patch[]) {
-		if (patches === undefined || patches === null) {
-			throw new Error(`no patches provided`)
-		}
 		if (!this.blockHash) {
 			throw new Error(`no blockhash set`);
 		}

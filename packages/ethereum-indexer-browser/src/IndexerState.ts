@@ -88,11 +88,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	const initialState = processor.createInitialState();
 
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
-	const initialState_frozen = Object.isFrozen(initialState);
-	console.log({initialState_frozen});
-	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>({...initialState});
-	const initialState_store_frozen = Object.isFrozen(initialState);
-	console.log({initialState_store_frozen});
+	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(initialState);
 
 	let indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;
 	let indexingTimeout: number | undefined;
@@ -153,13 +149,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			})
 		}
 
-		const before_configure_frozen = Object.isFrozen(initialState);
-		console.log({before_configure_frozen});
 		if (processor.configure && processorConfig) {
 			processor.configure(processorConfig);
 		}
-		const after_configure_frozen = Object.isFrozen(initialState);
-		console.log({after_configure_frozen});
 		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, config);
 		setSyncing({waitingForProvider: false});
 	}
@@ -189,8 +181,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	}
 
 	async function setupIndexing(): Promise<LastSync<ABI>> {
-		const setupIndexing_frozen = Object.isFrozen(initialState);
-		console.log({setupIndexing_frozen});
 		if ($syncing.lastSync) {
 			return $syncing.lastSync;
 		}
@@ -198,9 +188,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no indexer`);
 		}
 		indexer.onLoad = async (loadingState) => {
-			const onload_frozen = Object.isFrozen(initialState);
-			console.log({onload_frozen});
-
 			setStatus({state: loadingState});
 			if (loadingState === 'Loading') {
 			} else if (loadingState === 'Fetching') {
@@ -213,14 +200,10 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			await wait(0.001); // allow propagation if the whole proces is synchronous
 		};
 		indexer.onLastSyncUpdated = (lastSync) => {
-			const onLastSyncUpdated_frozen = Object.isFrozen(initialState);
-			console.log({onLastSyncUpdated_frozen});
 			// should we also wait ?
 			setLastSync(lastSync);
 		};
 		indexer.onStateUpdated = (state) => {
-			const onStateUpdated_frozen = Object.isFrozen(state);
-			console.log({onStateUpdated_frozen});
 			setState(state);
 		};
 
