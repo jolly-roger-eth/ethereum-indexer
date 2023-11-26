@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.18
+
+### Patch Changes
+
+- allow to reset indexer
+
 ## 0.6.17
 
 ### Patch Changes

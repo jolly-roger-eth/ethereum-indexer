@@ -308,6 +308,13 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		}
 	}
 
+	function reset() {
+		if (!indexer) {
+			throw new Error(`no indexer`);
+		}
+		return indexer.reset()
+	}
+
 	async function _auto_index() {
 		setSyncing({autoIndexing: true});
 		try {
@@ -352,6 +359,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		indexMoreAndCatchupIfNeeded,
 		startAutoIndexing,
 		stopAutoIndexing,
+		reset,
 		updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);

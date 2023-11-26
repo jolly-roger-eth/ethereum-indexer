@@ -293,6 +293,19 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 	}
 
+	async reset() {
+		if (this._index.executing) {
+			this._index.cancel();
+		}
+		if (this._feed.executing) {
+			this._feed.cancel();
+		}
+		this._load.reset();
+
+		await this.config.keepStream?.clear(this.source);
+		await this.processor.clear().then(() => this.load());
+	}
+
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNALS
 	// ------------------------------------------------------------------------------------------------------------------
@@ -316,11 +329,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				);
 			} else {
 				const genesisHash = genesisBlock.hash;
-			if (genesisHash !== this.source.genesisHash) {
-				throw new Error(
-					`Connected to a different chain (genesisHash: ${genesisHash}). Expected genesisHash === ${this.source.genesisHash}`
-				);
-			}	
+				if (genesisHash !== this.source.genesisHash) {
+					throw new Error(
+						`Connected to a different chain (genesisHash: ${genesisHash}). Expected genesisHash === ${this.source.genesisHash}`
+					);
+				}	
 			}
 			
 		}
@@ -498,6 +511,18 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			throw new Error(`chainId changed before fetch`);
 		}
 
+
+		// if (!this.config.skipGenesisCheck && this.source.genesisHash) {
+		// 	// as precautious measure, we check genesisHash in case the provider is now pointing to a new chain
+		// 	// while this is valid use, it is important to warn the indexer as soon as possible via chainChanged event
+		// 	// and pausing the call to index until the correct chain is connected again
+		// 	const before_fetch_genesisBlock = (await unlessCancelled(this.provider.request({method: 'eth_getBlockByNumber', params: ["earliest", false]})))?.hash;
+		// 	if (before_fetch_genesisBlock !== this.source.genesisHash) {
+		// 		throw new Error(`genesis hash changed before fetch`);
+		// 	}
+		// }
+		
+
 		const previousLastSync = this.lastSync as LastSync<ABI>;
 		const {lastSync: newLastSync, eventStream} = await this.fetchLogsFromProvider(previousLastSync, unlessCancelled);
 
@@ -507,6 +532,14 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (chainId !== this.source.chainId) {
 			throw new Error(`chainId changed after fetch`);
 		}
+
+		// if (!this.config.skipGenesisCheck && this.source.genesisHash) {
+		// 	// as precautious measure, we check genesisHash in case the provider is now pointing to a new chain
+		// 	const after_fetch_genesisBlock = (await unlessCancelled(this.provider.request({method: 'eth_getBlockByNumber', params: ["earliest", false]})))?.hash;
+		// 	if (after_fetch_genesisBlock !== this.source.genesisHash) {
+		// 		throw new Error(`genesis hash changed after fetch`);
+		// 	}
+		// }
 
 		// ----------------------------------------------------------------------------------------
 		// MAKE THE PROCESSOR PROCESS IT

@@ -1,5 +1,11 @@
 # event-processor-conquest-eth
 
+## 0.0.53
+
+### Patch Changes
+
+- ethereum-indexer-js-processor@0.6.27
+
 ## 0.0.52
 
 ### Patch Changes
