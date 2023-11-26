@@ -38,7 +38,7 @@ export class History {
 		}
 
 		const patches = this.historyJSON.reversals[blockHash];
-		for (let i = patches.length - 1; i <= 0; i--) {
+		for (let i = patches.length - 1; i >= 0; i--) {
 			json = applyPatches(json, patches[i]);
 		}
 

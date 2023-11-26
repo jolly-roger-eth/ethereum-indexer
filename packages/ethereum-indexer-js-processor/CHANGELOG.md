@@ -1,5 +1,11 @@
 # ethereum-indexer-js-processor
 
+## 0.6.26
+
+### Patch Changes
+
+- fix reverseBlock bug
+
 ## 0.6.25
 
 ### Patch Changes
