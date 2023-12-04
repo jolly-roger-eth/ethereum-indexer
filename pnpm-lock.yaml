@@ -42,10 +42,10 @@ importers:
   examples/basic:
     dependencies:
       ethereum-indexer-browser:
-        specifier: workspace:^0.6.0
+        specifier: workspace:^0.6.14
         version: link:../../packages/ethereum-indexer-browser
       ethereum-indexer-js-processor:
-        specifier: workspace:^0.6.0
+        specifier: workspace:^0.6.16
         version: link:../../packages/ethereum-indexer-js-processor
       react:
         specifier: ^18.2.0
@@ -362,9 +362,9 @@ importers:
       commander:
         specifier: ^11.1.0
         version: 11.1.0
-      eip-1193-json-provider:
-        specifier: ^0.2.1
-        version: 0.2.1
+      eip-1193-jsonrpc-provider:
+        specifier: ^0.3.0
+        version: 0.3.0
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
@@ -395,7 +395,7 @@ importers:
         version: 11.1.1
       tsup:
         specifier: ^8.0.1
-        version: 8.0.1(typescript@5.3.2)
+        version: 8.0.1(ts-node@10.9.1)(typescript@5.3.2)
       typescript:
         specifier: ^5.3.2
         version: 5.3.2
@@ -517,9 +517,9 @@ importers:
       commander:
         specifier: ^11.1.0
         version: 11.1.0
-      eip-1193-json-provider:
-        specifier: ^0.2.1
-        version: 0.2.1
+      eip-1193-jsonrpc-provider:
+        specifier: ^0.3.0
+        version: 0.3.0
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
@@ -604,7 +604,7 @@ importers:
         version: 2.6.2
       tsup:
         specifier: ^8.0.1
-        version: 8.0.1(typescript@5.3.2)
+        version: 8.0.1(ts-node@10.9.1)(typescript@5.3.2)
       typescript:
         specifier: ^5.3.2
         version: 5.3.2
@@ -3682,8 +3682,8 @@ packages:
   /ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  /eip-1193-json-provider@0.2.1:
-    resolution: {integrity: sha512-yFwMx0LpNFgpktSXtXJyoDnQOllPfjvleJyIiHYZi/ZFWdlgTglevLT+Th6dmgE0IT1E4UFtxZqZ+Jr9vNK5qA==}
+  /eip-1193-jsonrpc-provider@0.3.0:
+    resolution: {integrity: sha512-27+csyR21UTIsh7YadNY60QefJcGBL7NX78jCbPZrNMOV5Yx3XbWpvAIvd3TwaYn4mPoWqonOHVfaoNh5ay6tw==}
     dependencies:
       named-logs: 0.2.2
       promise-throttle: 1.1.2
@@ -6151,22 +6151,6 @@ packages:
     engines: {node: '>=4.0.0'}
     dev: true
 
-  /postcss-load-config@4.0.2:
-    resolution: {integrity: sha512-bSVhyJGL00wMVoPUzAVAnbEoWyqRxkjv64tUl427SKnPrENtq6hJwUojroMz2VB+Q1edmi4IfrAPpami5VVgMQ==}
-    engines: {node: '>= 14'}
-    peerDependencies:
-      postcss: '>=8.0.9'
-      ts-node: '>=9.0.0'
-    peerDependenciesMeta:
-      postcss:
-        optional: true
-      ts-node:
-        optional: true
-    dependencies:
-      lilconfig: 3.0.0
-      yaml: 2.3.4
-    dev: true
-
   /postcss-load-config@4.0.2(ts-node@10.9.1):
     resolution: {integrity: sha512-bSVhyJGL00wMVoPUzAVAnbEoWyqRxkjv64tUl427SKnPrENtq6hJwUojroMz2VB+Q1edmi4IfrAPpami5VVgMQ==}
     engines: {node: '>= 14'}
@@ -7659,45 +7643,6 @@ packages:
       globby: 11.1.0
       joycon: 3.1.1
       postcss-load-config: 4.0.2(ts-node@10.9.1)
-      resolve-from: 5.0.0
-      rollup: 4.5.2
-      source-map: 0.8.0-beta.0
-      sucrase: 3.34.0
-      tree-kill: 1.2.2
-      typescript: 5.3.2
-    transitivePeerDependencies:
-      - supports-color
-      - ts-node
-    dev: true
-
-  /tsup@8.0.1(typescript@5.3.2):
-    resolution: {integrity: sha512-hvW7gUSG96j53ZTSlT4j/KL0q1Q2l6TqGBFc6/mu/L46IoNWqLLUzLRLP1R8Q7xrJTmkDxxDoojV5uCVs1sVOg==}
-    engines: {node: '>=18'}
-    hasBin: true
-    peerDependencies:
-      '@microsoft/api-extractor': ^7.36.0
-      '@swc/core': ^1
-      postcss: ^8.4.12
-      typescript: '>=4.5.0'
-    peerDependenciesMeta:
-      '@microsoft/api-extractor':
-        optional: true
-      '@swc/core':
-        optional: true
-      postcss:
-        optional: true
-      typescript:
-        optional: true
-    dependencies:
-      bundle-require: 4.0.2(esbuild@0.19.7)
-      cac: 6.7.14
-      chokidar: 3.5.3
-      debug: 4.3.4
-      esbuild: 0.19.7
-      execa: 5.1.1
-      globby: 11.1.0
-      joycon: 3.1.1
-      postcss-load-config: 4.0.2
       resolve-from: 5.0.0
       rollup: 4.5.2
       source-map: 0.8.0-beta.0

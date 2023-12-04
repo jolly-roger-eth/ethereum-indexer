@@ -1,6 +1,6 @@
 {
 	"name": "ethereum-indexer-server",
-	"version": "0.6.26",
+	"version": "0.6.27",
 	"description": "",
 	"keywords": [],
 	"author": "",
@@ -21,7 +21,7 @@
 	"dependencies": {
 		"@ethersproject/bignumber": "^5.7.0",
 		"commander": "^11.1.0",
-		"eip-1193-json-provider": "^0.2.1",
+		"eip-1193-jsonrpc-provider": "^0.3.0",
 		"ethereum-indexer": "workspace:*",
 		"ethereum-indexer-db-utils": "workspace:*",
 		"ethereum-indexer-fs-cache": "workspace:*",

@@ -1,5 +1,11 @@
 # ethereum-indexer-cli
 
+## 0.6.24
+
+### Patch Changes
+
+- make of eip-1193-jsonrpc-provider new name
+
 ## 0.6.23
 
 ### Patch Changes

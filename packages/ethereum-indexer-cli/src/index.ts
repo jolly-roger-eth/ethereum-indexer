@@ -10,7 +10,7 @@ import {
 } from 'ethereum-indexer';
 import type {Options} from './types';
 import {logs} from 'named-logs';
-import {JSONRPCHTTPProvider} from 'eip-1193-json-provider';
+import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import fs from 'fs';
 import path from 'path';
