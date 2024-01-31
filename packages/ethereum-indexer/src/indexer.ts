@@ -30,7 +30,7 @@ import {simple_hash} from './utils';
 
 const namedLogger = logs('ethereum-indexer');
 
-export type LoadingState = 'Loading' | 'Fetching' | 'Processing' | 'Loaded';
+export type LoadingState = 'Loading' | 'FetchingEventStream' | 'ProcessingEventStream' | 'Loaded';
 
 // PROPOSAL FOR STATE ANCHORS
 // we can have state anchor that get provided by the processor
@@ -373,7 +373,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 			// but we might have some stream still valid here
 			if (this.config.keepStream) {
-				await this._onLoad('Fetching');
+				await this._onLoad('FetchingEventStream');
 				// we start from scratch
 				const fromBlock = this.defaultFromBlock;
 				const existingStreamData = await this.config.keepStream.fetchFrom(this.source, fromBlock);
@@ -389,7 +389,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 						// we update the processorHash in case it was changed
 						currentLastSync.context.processor = processorHash;
 						if (eventsFetched.length > 0) {
-							await this._onLoad('Processing');
+							await this._onLoad('ProcessingEventStream');
 							await this.feed(eventsFetched, lastSyncFetched);
 						}
 					} else {

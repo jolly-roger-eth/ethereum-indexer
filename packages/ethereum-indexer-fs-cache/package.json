@@ -1,6 +1,6 @@
 {
   "name": "ethereum-indexer-fs-cache",
-  "version": "0.6.18",
+  "version": "0.6.19",
   "description": "",
   "publishConfig": {
     "access": "public"

@@ -38,7 +38,7 @@ export type SyncingState<ABI extends Abi> = {
 };
 
 export type StatusState = {
-	state: 'Idle' | 'Loading' | 'Fetching' | 'Processing' | 'Loaded';
+	state: 'Idle' | 'Loading' | 'FetchingEventStream' | 'ProcessingEventStream' | 'CatchingUp' | 'IndexingLatest';
 };
 
 type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfig extends undefined
@@ -59,6 +59,7 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
+		catchupThreshold?: number;
 		trackNumRequests?: boolean;
 		logRequests?: boolean;
 		keepState?: KeepState<ABI, ProcessResultType, unknown, ProcessorConfig>;
@@ -188,20 +189,27 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no indexer`);
 		}
 		indexer.onLoad = async (loadingState) => {
-			setStatus({state: loadingState});
+			
 			if (loadingState === 'Loading') {
-			} else if (loadingState === 'Fetching') {
+				setStatus({state: 'Loading'});
+			} else if (loadingState === 'FetchingEventStream') {
 				setSyncing({fetchingLogs: true});
-			} else if (loadingState === 'Processing') {
+				setStatus({state: 'FetchingEventStream'});
+			} else if (loadingState === 'ProcessingEventStream') {
+				
 				setSyncing({fetchingLogs: false, processingFetchedLogs: true});
+				setStatus({state: 'ProcessingEventStream'});
 			} else if (loadingState === 'Loaded') {
 				setSyncing({processingFetchedLogs: false});
+				setSyncing({catchingUp: true});
+				setStatus({state: 'CatchingUp'});
 			}
 			await wait(0.001); // allow propagation if the whole proces is synchronous
 		};
 		indexer.onLastSyncUpdated = (lastSync) => {
 			// should we also wait ?
 			setLastSync(lastSync);
+			setCatchup(lastSync);
 		};
 		indexer.onStateUpdated = (state) => {
 			setState(state);
@@ -224,6 +232,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		}
 		const lastSync = await indexer.indexMore();
 		setLastSync(lastSync);
+		setCatchup(lastSync);
 		return lastSync;
 	}
 
@@ -235,6 +244,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 
 		const lastSync = await indexer.indexMore();
 		setLastSync(lastSync);
+		setCatchup(lastSync);
 
 		if (lastSync.lastToBlock !== lastSync.latestBlock) {
 			return indexToLatest();
@@ -243,17 +253,33 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		return lastSync;
 	}
 
+	function setCatchup(lastSync: LastSync<ABI>) {
+		if (lastSync.latestBlock - lastSync.lastToBlock > (options?.catchupThreshold || 20)) {
+			if (!$syncing.catchingUp) {
+				setSyncing({catchingUp: true});
+				setStatus({state: 'CatchingUp'});
+			}
+		} else {
+			if ($syncing.catchingUp) {
+				setSyncing({catchingUp: false});
+				setStatus({state: 'IndexingLatest'});
+			}
+		}
+	}
+
 	async function indexToLatest() {
 		let lastSync: LastSync<ABI> = await setupIndexing();
 		setLastSync(lastSync);
+		setCatchup(lastSync);
 		if (!indexer) {
 			throw new Error(`no indexer`);
 		}
 
-		setSyncing({catchingUp: true});
+		
 		try {
 			lastSync = await indexer.indexMore();
 			setLastSync(lastSync);
+			setCatchup(lastSync);
 		} catch (err) {
 			lastSync = await new Promise((resolve) => {
 				setTimeout(async () => {
@@ -267,19 +293,19 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no lastSync`);
 		}
 
+
 		while (lastSync.lastToBlock !== lastSync.latestBlock) {
 			try {
 				lastSync = await indexer.indexMore();
 				setLastSync(lastSync);
+				setCatchup(lastSync);
 			} catch (err) {
 				await new Promise((resolve) => {
 					setTimeout(resolve, 1000);
 				});
 			}
 		}
-		setSyncing({
-			catchingUp: false,
-		});
+		
 		return lastSync;
 	}
 

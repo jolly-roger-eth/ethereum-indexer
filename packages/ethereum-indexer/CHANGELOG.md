@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.19
+
+### Patch Changes
+
+- new loading state + CatchingUp for browser-indexer
+
 ## 0.6.18
 
 ### Patch Changes
