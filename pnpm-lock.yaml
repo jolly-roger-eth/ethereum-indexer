@@ -42,7 +42,7 @@ importers:
   examples/basic:
     dependencies:
       ethereum-indexer-browser:
-        specifier: workspace:^0.6.14
+        specifier: workspace:^0.7.0
         version: link:../../packages/ethereum-indexer-browser
       ethereum-indexer-js-processor:
         specifier: workspace:^0.6.16
