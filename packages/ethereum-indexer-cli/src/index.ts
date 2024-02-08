@@ -80,7 +80,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 	(processor as unknown as ProcessorWithKeepState<ABI>).keepState({
 		fetch: async (context: ProcessorContext<ABI, any>) => {
 			const {stateFile} = filepaths(options.folder, context);
-			console.log({reading: stateFile});
+			// console.log({reading: stateFile});
 			try {
 				
 				const content = fs.readFileSync(stateFile, 'utf-8');
@@ -91,13 +91,13 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 					history: json.history,
 				};
 			} catch {
-				console.log(`no ${stateFile}`);
+				// console.log(`no ${stateFile}`);
 				return undefined as any; // TODO fix type in KeepState to allow undefined
 			}
 		},
 		save: async (context, all) => {
 			const {stateFile,lastSyncFile} = filepaths(options.folder, context);
-			console.log({saving: stateFile, sync: lastSyncFile});
+			// console.log({saving: stateFile, sync: lastSyncFile});
 			const data = {lastSync: all.lastSync, state: all.state, history: all.history};
 			const dirname = path.dirname(stateFile);
 			if (!fs.existsSync(dirname)) {
