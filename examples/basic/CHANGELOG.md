@@ -1,5 +1,12 @@
 # basic
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer-browser@0.7.0
+
 ## 0.0.2
 
 ### Patch Changes

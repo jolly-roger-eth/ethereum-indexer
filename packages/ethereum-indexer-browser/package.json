@@ -1,6 +1,6 @@
 {
 	"name": "ethereum-indexer-browser",
-	"version": "0.6.30",
+	"version": "0.7.0",
 	"publishConfig": {
 		"access": "public"
 	},

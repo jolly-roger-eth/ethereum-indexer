@@ -1,7 +1,7 @@
 {
   "name": "basic",
   "private": true,
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "ethereum-indexer-browser": "workspace:^0.6.14",
+    "ethereum-indexer-browser": "workspace:^0.7.0",
     "ethereum-indexer-js-processor": "workspace:^0.6.16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

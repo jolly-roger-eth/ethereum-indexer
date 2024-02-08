@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.7.0
+
+### Minor Changes
+
+- support url
+
 ## 0.6.30
 
 ### Patch Changes

@@ -40,29 +40,48 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 			let remoteState: StateData<ABI, ProcessResultType, unknown> | undefined;
 			if (remote) {
 				if (Array.isArray(remote)) {
-					
 					let latest: {index: number; lastSync?: LastSync<Abi>} | undefined;
 					for (let i = 0; i < remote.length; i++) {
 						if (typeof remote[i] === 'string' || 'url' in remote[i]) {
-							// console.log(`raw url, do not fetch lastSync`);
-							continue;
-						}
-						const urlOfLastSync = getURL(remote[i], context, true);
-						try {
-							const response = await fetch(urlOfLastSync);
-							const json: LastSync<Abi> = await response.json();
-							if (!latest || !latest.lastSync || json.lastToBlock > latest.lastSync.lastToBlock) {
-								latest = {
-									index: i,
-									lastSync: json
+							const urlOfRemote = getURL(remote[i], context);
+							try {
+								const response = await fetch(urlOfRemote);
+								const json: {
+									state: ProcessResultType;
+									lastSync: LastSync<ABI>;
+								} = await response.json();
+								if (!latest || !latest.lastSync || (json.lastSync && json.lastSync.lastToBlock > latest.lastSync.lastToBlock)) {
+									latest = {
+										index: i,
+										lastSync: json.lastSync,
+									};
 								}
+							} catch (err) {
+								console.error(`failed to fetch remote lastSync`, err);
 							}
-						} catch (err) {
-							console.error(`failed to fetch remote lastSync`, err);
+						} else {
+							const urlOfLastSync = getURL(remote[i], context, true);
+							try {
+								const response = await fetch(urlOfLastSync);
+								const json: LastSync<Abi> = await response.json();
+								if (!latest || !latest.lastSync || json.lastToBlock > latest.lastSync.lastToBlock) {
+									latest = {
+										index: i,
+										lastSync: json,
+									};
+								}
+							} catch (err) {
+								console.error(`failed to fetch remote lastSync`, err);
+							}
 						}
 					}
 
-					if (existingState && latest && latest.lastSync && latest.lastSync.lastToBlock < existingState.lastSync.lastToBlock) {
+					if (
+						existingState &&
+						latest &&
+						latest.lastSync &&
+						latest.lastSync.lastToBlock < existingState.lastSync.lastToBlock
+					) {
 						// console.log(`Existing State`)
 						return existingState;
 					}
@@ -70,9 +89,12 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 					if (!latest) {
 						console.error(`could not fetch any valid lastSync, still continue with first`);
 						latest = {
-							index: 0
-						}
-					}
+							index: 0,
+						};
+					} 
+					// else {
+					// 	console.log(`Using ${latest.index}`)
+					// }
 					const url = getURL(remote[latest.index], context);
 					try {
 						const response = await fetch(url);
@@ -80,13 +102,13 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 						remoteState = json;
 					} catch (err) {
 						console.error(`failed to fetch remote-state, try second`, err);
-						
+
 						const url = getURL(remote[(latest.index + 1) % remote.length], context);
 						try {
 							const response = await fetch(url);
 							const json = await response.json();
 							remoteState = json;
-						} catch(err) {
+						} catch (err) {
 							console.error(`failed to fetch second remote-state`, err);
 							// TODO more than 2
 						}
