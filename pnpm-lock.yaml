@@ -334,6 +334,9 @@ importers:
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
+      ethereum-indexer-utils:
+        specifier: workspace:*
+        version: link:../ethereum-indexer-utils
       idb-keyval:
         specifier: ^6.2.1
         version: 6.2.1

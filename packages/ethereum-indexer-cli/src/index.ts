@@ -14,7 +14,7 @@ import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import fs from 'fs';
 import path from 'path';
-import {loadContracts} from 'ethereum-indexer-utils';
+import {contextFilenames, loadContracts} from 'ethereum-indexer-utils';
 import {bnReplacer, bnReviver} from './utils/bn';
 import {createRequire} from 'module';
 
@@ -23,6 +23,11 @@ const logger = logs('ei');
 type ProcessorWithKeepState<ABI extends Abi> = {
 	keepState(keeper: KeepState<ABI, any, {history: any}, any>): void;
 };
+
+function filepaths(folder: string, context: ProcessorContext<Abi, any>) {
+	const {stateFile, lastSyncFile} = contextFilenames(context)
+	return {stateFile: path.join(folder, stateFile),lastSyncFile:path.join(folder, lastSyncFile)}
+}
 
 // TODO ethereum-indexer-server could reuse
 export async function init<ABI extends Abi, ProcessResultType>(options: Options) {
@@ -69,10 +74,16 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 	if (!(processor as any).keepState) {
 		throw new Error(`this processor do not support "keepState" config`);
 	}
+
+	
+
 	(processor as unknown as ProcessorWithKeepState<ABI>).keepState({
 		fetch: async (context: ProcessorContext<ABI, any>) => {
+			const {stateFile} = filepaths(options.folder, context);
+			console.log({reading: stateFile});
 			try {
-				const content = fs.readFileSync(options.file, 'utf-8');
+				
+				const content = fs.readFileSync(stateFile, 'utf-8');
 				const json = JSON.parse(content, bnReviver);
 				return {
 					state: json.state,
@@ -80,16 +91,20 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 					history: json.history,
 				};
 			} catch {
+				console.log(`no ${stateFile}`);
 				return undefined as any; // TODO fix type in KeepState to allow undefined
 			}
 		},
 		save: async (context, all) => {
+			const {stateFile,lastSyncFile} = filepaths(options.folder, context);
+			console.log({saving: stateFile, sync: lastSyncFile});
 			const data = {lastSync: all.lastSync, state: all.state, history: all.history};
-			const dirname = path.dirname(options.file);
+			const dirname = path.dirname(stateFile);
 			if (!fs.existsSync(dirname)) {
 				fs.mkdirSync(dirname, {recursive: true});
 			}
-			fs.writeFileSync(options.file, JSON.stringify(data, bnReplacer, 2));
+			fs.writeFileSync(lastSyncFile, JSON.stringify(data.lastSync, bnReplacer, 2));
+			fs.writeFileSync(stateFile, JSON.stringify(data, bnReplacer, 2));
 		},
 		clear: async () => {},
 	});
@@ -170,7 +185,4 @@ export async function run(options: Options) {
 	while (newLastSync.lastToBlock < newLastSync.latestBlock) {
 		newLastSync = await indexer.indexMore();
 	}
-
-	// const data = {lastSync: newLastSync, state};
-	// fs.writeFileSync(options.file, JSON.stringify(data, bnReplacer, 2));
 }

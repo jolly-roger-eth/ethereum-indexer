@@ -1,7 +1,7 @@
 export type Options = {
 	processor: string;
 	nodeUrl: string;
-	file: string;
+	folder: string;
 	deployments?: string;
 	rps?: number;
 };

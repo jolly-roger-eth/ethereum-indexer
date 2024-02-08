@@ -1,5 +1,13 @@
 # ethereum-indexer-cli
 
+## 0.6.26
+
+### Patch Changes
+
+- support folder export with lastSync + allow fetch lastSync first to get latest sync
+- Updated dependencies
+  - ethereum-indexer-utils@0.6.12
+
 ## 0.6.25
 
 ### Patch Changes

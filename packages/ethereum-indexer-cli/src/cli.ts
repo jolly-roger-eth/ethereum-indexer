@@ -13,15 +13,15 @@ program
 	.name('ei')
 	.version(pkg.version)
 	.usage(`ei -p <processor's path> [-d <deployment folder> -n http://localhost:8545]`)
-	.description('Run The Indexer as Server')
+	.description('Run The Indexer And Write To File')
 	.requiredOption(
 		'-p, --processor <path>',
 		`path to the event processor module (need to export a field named "createProcessor")`
 	)
-	.requiredOption('-f, --file <value>', 'file to start from')
+	.requiredOption('-f, --folder <value>', 'folder to read and write to')
 	.option(
 		'-d, --deployments <value>',
-		"path the folder containing contract deployments, use hardhat-deploy format, optional if processor's module provide it"
+		"path the folder containing contract deployments, use hardhat-deploy/rocketh format, optional if processor's module provide it"
 	)
 	.option(
 		'--rps <value>',
