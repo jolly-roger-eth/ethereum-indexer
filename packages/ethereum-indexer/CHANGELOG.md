@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.20
+
+### Patch Changes
+
+- base rpc range to large
+
 ## 0.6.19
 
 ### Patch Changes

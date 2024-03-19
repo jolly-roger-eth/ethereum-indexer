@@ -115,17 +115,25 @@ export class LogFetcher {
 				}
 			} else {
 				const totalNumOfBlocksThatWasFetched = toBlock - fromBlock;
+				// "block range too large"
 				if (
 					err.code === -32603 &&
 					err.data &&
-					err.data.message &&
-					err.data.message.indexOf('block range is too wide') !== -1
+					err.data.message
 				) {
-					// found on polygon rpc
-					this.foundNumBlockToHigh = Math.min(
-						this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
-						totalNumOfBlocksThatWasFetched
-					);
+					if (err.data.message.indexOf('block range is too wide') !== -1) {
+						// found on polygon rpc
+						this.foundNumBlockToHigh = Math.min(
+							this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
+							totalNumOfBlocksThatWasFetched
+						);
+					} else if (err.data.message.indexOf("block range too large")) {
+						// found on base rpc
+						this.foundNumBlockToHigh = Math.min(
+							this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
+							totalNumOfBlocksThatWasFetched
+						);
+					}
 				}
 
 				if (totalNumOfBlocksThatWasFetched > 1) {

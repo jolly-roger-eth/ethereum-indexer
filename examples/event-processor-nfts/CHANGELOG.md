@@ -1,5 +1,11 @@
 # event-processor-nfts
 
+## 0.0.55
+
+### Patch Changes
+
+- ethereum-indexer-js-processor@0.6.29
+
 ## 0.0.54
 
 ### Patch Changes
