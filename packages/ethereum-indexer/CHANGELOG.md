@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.21
+
+### Patch Changes
+
+- forgot to build
+
 ## 0.6.20
 
 ### Patch Changes
