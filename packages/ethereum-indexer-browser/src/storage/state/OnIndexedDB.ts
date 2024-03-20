@@ -77,7 +77,8 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 							const urlOfLastSync = getURL(remote[i], context, true);
 							try {
 								const response = await fetch(urlOfLastSync);
-								const json: LastSync<Abi> = await response.json();
+								const text = await response.text();
+								const json: LastSync<Abi> = JSON.parse(text, bnReviver);
 								if (!latest || !latest.lastSync || json.lastToBlock > latest.lastSync.lastToBlock) {
 									latest = {
 										index: i,

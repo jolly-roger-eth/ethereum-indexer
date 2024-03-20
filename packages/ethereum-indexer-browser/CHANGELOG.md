@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.7.5
+
+### Patch Changes
+
+- parseJson if lastSync via bnReviver too
+
 ## 0.7.4
 
 ### Patch Changes
