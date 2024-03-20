@@ -28,6 +28,18 @@ function getURL(remote: IndexedStateLocation | string, context: ProcessorContext
 	return url;
 }
 
+export function bnReviver(k: string, v: any): any {
+	if (
+		typeof v === 'string' &&
+		(v.startsWith('-') ? !isNaN(parseInt(v.charAt(1))) : !isNaN(parseInt(v.charAt(0)))) &&
+		v.charAt(v.length - 1) === 'n'
+	) {
+		return BigInt(v.slice(0, -1));
+	}
+	return v;
+}
+
+
 export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, ProcessorConfig>(
 	name: string,
 	remote?: IndexedStateLocation | string | IndexedStateLocation[],
@@ -46,10 +58,13 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 							const urlOfRemote = getURL(remote[i], context);
 							try {
 								const response = await fetch(urlOfRemote);
+								const text = await response.text();
+
 								const json: {
 									state: ProcessResultType;
 									lastSync: LastSync<ABI>;
-								} = await response.json();
+								} = JSON.parse(text, bnReviver);
+								
 								if (!latest || !latest.lastSync || (json.lastSync && json.lastSync.lastToBlock > latest.lastSync.lastToBlock)) {
 									latest = {
 										index: i,

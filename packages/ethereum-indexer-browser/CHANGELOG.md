@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.7.3
+
+### Patch Changes
+
+- bnRevivier for snapshots
+
 ## 0.7.2
 
 ### Patch Changes
