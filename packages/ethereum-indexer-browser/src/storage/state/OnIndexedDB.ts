@@ -59,7 +59,6 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 							try {
 								const response = await fetch(urlOfRemote);
 								const text = await response.text();
-
 								const json: {
 									state: ProcessResultType;
 									lastSync: LastSync<ABI>;
@@ -113,7 +112,8 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 					const url = getURL(remote[latest.index], context);
 					try {
 						const response = await fetch(url);
-						const json = await response.json();
+						const text = await response.text();
+						const json = JSON.parse(text, bnReviver);
 						remoteState = json;
 					} catch (err) {
 						console.error(`failed to fetch remote-state, try second`, err);
@@ -121,7 +121,8 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 						const url = getURL(remote[(latest.index + 1) % remote.length], context);
 						try {
 							const response = await fetch(url);
-							const json = await response.json();
+							const text = await response.text();
+							const json = JSON.parse(text, bnReviver);
 							remoteState = json;
 						} catch (err) {
 							console.error(`failed to fetch second remote-state`, err);
@@ -132,7 +133,8 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 					const url = getURL(remote, context);
 					try {
 						const response = await fetch(url);
-						const json = await response.json();
+						const text = await response.text();
+						const json = JSON.parse(text, bnReviver);
 						remoteState = json;
 					} catch (err) {
 						console.error(`failed to fetch remote-state`, err);

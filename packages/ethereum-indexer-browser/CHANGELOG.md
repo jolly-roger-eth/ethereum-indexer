@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.7.4
+
+### Patch Changes
+
+- fix: bnReviver for all remote fetch
+
 ## 0.7.3
 
 ### Patch Changes
