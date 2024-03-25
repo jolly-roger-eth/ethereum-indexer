@@ -1,0 +1,28 @@
+{
+	"name": "ethereum-indexer-fs",
+	"version": "0.7.6",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"main": "dist/index.cjs",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"typedoc": {
+		"entryPoint": "src/index.ts"
+	},
+	"devDependencies": {
+		"@types/node": "^20.10.0",
+		"eip-1193": "^0.4.7",
+		"tsup": "^8.0.1",
+		"typescript": "^5.3.2"
+	},
+	"dependencies": {
+		"ethereum-indexer": "workspace:*",
+		"ethereum-indexer-utils": "workspace:*",
+		"named-logs": "^0.2.2"
+	},
+	"scripts": {
+		"build": "tsup src/index.ts --dts --format esm,cjs"
+	}
+}
