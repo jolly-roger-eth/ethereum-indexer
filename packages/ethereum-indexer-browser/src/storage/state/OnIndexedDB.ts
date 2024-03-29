@@ -111,6 +111,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 					// 	console.log(`Using ${latest.index}`)
 					// }
 					const url = getURL(remote[latest.index], context);
+					// console.log(`fetching ${url}`);
 					try {
 						const response = await fetch(url);
 						const text = await response.text();
@@ -132,6 +133,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 					}
 				} else {
 					const url = getURL(remote, context);
+					// console.log(`fetching single remote ${url}`);
 					try {
 						const response = await fetch(url);
 						const text = await response.text();

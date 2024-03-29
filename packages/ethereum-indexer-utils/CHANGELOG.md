@@ -1,5 +1,11 @@
 # ethereum-indexer-utils
 
+## 0.6.13
+
+### Patch Changes
+
+- use source hash in generated file names for indexed state
+
 ## 0.6.12
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # ethereum-indexer-browser
 
+## 0.7.6
+
+### Patch Changes
+
+- use source hash in generated file names for indexed state
+- Updated dependencies
+  - ethereum-indexer-utils@0.6.13
+
 ## 0.7.5
 
 ### Patch Changes
