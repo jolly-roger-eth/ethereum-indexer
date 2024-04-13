@@ -1,5 +1,11 @@
 # ethereum-indexer-js-processor
 
+## 0.7.0
+
+### Minor Changes
+
+- allow js processor to be async
+
 ## 0.6.30
 
 ### Patch Changes

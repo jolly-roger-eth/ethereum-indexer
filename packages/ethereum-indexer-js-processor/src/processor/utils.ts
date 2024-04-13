@@ -13,7 +13,7 @@ export type JSProcessor<
 > = EventFunctions<ABI, ProcessResultType, ProcessorConfig> & {
 	version?: string;
 	construct(): ProcessResultType;
-	handleUnparsedEvent?(json: ProcessResultType, event: LogEventWithParsingFailure): Promise<void>;
+	handleUnparsedEvent?(json: ProcessResultType, event: LogEventWithParsingFailure): void | Promise<void>;
 };
 
 class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig> {
@@ -31,7 +31,7 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 		this.config = config;
 	}
 
-	processEvent(json: ProcessResultType, event: LogEvent<ABI>) {
+	processEvent(json: ProcessResultType, event: LogEvent<ABI>): Promise<void> | void {
 		if ('decodeError' in event) {
 			if (this.obj.handleUnparsedEvent) {
 				return this.obj.handleUnparsedEvent(json, event);

@@ -28,7 +28,7 @@ export type SingleEventJSONProcessor<
 	version?: string;
 	createInitialState(): ProcessResultType;
 	configure(config: ProcessorConfig): void;
-	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void;
+	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void | Promise<void>;
 };
 
 export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
@@ -181,7 +181,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 					}
 				} else {
 					if (willNotChange) {
-						this.singleEventProcessor.processEvent(this._json.state, event);
+						await this.singleEventProcessor.processEvent(this._json.state, event);
 					} else {
 						if (!lastBlockHash || event.blockHash != lastBlockHash) {
 							if (draft as any) {

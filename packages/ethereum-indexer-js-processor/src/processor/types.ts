@@ -28,7 +28,7 @@ export type EventFunctions<ABI extends Abi, ProcessResultType extends JSObject, 
 				json: ProcessResultType,
 				event: LogEvent<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>},
 				config: ProcessorConfig
-		  ) => void;
+		  ) => Promise<void> | void;
 };
 
 export type MergedEventFunctions<
