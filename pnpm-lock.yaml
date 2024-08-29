@@ -45,7 +45,7 @@ importers:
         specifier: workspace:^0.7.0
         version: link:../../packages/ethereum-indexer-browser
       ethereum-indexer-js-processor:
-        specifier: workspace:^0.6.16
+        specifier: workspace:^0.7.0
         version: link:../../packages/ethereum-indexer-js-processor
       react:
         specifier: ^18.2.0

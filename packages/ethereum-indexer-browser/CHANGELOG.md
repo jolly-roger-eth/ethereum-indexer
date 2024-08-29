@@ -1,5 +1,11 @@
 # ethereum-indexer-browser
 
+## 0.7.7
+
+### Patch Changes
+
+- prevent re-initialization
+
 ## 0.7.6
 
 ### Patch Changes

@@ -103,6 +103,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		},
 		processorConfig?: ProcessorConfig
 	) {
+		if (indexer) {
+			throw new Error(`already initialised`);
+		}
 		const config = {...{}, keepStream: options?.keepStream, ...(indexerSetup.config || {})};
 		const source = indexerSetup.source;
 
