@@ -5,7 +5,7 @@
 	import {connect} from './lib/utils/web3';
 	import {parseAbi} from 'viem';
 
-	const chainId = '4242';
+	const chainId = '690';
 
 	// we need the contract info
 	// the abi will be used by the processor to have its type generated, allowing you to get type-safety
@@ -14,21 +14,48 @@
 	// here it is the block at which the contract was deployed
 	const contract = {
 		abi: parseAbi([
-			'event ComponentValueSet(uint256 indexed componentId, address indexed component, uint256 indexed entity, bytes data)',
-			'event ComponentValueRemoved(uint256 indexed componentId, address indexed component, uint256 indexed entity)',
+			'event Store_SetRecord(bytes32 indexed tableId, bytes32[] keyTuple, bytes staticData, bytes32 encodedLengths, bytes dynamicData)',
+			'event Store_SpliceStaticData(bytes32 indexed tableId, bytes32[] keyTuple, uint48 start, bytes data)',
+			'event Store_SpliceDynamicData(bytes32 indexed tableId, bytes32[] keyTuple, uint8 dynamicFieldIndex, uint48 start, uint40 deleteCount, bytes32 encodedLengths, bytes data)',
+			'event Store_DeleteRecord(bytes32 indexed tableId, bytes32[] keyTuple)',
 		]),
-		address: '0xCceC5dFc845AdF8C4a1468A29E504059383503aF',
-		startBlock: 9045311,
+		address: '0xF75b1b7bDB6932e487c4aA8d210F4A682ABeAcf0', // Biomes AW
+		startBlock: 1079762,
 	} as const;
 
 	// we define the type of the state computed by the processor
 	// we can also declare it inline in the generic type of JSProcessor
-	type State = {
-		entities: {
-			id: bigint;
-			components: {id: bigint; value: `0x${string}`}[];
-		}[];
+
+	type Hex = `0x${string}`;
+
+	type Record = {
+		staticData: Hex;
+		encodedLengths: Hex;
+		dynamicData: Hex;
 	};
+
+	type State = {
+		records: {[key: Hex]: Record};
+	};
+
+	// Create a key string from a table ID and key tuple to use in our store Map above
+	function storeKey(tableId: Hex, keyTuple: readonly Hex[]): `0x${string}` {
+		return `${tableId}:${keyTuple.join(',')}`;
+	}
+
+	// Like `Array.splice`, but for strings of bytes
+	function bytesSplice(data: Hex, start: number, deleteCount = 0, newData: Hex = '0x'): Hex {
+		const dataNibbles = data.replace(/^0x/, '').split('');
+		const newDataNibbles = newData.replace(/^0x/, '').split('');
+		return `0x${dataNibbles
+			.splice(start, deleteCount * 2)
+			.concat(newDataNibbles)
+			.join('')}`;
+	}
+
+	function bytesLength(data: Hex): number {
+		return data.replace(/^0x/, '').length / 2;
+	}
 
 	// the processor is given the type of the ABI as Generic type to get generated
 	// it also specify the type which represent the current state
@@ -40,40 +67,57 @@
 		// this function set the starting state
 		// this allow the app to always have access to a state, no undefined needed
 		construct() {
-			return {entities: []};
+			return {records: {}};
 		},
 		// each event has an associated on<EventName> function which is given both the current state and the typed event
 		// each event's argument can be accessed via the `args` field
 		// it then modify the state as it wishes
-		onComponentValueSet(state, event) {
-			const entityFound = state.entities.find((v) => v.id === event.args.entity);
-			if (entityFound) {
-				const componentFound = entityFound.components.find((v) => v.id === event.args.componentId);
-				// TODO parse event.args.data
-				if (componentFound) {
-					componentFound.value = event.args.data;
-				} else {
-					entityFound.components.push({id: event.args.componentId, value: event.args.data});
-				}
-			} else {
-				state.entities.push({
-					id: event.args.entity,
-					components: [{id: event.args.componentId, value: event.args.data}],
-				});
-			}
+		onStore_SetRecord(state, event) {
+			const key = storeKey(event.args.tableId, event.args.keyTuple);
+
+			// Overwrite all of the Record's fields
+			state.records[key] = {
+				staticData: event.args.staticData,
+				encodedLengths: event.args.encodedLengths,
+				dynamicData: event.args.dynamicData,
+			};
 		},
-		onComponentValueRemoved(state, event) {
-			const entityFound = state.entities.find((v) => v.id === event.args.entity);
-			if (entityFound) {
-				const componentIndexFound = entityFound.components.findIndex((v) => v.id === event.args.componentId);
-				if (componentIndexFound !== -1) {
-					entityFound.components.splice(componentIndexFound, 1);
-				} else {
-					console.error(`component ${event.args.componentId} not found on entity ${event.args.entity}`);
-				}
-			} else {
-				console.error(`entity not found with id ${event.args.entity}`);
-			}
+		onStore_SpliceStaticData(state, event) {
+			const key = storeKey(event.args.tableId, event.args.keyTuple);
+			const record = state.records[key] ?? {
+				staticData: '0x',
+				encodedLengths: '0x',
+				dynamicData: '0x',
+			};
+
+			// Splice the static field data of the Record
+			state.records[key] = {
+				staticData: bytesSplice(record.staticData, event.args.start, bytesLength(event.args.data), event.args.data),
+				encodedLengths: record.encodedLengths,
+				dynamicData: record.dynamicData,
+			};
+		},
+
+		onStore_SpliceDynamicData(state, event) {
+			const key = storeKey(event.args.tableId, event.args.keyTuple);
+			const record = state.records[key] ?? {
+				staticData: '0x',
+				encodedLengths: '0x',
+				dynamicData: '0x',
+			};
+
+			// Splice the dynamic field data of the Record
+			state.records[key] = {
+				staticData: record.staticData,
+				encodedLengths: event.args.encodedLengths,
+				dynamicData: bytesSplice(record.dynamicData, event.args.start, event.args.deleteCount, event.args.data),
+			};
+		},
+		onStore_DeleteRecord(state, event) {
+			const key = storeKey(event.args.tableId, event.args.keyTuple);
+
+			// Delete the whole Record
+			delete state.records[key];
 		},
 	};
 
@@ -101,7 +145,7 @@
 					chainName: 'lattice testnet',
 					rpcUrls: ['https://follower.testnet-chain.linfra.xyz'],
 					nativeCurrency: {name: 'Ether', symbol: 'ETH', decimals: 18},
-					blockExplorerUrls: null, //[],
+					blockExplorerUrls: [],
 				},
 			}).then(({ethereum}) => {
 				// we already setup the processor
@@ -122,6 +166,8 @@
 			});
 		}
 	}
+
+	$: recordKeys = Object.keys($state.records) as `0x${string}`[];
 </script>
 
 <div class="App">
@@ -138,8 +184,8 @@
 			<p>Please wait...</p>
 		{/if}
 		<div>
-			{#each $state.entities as entity (entity.id)}
-				<p>{entity.id} has {entity.components.length} components</p>
+			{#each recordKeys as key (key)}
+				<span>{key} </span> <span>{JSON.stringify($state.records[key], null, 2)}</span>
 			{/each}
 		</div>
 	{/if}
