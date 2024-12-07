@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './App.css';
-	import {fromJSProcessor, type JSProcessor} from 'ethereum-indexer-js-processor';
+	import {fromJSProcessor, type JSProcessor, type JSType} from 'ethereum-indexer-js-processor';
 	import {createIndexerState, keepStateOnIndexedDB} from 'ethereum-indexer-browser';
 	import {connect} from './lib/utils/web3';
 	import {parseAbi, decodeAbiParameters} from 'viem';
@@ -43,8 +43,8 @@
 	};
 
 	type State = {
-		records: {[key: Hex]: {raw: Record}};
-		tables: {[name: string]: TableRecord};
+		tables: {[key: string]: JSType[]};
+		tableDefinitions: {[name: string]: TableRecord};
 	};
 
 	// Create a key string from a table ID and key tuple to use in our store Map above
@@ -280,11 +280,11 @@
 		// you can set a version, ideally you would generate it so that it changes for each change
 		// when a version changes, the indexer will detect that and clear the state
 		// if it has the event stream cached, it will repopulate the state automatically
-		version: '1.0.14',
+		version: '1.0.15',
 		// this function set the starting state
 		// this allow the app to always have access to a state, no undefined needed
 		construct() {
-			return {records: {test: {raw: {staticData: '0x', encodedLengths: '0x', dynamicData: '0x'}}}, tables: {}};
+			return {tables: {}, tableDefinitions: {}};
 		},
 		// each event has an associated on<EventName> function which is given both the current state and the typed event
 		// each event's argument can be accessed via the `args` field
@@ -300,7 +300,44 @@
 				const parsedTable = parseTablesRecord(event.args);
 				console.log({...registeredTableInfo, ...event.args, parsedTable});
 				// const fieldLayour = event.args.
+
+				// TODO registeredTableInfo.type
+				const registeredTableNameId = registeredTableInfo.namespace + '_' + registeredTableInfo.name;
+				const existingTable = state.tableDefinitions[registeredTableNameId];
+				if (existingTable) {
+					throw new Error(`invalid world, table registered twice`);
+				}
+				state.tableDefinitions[registeredTableNameId] = parsedTable;
 			} else {
+				const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
+				const table = state.tableDefinitions[tableNameId];
+				if (!table) {
+					throw new Error(`invalid world, table not registered before use`);
+				}
+				const row: JSType = {};
+
+				let i = 0;
+				for (const keyName of table.keyNames) {
+					if (i < table.keySchema.staticFieldsCount) {
+						const type = table.keySchema.fieldTypes[i];
+						row[keyName] = event.args.staticData; // TODO based on type
+					}
+					// no dynamic data for keys
+					i++;
+				}
+
+				i = 0;
+				for (const fieldName of table.fieldNames) {
+					if (i < table.valueSchema.staticFieldsCount) {
+						const type = table.valueSchema.fieldTypes[i];
+						row[fieldName] = event.args.staticData; // TODO based on type
+					} else {
+						// TODO dynamic fields
+					}
+					i++;
+				}
+				state.tables[tableNameId] = state.tables[tableNameId] || [];
+				state.tables[tableNameId].push(row);
 			}
 
 			// if (BigInt(event.args.tableId) >> 240n == 0x6f74n) {
@@ -320,50 +357,49 @@
 			// }
 		},
 		onStore_SpliceStaticData(state, event) {
-			const key = storeKey(event.args.tableId, event.args.keyTuple);
-			const record = state.records[key] ?? {
-				staticData: '0x',
-				encodedLengths: '0x',
-				dynamicData: '0x',
-			};
-
+			// const key = storeKey(event.args.tableId, event.args.keyTuple);
+			// const record = state.tables[key] ?? {
+			// 	staticData: '0x',
+			// 	encodedLengths: '0x',
+			// 	dynamicData: '0x',
+			// };
 			// Splice the static field data of the Record
-			state.records[key] = {
-				raw: {
-					staticData: bytesSplice(
-						record.raw.staticData,
-						event.args.start,
-						bytesLength(event.args.data),
-						event.args.data,
-					),
-					encodedLengths: record.raw.encodedLengths,
-					dynamicData: record.raw.dynamicData,
-				},
-			};
+			// state.records[key] = {
+			// 	raw: {
+			// 		staticData: bytesSplice(
+			// 			record.raw.staticData,
+			// 			event.args.start,
+			// 			bytesLength(event.args.data),
+			// 			event.args.data,
+			// 		),
+			// 		encodedLengths: record.raw.encodedLengths,
+			// 		dynamicData: record.raw.dynamicData,
+			// 	},
+			// 	row: {}
+			// };
 		},
 
 		onStore_SpliceDynamicData(state, event) {
-			const key = storeKey(event.args.tableId, event.args.keyTuple);
-			const record = state.records[key] ?? {
-				staticData: '0x',
-				encodedLengths: '0x',
-				dynamicData: '0x',
-			};
-
+			// const key = storeKey(event.args.tableId, event.args.keyTuple);
+			// const record = state.tables[key] ?? {
+			// 	staticData: '0x',
+			// 	encodedLengths: '0x',
+			// 	dynamicData: '0x',
+			// };
 			// Splice the dynamic field data of the Record
-			state.records[key] = {
-				raw: {
-					staticData: record.raw.staticData,
-					encodedLengths: event.args.encodedLengths,
-					dynamicData: bytesSplice(record.raw.dynamicData, event.args.start, event.args.deleteCount, event.args.data),
-				},
-			};
+			// state.records[key] = {
+			// 	raw: {
+			// 		staticData: record.raw.staticData,
+			// 		encodedLengths: event.args.encodedLengths,
+			// 		dynamicData: bytesSplice(record.raw.dynamicData, event.args.start, event.args.deleteCount, event.args.data),
+			// 	},
+			// 	row: {}
+			// };
 		},
 		onStore_DeleteRecord(state, event) {
-			const key = storeKey(event.args.tableId, event.args.keyTuple);
-
-			// Delete the whole Record
-			delete state.records[key];
+			// const key = storeKey(event.args.tableId, event.args.keyTuple);
+			// // Delete the whole Record
+			// delete state.records[key];
 		},
 	};
 
@@ -413,7 +449,7 @@
 		}
 	}
 
-	$: recordKeys = (Object.keys($state.records) as `0x${string}`[]).slice(0, 10);
+	$: recordKeys = (Object.keys($state.tables) as `0x${string}`[]).slice(0, 10);
 </script>
 
 <div class="App">
@@ -431,7 +467,8 @@
 		{/if}
 		<div>
 			{#each recordKeys as key (key)}
-				<span>{key} </span> <span>{JSON.stringify($state.records[key].raw, null, 2)}</span>
+				<span>{key} </span> <span>{JSON.stringify($state.tables[key][0], null, 2)}</span>
+				<hr />
 			{/each}
 		</div>
 	{/if}
