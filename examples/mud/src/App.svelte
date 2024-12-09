@@ -4,7 +4,8 @@
 	import {createIndexerState, keepStateOnIndexedDB} from 'ethereum-indexer-browser';
 	import {connect} from './lib/utils/web3';
 	import {parseAbi, type Hex} from 'viem';
-	import {extractTableInfo, parseTablesRecord, type TableRecord} from './lib/utils/mud';
+	import {TablesTable, extractTableInfo, logToRecord, recordToTableDefinition} from './lib/utils/mud';
+	import type {TableInfo, TableSchema} from './lib/utils/mud';
 
 	const chainId = '690';
 
@@ -28,7 +29,7 @@
 	// we can also declare it inline in the generic type of JSProcessor
 	type State = {
 		tables: {[key: string]: JSType[]};
-		tableDefinitions: {[name: string]: TableRecord};
+		tableDefinitions: {[name: string]: TableSchema & TableInfo};
 	};
 
 	// Create a key string from a table ID and key tuple to use in our store Map above
@@ -42,7 +43,7 @@
 		// you can set a version, ideally you would generate it so that it changes for each change
 		// when a version changes, the indexer will detect that and clear the state
 		// if it has the event stream cached, it will repopulate the state automatically
-		version: '1.0.21',
+		version: '1.0.29',
 		// this function set the starting state
 		// this allow the app to always have access to a state, no undefined needed
 		construct() {
@@ -57,73 +58,25 @@
 			const tableInfo = extractTableInfo(event.args.tableId);
 
 			if (tableInfo.namespace == 'store' && tableInfo.name === 'Tables') {
-				const registeredTableId = event.args.keyTuple[0];
-				const registeredTableInfo = extractTableInfo(registeredTableId);
-				const parsedTable = parseTablesRecord(event.args);
-				console.log({...registeredTableInfo, ...event.args, parsedTable});
-				// const fieldLayour = event.args.
-
-				// try {
-				// 	const tableDef = logToTable(event);
-				// 	console.log('tabledef', {tableDef});
-				// } catch (err) {
-				// 	console.error(err);
-				// }
-
-				// TODO registeredTableInfo.type
-				const registeredTableNameId = registeredTableInfo.namespace + '_' + registeredTableInfo.name;
-				const existingTable = state.tableDefinitions[registeredTableNameId];
-				if (existingTable) {
-					throw new Error(`invalid world, table registered twice`);
-				}
-				state.tableDefinitions[registeredTableNameId] = parsedTable;
+				const record = logToRecord({tableSchema: TablesTable, log: event});
+				const registeredTableInfo = extractTableInfo(record.tableId);
+				const registeredTableDef = recordToTableDefinition(record);
+				// console.log({tableDef});
+				state.tableDefinitions[record.tableId] = {...registeredTableInfo, ...registeredTableDef};
 			} else {
 				const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
-				const table = state.tableDefinitions[tableNameId];
+				const table = state.tableDefinitions[event.args.tableId];
 				if (!table) {
 					throw new Error(`invalid world, table not registered before use`);
 				}
-				const row: JSType = {};
-
-				let i = 0;
-				for (const keyName of table.keyNames) {
-					if (i < table.keySchema.staticFieldsCount) {
-						const type = table.keySchema.fieldTypes[i];
-						row[keyName] = event.args.staticData; // TODO based on type
-					}
-					// no dynamic data for keys
-					i++;
+				const record = logToRecord({tableSchema: table, log: event});
+				if ('x' in record) {
+					console.log({table: tableNameId, RECORD: record});
 				}
 
-				i = 0;
-				for (const fieldName of table.fieldNames) {
-					if (i < table.valueSchema.staticFieldsCount) {
-						const type = table.valueSchema.fieldTypes[i];
-						row[fieldName] = event.args.staticData; // TODO based on type
-					} else {
-						// TODO dynamic fields
-					}
-					i++;
-				}
 				state.tables[tableNameId] = state.tables[tableNameId] || [];
-				state.tables[tableNameId].push(row);
+				state.tables[tableNameId].push(record);
 			}
-
-			// if (BigInt(event.args.tableId) >> 240n == 0x6f74n) {
-			// 	console.log(`offchain table: ${tableInfo.name} (${tableInfo.namespace})`);
-			// } else {
-			// 	console.log(`onchain table: ${tableInfo.name} (${tableInfo.namespace})`);
-			// }
-
-			// // Overwrite all of the Record's fields
-			// state.records[key] = {
-			// 	staticData: event.args.staticData,
-			// 	encodedLengths: event.args.encodedLengths,
-			// 	dynamicData: event.args.dynamicData,
-			// };
-
-			// if (event.args.tableId === '0x746273746f72650000000000000000005461626c657300000000000000000000') {
-			// }
 		},
 		onStore_SpliceStaticData(state, event) {
 			// const key = storeKey(event.args.tableId, event.args.keyTuple);
