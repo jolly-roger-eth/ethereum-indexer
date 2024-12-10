@@ -295,7 +295,14 @@
 		}
 	}
 
-	$: tables = Object.keys($state.tableDefinitions) as `0x${string}`[];
+	$: tables = Object.entries($state.tableDefinitions).map(([key, table]) => {
+		const records = $state.tables[table.namespace + '_' + table.name];
+		return {
+			name: table.name,
+			namespace: table.namespace,
+			example: records ? records[Object.keys(records)[0]] : undefined,
+		};
+	});
 
 	$: positionableObjects = Object.values($state.tables['_Position'] || {});
 </script>
@@ -313,16 +320,16 @@
 		{:else}
 			<p>Please wait...</p>
 		{/if}
-		<div>
+		<!-- <div>
 			{#each positionableObjects as object}
 				{JSON.stringify(object, null, 2)}
 				<hr />
 			{/each}
-		</div>
+		</div> -->
 
 		<div>
 			{#each tables as table}
-				{JSON.stringify($state.tableDefinitions[table], null, 2)}
+				{JSON.stringify(table, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 2)}
 				<hr />
 			{/each}
 		</div>
