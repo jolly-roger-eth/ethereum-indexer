@@ -95,8 +95,6 @@
 					const record = logToRecord({tableSchema: TablesTable, log: event});
 					const registeredTableInfo = extractTableInfo(record.tableId);
 					const registeredTableDef = recordToTableDefinition(record);
-					// console.log({tableDef});
-					console.log(`registering ${tableInfo.namespace}_${tableInfo.name}`);
 					state.tableDefinitions[record.tableId] = {...registeredTableInfo, ...registeredTableDef};
 				} else {
 					const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
@@ -127,7 +125,6 @@
 
 					const {valueSchema, keySchema} = getSchema(tableDef);
 					const key = decodeKey(keySchema, event.args.keyTuple);
-					console.log({key});
 					const encodedKey = encodeKey(tableDef, key);
 
 					const previousValue = state.tables[tableNameId]?.[encodedKey];
@@ -143,7 +140,6 @@
 						encodedLengths,
 						dynamicData,
 					});
-					console.log({value});
 					_setRecord(state, tableNameId, tableDef, {...value, ...key});
 				}
 			} catch (e) {
