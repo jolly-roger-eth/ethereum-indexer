@@ -13,6 +13,7 @@ import {
 	decodeKey,
 	decodeValueArgs,
 	type Schema,
+	encodeKey,
 } from '@latticexyz/protocol-parser/internal';
 import type {SchemaAbiType} from '@latticexyz/schema-type/internal';
 import type {Table} from '@latticexyz/config';
@@ -52,6 +53,13 @@ export const TablesTable: TableSchema = {
 	},
 	key: ['tableId'],
 };
+
+export function getSchema(tableSchema: TableSchema) {
+	const keySchema = getSchemaTypes(getKeySchema(tableSchema as unknown as Pick<Table, 'schema' | 'key'>));
+	const valueSchema = getSchemaTypes(getValueSchema(tableSchema as unknown as Pick<Table, 'schema' | 'key'>));
+
+	return {keySchema, valueSchema};
+}
 
 export function logToRecord({tableSchema, log}: {tableSchema: TableSchema; log: any}): any {
 	const keySchema = getSchemaTypes(getKeySchema(tableSchema as unknown as Pick<Table, 'schema' | 'key'>));

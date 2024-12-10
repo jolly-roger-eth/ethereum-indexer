@@ -3,9 +3,12 @@
 	import {fromJSProcessor, type JSProcessor, type JSType} from 'ethereum-indexer-js-processor';
 	import {createIndexerState, keepStateOnIndexedDB} from 'ethereum-indexer-browser';
 	import {connect} from './lib/utils/web3';
-	import {parseAbi, type Hex} from 'viem';
-	import {TablesTable, extractTableInfo, logToRecord, recordToTableDefinition} from './lib/utils/mud';
+	import {parseAbi, size, type Hex} from 'viem';
+	import {TablesTable, extractTableInfo, getSchema, logToRecord, recordToTableDefinition} from './lib/utils/mud';
 	import type {TableInfo, TableSchema} from './lib/utils/mud';
+	import {dynamicAbiTypeToDefaultValue, staticAbiTypeToDefaultValue} from '@latticexyz/schema-type/internal';
+	import {spliceHex} from '@latticexyz/common';
+	import {decodeKey, decodeValueArgs, encodeValueArgs} from '@latticexyz/protocol-parser/internal';
 
 	const chainId = '690';
 
@@ -28,13 +31,44 @@
 	// we define the type of the state computed by the processor
 	// we can also declare it inline in the generic type of JSProcessor
 	type State = {
-		tables: {[key: string]: JSType[]};
+		tables: {[key: string]: {[key: string]: JSType}};
 		tableDefinitions: {[name: string]: TableSchema & TableInfo};
 	};
 
-	// Create a key string from a table ID and key tuple to use in our store Map above
-	function storeKey(tableId: Hex, keyTuple: readonly Hex[]): `0x${string}` {
-		return `${tableId}:${keyTuple.join(',')}`;
+	export const emptyValueArgs = {
+		staticData: '0x',
+		encodedLengths: '0x',
+		dynamicData: '0x',
+	} as const;
+
+	function encodeKey(table: TableSchema, key: {[name: string]: `0x${string}` | number | bigint | boolean}): string {
+		const {key: keyOrder} = table;
+
+		return keyOrder
+			.map((keyName) => {
+				const keyValue = key[keyName as never];
+				if (keyValue == null) {
+					throw new Error(`Provided key is missing field ${keyName}.: ${JSON.stringify(key, null, 2)}`);
+				}
+				return keyValue;
+			})
+			.join('|');
+	}
+
+	function _setRecord(state: State, tableNameId: string, tableDef: TableSchema, record: any) {
+		const encodedKey = encodeKey(tableDef, record);
+		const prevRecord: JSType | null = state.tables[tableNameId]?.[encodedKey];
+		const newRecord = Object.fromEntries(
+			Object.keys(tableDef.schema).map((fieldName) => [
+				fieldName,
+				record[fieldName] ?? // Override provided record fields
+					(prevRecord as any)?.[fieldName] ?? // Keep existing non-overridden fields
+					staticAbiTypeToDefaultValue[tableDef.schema[fieldName] as never] ?? // Default values for new fields
+					dynamicAbiTypeToDefaultValue[tableDef.schema[fieldName] as never],
+			]),
+		);
+		state.tables[tableNameId] = state.tables[tableNameId] || {};
+		state.tables[tableNameId][encodedKey] = newRecord;
 	}
 
 	// the processor is given the type of the ABI as Generic type to get generated
@@ -43,42 +77,81 @@
 		// you can set a version, ideally you would generate it so that it changes for each change
 		// when a version changes, the indexer will detect that and clear the state
 		// if it has the event stream cached, it will repopulate the state automatically
-		version: '1.0.29',
+		version: '1.0.31',
 		// this function set the starting state
 		// this allow the app to always have access to a state, no undefined needed
 		construct() {
 			return {tables: {}, tableDefinitions: {}};
 		},
+
 		// each event has an associated on<EventName> function which is given both the current state and the typed event
 		// each event's argument can be accessed via the `args` field
 		// it then modify the state as it wishes
 		onStore_SetRecord(state, event) {
-			const key = storeKey(event.args.tableId, event.args.keyTuple);
+			try {
+				const tableInfo = extractTableInfo(event.args.tableId);
 
-			const tableInfo = extractTableInfo(event.args.tableId);
+				if (tableInfo.namespace == 'store' && tableInfo.name === 'Tables') {
+					const record = logToRecord({tableSchema: TablesTable, log: event});
+					const registeredTableInfo = extractTableInfo(record.tableId);
+					const registeredTableDef = recordToTableDefinition(record);
+					// console.log({tableDef});
+					state.tableDefinitions[record.tableId] = {...registeredTableInfo, ...registeredTableDef};
+				} else {
+					const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
+					const tableDef = state.tableDefinitions[event.args.tableId];
+					if (!tableDef) {
+						throw new Error(`invalid world, table not registered before use`);
+					}
+					const record = logToRecord({tableSchema: tableDef, log: event});
+					// if ('x' in record) {
+					// 	// console.log({table: tableNameId, RECORD: record});
+					// }
 
-			if (tableInfo.namespace == 'store' && tableInfo.name === 'Tables') {
-				const record = logToRecord({tableSchema: TablesTable, log: event});
-				const registeredTableInfo = extractTableInfo(record.tableId);
-				const registeredTableDef = recordToTableDefinition(record);
-				// console.log({tableDef});
-				state.tableDefinitions[record.tableId] = {...registeredTableInfo, ...registeredTableDef};
-			} else {
-				const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
-				const table = state.tableDefinitions[event.args.tableId];
-				if (!table) {
-					throw new Error(`invalid world, table not registered before use`);
+					_setRecord(state, tableNameId, tableDef, record);
 				}
-				const record = logToRecord({tableSchema: table, log: event});
-				if ('x' in record) {
-					console.log({table: tableNameId, RECORD: record});
-				}
-
-				state.tables[tableNameId] = state.tables[tableNameId] || [];
-				state.tables[tableNameId].push(record);
+			} catch (e) {
+				console.error(e);
 			}
 		},
 		onStore_SpliceStaticData(state, event) {
+			try {
+				const tableInfo = extractTableInfo(event.args.tableId);
+
+				if (tableInfo.namespace == 'store' && tableInfo.name === 'Tables') {
+					throw new Error(`invalid world?, cannot change tableInfo`);
+				} else {
+					const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
+					const tableDef = state.tableDefinitions[event.args.tableId];
+					if (!tableDef) {
+						throw new Error(`invalid world, table not registered before use`);
+					}
+
+					const {valueSchema, keySchema} = getSchema(tableDef);
+					const key = decodeKey(keySchema, event.args.keyTuple);
+					console.log({key});
+					const encodedKey = encodeKey(tableDef, key);
+
+					const previousValue = state.tables[tableNameId]?.[encodedKey];
+					const {
+						staticData: previousStaticData,
+						encodedLengths,
+						dynamicData,
+					} = previousValue ? encodeValueArgs(valueSchema, previousValue as any) : emptyValueArgs;
+
+					const staticData = spliceHex(previousStaticData, event.args.start, size(event.args.data), event.args.data);
+					const value = decodeValueArgs(valueSchema, {
+						staticData,
+						encodedLengths,
+						dynamicData,
+					});
+					console.log({value});
+					_setRecord(state, tableNameId, tableDef, value);
+				}
+			} catch (e) {
+				console.error(e);
+			}
+
 			// const key = storeKey(event.args.tableId, event.args.keyTuple);
 			// const record = state.tables[key] ?? {
 			// 	staticData: '0x',
@@ -102,6 +175,38 @@
 		},
 
 		onStore_SpliceDynamicData(state, event) {
+			try {
+				const tableInfo = extractTableInfo(event.args.tableId);
+
+				if (tableInfo.namespace == 'store' && tableInfo.name === 'Tables') {
+					throw new Error(`invalid world?, cannot change tableInfo`);
+				} else {
+					const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
+					const tableDef = state.tableDefinitions[event.args.tableId];
+					if (!tableDef) {
+						throw new Error(`invalid world, table not registered before use`);
+					}
+
+					const {valueSchema, keySchema} = getSchema(tableDef);
+					const key = decodeKey(keySchema, event.args.keyTuple);
+					const encodedKey = encodeKey(tableDef, key);
+
+					const previousValue = state.tables[tableNameId]?.[encodedKey];
+					const {staticData, dynamicData: previousDynamicData} = previousValue
+						? encodeValueArgs(valueSchema, previousValue as any)
+						: emptyValueArgs;
+
+					const dynamicData = spliceHex(previousDynamicData, event.args.start, event.args.deleteCount, event.args.data);
+					const value = decodeValueArgs(valueSchema, {
+						staticData,
+						encodedLengths: event.args.encodedLengths,
+						dynamicData,
+					});
+					_setRecord(state, tableNameId, tableDef, value);
+				}
+			} catch (e) {
+				console.error(e);
+			}
 			// const key = storeKey(event.args.tableId, event.args.keyTuple);
 			// const record = state.tables[key] ?? {
 			// 	staticData: '0x',
@@ -119,9 +224,27 @@
 			// };
 		},
 		onStore_DeleteRecord(state, event) {
-			// const key = storeKey(event.args.tableId, event.args.keyTuple);
-			// // Delete the whole Record
-			// delete state.records[key];
+			try {
+				const tableInfo = extractTableInfo(event.args.tableId);
+
+				if (tableInfo.namespace == 'store' && tableInfo.name === 'Tables') {
+					throw new Error(`invalid world?, cannot delete tableInfo`);
+				} else {
+					const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
+					const tableDef = state.tableDefinitions[event.args.tableId];
+					if (!tableDef) {
+						throw new Error(`invalid world, table not registered before use`);
+					}
+
+					const {valueSchema, keySchema} = getSchema(tableDef);
+					const key = decodeKey(keySchema, event.args.keyTuple);
+					const encodedKey = encodeKey(tableDef, key);
+
+					delete state.tables[tableNameId][encodedKey];
+				}
+			} catch (e) {
+				console.error(e);
+			}
 		},
 	};
 
@@ -171,7 +294,9 @@
 		}
 	}
 
-	$: recordKeys = (Object.keys($state.tables) as `0x${string}`[]).slice(0, 10);
+	$: tables = Object.keys($state.tableDefinitions) as `0x${string}`[];
+
+	$: positionableObjects = Object.values($state.tables['_Position'] || {});
 </script>
 
 <div class="App">
@@ -188,8 +313,15 @@
 			<p>Please wait...</p>
 		{/if}
 		<div>
-			{#each recordKeys as key (key)}
-				<span>{key} </span> <span>{JSON.stringify($state.tables[key][0], null, 2)}</span>
+			{#each positionableObjects as object}
+				{JSON.stringify(object, null, 2)}
+				<hr />
+			{/each}
+		</div>
+
+		<div>
+			{#each tables as table}
+				{JSON.stringify($state.tableDefinitions[table], null, 2)}
 				<hr />
 			{/each}
 		</div>
