@@ -1,21 +1,13 @@
 import type {Hex} from 'viem';
-import {concatHex, decodeAbiParameters, parseAbiParameters} from 'viem';
-
-// import { DynamicAbiType, StaticAbiType } from "@latticexyz/schema-type/internal";
-import type {ResourceType} from '@latticexyz/common';
-import {hexToResource} from '@latticexyz/common';
+import {decodeAbiParameters, parseAbiParameters} from 'viem';
 import {
 	hexToSchema,
-	decodeValue,
 	getSchemaTypes,
 	getValueSchema,
 	getKeySchema,
 	decodeKey,
 	decodeValueArgs,
-	type Schema,
-	encodeKey,
 } from '@latticexyz/protocol-parser/internal';
-import type {SchemaAbiType} from '@latticexyz/schema-type/internal';
 import type {Table} from '@latticexyz/config';
 
 export type {Table};
@@ -77,26 +69,6 @@ export function recordToTableDefinition(record: {
 	tableId: Hex;
 	valueSchema: Hex;
 }): TableSchema {
-	// const keySchema = hexToSchema(record.keySchema);
-	// const valueSchema = hexToSchema(record.valueSchema);
-	// const keyNames = decodeAbiParameters(parseAbiParameters('string[]'), record.abiEncodedKeyNames)[0] as string[];
-	// const fieldNames = decodeAbiParameters(parseAbiParameters('string[]'), record.abiEncodedFieldNames)[0] as string[];
-	// // return {
-	// // 	keySchema,
-	// // 	valueSchema,
-	// // 	keyNames,
-	// // 	fieldNames,
-	// // };
-
-	// const schema = {};
-
-	// for ()
-
-	// return {
-	// 	schema,
-	// 	key: keyNames,
-	// };
-
 	const solidityKeySchema = hexToSchema(record.keySchema);
 	const solidityValueSchema = hexToSchema(record.valueSchema);
 	const keyNames = decodeAbiParameters(parseAbiParameters('string[]'), record.abiEncodedKeyNames)[0] as string[];
