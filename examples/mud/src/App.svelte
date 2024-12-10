@@ -105,9 +105,6 @@
 						throw new Error(`invalid world, table not registered before use`);
 					}
 					const record = logToRecord({tableSchema: tableDef, log: event});
-					// if ('x' in record) {
-					// 	// console.log({table: tableNameId, RECORD: record});
-					// }
 
 					_setRecord(state, tableNameId, tableDef, record);
 				}
@@ -152,27 +149,6 @@
 			} catch (e) {
 				console.error(e);
 			}
-
-			// const key = storeKey(event.args.tableId, event.args.keyTuple);
-			// const record = state.tables[key] ?? {
-			// 	staticData: '0x',
-			// 	encodedLengths: '0x',
-			// 	dynamicData: '0x',
-			// };
-			// Splice the static field data of the Record
-			// state.records[key] = {
-			// 	raw: {
-			// 		staticData: bytesSplice(
-			// 			record.raw.staticData,
-			// 			event.args.start,
-			// 			bytesLength(event.args.data),
-			// 			event.args.data,
-			// 		),
-			// 		encodedLengths: record.raw.encodedLengths,
-			// 		dynamicData: record.raw.dynamicData,
-			// 	},
-			// 	row: {}
-			// };
 		},
 
 		onStore_SpliceDynamicData(state, event) {
@@ -208,21 +184,6 @@
 			} catch (e) {
 				console.error(e);
 			}
-			// const key = storeKey(event.args.tableId, event.args.keyTuple);
-			// const record = state.tables[key] ?? {
-			// 	staticData: '0x',
-			// 	encodedLengths: '0x',
-			// 	dynamicData: '0x',
-			// };
-			// Splice the dynamic field data of the Record
-			// state.records[key] = {
-			// 	raw: {
-			// 		staticData: record.raw.staticData,
-			// 		encodedLengths: event.args.encodedLengths,
-			// 		dynamicData: bytesSplice(record.raw.dynamicData, event.args.start, event.args.deleteCount, event.args.data),
-			// 	},
-			// 	row: {}
-			// };
 		},
 		onStore_DeleteRecord(state, event) {
 			try {
