@@ -77,7 +77,7 @@
 		// you can set a version, ideally you would generate it so that it changes for each change
 		// when a version changes, the indexer will detect that and clear the state
 		// if it has the event stream cached, it will repopulate the state automatically
-		version: '1.0.31',
+		version: '1.0.32',
 		// this function set the starting state
 		// this allow the app to always have access to a state, no undefined needed
 		construct() {
@@ -96,6 +96,7 @@
 					const registeredTableInfo = extractTableInfo(record.tableId);
 					const registeredTableDef = recordToTableDefinition(record);
 					// console.log({tableDef});
+					console.log(`registering ${tableInfo.namespace}_${tableInfo.name}`);
 					state.tableDefinitions[record.tableId] = {...registeredTableInfo, ...registeredTableDef};
 				} else {
 					const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
@@ -124,7 +125,7 @@
 					const tableNameId = tableInfo.namespace + '_' + tableInfo.name;
 					const tableDef = state.tableDefinitions[event.args.tableId];
 					if (!tableDef) {
-						throw new Error(`invalid world, table not registered before use`);
+						throw new Error(`invalid world, table not registered before use: ${tableInfo.namespace}_${tableInfo.name}`);
 					}
 
 					const {valueSchema, keySchema} = getSchema(tableDef);
@@ -146,7 +147,7 @@
 						dynamicData,
 					});
 					console.log({value});
-					_setRecord(state, tableNameId, tableDef, value);
+					_setRecord(state, tableNameId, tableDef, {...value, ...key});
 				}
 			} catch (e) {
 				console.error(e);
@@ -202,7 +203,7 @@
 						encodedLengths: event.args.encodedLengths,
 						dynamicData,
 					});
-					_setRecord(state, tableNameId, tableDef, value);
+					_setRecord(state, tableNameId, tableDef, {...value, ...key});
 				}
 			} catch (e) {
 				console.error(e);
