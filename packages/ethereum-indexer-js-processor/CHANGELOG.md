@@ -1,5 +1,12 @@
 # ethereum-indexer-js-processor
 
+## 0.7.1
+
+### Patch Changes
+
+- Updated dependencies
+  - ethereum-indexer@0.6.22
+
 ## 0.7.0
 
 ### Minor Changes

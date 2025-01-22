@@ -254,10 +254,12 @@
 
 	$: tables = Object.entries($state.tableDefinitions).map(([key, table]) => {
 		const records = $state.tables[table.namespace + '_' + table.name];
+		const recordKeys = records ? Object.keys(records) : [];
 		return {
 			name: table.name,
 			namespace: table.namespace,
-			example: records ? records[Object.keys(records)[0]] : undefined,
+			example: records ? records[recordKeys[0]] : undefined,
+			numRecords: recordKeys.length,
 		};
 	});
 

@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.22
+
+### Patch Changes
+
+- stream option: doNotFetchUnfinalizedLogs
+
 ## 0.6.21
 
 ### Patch Changes

@@ -33,7 +33,7 @@ export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	getVersionHash(): string;
 	load: (
 		source: IndexingSource<ABI>,
-		streamConfig: UsedStreamConfig
+		streamConfig: UsedStreamConfig,
 	) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>} | undefined>;
 	process: (eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
@@ -85,14 +85,14 @@ export type IndexingSource<ABI extends Abi> = {
 
 export type StreamFecther<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
-	fromBlock: number
+	fromBlock: number,
 ) => Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]} | undefined>;
 export type StreamSaver<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	stream: {
 		lastSync: LastSync<ABI>;
 		eventStream: LogEvent<ABI>[];
-	}
+	},
 ) => Promise<void>;
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
@@ -107,6 +107,7 @@ export type UsedStreamConfig = ProvidedStreamConfig & {
 
 export type ProvidedStreamConfig = {
 	finality?: number;
+	doNotFetchUnfinalizedLogs?: boolean;
 	alwaysFetchTimestamps?: boolean;
 	alwaysFetchTransactions?: boolean;
 	parse?: LogParseConfig;
@@ -164,11 +165,11 @@ export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
 } & Extra;
 
 export type ExistingStateFecther<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
-	context: ProcessorContext<ABI, ProcessorConfig>
+	context: ProcessorContext<ABI, ProcessorConfig>,
 ) => Promise<AllData<ABI, ProcessResultType, Extra>>;
 export type StateSaver<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
 	context: ProcessorContext<ABI, ProcessorConfig>,
-	all: AllData<ABI, ProcessResultType, Extra>
+	all: AllData<ABI, ProcessResultType, Extra>,
 ) => Promise<void>;
 
 export type KeepState<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = {
