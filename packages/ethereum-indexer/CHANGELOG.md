@@ -1,5 +1,11 @@
 # ethereum-indexer
 
+## 0.6.23
+
+### Patch Changes
+
+- stream option: upToBlock
+
 ## 0.6.22
 
 ### Patch Changes

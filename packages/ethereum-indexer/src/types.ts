@@ -107,6 +107,7 @@ export type UsedStreamConfig = ProvidedStreamConfig & {
 
 export type ProvidedStreamConfig = {
 	finality?: number;
+	upToBlock?: number;
 	doNotFetchUnfinalizedLogs?: boolean;
 	alwaysFetchTimestamps?: boolean;
 	alwaysFetchTransactions?: boolean;

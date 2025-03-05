@@ -584,6 +584,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			latestBlock -= this.finality;
 		}
 
+		if (this.config.stream.upToBlock && latestBlock > this.config.stream.upToBlock) {
+			latestBlock = this.config.stream.upToBlock;
+		}
+
 		let toBlock = latestBlock;
 
 		if (fromBlock > toBlock) {
