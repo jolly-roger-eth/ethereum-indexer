@@ -390,13 +390,18 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		startAutoIndexing,
 		stopAutoIndexing,
 		reset,
-		updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
+		async updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
-			indexer.updateProcessor(newProcessor);
+			try {
+				await indexer.updateProcessor(newProcessor);
+			} catch (err) {
+				setSyncing({error: {message: 'Failed to update processor', id: 'FAILED_TO_UPDATE_PROCESSOR'}});
+				throw err;
+			}
 		},
-		updateIndexer(update: {
+		async updateIndexer(update: {
 			provider?: EIP1193ProviderWithoutEvents;
 			source?: IndexingSource<ABI>;
 			streamConfig?: ProvidedStreamConfig;
@@ -404,7 +409,12 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
-			indexer.updateIndexer(update);
+			try {
+				await indexer.updateIndexer(update);
+			} catch (err) {
+				setSyncing({error: {message: 'Failed to update indexer', id: 'FAILED_TO_UPDATE_INDEXER'}});
+				throw err;
+			}
 		},
 		withHooks(react: ReactHooks) {
 			const {useReadable} = useStores(react);
