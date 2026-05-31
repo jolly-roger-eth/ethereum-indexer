@@ -120,10 +120,20 @@ export function createAction<T, U = undefined, C = undefined>(
 	let _promise: CancellablePromise<T> | undefined;
 	let _blocked: boolean = false;
 
-	function _execute(mode: 'queue' | 'wait' | 'force' | 'once' = 'wait', args: U) {
+	function _execute(mode: 'queue' | 'wait' | 'force' | 'once' = 'wait', args?: U, hasArgs: boolean = false) {
 		if (_blocked) {
 			throw new Error('Blocked');
 		}
+		// Whether to forward `args` to the executor must be decided by whether an argument
+		// was actually provided, NOT by its truthiness. Otherwise a falsy-but-valid arg
+		// (0, '', false) would be dropped and the executor would receive the operations
+		// object in the first slot instead.
+		const callExecutor = (
+			executeFn: (...a: any[]) => void | Promise<T>,
+			promiseAction: ActionOperations<T>
+		): void | Promise<T> => {
+			return hasArgs ? executeFn(args, promiseAction) : executeFn(promiseAction);
+		};
 		if (_promise) {
 			if (_promise.completed) {
 				if (mode === 'once') {
@@ -139,7 +149,7 @@ export function createAction<T, U = undefined, C = undefined>(
 						return createCancellablePromise(
 							(resolve, reject, unlessCancelled, cancel) => {
 								const promiseAction = {resolve, reject, unlessCancelled, cancel};
-								const result = (execute as any)(args ? args : promiseAction, args ? promiseAction : undefined);
+								const result = callExecutor(execute as any, promiseAction);
 								if (result) {
 									result.then(resolve).catch(reject);
 								}
@@ -158,7 +168,7 @@ export function createAction<T, U = undefined, C = undefined>(
 		_context = undefined;
 		_promise = createCancellablePromise((resolve, reject, unlessCancelled, cancel) => {
 			const promiseAction = {resolve, reject, unlessCancelled, cancel};
-			const result = (execute as any)(args ? args : promiseAction, args ? promiseAction : undefined);
+			const result = callExecutor(execute as any, promiseAction);
 			if (result) {
 				result.then(resolve).catch(reject);
 			}
@@ -167,10 +177,10 @@ export function createAction<T, U = undefined, C = undefined>(
 	}
 
 	return {
-		next: (args: U) => _execute('queue', args),
-		ifNotExecuting: (args: U) => _execute('wait', args), // ifNotExecuting args is ignored if first execited
-		now: (args: U) => _execute('force', args),
-		once: (args: U) => _execute('once', args), // once args is ignored if first execited
+		next: (...a: [U] | []) => _execute('queue', a[0], a.length > 0),
+		ifNotExecuting: (...a: [U] | []) => _execute('wait', a[0], a.length > 0), // ifNotExecuting args is ignored if first execited
+		now: (...a: [U] | []) => _execute('force', a[0], a.length > 0),
+		once: (...a: [U] | []) => _execute('once', a[0], a.length > 0), // once args is ignored if first execited
 		cancel() {
 			_promise?.cancel();
 		},
