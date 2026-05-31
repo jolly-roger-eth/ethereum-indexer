@@ -64,6 +64,16 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		logRequests?: boolean;
 		keepState?: KeepState<ABI, ProcessResultType, unknown, ProcessorConfig>;
 		keepStream?: ExistingStream<ABI>;
+		// Optional factory used to construct the underlying EthereumIndexer. Receives the same
+		// arguments (already request-tracked/logged provider, configured processor, source, config)
+		// that would otherwise be passed to `new EthereumIndexer(...)`. Useful for injecting a
+		// subclass, a shared instance, or a spy/fake in tests. Defaults to `new EthereumIndexer(...)`.
+		createIndexer?: (
+			provider: EIP1193ProviderWithoutEvents,
+			processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+			source: IndexingSource<ABI>,
+			config: ProvidedIndexerConfig<ABI>
+		) => EthereumIndexer<ABI, ProcessResultType>;
 	}
 ) {
 	const {
@@ -156,7 +166,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		if (processor.configure && processorConfig) {
 			processor.configure(processorConfig);
 		}
-		indexer = new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, config);
+		indexer = options?.createIndexer
+			? options.createIndexer(provider, processor, source, config)
+			: new EthereumIndexer<ABI, ProcessResultType>(provider, processor, source, config);
 		setSyncing({waitingForProvider: false});
 	}
 
