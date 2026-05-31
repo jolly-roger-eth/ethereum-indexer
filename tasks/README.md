@@ -27,12 +27,14 @@ Review output is written to `tasks/findings/` so it can be fed into the design p
 - [findings/revertable-database.md](./findings/revertable-database.md)
 - [findings/event-cache.md](./findings/event-cache.md)
 - [findings/ethereum-indexer-browser.md](./findings/ethereum-indexer-browser.md)
+- [findings/browser-live-reload.md](./findings/browser-live-reload.md) — focused review of live reconfigure (new contracts / event ABIs / chain)
 - [findings/todo-triage.md](./findings/todo-triage.md) — triage of the ~60 existing inline TODOs + root `TODO.md`
 
 ## Active tasks
 
 | Task | Area | Type | Status |
 |------|------|------|--------|
+| [fix-browser-live-reload.md](./fix-browser-live-reload.md) | `ethereum-indexer-browser` (+ core) | Implementation (TDD) | todo |
 | [plan-historical-state-database.md](./plan-historical-state-database.md) | new server-side arch (log-watcher + log-processor) / design | Planning | todo |
 | [plan-trigger-system.md](./plan-trigger-system.md) | new mechanism (depends on historical state) / design | Planning | todo |
 | [modernize-repo.md](./modernize-repo.md) | repo-wide tooling / config | Implementation (maintainer) | todo |
