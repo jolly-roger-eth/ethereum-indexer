@@ -28,13 +28,20 @@ Review output is written to `tasks/findings/` so it can be fed into the design p
 - [findings/event-cache.md](./findings/event-cache.md)
 - [findings/ethereum-indexer-browser.md](./findings/ethereum-indexer-browser.md)
 
-## Index
+## Active tasks
 
 | Task | Area | Type | Status |
 |------|------|------|--------|
-| [review-revertable-database.md](./review-revertable-database.md) | `ethereum-indexer-db-processors` | Review (may be unfinished code) | done (initial) — see findings |
-| [review-event-cache.md](./review-event-cache.md) | `ethereum-indexer-db-utils` | Review | done (initial) — see findings |
-| [review-ethereum-indexer-browser.md](./review-ethereum-indexer-browser.md) | `ethereum-indexer-browser` | Review | done (initial) — see findings |
 | [plan-historical-state-database.md](./plan-historical-state-database.md) | new server-side arch (log-watcher + log-processor) / design | Planning | todo |
 | [plan-trigger-system.md](./plan-trigger-system.md) | new mechanism (depends on historical state) / design | Planning | todo |
 | [modernize-repo.md](./modernize-repo.md) | repo-wide tooling / config | Implementation (maintainer) | todo |
+
+## Archived (done)
+
+Completed tasks are moved to `tasks/archive/`. Their findings remain under `tasks/findings/`.
+
+| Task | Area | Type | Outcome |
+|------|------|------|---------|
+| [archive/review-revertable-database.md](./archive/review-revertable-database.md) | `ethereum-indexer-db-processors` | Review | done (initial) — see [findings](./findings/revertable-database.md) |
+| [archive/review-event-cache.md](./archive/review-event-cache.md) | `ethereum-indexer-db-utils` | Review | done (initial) — see [findings](./findings/event-cache.md) |
+| [archive/review-ethereum-indexer-browser.md](./archive/review-ethereum-indexer-browser.md) | `ethereum-indexer-browser` | Review | done (initial) — see [findings](./findings/ethereum-indexer-browser.md) |
