@@ -159,6 +159,11 @@ export function createAction<T, U = undefined, C = undefined>(
 							}
 						);
 					}) as CancellablePromise<T>;
+					// The queued execution is chained onto the in-flight one above.
+					// We must return here: falling through would create a SECOND, immediate
+					// execution and overwrite the queued promise (running the executor twice
+					// and breaking serialization).
+					return _promise;
 				} else {
 					return _promise;
 				}
