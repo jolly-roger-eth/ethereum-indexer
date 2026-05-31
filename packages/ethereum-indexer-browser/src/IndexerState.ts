@@ -184,6 +184,21 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		setSyncing({lastSync: lastSyncObject});
 	}
 
+	// Clears the browser-layer syncing state that gates `setupIndexing` (its early-return on
+	// `$syncing.lastSync`) so that after a reconfiguration (updateIndexer/updateProcessor) the next
+	// indexMore/auto-index re-runs setupIndexing cleanly against the new source/config and recomputes
+	// progress against the (possibly new) defaultFromBlock.
+	function clearSyncingStateForReconfigure() {
+		setSyncing({lastSync: undefined});
+		// NOTE: we intentionally do NOT touch `status` here.
+		// - If indexing resumes (auto-index tick or a manual indexMore), the next setupIndexing() ->
+		//   load() emits `Loading` (and onward) via onLoad, so the status corrects itself.
+		// - If nothing is called after the reconfigure, the indexer really is idle now (lastSync is
+		//   undefined), so arguably `Idle` would be the most correct resting status. We avoid forcing
+		//   either `Loading` (a lie if no reload follows, e.g. a no-reset updateIndexer) or `Idle` (a
+		//   flicker if a reload does follow) and let the actual next operation set the truthful status.
+	}
+
 	async function setupIndexing(): Promise<LastSync<ABI>> {
 		if ($syncing.lastSync) {
 			return $syncing.lastSync;
@@ -400,6 +415,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				setSyncing({error: {message: 'Failed to update processor', id: 'FAILED_TO_UPDATE_PROCESSOR'}});
 				throw err;
 			}
+			// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
+			clearSyncingStateForReconfigure();
 		},
 		async updateIndexer(update: {
 			provider?: EIP1193ProviderWithoutEvents;
@@ -415,6 +432,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				setSyncing({error: {message: 'Failed to update indexer', id: 'FAILED_TO_UPDATE_INDEXER'}});
 				throw err;
 			}
+			// On success only (option b): clear stale syncing state so setupIndexing() re-runs
+			// cleanly for the new source/config instead of early-returning with old progress.
+			clearSyncingStateForReconfigure();
 		},
 		withHooks(react: ReactHooks) {
 			const {useReadable} = useStores(react);
