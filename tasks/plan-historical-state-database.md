@@ -30,6 +30,12 @@ This builds on existing pieces worth studying first:
 - `tasks/findings/todo-triage.md` — several existing TODOs feed this design directly (source/context
   matching on load, deterministic reorg replay with `unconfirmedBlocks`, `extra` persistence, Database
   API gaps / batching / transactionality / PouchDB coupling, Result-error typing). Read it before designing.
+- **Prior art (removed):** `ethereum-indexer-streams` was an early, **un-started** attempt at a
+  multi-source server exposing both a processed-state query API (`/get/:id`, `/query`) and a raw
+  cached-event query API (`/events`) over authenticated HTTP, driving the indexer via `/indexMore`.
+  The actual indexing was never wired (the routes were commented out) and the concept is **superseded
+  by the log-watcher / log-processor split** described below. The package has been removed from the
+  repo; this note preserves its original intent.
 - `EventCache` / `keepStream` in `packages/ethereum-indexer-db-utils` (cached event stream).
   **A review already exists: see `tasks/findings/event-cache.md`** — it documents that there are TWO
   distinct cache mechanisms (core `keepStream`/`ExistingStream` raw-event store vs. processor-side
