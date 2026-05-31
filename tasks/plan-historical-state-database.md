@@ -22,9 +22,16 @@ This builds on existing pieces worth studying first:
 - The reorg model in `packages/ethereum-indexer/src/internal/engine/utils.ts` (`generateStreamToAppend`,
   unconfirmed blocks, finality).
 - `RevertableDatabase` in `packages/ethereum-indexer-db-processors` (server-side revert/replay) — the
-  closest existing thing to versioned/historical writes.
+  closest existing thing to versioned/historical writes. **A review already exists:
+  see `tasks/findings/revertable-database.md`** — it documents that a per-doc validity-range model
+  (`startBlock`/`endBlock`, archive-on-write, restore-on-revert, `queryAtBlock`) is already
+  prototyped, plus the finality-vs-retention tension and known bugs. Read it before designing.
 - The `LastSync` / `EventBlock` / `LogEvent` types in `packages/ethereum-indexer/src/types.ts`.
 - `EventCache` / `keepStream` in `packages/ethereum-indexer-db-utils` (cached event stream).
+  **A review already exists: see `tasks/findings/event-cache.md`** — it documents that there are TWO
+  distinct cache mechanisms (core `keepStream`/`ExistingStream` raw-event store vs. processor-side
+  replay wrapper), that replay does not safely handle reorged events, and the recurring `lastSync` /
+  composite-key / atomicity patterns. Read it before designing.
 
 ## Architecture direction (maintainer decision)
 

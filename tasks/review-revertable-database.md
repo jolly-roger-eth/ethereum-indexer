@@ -2,7 +2,12 @@
 
 **Area:** `packages/ethereum-indexer-db-processors`
 **Type:** Code review (note: this code may be in an unfinished state)
-**Status:** todo
+**Status:** done (initial review) — see `tasks/findings/revertable-database.md`
+
+> An initial review has been completed. Findings (how reorg/revert + historical state work today,
+> bugs found, and implications for the historical-state DB plan) are written up in
+> `tasks/findings/revertable-database.md`. Remaining work = the test/fix follow-ups listed there,
+> ideally after the historical-state DB plan decides whether this code is evolved or superseded.
 
 ## Context
 

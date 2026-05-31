@@ -2,7 +2,12 @@
 
 **Area:** `packages/ethereum-indexer-db-utils`
 **Type:** Code review
-**Status:** todo
+**Status:** done (initial review) — see `tasks/findings/event-cache.md`
+
+> An initial review has been completed. Findings are in `tasks/findings/event-cache.md`. Key result:
+> there are TWO distinct cache mechanisms (the core `keepStream`/`ExistingStream` raw-event store in
+> `StreamDBCache`, vs. the processor-side replay wrapper `EventCache`), and replay does not safely
+> handle reorged (`removed`) events. Remaining work = the test/fix follow-ups listed there.
 
 ## Context
 

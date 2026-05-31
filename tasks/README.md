@@ -20,13 +20,21 @@ Suggested workflow per task:
 - Changes that affect a published package's public API require a **changeset** (`.changeset/*.md`).
 - Do NOT auto-commit, push, or run destructive commands without explicit confirmation.
 
+## Findings
+
+Review output is written to `tasks/findings/` so it can be fed into the design plans:
+
+- [findings/revertable-database.md](./findings/revertable-database.md)
+- [findings/event-cache.md](./findings/event-cache.md)
+- [findings/ethereum-indexer-browser.md](./findings/ethereum-indexer-browser.md)
+
 ## Index
 
 | Task | Area | Type | Status |
 |------|------|------|--------|
-| [review-revertable-database.md](./review-revertable-database.md) | `ethereum-indexer-db-processors` | Review (may be unfinished code) | todo |
-| [review-event-cache.md](./review-event-cache.md) | `ethereum-indexer-db-utils` | Review | todo |
-| [review-ethereum-indexer-browser.md](./review-ethereum-indexer-browser.md) | `ethereum-indexer-browser` | Review | todo |
+| [review-revertable-database.md](./review-revertable-database.md) | `ethereum-indexer-db-processors` | Review (may be unfinished code) | done (initial) — see findings |
+| [review-event-cache.md](./review-event-cache.md) | `ethereum-indexer-db-utils` | Review | done (initial) — see findings |
+| [review-ethereum-indexer-browser.md](./review-ethereum-indexer-browser.md) | `ethereum-indexer-browser` | Review | done (initial) — see findings |
 | [plan-historical-state-database.md](./plan-historical-state-database.md) | new server-side arch (log-watcher + log-processor) / design | Planning | todo |
 | [plan-trigger-system.md](./plan-trigger-system.md) | new mechanism (depends on historical state) / design | Planning | todo |
 | [modernize-repo.md](./modernize-repo.md) | repo-wide tooling / config | Implementation (maintainer) | todo |

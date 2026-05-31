@@ -2,7 +2,12 @@
 
 **Area:** `packages/ethereum-indexer-browser`
 **Type:** Code review
-**Status:** todo
+**Status:** done (initial review) — see `tasks/findings/ethereum-indexer-browser.md`
+
+> An initial review has been completed. Findings are in `tasks/findings/ethereum-indexer-browser.md`.
+> Notable: a real bug where `setupIndexing()` sets a `FAILED_TO_LOAD` error in a `finally` block on
+> every call (should be `catch`), plus auto-index stop/retry robustness gaps. Remaining work = the
+> follow-ups listed there (fix bug #1 first).
 
 ## Context
 
