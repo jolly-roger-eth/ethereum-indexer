@@ -433,7 +433,10 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		startAutoIndexing,
 		stopAutoIndexing,
 		reset,
-		updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
+		updateProcessor(
+			newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+			options?: {force?: boolean}
+		) {
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
@@ -450,7 +453,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					stopAutoIndexing();
 				}
 				try {
-					await indexer.updateProcessor(newProcessor);
+					await indexer.updateProcessor(newProcessor, options);
 					// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
 					// Must run before resuming auto-indexing so the resumed loop does not early-return
 					// on the stale lastSync.

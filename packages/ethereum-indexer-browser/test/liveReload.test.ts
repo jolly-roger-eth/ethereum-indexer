@@ -276,3 +276,27 @@ describe('createIndexerState - live reload (MEDIUM #4: overlapping reconfigure c
 		]);
 	});
 });
+
+describe('createIndexerState - live reload (#5: updateProcessor force option passthrough)', () => {
+	it('forwards the {force} option to the core updateProcessor', async () => {
+		let receivedOptions: any;
+		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {
+			createIndexer: (provider, processor, source, config) => {
+				const real = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+				const realUpdateProcessor = real.updateProcessor.bind(real);
+				real.updateProcessor = (async (p: any, opts: any) => {
+					receivedOptions = opts;
+					return realUpdateProcessor(p, opts);
+				}) as any;
+				return real;
+			},
+		});
+		await indexer.init({provider: makeProvider(), source: SOURCE});
+		await indexer.indexMore();
+
+		// same version hash + force:true should still be forwarded so the core performs the swap
+		await indexer.updateProcessor(makeProcessor('v1'), {force: true});
+
+		expect(receivedOptions).toEqual({force: true});
+	});
+});
