@@ -153,3 +153,126 @@ describe('createIndexerState - live reload (MEDIUM #3: pause auto-indexing durin
 		indexer.stopAutoIndexing();
 	});
 });
+
+// Helper: wrap a real EthereumIndexer so that updateIndexer/updateProcessor record an ordered
+// trace of enter/exit and (optionally) block until a test-controlled gate is released. This lets
+// us deterministically detect whether two overlapping reconfigure calls interleave.
+function recordingIndexer() {
+	const trace: string[] = [];
+	const gates: {[key: string]: {promise: Promise<void>; release: () => void}} = {};
+
+	function gate(key: string) {
+		let release!: () => void;
+		const promise = new Promise<void>((resolve) => (release = resolve));
+		gates[key] = {promise, release};
+		return gates[key];
+	}
+
+	const createIndexer = (provider: any, processor: any, source: any, config: any) => {
+		const real = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+
+		const realUpdateIndexer = real.updateIndexer.bind(real);
+		real.updateIndexer = (async (update: any) => {
+			trace.push('updateIndexer:enter');
+			if (gates['updateIndexer']) {
+				await gates['updateIndexer'].promise;
+			}
+			const r = await realUpdateIndexer(update);
+			trace.push('updateIndexer:exit');
+			return r;
+		}) as any;
+
+		const realUpdateProcessor = real.updateProcessor.bind(real);
+		real.updateProcessor = (async (p: any) => {
+			trace.push('updateProcessor:enter');
+			if (gates['updateProcessor']) {
+				await gates['updateProcessor'].promise;
+			}
+			const r = await realUpdateProcessor(p);
+			trace.push('updateProcessor:exit');
+			return r;
+		}) as any;
+
+		return real;
+	};
+
+	return {createIndexer, trace, gate};
+}
+
+describe('createIndexerState - live reload (MEDIUM #4: overlapping reconfigure calls must serialize)', () => {
+	it('updateProcessor started while updateIndexer is in flight must NOT interleave (source then processor)', async () => {
+		const {createIndexer, trace, gate} = recordingIndexer();
+		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {createIndexer});
+		await indexer.init({provider: makeProvider(), source: SOURCE});
+		await indexer.indexMore();
+
+		// keep the first reconfigure (source change) in flight
+		const g = gate('updateIndexer');
+		const p1 = indexer.updateIndexer({source: NEW_SOURCE});
+		await Promise.resolve();
+
+		// while it is in flight, a processor change event arrives (user fixed handlers for new ABI)
+		const p2 = indexer.updateProcessor(makeProcessor('v2'));
+		await Promise.resolve();
+
+		// release the first; let both settle
+		g.release();
+		await Promise.allSettled([p1, p2]);
+
+		// EXPECTED (serialized): updateIndexer fully completes before updateProcessor starts.
+		// BUG (current): updateProcessor:enter appears before updateIndexer:exit -> interleaved.
+		const idxExit = trace.indexOf('updateIndexer:exit');
+		const procEnter = trace.indexOf('updateProcessor:enter');
+		expect(idxExit).toBeGreaterThanOrEqual(0);
+		expect(procEnter).toBeGreaterThan(idxExit);
+	});
+
+	it('updateIndexer started while updateProcessor is in flight must NOT interleave (processor then source)', async () => {
+		const {createIndexer, trace, gate} = recordingIndexer();
+		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {createIndexer});
+		await indexer.init({provider: makeProvider(), source: SOURCE});
+		await indexer.indexMore();
+
+		// keep the processor change in flight
+		const g = gate('updateProcessor');
+		const p1 = indexer.updateProcessor(makeProcessor('v2'));
+		await Promise.resolve();
+
+		// while it is in flight, the (slow) deploy completes and a source change arrives
+		const p2 = indexer.updateIndexer({source: NEW_SOURCE});
+		await Promise.resolve();
+
+		g.release();
+		await Promise.allSettled([p1, p2]);
+
+		const procExit = trace.indexOf('updateProcessor:exit');
+		const idxEnter = trace.indexOf('updateIndexer:enter');
+		expect(procExit).toBeGreaterThanOrEqual(0);
+		expect(idxEnter).toBeGreaterThan(procExit);
+	});
+
+	it('two updateIndexer calls in quick succession must serialize (not interleave)', async () => {
+		const {createIndexer, trace, gate} = recordingIndexer();
+		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {createIndexer});
+		await indexer.init({provider: makeProvider(), source: SOURCE});
+		await indexer.indexMore();
+
+		const g = gate('updateIndexer');
+		const p1 = indexer.updateIndexer({source: NEW_SOURCE});
+		await Promise.resolve();
+		const p2 = indexer.updateIndexer({source: SOURCE});
+		await Promise.resolve();
+
+		g.release();
+		await Promise.allSettled([p1, p2]);
+
+		// Expect strictly serialized: enter,exit,enter,exit (no two enters before an exit).
+		const onlyIndexer = trace.filter((t) => t.startsWith('updateIndexer'));
+		expect(onlyIndexer).toEqual([
+			'updateIndexer:enter',
+			'updateIndexer:exit',
+			'updateIndexer:enter',
+			'updateIndexer:exit',
+		]);
+	});
+});

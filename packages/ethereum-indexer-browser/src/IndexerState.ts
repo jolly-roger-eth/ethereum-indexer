@@ -105,6 +105,22 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	let indexingTimeout: number | undefined;
 	let autoIndexingInterval: number = 4;
 
+	// Serializes reconfiguration (updateIndexer/updateProcessor) so that overlapping calls
+	// (e.g. a slow deploy's source change racing a processor change, in either order) run one fully
+	// settled then the next, in arrival order, instead of interleaving their reset/reinit/load phases
+	// on the same indexer instance.
+	let reconfigureQueue: Promise<unknown> = Promise.resolve();
+	function serializeReconfigure<T>(fn: () => Promise<T>): Promise<T> {
+		// chain after the previous reconfigure regardless of whether it succeeded or failed
+		const run = reconfigureQueue.then(fn, fn);
+		// keep the chain alive even if this step rejects (so a failure does not poison the queue)
+		reconfigureQueue = run.then(
+			() => undefined,
+			() => undefined
+		);
+		return run;
+	}
+
 	async function init(
 		indexerSetup: {
 			provider: EIP1193ProviderWithoutEvents;
@@ -417,32 +433,39 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		startAutoIndexing,
 		stopAutoIndexing,
 		reset,
-		async updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
+		updateProcessor(newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>) {
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
-			// Pause the auto-index loop so a timer tick cannot race the core reinit
-			// (which would throw `Blocked` and trigger noisy retries). Resume after.
-			const wasAutoIndexing = $syncing.autoIndexing;
-			if (wasAutoIndexing) {
-				stopAutoIndexing();
-			}
-			try {
-				await indexer.updateProcessor(newProcessor);
-				// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
-				// Must run before resuming auto-indexing so the resumed loop does not early-return
-				// on the stale lastSync.
-				clearSyncingStateForReconfigure();
-			} catch (err) {
-				setSyncing({error: {message: 'Failed to update processor', id: 'FAILED_TO_UPDATE_PROCESSOR'}});
-				throw err;
-			} finally {
-				if (wasAutoIndexing) {
-					await startAutoIndexing(autoIndexingInterval);
+			// Serialize against any other in-flight reconfigure so overlapping update* calls do not
+			// interleave their reset/reinit/load phases.
+			return serializeReconfigure(async () => {
+				if (!indexer) {
+					throw new Error(`no indexer setup, call init`);
 				}
-			}
+				// Pause the auto-index loop so a timer tick cannot race the core reinit
+				// (which would throw `Blocked` and trigger noisy retries). Resume after.
+				const wasAutoIndexing = $syncing.autoIndexing;
+				if (wasAutoIndexing) {
+					stopAutoIndexing();
+				}
+				try {
+					await indexer.updateProcessor(newProcessor);
+					// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
+					// Must run before resuming auto-indexing so the resumed loop does not early-return
+					// on the stale lastSync.
+					clearSyncingStateForReconfigure();
+				} catch (err) {
+					setSyncing({error: {message: 'Failed to update processor', id: 'FAILED_TO_UPDATE_PROCESSOR'}});
+					throw err;
+				} finally {
+					if (wasAutoIndexing) {
+						await startAutoIndexing(autoIndexingInterval);
+					}
+				}
+			});
 		},
-		async updateIndexer(update: {
+		updateIndexer(update: {
 			provider?: EIP1193ProviderWithoutEvents;
 			source?: IndexingSource<ABI>;
 			streamConfig?: ProvidedStreamConfig;
@@ -450,26 +473,33 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
-			// Pause the auto-index loop so a timer tick cannot race the core reinit
-			// (which would throw `Blocked` and trigger noisy retries). Resume after.
-			const wasAutoIndexing = $syncing.autoIndexing;
-			if (wasAutoIndexing) {
-				stopAutoIndexing();
-			}
-			try {
-				await indexer.updateIndexer(update);
-				// On success only (option b): clear stale syncing state so setupIndexing() re-runs
-				// cleanly for the new source/config instead of early-returning with old progress.
-				// Must run before resuming auto-indexing.
-				clearSyncingStateForReconfigure();
-			} catch (err) {
-				setSyncing({error: {message: 'Failed to update indexer', id: 'FAILED_TO_UPDATE_INDEXER'}});
-				throw err;
-			} finally {
-				if (wasAutoIndexing) {
-					await startAutoIndexing(autoIndexingInterval);
+			// Serialize against any other in-flight reconfigure so overlapping update* calls do not
+			// interleave their reset/reinit/load phases.
+			return serializeReconfigure(async () => {
+				if (!indexer) {
+					throw new Error(`no indexer setup, call init`);
 				}
-			}
+				// Pause the auto-index loop so a timer tick cannot race the core reinit
+				// (which would throw `Blocked` and trigger noisy retries). Resume after.
+				const wasAutoIndexing = $syncing.autoIndexing;
+				if (wasAutoIndexing) {
+					stopAutoIndexing();
+				}
+				try {
+					await indexer.updateIndexer(update);
+					// On success only (option b): clear stale syncing state so setupIndexing() re-runs
+					// cleanly for the new source/config instead of early-returning with old progress.
+					// Must run before resuming auto-indexing.
+					clearSyncingStateForReconfigure();
+				} catch (err) {
+					setSyncing({error: {message: 'Failed to update indexer', id: 'FAILED_TO_UPDATE_INDEXER'}});
+					throw err;
+				} finally {
+					if (wasAutoIndexing) {
+						await startAutoIndexing(autoIndexingInterval);
+					}
+				}
+			});
 		},
 		withHooks(react: ReactHooks) {
 			const {useReadable} = useStores(react);
