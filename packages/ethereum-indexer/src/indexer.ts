@@ -596,31 +596,25 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		const blockHashes: string[] = [];
 		const transactionHashes: string[] = [];
-		let lastBlock;
-		let lastTransactionHash;
+		// We deduplicate by hash (not by block number / position) so that every distinct
+		// block or transaction gets fetched exactly once, even when two different block
+		// hashes share the same block number (e.g. after a reorg within the unconfirmed
+		// window, or when logs from multiple filters are merged out of strict order).
+		const seenBlockHashes = new Set<string>();
+		const seenTransactionHashes = new Set<string>();
 		for (const event of eventsFetched) {
-			let fetchTransaction = false;
-			let fetchBlock = false;
-
 			if (this.config.stream.alwaysFetchTransactions) {
-				if (lastTransactionHash !== event.transactionHash) {
-					fetchTransaction = true;
+				if (!seenTransactionHashes.has(event.transactionHash)) {
+					seenTransactionHashes.add(event.transactionHash);
+					transactionHashes.push(event.transactionHash);
 				}
 			}
 
 			if (this.config.stream.alwaysFetchTimestamps) {
-				if (!lastBlock || event.blockNumber > lastBlock) {
-					fetchBlock = true;
+				if (!seenBlockHashes.has(event.blockHash)) {
+					seenBlockHashes.add(event.blockHash);
+					blockHashes.push(event.blockHash);
 				}
-			}
-
-			if (fetchTransaction) {
-				lastTransactionHash = event.transactionHash;
-				transactionHashes.push(event.transactionHash);
-			}
-			if (fetchBlock) {
-				lastBlock = event.blockNumber;
-				blockHashes.push(event.blockHash);
 			}
 		}
 		if (blockHashes.length > 0) {
