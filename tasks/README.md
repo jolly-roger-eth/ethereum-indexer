@@ -36,6 +36,8 @@ Review output is written to `tasks/findings/` so it can be fed into the design p
 |------|------|------|--------|
 | [fix-browser-live-reload.md](./fix-browser-live-reload.md) | `ethereum-indexer-browser` (+ core) | Implementation (TDD) | todo |
 | [add-browser-dispose.md](./add-browser-dispose.md) | `ethereum-indexer-browser` | Implementation (TDD) | todo |
+| [audit-server-cli-batch-indexing.md](./audit-server-cli-batch-indexing.md) | `ethereum-indexer-server`, `ethereum-indexer-cli` | Review (+ TDD) | todo |
+| [add-package-readmes-and-descriptions.md](./add-package-readmes-and-descriptions.md) | all published packages | Documentation | todo |
 | [plan-historical-state-database.md](./plan-historical-state-database.md) | new server-side arch (log-watcher + log-processor) / design | Planning | todo |
 | [plan-trigger-system.md](./plan-trigger-system.md) | new mechanism (depends on historical state) / design | Planning | todo |
 | [modernize-repo.md](./modernize-repo.md) | repo-wide tooling / config | Implementation (maintainer) | todo |
