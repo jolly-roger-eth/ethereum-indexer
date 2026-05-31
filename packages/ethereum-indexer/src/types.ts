@@ -83,7 +83,7 @@ export type IndexingSource<ABI extends Abi> = {
 	readonly genesisHash?: `0x${string}`;
 };
 
-export type StreamFecther<ABI extends Abi> = (
+export type StreamFetcher<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	fromBlock: number
 ) => Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]} | undefined>;
@@ -130,7 +130,7 @@ export type UsedIndexerConfig<ABI extends Abi> = ProvidedIndexerConfig<ABI> & {
 };
 
 export type ExistingStream<ABI extends Abi> = {
-	fetchFrom: StreamFecther<ABI>;
+	fetchFrom: StreamFetcher<ABI>;
 	saveNewEvents: StreamSaver<ABI>;
 	clear: StreamClearer<ABI>;
 };
@@ -163,7 +163,7 @@ export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
 	lastSync: LastSync<ABI>;
 } & Extra;
 
-export type ExistingStateFecther<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
+export type ExistingStateFetcher<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
 	context: ProcessorContext<ABI, ProcessorConfig>
 ) => Promise<AllData<ABI, ProcessResultType, Extra>>;
 export type StateSaver<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
@@ -172,7 +172,7 @@ export type StateSaver<ABI extends Abi, ProcessResultType, Extra, ProcessorConfi
 ) => Promise<void>;
 
 export type KeepState<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = {
-	fetch: ExistingStateFecther<ABI, ProcessResultType, Extra, ProcessorConfig>;
+	fetch: ExistingStateFetcher<ABI, ProcessResultType, Extra, ProcessorConfig>;
 	save: StateSaver<ABI, ProcessResultType, Extra, ProcessorConfig>;
 	clear: (context: ProcessorContext<ABI, ProcessorConfig>) => Promise<void>;
 };
