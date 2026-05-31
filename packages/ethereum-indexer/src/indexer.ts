@@ -7,7 +7,7 @@ import {
 	LogTransactionData,
 } from './internal/engine/ethereum';
 
-import {EIP1193Block, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 import {logs} from 'named-logs';
 import type {
@@ -93,7 +93,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 	protected _index = createAction<LastSync<ABI>>(this.promiseToIndex.bind(this));
 	protected _feed = createAction<LastSync<ABI>, {newEvents: LogEvent<ABI>[]; lastSyncFetched: LastSync<ABI>}>(
-		this.promiseToFeed.bind(this)
+		this.promiseToFeed.bind(this),
 	);
 	protected _load = createAction<LastSync<ABI>>(this.promiseToLoad.bind(this));
 	protected _save = createAction<
@@ -110,7 +110,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		provider: EIP1193ProviderWithoutEvents,
 		protected processor: EventProcessor<ABI, ProcessResultType>,
 		source: IndexingSource<ABI>,
-		config: ProvidedIndexerConfig<ABI> = {}
+		config: ProvidedIndexerConfig<ABI> = {},
 	) {
 		this.reinit(provider, source, config);
 	}
@@ -228,7 +228,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			processor: processorVersionHash,
 		});
 
-		
 		// TODO remove, this is the responsibility of the developer to ensure it pass correct data when indexer context changes
 		// for now we do a minimum check of chainId
 		// if this has been updated but the source remain unchanged, then the developer must have forgot to send a different source
@@ -241,7 +240,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					Connected to a different chain (chainId : ${newChainId}) than the previous indexer conext (${oldSource.chainId}).
 					Indexer should reset.
 					Did you forget to pass some new source?
-					`
+					`,
 				);
 			}
 		} else {
@@ -251,7 +250,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					newConfigHash,
 					sourceHashes: this.sourceHashes,
 					streamConfigHash: this.streamConfigHash,
-					processorVersionHash
+					processorVersionHash,
 				});
 			}
 		}
@@ -263,7 +262,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.reinit(
 			newProvider,
 			update.source || this.source,
-			update.streamConfig ? {...this.config, stream: update.streamConfig} : this.config
+			update.streamConfig ? {...this.config, stream: update.streamConfig} : this.config,
 		);
 
 		if (resetNeeded) {
@@ -318,24 +317,21 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		const chainId = await this.provider.request({method: 'eth_chainId'});
 		if (parseInt(chainId.slice(2), 16).toString() !== this.source.chainId) {
 			throw new Error(
-				`Connected to a different chain (chainId : ${chainId}). Expected chainId === ${this.source.chainId}`
+				`Connected to a different chain (chainId : ${chainId}). Expected chainId === ${this.source.chainId}`,
 			);
 		}
 		if (this.source.genesisHash && !this.config.skipGenesisCheck) {
 			const genesisBlock = await this.provider.request({method: 'eth_getBlockByNumber', params: ['earliest', false]});
 			if (!genesisBlock) {
-				throw new Error(
-					`Cannot fetch genesis Hash. Expected genesisHash === ${this.source.genesisHash}`
-				);
+				throw new Error(`Cannot fetch genesis Hash. Expected genesisHash === ${this.source.genesisHash}`);
 			} else {
 				const genesisHash = genesisBlock.hash;
 				if (genesisHash !== this.source.genesisHash) {
 					throw new Error(
-						`Connected to a different chain (genesisHash: ${genesisHash}). Expected genesisHash === ${this.source.genesisHash}`
+						`Connected to a different chain (genesisHash: ${genesisHash}). Expected genesisHash === ${this.source.genesisHash}`,
 					);
-				}	
+				}
 			}
-			
 		}
 
 		let currentLastSync: LastSync<ABI> | undefined = undefined;
@@ -353,14 +349,21 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			} else {
 				namedLogger.info(`STATE DISCARDED AS PROCESSOR CHANGED`);
 				if (this.config?.logLevel && this.config.logLevel >= 1) {
-					namedLogger.info(`State Discarded: processor changed`, JSON.stringify({
-						sourceHashes: this.sourceHashes,
-						loadedSourceHashes: loaded.lastSync.context.source,
-						streamConfigHash: this.streamConfigHash,
-						loadedStreamConfigHash: loaded.lastSync.context.config,
-						processorHash,
-						loadedProcessorHash: loadedLastSync.context.processor
-					}, null, 2));
+					namedLogger.info(
+						`State Discarded: processor changed`,
+						JSON.stringify(
+							{
+								sourceHashes: this.sourceHashes,
+								loadedSourceHashes: loaded.lastSync.context.source,
+								streamConfigHash: this.streamConfigHash,
+								loadedStreamConfigHash: loaded.lastSync.context.config,
+								processorHash,
+								loadedProcessorHash: loadedLastSync.context.processor,
+							},
+							null,
+							2,
+						),
+					);
 				}
 				await this.processor.clear();
 			}
@@ -404,7 +407,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				// we still need to clear if it does not matches, as otherwise it will be written as if it contained all logs
 				const existingStreamData = await this.config.keepStream.fetchFrom(
 					this.source,
-					getFromBlock(currentLastSync, this.defaultFromBlock, this.finality)
+					getFromBlock(currentLastSync, this.defaultFromBlock, this.finality),
 				);
 				if (existingStreamData) {
 					const {lastSync: lastSyncFetched} = existingStreamData;
@@ -425,7 +428,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			newEvents: LogEvent<ABI>[];
 			lastSyncFetched: LastSync<ABI>;
 		},
-		{unlessCancelled}: CancelOperations
+		{unlessCancelled}: CancelOperations,
 	): Promise<LastSync<ABI>> {
 		const newEvents = params.newEvents;
 		const lastSyncFetched = params.lastSyncFetched;
@@ -511,7 +514,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			throw new Error(`chainId changed before fetch`);
 		}
 
-
+		// TODO ?
 		// if (!this.config.skipGenesisCheck && this.source.genesisHash) {
 		// 	// as precautious measure, we check genesisHash in case the provider is now pointing to a new chain
 		// 	// while this is valid use, it is important to warn the indexer as soon as possible via chainChanged event
@@ -521,7 +524,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// 		throw new Error(`genesis hash changed before fetch`);
 		// 	}
 		// }
-		
 
 		const previousLastSync = this.lastSync as LastSync<ABI>;
 		const {lastSync: newLastSync, eventStream} = await this.fetchLogsFromProvider(previousLastSync, unlessCancelled);
@@ -532,14 +534,6 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (chainId !== this.source.chainId) {
 			throw new Error(`chainId changed after fetch`);
 		}
-
-		// if (!this.config.skipGenesisCheck && this.source.genesisHash) {
-		// 	// as precautious measure, we check genesisHash in case the provider is now pointing to a new chain
-		// 	const after_fetch_genesisBlock = (await unlessCancelled(this.provider.request({method: 'eth_getBlockByNumber', params: ["earliest", false]})))?.hash;
-		// 	if (after_fetch_genesisBlock !== this.source.genesisHash) {
-		// 		throw new Error(`genesis hash changed after fetch`);
-		// 	}
-		// }
 
 		// ----------------------------------------------------------------------------------------
 		// MAKE THE PROCESSOR PROCESS IT
@@ -564,7 +558,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	async fetchLogsFromProvider<ABI extends Abi>(
 		lastSync: LastSync<ABI>,
-		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
+		unlessCancelled: <T>(p: Promise<T>) => Promise<T>,
 	): Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]}> {
 		const lastUnconfirmedBlocks = lastSync.unconfirmedBlocks;
 
@@ -592,7 +586,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				fromBlock,
 				toBlock: toBlock,
 			},
-			unlessCancelled
+			unlessCancelled,
 		);
 		toBlock = newToBlock;
 
@@ -663,12 +657,18 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		// PROCESS THE STREAM FOR REORG
 		// ----------------------------------------------------------------------------------------
-		const {eventStream, newLastSync} = generateStreamToAppend(lastSync, this.defaultFromBlock, eventsFetched as LogEvent<ABI>[], { // TODO investigate: why need to type it here ?
-			newLatestBlock: latestBlock,
-			newLastToBlock: toBlock,
-			newLastFromBlock: fromBlock,
-			finality: this.finality,
-		});
+		const {eventStream, newLastSync} = generateStreamToAppend(
+			lastSync,
+			this.defaultFromBlock,
+			eventsFetched as LogEvent<ABI>[],
+			{
+				// TODO investigate: why need to type it here ?
+				newLatestBlock: latestBlock,
+				newLastToBlock: toBlock,
+				newLastFromBlock: fromBlock,
+				finality: this.finality,
+			},
+		);
 		// ----------------------------------------------------------------------------------------
 
 		return {lastSync: newLastSync, eventStream};
@@ -676,7 +676,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected async getBlocks(
 		blockHashes: string[],
-		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
+		unlessCancelled: <T>(p: Promise<T>) => Promise<T>,
 	): Promise<{timestamp: number}[]> {
 		if (this.config.providerSupportsETHBatch) {
 			return getBlockDataFromMultipleHashes(this.provider, blockHashes);
@@ -693,7 +693,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected async getTransactions(
 		transactionHashes: string[],
-		unlessCancelled: <T>(p: Promise<T>) => Promise<T>
+		unlessCancelled: <T>(p: Promise<T>) => Promise<T>,
 	): Promise<LogTransactionData[]> {
 		if (this.config.providerSupportsETHBatch) {
 			return getTransactionDataFromMultipleHashes(this.provider, transactionHashes);
@@ -730,7 +730,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (this.onStateUpdated) {
 			try {
 				this.onStateUpdated(outcome);
-			} catch {}
+			} catch (err) {
+				namedLogger.error(`onStateUpdated listener threw`, err);
+			}
 		}
 	}
 
@@ -738,7 +740,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (this.lastSync && this.onLastSyncUpdated) {
 			try {
 				this.onLastSyncUpdated(this.lastSync);
-			} catch {}
+			} catch (err) {
+				namedLogger.error(`onLastSyncUpdated listener threw`, err);
+			}
 		}
 	}
 
@@ -746,7 +750,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		if (this.onLoad) {
 			try {
 				await this.onLoad(state);
-			} catch {}
+			} catch (err) {
+				namedLogger.error(`onLoad listener threw`, err);
+			}
 		}
 	}
 }
@@ -757,7 +763,7 @@ function indexerMatches(
 	indexerConfigHash: string,
 	// this is the stream loaded
 	lastToBlock: number,
-	context: ContextIdentifier
+	context: ContextIdentifier,
 	// if they do not match the indexer will take over and restart from zero
 ): boolean {
 	if (context.config !== indexerConfigHash) {
