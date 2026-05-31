@@ -275,20 +275,38 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 	}
 
-	async updateProcessor(newProcessor: EventProcessor<ABI, ProcessResultType>) {
+	async updateProcessor(newProcessor: EventProcessor<ABI, ProcessResultType>, options?: {force?: boolean}) {
+		// Align with updateIndexer: disable processing first so a racing index/feed tick cannot
+		// interleave with the swap, then decide, then re-enable.
+		this.disableProcessing();
+
 		const oldProcessor = this.processor;
-		this.processor = newProcessor;
-		if (oldProcessor.getVersionHash() != newProcessor.getVersionHash()) {
-			// reset should close but we need to take care of state
-			if (this._index.executing) {
-				this._index.cancel();
-			}
-			if (this._feed.executing) {
-				this._feed.cancel();
-			}
+		const versionChanged = oldProcessor.getVersionHash() != newProcessor.getVersionHash();
+
+		if (versionChanged || options?.force) {
+			// Only swap once we have decided a change is needed; do not replace the running instance
+			// on a no-op path.
+			this.processor = newProcessor;
+			this._feed.reset();
+			this._index.reset();
 			this._load.reset();
 
-			await oldProcessor.clear().then(() => this.load());
+			try {
+				await oldProcessor.clear().then(() => this.load());
+			} finally {
+				this.reenableProcessing();
+			}
+		} else {
+			// Same version hash and not forced: nothing to reset/reload, so we keep the running
+			// processor instance. Warn in case the developer changed the processor but forgot to bump
+			// its version hash (the new instance will NOT take effect). Pass `{force: true}` to swap
+			// regardless of the version hash.
+			namedLogger.warn(
+				`updateProcessor: new processor has the same version hash as the current one; ` +
+					`the swap was skipped. If this is unexpected, bump the processor's version hash or call ` +
+					`updateProcessor(newProcessor, {force: true}).`,
+			);
+			this.reenableProcessing();
 		}
 	}
 
