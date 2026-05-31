@@ -246,7 +246,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 		} else {
 			if (this.config?.logLevel && this.config.logLevel >= 1) {
-				console.log(`updateIndexer: Reset needed, Indexer do not match`, {
+				namedLogger.info(`updateIndexer: Reset needed, Indexer do not match`, {
 					newSourceHashes,
 					newConfigHash,
 					sourceHashes: this.sourceHashes,
@@ -351,9 +351,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				currentLastSync = loadedLastSync;
 				this._onStateUpdated(state);
 			} else {
-				namedLogger.log(`STATE DISCARDED AS PROCESSOR CHANGED`);
+				namedLogger.info(`STATE DISCARDED AS PROCESSOR CHANGED`);
 				if (this.config?.logLevel && this.config.logLevel >= 1) {
-					console.log(`State Discarded: processor changed`, JSON.stringify({
+					namedLogger.info(`State Discarded: processor changed`, JSON.stringify({
 						sourceHashes: this.sourceHashes,
 						loadedSourceHashes: loaded.lastSync.context.source,
 						streamConfigHash: this.streamConfigHash,

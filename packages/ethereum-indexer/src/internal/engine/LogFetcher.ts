@@ -1,7 +1,10 @@
 import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {logs} from 'named-logs';
 import {IncludedEIP1193Log} from '../../types';
 import {UnlessCancelledFunction} from '../utils/promises';
 import {ExtraFilters, getLogs, getLogsWithVariousFilters} from './ethereum';
+
+const namedLogger = logs('ethereum-indexer');
 
 type InternalLogFetcherConfig = {
 	numBlocksToFetchAtStart: number;
@@ -23,13 +26,20 @@ export type LogFetcherConfig = {
 };
 
 export function getNewToBlockFromError(error: any): number | undefined {
-	if (error.code === -32005 || (error.code === -32602 && error.message)) {
-		if (error.message.startsWith('query returned more than 10000 results.')) {
+	const message: string | undefined = error.message;
+	// -32005: limit exceeded (provider returned too many results)
+	// -32602: invalid params, but some providers use it to signal a too-large range.
+	//   We only treat it as a range hint when the message actually mentions a result/range limit,
+	//   otherwise a generic "invalid params" error could be mis-parsed into a bogus toBlock.
+	const looksLikeRangeHint =
+		!!message && (message.indexOf('results') !== -1 || message.indexOf('block range') !== -1);
+	if (error.code === -32005 || (error.code === -32602 && looksLikeRangeHint)) {
+		if (message && message.startsWith('query returned more than 10000 results.')) {
 			// query returned more than 10000 results. Try with this block range [0xEC23E8, 0xEC23F5].
-			console.error(error.message);
+			namedLogger.error(message);
 		}
 		const regex = /\[.*\]/gm;
-		const result = regex.exec(error.message);
+		const result = message ? regex.exec(message) : null;
 		let values: number[] | undefined;
 		if (result && result[0]) {
 			values = result[0]
@@ -127,7 +137,7 @@ export class LogFetcher {
 							this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
 							totalNumOfBlocksThatWasFetched
 						);
-					} else if (err.data.message.indexOf("block range too large")) {
+					} else if (err.data.message.indexOf("block range too large") !== -1) {
 						// found on base rpc
 						this.foundNumBlockToHigh = Math.min(
 							this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
