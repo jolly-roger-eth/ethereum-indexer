@@ -41,6 +41,10 @@ Also relevant:
 - Existing pieces: the reorg model in `packages/ethereum-indexer/src/internal/engine/utils.ts`, the
   `LogEvent` / `LastSync` types in `packages/ethereum-indexer/src/types.ts`, and (if it exists by then)
   the historical-state query API.
+- The existing HTTP server layer (`packages/ethereum-indexer-server/src/server/simple.ts` and
+  `packages/ethereum-indexer-streams/src/server/multiStreams.ts`) and its TODOs (auth / api key,
+  response field shaping) — see `tasks/findings/todo-triage.md` ("Server / streams packages").
+  Relevant to the trigger registration/delivery API surface.
 
 ## Goal of this task
 

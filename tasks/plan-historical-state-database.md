@@ -27,6 +27,9 @@ This builds on existing pieces worth studying first:
   (`startBlock`/`endBlock`, archive-on-write, restore-on-revert, `queryAtBlock`) is already
   prototyped, plus the finality-vs-retention tension and known bugs. Read it before designing.
 - The `LastSync` / `EventBlock` / `LogEvent` types in `packages/ethereum-indexer/src/types.ts`.
+- `tasks/findings/todo-triage.md` — several existing TODOs feed this design directly (source/context
+  matching on load, deterministic reorg replay with `unconfirmedBlocks`, `extra` persistence, Database
+  API gaps / batching / transactionality / PouchDB coupling, Result-error typing). Read it before designing.
 - `EventCache` / `keepStream` in `packages/ethereum-indexer-db-utils` (cached event stream).
   **A review already exists: see `tasks/findings/event-cache.md`** — it documents that there are TWO
   distinct cache mechanisms (core `keepStream`/`ExistingStream` raw-event store vs. processor-side

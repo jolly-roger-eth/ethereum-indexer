@@ -27,6 +27,7 @@ Review output is written to `tasks/findings/` so it can be fed into the design p
 - [findings/revertable-database.md](./findings/revertable-database.md)
 - [findings/event-cache.md](./findings/event-cache.md)
 - [findings/ethereum-indexer-browser.md](./findings/ethereum-indexer-browser.md)
+- [findings/todo-triage.md](./findings/todo-triage.md) — triage of the ~60 existing inline TODOs + root `TODO.md`
 
 ## Active tasks
 
