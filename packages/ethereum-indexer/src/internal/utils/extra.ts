@@ -1,9 +1,12 @@
 import {Abi} from 'abitype';
 import {EIP1193Account, EIP1193DATA, EIP1193Provider, EIP1193QUANTITY} from 'eip-1193';
 import {decodeFunctionResult, encodeFunctionData} from 'viem';
+import {logs} from 'named-logs';
 import {JSONType} from '../types';
 import {LogEvent} from '../../types';
 import {normalizeAddress} from './address';
+
+const namedLogger = logs('ethereum-indexer');
 
 const multicallInterface = [
 	{
@@ -196,7 +199,10 @@ export function createER721TokenURIFetcher<ABI extends Abi>(
 					tokenURIAtMint: uri,
 				};
 			}
-		} catch (e) {}
+		} catch (e) {
+			// best-effort: a missing/failing tokenURI should not break indexing, but log it for diagnosability
+			namedLogger.error(`failed to fetch tokenURI at mint`, e);
+		}
 		return undefined;
 	};
 }
