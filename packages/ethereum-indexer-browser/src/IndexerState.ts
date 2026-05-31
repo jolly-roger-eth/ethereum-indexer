@@ -421,14 +421,26 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
+			// Pause the auto-index loop so a timer tick cannot race the core reinit
+			// (which would throw `Blocked` and trigger noisy retries). Resume after.
+			const wasAutoIndexing = $syncing.autoIndexing;
+			if (wasAutoIndexing) {
+				stopAutoIndexing();
+			}
 			try {
 				await indexer.updateProcessor(newProcessor);
+				// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
+				// Must run before resuming auto-indexing so the resumed loop does not early-return
+				// on the stale lastSync.
+				clearSyncingStateForReconfigure();
 			} catch (err) {
 				setSyncing({error: {message: 'Failed to update processor', id: 'FAILED_TO_UPDATE_PROCESSOR'}});
 				throw err;
+			} finally {
+				if (wasAutoIndexing) {
+					await startAutoIndexing(autoIndexingInterval);
+				}
 			}
-			// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
-			clearSyncingStateForReconfigure();
 		},
 		async updateIndexer(update: {
 			provider?: EIP1193ProviderWithoutEvents;
@@ -438,15 +450,26 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);
 			}
+			// Pause the auto-index loop so a timer tick cannot race the core reinit
+			// (which would throw `Blocked` and trigger noisy retries). Resume after.
+			const wasAutoIndexing = $syncing.autoIndexing;
+			if (wasAutoIndexing) {
+				stopAutoIndexing();
+			}
 			try {
 				await indexer.updateIndexer(update);
+				// On success only (option b): clear stale syncing state so setupIndexing() re-runs
+				// cleanly for the new source/config instead of early-returning with old progress.
+				// Must run before resuming auto-indexing.
+				clearSyncingStateForReconfigure();
 			} catch (err) {
 				setSyncing({error: {message: 'Failed to update indexer', id: 'FAILED_TO_UPDATE_INDEXER'}});
 				throw err;
+			} finally {
+				if (wasAutoIndexing) {
+					await startAutoIndexing(autoIndexingInterval);
+				}
 			}
-			// On success only (option b): clear stale syncing state so setupIndexing() re-runs
-			// cleanly for the new source/config instead of early-returning with old progress.
-			clearSyncingStateForReconfigure();
 		},
 		withHooks(react: ReactHooks) {
 			const {useReadable} = useStores(react);

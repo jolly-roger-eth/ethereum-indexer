@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi, EventProcessorWithInitialState, IndexingSource} from 'ethereum-indexer';
+import {EthereumIndexer} from 'ethereum-indexer';
 import {createIndexerState} from '../src/IndexerState';
 
 // chainId '1' as the 0x-hex the provider returns
@@ -105,5 +106,50 @@ describe('createIndexerState - live reload (HIGH #2: clear syncing state on reco
 
 		expect(indexer.syncing.$state.lastSync).toBeDefined();
 		expect(indexer.syncing.$state.error).toBeDefined();
+	});
+});
+
+describe('createIndexerState - live reload (MEDIUM #3: pause auto-indexing during reconfigure)', () => {
+	it('pauses auto-indexing while a reconfigure is in flight and resumes it after', async () => {
+		// Gate we resolve manually to keep the core updateIndexer "in flight".
+		let releaseReconfigure!: () => void;
+		const reconfigureGate = new Promise<void>((resolve) => (releaseReconfigure = resolve));
+
+		const indexer = createIndexerState<Abi, State>(makeProcessor(), {
+			createIndexer: (provider, processor, source, config) => {
+				const real = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+				const realUpdateIndexer = real.updateIndexer.bind(real);
+				real.updateIndexer = (async (update: any) => {
+					// stay in flight until the test releases the gate
+					await reconfigureGate;
+					return realUpdateIndexer(update);
+				}) as any;
+				return real;
+			},
+		});
+		await indexer.init({provider: makeProvider(), source: SOURCE});
+
+		// start the auto-index loop (long interval so its timer does not interfere with this test)
+		await indexer.startAutoIndexing(3600);
+		expect(indexer.syncing.$state.autoIndexing).toBe(true);
+
+		// kick off a reconfigure that stays in flight (gated)
+		const reconfiguring = indexer.updateIndexer({source: NEW_SOURCE});
+		// let the synchronous part of updateIndexer run up to the gate
+		await Promise.resolve();
+
+		// BUG (#3): auto-indexing keeps running during the reconfigure. With the fix it is paused
+		// for the duration so a timer tick cannot race the mid-reinit core.
+		expect(indexer.syncing.$state.autoIndexing).toBe(false);
+
+		// release the reconfigure and let it complete
+		releaseReconfigure();
+		await reconfiguring;
+
+		// auto-indexing should be resumed after the reconfigure
+		expect(indexer.syncing.$state.autoIndexing).toBe(true);
+
+		// cleanup: stop the loop so no timers leak
+		indexer.stopAutoIndexing();
 	});
 });
