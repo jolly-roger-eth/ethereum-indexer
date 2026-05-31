@@ -237,7 +237,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			if (newChainId !== oldSource.chainId) {
 				throw new Error(
 					`
-					Connected to a different chain (chainId : ${newChainId}) than the previous indexer conext (${oldSource.chainId}).
+					Connected to a different chain (chainId : ${newChainId}) than the previous indexer context (${oldSource.chainId}).
 					Indexer should reset.
 					Did you forget to pass some new source?
 					`,
