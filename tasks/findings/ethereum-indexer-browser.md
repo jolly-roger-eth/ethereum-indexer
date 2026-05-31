@@ -19,7 +19,9 @@ stores as hooks. `init` optionally wraps the provider in a `Proxy` to count/log 
 
 ## Bugs / correctness risks found
 
-1. **`setupIndexing()` always sets a `Failed to load` error via a `finally` block — even on success.**
+1. **[FIXED]** **`setupIndexing()` always sets a `Failed to load` error via a `finally` block — even on success.**
+   (Fixed: `finally` → `catch (err) { ...; throw err; }`, with a regression test in
+   `packages/ethereum-indexer-browser/test/setupIndexing.test.ts`.)
    ```ts
    try {
        const lastSync = await indexer.load();

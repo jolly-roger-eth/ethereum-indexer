@@ -223,8 +223,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			const lastSync = await indexer.load();
 			setSyncing({loading: false});
 			return lastSync;
-		} finally {
+		} catch (err) {
 			setSyncing({loading: false, error: {message: 'Failed to load', id: 'FAILED_TO_LOAD'}});
+			throw err;
 		}
 	}
 
