@@ -63,15 +63,19 @@ Consider whether `dispose()` should also be idempotent (safe to call twice) and 
 
 ## Prompt (paste into a fresh context)
 
-> Add a `dispose()` / safe teardown path to `packages/ethereum-indexer-browser`
-> (`src/IndexerState.ts`). Read `tasks/add-browser-dispose.md` and
-> `tasks/findings/browser-live-reload.md` (item #6) first. The problem: there is no way to fully tear
-> down a `createIndexerState(...)` instance — `init()` throws `already initialised`, the auto-index
-> `setTimeout` loop leaks if references are dropped without `stopAutoIndexing()`, and the
-> `onLoad`/`onLastSyncUpdated`/`onStateUpdated` callbacks are never detached. Implement a minimal
-> `dispose()` that stops auto-indexing, detaches those callbacks, drops the indexer reference, and
-> resets the stores, and decide/document whether `init()` may run again afterwards. Use strict TDD
-> with confirmation gates: write a failing test first (vitest in
-> `packages/ethereum-indexer-browser/test/`; the `createIndexer` factory option is handy for
-> injecting a spy), show it RED, STOP and ask me to confirm, then implement and show GREEN. Add a
-> changeset (`ethereum-indexer-browser`). Do not commit without my confirmation.
+---
+
+Add a `dispose()` / safe teardown path to `packages/ethereum-indexer-browser`
+(`src/IndexerState.ts`). Read `tasks/add-browser-dispose.md` and
+`tasks/findings/browser-live-reload.md` (item #6) first. The problem: there is no way to fully tear
+down a `createIndexerState(...)` instance — `init()` throws `already initialised`, the auto-index
+`setTimeout` loop leaks if references are dropped without `stopAutoIndexing()`, and the
+`onLoad`/`onLastSyncUpdated`/`onStateUpdated` callbacks are never detached. Implement a minimal
+`dispose()` that stops auto-indexing, detaches those callbacks, drops the indexer reference, and
+resets the stores, and decide/document whether `init()` may run again afterwards. Use strict TDD
+with confirmation gates: write a failing test first (vitest in
+`packages/ethereum-indexer-browser/test/`; the `createIndexer` factory option is handy for
+injecting a spy), show it RED, STOP and ask me to confirm, then implement and show GREEN. Add a
+changeset (`ethereum-indexer-browser`). Do not commit without my confirmation.
+
+---

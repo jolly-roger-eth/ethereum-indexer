@@ -120,31 +120,35 @@ implementation. The plan should cover:
 
 ## Prompt (paste into a fresh context)
 
-> I want to plan (design only — no implementation yet) a proper **server-side** database
-> implementation for the `ethereum-indexer` monorepo that keeps **historical state**, so consumers can
-> query the computed state as of a specific block hash, block height, or timestamp (whichever are
-> feasible — note timestamps are not generally available from `eth_getLogs`, see the core README, so
-> call out that constraint).
->
-> Target architecture (my decision): split the server indexer into a **log-watcher** and a
-> **log-processor**. The log-watcher watches the chain and produces the log/event stream (reusing the
-> core engine's fetch + reorg detection), is NOT public-facing, can run anywhere, and pushes the
-> stream to the processor over an **authenticated HTTP API**. The log-processor receives that stream,
-> owns the database (including historical state), and serves the query API; it should be deployable as
-> a **serverless worker (e.g. Cloudflare Worker)**. For storage use the **`remote-sql`** npm package,
-> which targets **Cloudflare D1 or SQLite** (SQLite semantics), so the schema/queries must fit
-> SQLite/D1 constraints.
->
-> Study the existing reorg model in `packages/ethereum-indexer/src/internal/engine/utils.ts`, the
-> `LastSync`/`EventBlock`/`LogEvent` types in `packages/ethereum-indexer/src/types.ts`,
-> `RevertableDatabase` in `packages/ethereum-indexer-db-processors`, and the `EventCache`/`keepStream`
-> mechanism in `packages/ethereum-indexer-db-utils`. Then produce a design document covering:
-> requirements & scope (query axes for v1); data-model options (append-only replay vs. per-key
-> validity ranges vs. snapshots/checkpoints vs. hybrid) with trade-offs, expressed in SQLite/D1;
-> reorg handling and finality interaction; exact query semantics; the watcher↔processor authenticated
-> HTTP protocol (payload shape, how reorgs/`removed`+`LastSync` are transmitted, auth, delivery
-> semantics, idempotency, resumption/backpressure); serverless constraints for the processor on
-> Cloudflare Workers + D1; component boundaries/reuse (what the watcher reuses from the core engine);
-> migration/compatibility with existing processors and the `KeepState`/`ExistingStream` abstractions;
-> and a phased implementation plan with a test strategy (testing against local SQLite vs. D1). Deliver
-> it as a markdown file under `docs/design/` and do not start implementing.
+---
+
+I want to plan (design only — no implementation yet) a proper **server-side** database
+implementation for the `ethereum-indexer` monorepo that keeps **historical state**, so consumers can
+query the computed state as of a specific block hash, block height, or timestamp (whichever are
+feasible — note timestamps are not generally available from `eth_getLogs`, see the core README, so
+call out that constraint).
+
+Target architecture (my decision): split the server indexer into a **log-watcher** and a
+**log-processor**. The log-watcher watches the chain and produces the log/event stream (reusing the
+core engine's fetch + reorg detection), is NOT public-facing, can run anywhere, and pushes the
+stream to the processor over an **authenticated HTTP API**. The log-processor receives that stream,
+owns the database (including historical state), and serves the query API; it should be deployable as
+a **serverless worker (e.g. Cloudflare Worker)**. For storage use the **`remote-sql`** npm package,
+which targets **Cloudflare D1 or SQLite** (SQLite semantics), so the schema/queries must fit
+SQLite/D1 constraints.
+
+Study the existing reorg model in `packages/ethereum-indexer/src/internal/engine/utils.ts`, the
+`LastSync`/`EventBlock`/`LogEvent` types in `packages/ethereum-indexer/src/types.ts`,
+`RevertableDatabase` in `packages/ethereum-indexer-db-processors`, and the `EventCache`/`keepStream`
+mechanism in `packages/ethereum-indexer-db-utils`. Then produce a design document covering:
+requirements & scope (query axes for v1); data-model options (append-only replay vs. per-key
+validity ranges vs. snapshots/checkpoints vs. hybrid) with trade-offs, expressed in SQLite/D1;
+reorg handling and finality interaction; exact query semantics; the watcher↔processor authenticated
+HTTP protocol (payload shape, how reorgs/`removed`+`LastSync` are transmitted, auth, delivery
+semantics, idempotency, resumption/backpressure); serverless constraints for the processor on
+Cloudflare Workers + D1; component boundaries/reuse (what the watcher reuses from the core engine);
+migration/compatibility with existing processors and the `KeepState`/`ExistingStream` abstractions;
+and a phased implementation plan with a test strategy (testing against local SQLite vs. D1). Deliver
+it as a markdown file under `docs/design/` and do not start implementing.
+
+---

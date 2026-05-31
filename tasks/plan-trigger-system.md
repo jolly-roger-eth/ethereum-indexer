@@ -84,28 +84,32 @@ covering:
 
 ## Prompt (paste into a fresh context)
 
-> I want to plan (design only — no implementation) a **trigger system** for the `ethereum-indexer`
-> monorepo: a mechanism that fires an action when a condition based on **logs and/or state** is met.
-> The first action type is an **HTTP webhook**, with an extensible interface for others (a key use
-> case is **push notifications**, possibly via a third-party handler). Triggers must be **reliable** —
-> guaranteed execution — which implies a **durable queue** with retries / at-least-once delivery and
-> idempotency, not fire-and-forget.
->
-> Critical constraint: **state conditions require historical state.** When a log occurs and the
-> condition wants to read "the state", the state may already have advanced to a newer block, so the
-> condition must read the state **as of the block of the triggering log** — i.e. it depends on the
-> historical-state database design (see `tasks/plan-historical-state-database.md` /
-> `docs/design/historical-state-database.md` if present). Assume triggers run in the **log-processor**
-> component (which has the events, the DB, and historical state).
->
-> Study the reorg model in `packages/ethereum-indexer/src/internal/engine/utils.ts` and the
-> `LogEvent`/`LastSync` types in `packages/ethereum-indexer/src/types.ts`. Then produce a design
-> document covering: the condition model (log conditions + state predicates as-of-block); evaluation
-> semantics and how historical state is queried (spelling out the state-advanced-already timing
-> problem); reorg behaviour (fire on unconfirmed vs. final vs. hybrid with retraction; exactly-once vs.
-> at-least-once under reorgs); action types (HTTP first, extensible, third-party push handler);
-> delivery guarantees & the durable queue (retries, dead-letter, idempotency keys, mapping to
-> serverless / Cloudflare Queues or external queue); where it runs (log-processor); the registration/
-> config API and delivery-status observability; security (webhook auth, payload signing); and a phased
-> implementation plan with a test strategy. Deliver it as a markdown file under `docs/design/` and do
-> not start implementing.
+---
+
+I want to plan (design only — no implementation) a **trigger system** for the `ethereum-indexer`
+monorepo: a mechanism that fires an action when a condition based on **logs and/or state** is met.
+The first action type is an **HTTP webhook**, with an extensible interface for others (a key use
+case is **push notifications**, possibly via a third-party handler). Triggers must be **reliable** —
+guaranteed execution — which implies a **durable queue** with retries / at-least-once delivery and
+idempotency, not fire-and-forget.
+
+Critical constraint: **state conditions require historical state.** When a log occurs and the
+condition wants to read "the state", the state may already have advanced to a newer block, so the
+condition must read the state **as of the block of the triggering log** — i.e. it depends on the
+historical-state database design (see `tasks/plan-historical-state-database.md` /
+`docs/design/historical-state-database.md` if present). Assume triggers run in the **log-processor**
+component (which has the events, the DB, and historical state).
+
+Study the reorg model in `packages/ethereum-indexer/src/internal/engine/utils.ts` and the
+`LogEvent`/`LastSync` types in `packages/ethereum-indexer/src/types.ts`. Then produce a design
+document covering: the condition model (log conditions + state predicates as-of-block); evaluation
+semantics and how historical state is queried (spelling out the state-advanced-already timing
+problem); reorg behaviour (fire on unconfirmed vs. final vs. hybrid with retraction; exactly-once vs.
+at-least-once under reorgs); action types (HTTP first, extensible, third-party push handler);
+delivery guarantees & the durable queue (retries, dead-letter, idempotency keys, mapping to
+serverless / Cloudflare Queues or external queue); where it runs (log-processor); the registration/
+config API and delivery-status observability; security (webhook auth, payload signing); and a phased
+implementation plan with a test strategy. Deliver it as a markdown file under `docs/design/` and do
+not start implementing.
+
+---

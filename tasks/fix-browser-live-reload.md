@@ -58,22 +58,26 @@ imply the other. Do not collapse them into a single mandatory operation; the onl
 
 ## Prompt (paste into a fresh context)
 
-> Work on fixing the live-reload / reconfiguration issues in `ethereum-indexer-browser` (when new
-> contracts / event ABIs / a new processor / a new chain are introduced at runtime). The full review
-> is in `tasks/findings/browser-live-reload.md` and the task (priority-ordered issues) is in
-> `tasks/fix-browser-live-reload.md` — read both first.
->
-> Key facts: the core `EthereumIndexer.updateIndexer`/`updateProcessor`/`reinit` are mostly fine; the
-> browser wrapper (`packages/ethereum-indexer-browser/src/IndexerState.ts`) is the weak layer. Source
-> changes and processor changes are INDEPENDENT axes — do not assume one implies the other.
->
-> Use strict TDD WITH CONFIRMATION GATES: for each issue, FIRST write a failing test that demonstrates
-> it and run it to show it RED, then STOP and ask me to confirm before you write the fix; only after I
-> confirm, implement it and show it GREEN. Start with the two HIGH issues: (1) make the browser
-> `updateIndexer`/`updateProcessor` async + awaited + route errors to `$syncing.error`; (2) clear
-> `$syncing.lastSync`/status on reconfigure so `setupIndexing` re-runs. Then the MEDIUM ones (pause
-> auto-indexing during reconfigure; the uncoordinated combined source+processor change; aligning core
-> `updateProcessor` with `updateIndexer`). Tests use vitest in
-> `packages/ethereum-indexer-browser/test/` (see `test/setupIndexing.test.ts` for the harness pattern).
-> Run state-dependent commands sequentially (this repo has hit races with parallel edit+test batches).
-> Add changesets for published-package changes. Do not commit without my confirmation.
+---
+
+Work on fixing the live-reload / reconfiguration issues in `ethereum-indexer-browser` (when new
+contracts / event ABIs / a new processor / a new chain are introduced at runtime). The full review
+is in `tasks/findings/browser-live-reload.md` and the task (priority-ordered issues) is in
+`tasks/fix-browser-live-reload.md` — read both first.
+
+Key facts: the core `EthereumIndexer.updateIndexer`/`updateProcessor`/`reinit` are mostly fine; the
+browser wrapper (`packages/ethereum-indexer-browser/src/IndexerState.ts`) is the weak layer. Source
+changes and processor changes are INDEPENDENT axes — do not assume one implies the other.
+
+Use strict TDD WITH CONFIRMATION GATES: for each issue, FIRST write a failing test that demonstrates
+it and run it to show it RED, then STOP and ask me to confirm before you write the fix; only after I
+confirm, implement it and show it GREEN. Start with the two HIGH issues: (1) make the browser
+`updateIndexer`/`updateProcessor` async + awaited + route errors to `$syncing.error`; (2) clear
+`$syncing.lastSync`/status on reconfigure so `setupIndexing` re-runs. Then the MEDIUM ones (pause
+auto-indexing during reconfigure; the uncoordinated combined source+processor change; aligning core
+`updateProcessor` with `updateIndexer`). Tests use vitest in
+`packages/ethereum-indexer-browser/test/` (see `test/setupIndexing.test.ts` for the harness pattern).
+Run state-dependent commands sequentially (this repo has hit races with parallel edit+test batches).
+Add changesets for published-package changes. Do not commit without my confirmation.
+
+---

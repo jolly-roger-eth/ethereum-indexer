@@ -57,11 +57,15 @@ prototype superseded by `tasks/plan-historical-state-database.md`) and
 
 ## Prompt (paste into a fresh context)
 
-> Add a one-sentence `description` to every published package's `package.json` under `packages/*` in
-> the `ethereum-indexer` monorepo, and a short, accurate `README.md` per package, following
-> `tasks/add-package-readmes-and-descriptions.md`. Verify each summary against the actual source
-> (and against the real consumers `wighawag/stratagems` and `wighawag/stratagems-snapshots`) before
-> writing it — do not guess. `ethereum-indexer-db-processors` already has a status README (prototype,
-> superseded) and `ethereum-indexer-streams` was removed, so skip those except for consistency. Add a
-> changeset for the `package.json` description changes. Docs/metadata only — no behaviour changes; do
-> not commit without my confirmation.
+---
+
+Add a one-sentence `description` to every published package's `package.json` under `packages/*` in
+the `ethereum-indexer` monorepo, and a short, accurate `README.md` per package, following
+`tasks/add-package-readmes-and-descriptions.md`. Verify each summary against the actual source
+(and against the real consumers `wighawag/stratagems` and `wighawag/stratagems-snapshots`) before
+writing it — do not guess. `ethereum-indexer-db-processors` already has a status README (prototype,
+superseded) and `ethereum-indexer-streams` was removed, so skip those except for consistency. Add a
+changeset for the `package.json` description changes. Docs/metadata only — no behaviour changes; do
+not commit without my confirmation.
+
+---

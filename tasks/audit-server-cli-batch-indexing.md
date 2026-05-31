@@ -60,14 +60,18 @@ or CLI. They are intentionally restart-to-reconfigure.
 
 ## Prompt (paste into a fresh context)
 
-> Review the batch-indexing path of `ethereum-indexer-cli` and `ethereum-indexer-server` in this
-> monorepo (read `tasks/audit-server-cli-batch-indexing.md` first). These are NOT live-reconfigurable
-> (the CLI is one-shot: construct once, load, loop indexMore to tip, write state file, exit; the
-> server is long-running with a fixed source/processor driven via `/indexMore`) — so the browser
-> live-reload fixes do not apply. Focus on the correctness of the batch/long-running path itself:
-> `keepState`/`keepStream` snapshot round-trip + version/context invalidation (the
-> `wighawag/stratagems-snapshots` CI depends on this), CLI completion/exit semantics and atomic file
-> writes, error/retry loops, reorg handling across many indexMore calls, and the server's HTTP routes
-> (auth, overlapping `/indexMore`, response shaping). Produce a findings doc at
-> `tasks/findings/server-cli-batch.md` with prioritised issues; do not implement yet. For any fix,
-> use TDD with confirmation gates and add changesets. Do not commit without my confirmation.
+---
+
+Review the batch-indexing path of `ethereum-indexer-cli` and `ethereum-indexer-server` in this
+monorepo (read `tasks/audit-server-cli-batch-indexing.md` first). These are NOT live-reconfigurable
+(the CLI is one-shot: construct once, load, loop indexMore to tip, write state file, exit; the
+server is long-running with a fixed source/processor driven via `/indexMore`) — so the browser
+live-reload fixes do not apply. Focus on the correctness of the batch/long-running path itself:
+`keepState`/`keepStream` snapshot round-trip + version/context invalidation (the
+`wighawag/stratagems-snapshots` CI depends on this), CLI completion/exit semantics and atomic file
+writes, error/retry loops, reorg handling across many indexMore calls, and the server's HTTP routes
+(auth, overlapping `/indexMore`, response shaping). Produce a findings doc at
+`tasks/findings/server-cli-batch.md` with prioritised issues; do not implement yet. For any fix,
+use TDD with confirmation gates and add changesets. Do not commit without my confirmation.
+
+---
