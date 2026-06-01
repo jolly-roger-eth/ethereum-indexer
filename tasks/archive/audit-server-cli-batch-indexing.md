@@ -2,8 +2,16 @@
 
 **Area:** `packages/ethereum-indexer-server`, `packages/ethereum-indexer-cli` (and the `keepState` /
 `keepStream` persistence they rely on)
-**Type:** Review (then TDD fixes if issues are found)
-**Status:** todo
+**Type:** Review
+**Status:** done — see `tasks/findings/server-cli-batch.md`
+
+> Read-only review completed; findings in `tasks/findings/server-cli-batch.md` with prioritised
+> issues. Highlights: HIGH — server `/feed` reads `ctx.body.events` instead of `ctx.request.body`
+> (route is dead); CLI writes the state file non-atomically (CI can commit a truncated snapshot);
+> `keepState` snapshot has no integrity/version envelope. MEDIUM — CLI always exits 0 (failures look
+> like success in CI); CLI loop terminates at a moving tip with no retry; server auto-index retries
+> forever with no backoff and `/indexMore` is not serialized against the auto-loop. The fixes are
+> tracked separately in `tasks/fix-server-cli-batch.md` (no published-package code changed here).
 
 ## Context
 
