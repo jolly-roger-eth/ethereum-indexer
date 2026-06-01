@@ -2,7 +2,14 @@
 
 **Area:** `packages/ethereum-indexer-browser` (`src/IndexerState.ts`)
 **Type:** Implementation (TDD)
-**Status:** todo
+**Status:** done
+
+> Completed. Added an idempotent `dispose()` to the object returned by `createIndexerState`
+> (`src/IndexerState.ts`): stops auto-indexing + clears the armed timer, detaches
+> `onLoad`/`onLastSyncUpdated`/`onStateUpdated`, drops the indexer reference, and resets
+> syncing/status state. Re-init is allowed afterwards (reuses the same stores/processor instance;
+> documented in code + changeset). Covered by `test/dispose.test.ts`; changeset
+> `.changeset/browser-dispose.md` (`ethereum-indexer-browser` minor).
 
 ## Context
 

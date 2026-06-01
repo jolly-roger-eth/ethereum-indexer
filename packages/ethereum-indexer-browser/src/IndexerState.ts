@@ -384,6 +384,46 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		return indexer.reset();
 	}
 
+	// Tear down the indexer-state so it can be safely dropped (e.g. SPA navigation / component
+	// unmount). It:
+	//  1. stops the auto-index loop and clears any armed timer (otherwise the self-re-arming
+	//     `setTimeout(_auto_index, ...)` keeps firing forever, holding the closure alive);
+	//  2. detaches the indexer callbacks (onLoad/onLastSyncUpdated/onStateUpdated) which close over
+	//     the stores, so the stores become unreachable;
+	//  3. drops the indexer reference and resets the browser-layer syncing/status state.
+	// It is idempotent (safe to call more than once). After dispose(), `init(...)` may be called
+	// again to re-initialise — note this reuses the SAME stores and processor instance (the
+	// processor keeps whatever internal state it had); it is not a full fresh start of those.
+	function dispose() {
+		// 1. stop auto-indexing and unconditionally clear the timer (a tick may have armed it).
+		stopAutoIndexing();
+		if (indexingTimeout) {
+			clearTimeout(indexingTimeout);
+			indexingTimeout = undefined;
+		}
+
+		// 2. detach callbacks that close over the stores.
+		if (indexer) {
+			indexer.onLoad = undefined;
+			indexer.onLastSyncUpdated = undefined;
+			indexer.onStateUpdated = undefined;
+		}
+
+		// 3. drop the indexer reference and reset browser-layer state so a later init() starts clean.
+		indexer = undefined;
+		setSyncing({
+			waitingForProvider: true,
+			loading: false,
+			autoIndexing: false,
+			catchingUp: false,
+			fetchingLogs: false,
+			processingFetchedLogs: false,
+			lastSync: undefined,
+			error: undefined,
+		});
+		setStatus({state: 'Idle'});
+	}
+
 	async function _auto_index() {
 		setSyncing({autoIndexing: true});
 		try {
@@ -429,6 +469,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		startAutoIndexing,
 		stopAutoIndexing,
 		reset,
+		dispose,
 		updateProcessor(
 			newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 			options?: {force?: boolean},

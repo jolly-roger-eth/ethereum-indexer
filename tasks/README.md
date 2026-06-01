@@ -20,34 +20,13 @@ Suggested workflow per task:
 - Changes that affect a published package's public API require a **changeset** (`.changeset/*.md`).
 - Do NOT auto-commit, push, or run destructive commands without explicit confirmation.
 
-## Findings
+## Layout
 
-Review output is written to `tasks/findings/` so it can be fed into the design plans:
+There is no hand-maintained index of tasks here (it just goes stale) — list the folders instead:
 
-- [findings/revertable-database.md](./findings/revertable-database.md)
-- [findings/event-cache.md](./findings/event-cache.md)
-- [findings/ethereum-indexer-browser.md](./findings/ethereum-indexer-browser.md)
-- [findings/browser-live-reload.md](./findings/browser-live-reload.md) — focused review of live reconfigure (new contracts / event ABIs / chain)
-- [findings/todo-triage.md](./findings/todo-triage.md) — triage of the ~60 existing inline TODOs + root `TODO.md`
+- **Active tasks:** `ls tasks/` (the `*.md` files at the top level).
+- **Done tasks:** `ls tasks/archive/` — each archived file keeps its own `**Status:**`/outcome note.
+- **Findings:** `ls tasks/findings/` — review output, fed into the design/plan tasks.
 
-## Active tasks
-
-| Task | Area | Type | Status |
-|------|------|------|--------|
-| [fix-browser-live-reload.md](./fix-browser-live-reload.md) | `ethereum-indexer-browser` (+ core) | Implementation (TDD) | todo |
-| [add-browser-dispose.md](./add-browser-dispose.md) | `ethereum-indexer-browser` | Implementation (TDD) | todo |
-| [audit-server-cli-batch-indexing.md](./audit-server-cli-batch-indexing.md) | `ethereum-indexer-server`, `ethereum-indexer-cli` | Review (+ TDD) | todo |
-| [add-package-readmes-and-descriptions.md](./add-package-readmes-and-descriptions.md) | all published packages | Documentation | todo |
-| [plan-historical-state-database.md](./plan-historical-state-database.md) | new server-side arch (log-watcher + log-processor) / design | Planning | todo |
-| [plan-trigger-system.md](./plan-trigger-system.md) | new mechanism (depends on historical state) / design | Planning | todo |
-| [modernize-repo.md](./modernize-repo.md) | repo-wide tooling / config | Implementation (maintainer) | todo |
-
-## Archived (done)
-
-Completed tasks are moved to `tasks/archive/`. Their findings remain under `tasks/findings/`.
-
-| Task | Area | Type | Outcome |
-|------|------|------|---------|
-| [archive/review-revertable-database.md](./archive/review-revertable-database.md) | `ethereum-indexer-db-processors` | Review | done (initial) — see [findings](./findings/revertable-database.md) |
-| [archive/review-event-cache.md](./archive/review-event-cache.md) | `ethereum-indexer-db-utils` | Review | done (initial) — see [findings](./findings/event-cache.md) |
-| [archive/review-ethereum-indexer-browser.md](./archive/review-ethereum-indexer-browser.md) | `ethereum-indexer-browser` | Review | done (initial) — see [findings](./findings/ethereum-indexer-browser.md) |
+A task's location IS its status: top-level = open, `archive/` = done. Open any file to read its
+context + **Prompt** section.

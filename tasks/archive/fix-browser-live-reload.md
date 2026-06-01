@@ -2,7 +2,14 @@
 
 **Area:** `packages/ethereum-indexer-browser` (and possibly core `packages/ethereum-indexer`)
 **Type:** Implementation (TDD)
-**Status:** todo
+**Status:** done
+
+> Completed. HIGH #1 (async + awaited `updateIndexer`/`updateProcessor` with errors routed to
+> `$syncing.error`), HIGH #2 (clear `$syncing.lastSync`/status on reconfigure), MEDIUM #3 (pause
+> auto-indexing during reconfigure), MEDIUM #4 (serialize overlapping reconfigures) and the core
+> `updateProcessor` alignment (#5) are implemented and covered by
+> `packages/ethereum-indexer-browser/test/liveReload.test.ts`. LOW #6 (`dispose()` / re-init path)
+> was deferred to its own task: `add-browser-dispose.md`.
 
 ## Context
 

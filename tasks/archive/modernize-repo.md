@@ -1,8 +1,13 @@
 # Modernize the repo
 
 **Area:** repo-wide tooling / config
-**Type:** Implementation (will be done by the maintainer)
-**Status:** todo
+**Type:** Implementation (done by the maintainer)
+**Status:** done
+
+> Completed. Tooling modernized: `tsconfig.base.json` now targets `ESNext` with
+> `module`/`moduleResolution: NodeNext`; repo is ESM (`"type": "module"`); toolchain bumped
+> (TypeScript 6, typedoc 0.28 + markdown/vitepress plugins, prettier 3.8, changesets 2.29).
+> Remaining items from the checklist below are left as future follow-ups if needed.
 
 ## Context
 
