@@ -6,15 +6,47 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+log.txt
 
+# Dependencies
 node_modules
-.vscode/
 
+# Build output
+dist
+dist-ssr
+*.local
+
+# Env / data
+.env*
+data/
+ethereum-indexer-data
+
+# Editor directories and files
+.vscode/
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# yalc (local package linking)
+.yalc
+yalc.lock
+
+# CLI example output
+output.json
+indexed/
+
+# Docs (vitepress)
 /docs/.vitepress/*
+!/docs/.vitepress/theme
 !/docs/.vitepress/config.mts
 /docs/api
 /docs/public/examples
+/docs/public/pwa
 
 # this need to be copied in
-/docs/examples 
+/docs/examples
 /docs/media
