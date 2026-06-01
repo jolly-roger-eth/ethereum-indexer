@@ -31,7 +31,7 @@ import {
 	Query,
 	setupCache,
 } from 'ethereum-indexer-db-utils';
-import {adminPage} from '../pages/index.js';
+import {getAdminPage} from '../pages/index.js';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {createRequire} from 'module';
 import {clean, formatLastSync, removeUndefinedValuesFromObject} from 'ethereum-indexer-utils';
@@ -48,6 +48,10 @@ export type UserConfig<ABI extends Abi> = {
 	disableSecurity?: boolean;
 	useFSCache?: boolean;
 	port?: number;
+	// Optional factory used to construct the EIP-1193 provider from the node URL. Defaults to
+	// `new JSONRPCHTTPProvider(nodeURL)`. Useful for injecting a custom provider or a fake/spy in
+	// tests. When omitted the behaviour is unchanged.
+	createProvider?: (nodeURL: string) => EIP1193ProviderWithoutEvents;
 };
 
 type Config = {
@@ -78,15 +82,19 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			removeUndefinedValuesFromObject(config),
 		);
 		this.source = config.source;
+		this.createProvider = config.createProvider;
 	}
+
+	protected createProvider: ((nodeURL: string) => EIP1193ProviderWithoutEvents) | undefined;
 
 	async start(config: {autoIndex: boolean}) {
 		// TODO allow to pass processor configuration
 		await this.setupIndexing();
-		this.startServer();
+		const server = this.startServer();
 		if (config.autoIndex) {
 			this.startIndexing();
 		}
+		return server;
 	}
 
 	private async setupIndexing() {
@@ -125,7 +133,9 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			this.processor = processorFactory;
 		}
 
-		const eip1193Provider = new JSONRPCHTTPProvider(this.config.nodeURL);
+		const eip1193Provider = this.createProvider
+			? this.createProvider(this.config.nodeURL)
+			: (new JSONRPCHTTPProvider(this.config.nodeURL) as unknown as EIP1193ProviderWithoutEvents);
 
 		let contractsData: AllContractData<ABI> | ContractData<ABI>[] | undefined;
 		if (!this.source) {
@@ -324,7 +334,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 		// ----------------------------------------------------------------------------------------------------------------
 
 		router.get('/admin', async (ctx, next) => {
-			ctx.body = adminPage;
+			ctx.body = getAdminPage();
 			await next();
 		});
 
@@ -387,13 +397,17 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			} else if (this.indexing) {
 				ctx.body = {error: {code: 222, message: 'Server is Indexing, cannot import.'}};
 			} else {
-				const eventStream = ctx.body.events;
-				if (eventStream.length === 0) {
+				// NOTE: events come from the request body (populated by koa-bodyparser as
+				// `ctx.request.body`), not `ctx.body` (which is the response body).
+				const eventStream = (ctx.request.body as {events?: unknown})?.events;
+				if (!Array.isArray(eventStream)) {
+					ctx.body = {error: {code: 4000, message: 'Bad Request: expected an `events` array.'}};
+				} else if (eventStream.length === 0) {
 					ctx.body = {success: true};
 				} else {
-					await this.indexer.feed(eventStream);
+					await this.indexer.feed(eventStream as any);
+					ctx.body = {success: true};
 				}
-				ctx.body = {success: true};
 			}
 			await next();
 		});
@@ -424,7 +438,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 		this.app.use(router.routes()).use(router.allowedMethods());
 
 		const port = this.config.port;
-		this.app.listen(port, () => {
+		return this.app.listen(port, () => {
 			console.log(`server started on port: ${port}`);
 		});
 	}
