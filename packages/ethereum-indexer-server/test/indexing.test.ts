@@ -107,6 +107,19 @@ describe('SimpleServer indexing — characterization (current behaviour)', () =>
 		const res = await get(base, '/');
 		expect(res.json).toHaveProperty('indexing');
 	});
+
+	it('/ returns a shaped 503 (not a 500) when the indexer is not set up', async () => {
+		const server = makeServer(undefined);
+		(server as any).indexer = undefined;
+		(server as any).lastSync = undefined;
+		const {httpServer, base} = await listen(server);
+		openServers.push(httpServer);
+
+		const res = await get(base, '/');
+		expect(res.status).toBe(503);
+		expect(res.json).toHaveProperty('error');
+		expect(res.json.error.code).toBe(503);
+	});
 });
 
 // ---------------------------------------------------------------------------

@@ -260,21 +260,40 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			console.log(`generated apiKey: ${apiKey}`);
 		}
 
+		// Constant-time comparison so an attacker cannot learn the key byte-by-byte from response
+		// timing. Returns true if `provided` matches any configured key.
+		function matchesAnyKey(provided: unknown): boolean {
+			if (typeof provided !== 'string' || provided.length === 0) {
+				return false;
+			}
+			const providedBuf = Buffer.from(provided);
+			let matched = false;
+			for (const key of apiKeys) {
+				const keyBuf = Buffer.from(key);
+				// timingSafeEqual requires equal lengths; comparing lengths first leaks only the length,
+				// not the contents. Use a length-padded compare to keep it constant-time per key.
+				if (keyBuf.length === providedBuf.length && crypto.timingSafeEqual(keyBuf, providedBuf)) {
+					matched = true;
+				}
+			}
+			return matched;
+		}
+
 		function isAuthorized(ctx: any): boolean {
 			if (self.config.disableSecurity) {
 				return true;
 			}
 			// TODO pass api key in get request ?
 			const apiKeyProvided = ctx.request.header.authorization || ctx.request.body.apiKey;
-			return apiKeys.includes(apiKeyProvided);
+			return matchesAnyKey(apiKeyProvided);
 		}
 
 		router.get('/', async (ctx, next) => {
-			if (!this.indexer) {
-				throw new Error(`no indexer`);
-			}
-			if (!this.lastSync) {
-				throw new Error(`no lastSync`);
+			if (!this.indexer || !this.lastSync) {
+				ctx.status = 503;
+				ctx.body = {error: {code: 503, message: 'Server not ready (indexing not set up yet).'}};
+				await next();
+				return;
 			}
 
 			const startingBlock = this.indexer.defaultFromBlock;
@@ -317,7 +336,10 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 		// multiple kinds is separate stuff
 		router.get('/get/:id', async (ctx, next) => {
 			if (!this.processor) {
-				throw new Error(`no processor`);
+				ctx.status = 503;
+				ctx.body = {error: {code: 503, message: 'Server not ready (no processor).'}};
+				await next();
+				return;
 			}
 
 			const documentID = ctx.params['id'];
@@ -331,7 +353,10 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		router.post('/query', async (ctx, next) => {
 			if (!this.processor) {
-				throw new Error(`no processor`);
+				ctx.status = 503;
+				ctx.body = {error: {code: 503, message: 'Server not ready (no processor).'}};
+				await next();
+				return;
 			}
 			const response = await this.processor.query(ctx.request.body as Query);
 			// TODO clean response ? or force fields to be specified and prevent some (like underscore)
@@ -382,7 +407,10 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		router.post('/indexMore', async (ctx, next) => {
 			if (!this.indexer) {
-				throw new Error(`no indexer`);
+				ctx.status = 503;
+				ctx.body = {error: {code: 503, message: 'Server not ready (no indexer).'}};
+				await next();
+				return;
 			}
 			if (!isAuthorized(ctx)) {
 				ctx.body = {error: {code: 4030, message: 'Forbidden'}};
@@ -402,7 +430,10 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		router.post('/feed', async (ctx, next) => {
 			if (!this.indexer) {
-				throw new Error(`no indexer`);
+				ctx.status = 503;
+				ctx.body = {error: {code: 503, message: 'Server not ready (no indexer).'}};
+				await next();
+				return;
 			}
 			if (!isAuthorized(ctx)) {
 				ctx.body = {error: {code: 4030, message: 'Forbidden'}};
@@ -426,7 +457,10 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		router.post('/events', async (ctx, next) => {
 			if (!this.cache) {
-				throw new Error(`no cache`);
+				ctx.status = 503;
+				ctx.body = {error: {code: 503, message: 'Cache is disabled.'}};
+				await next();
+				return;
 			}
 			if (!isAuthorized(ctx)) {
 				ctx.body = {error: {code: 4030, message: 'Forbidden'}};
