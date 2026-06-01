@@ -11,7 +11,7 @@ export async function connect(
 			nativeCurrency: {name: string; symbol: string; decimals: number};
 		};
 		accountsToUse?: `0x${string}`;
-	}
+	},
 ) {
 	const chainIdAsHex = await ethereum.request({method: 'eth_chainId'});
 	const chainId = parseInt(chainIdAsHex.slice(2), 16).toString();

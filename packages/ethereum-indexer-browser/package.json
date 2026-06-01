@@ -13,7 +13,6 @@
 	"devDependencies": {
 		"eip-1193": "^0.4.7",
 		"as-soon": "^0.1.5",
-		"prettier": "^3.8.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.3.3",
 		"vitest": "^1.6.0"
@@ -27,8 +26,6 @@
 		"use-stores": "^0.1.0"
 	},
 	"scripts": {
-		"format": "prettier --write .",
-		"format:check": "prettier --check .",
 		"build": "tsc",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",

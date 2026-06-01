@@ -12,7 +12,7 @@
 		'conquest',
 		processor,
 		contractsDataPerChain[chainId],
-		chainId
+		chainId,
 	);
 </script>
 

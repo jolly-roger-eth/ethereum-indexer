@@ -11,7 +11,7 @@
 		'bleeps',
 		createProcessor(),
 		contractsData,
-		contractsData[0].chainId
+		contractsData[0].chainId,
 	);
 
 	let provider: EIP1193Provider | undefined;
@@ -22,8 +22,8 @@
 			connection.chainId === '1'
 				? 'https://etherscan.io'
 				: connection.chainId === '42161'
-				? 'https://arbiscan.io'
-				: undefined;
+					? 'https://arbiscan.io'
+					: undefined;
 		return initialize(connection);
 	}
 

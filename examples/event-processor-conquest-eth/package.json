@@ -21,6 +21,6 @@
     "eis": "eis",
     "test": "eis run -p ./dist/index.js --disable-cache",
     "build": "tsc",
-		"dev": "as-soon -w src pnpm build"
+    "dev": "as-soon -w src pnpm build"
   }
 }

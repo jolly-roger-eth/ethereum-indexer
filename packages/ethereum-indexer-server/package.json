@@ -44,13 +44,10 @@
 		"as-soon": "^0.1.5",
 		"eip-1193": "^0.4.7",
 		"fs-extra": "^11.1.1",
-		"prettier": "^3.8.0",
 		"tsx": "^4.21.0",
 		"typescript": "^5.3.3"
 	},
 	"scripts": {
-		"format": "prettier --write .",
-		"format:check": "prettier --check .",
 		"build": "tsc && cp -r templates dist/",
 		"dev": "as-soon -w src pnpm build",
 		"test": "echo \"Error: no test specified\" && exit 1"

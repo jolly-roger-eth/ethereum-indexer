@@ -21,6 +21,6 @@
     "eis": "eis",
     "test": "eis run -p ./dist/index.js --disableCache",
     "build": "tsc && node scripts/version.mjs",
-		"watch": "as-soon -w src pnpm build"
+    "watch": "as-soon -w src pnpm build"
   }
 }

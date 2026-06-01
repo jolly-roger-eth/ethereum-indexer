@@ -17,6 +17,9 @@ importers:
       ldenv:
         specifier: ^0.3.16
         version: 0.3.16
+      prettier:
+        specifier: ^3.8.0
+        version: 3.8.3
       pwag:
         specifier: ^0.2.0
         version: 0.2.0
@@ -319,9 +322,6 @@ importers:
       eip-1193:
         specifier: ^0.4.7
         version: 0.4.7
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -359,9 +359,6 @@ importers:
       eip-1193:
         specifier: ^0.4.7
         version: 0.4.7
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -411,9 +408,6 @@ importers:
       fs-extra:
         specifier: ^11.1.1
         version: 11.1.1
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -445,9 +439,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -476,9 +467,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -507,9 +495,6 @@ importers:
       eip-1193:
         specifier: ^0.4.7
         version: 0.4.7
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -547,9 +532,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -572,9 +554,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -675,9 +654,6 @@ importers:
       fs-extra:
         specifier: ^11.1.1
         version: 11.1.1
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -700,9 +676,6 @@ importers:
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
-      prettier:
-        specifier: ^3.8.0
-        version: 3.8.3
       tsx:
         specifier: ^4.21.0
         version: 4.22.4

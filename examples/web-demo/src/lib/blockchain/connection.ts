@@ -28,7 +28,7 @@ export type ActiveConnection = {ethereum: EIP1193Provider; chainId: string; acco
 
 async function start(
 	expectedChainId: string | undefined,
-	accountsToUse: boolean | `0x${string}`
+	accountsToUse: boolean | `0x${string}`,
 ): Promise<ActiveConnection> {
 	store.set({state: 'Loading'});
 	try {

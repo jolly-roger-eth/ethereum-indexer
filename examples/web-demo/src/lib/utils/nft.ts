@@ -32,7 +32,7 @@ function hex_to_ascii(hex: string) {
 export async function fetchDisplayedObjects(
 	provider: EIP1193Provider,
 	tokenAddress: `0x${string}`,
-	tokenID: bigint | string
+	tokenID: bigint | string,
 ): Promise<NFTValue> {
 	return getTokenURI(provider, tokenAddress, tokenID).then((tokenURI) => fetchDisplayedObjectsFromTokenURI(tokenURI));
 }
@@ -98,7 +98,7 @@ export async function fetchTokenURI(tokenURI: string) {
 		if (tokenURI.startsWith('http') && err.response === undefined) {
 			throw new Error(
 				`Could not fetch token's metadata. This could be a CORS issue or a dropped internet connection. It is not possible for us to know. (Please check in your browser console). If it is a CORS issue, please contact the persons responsible for the project and tell them to allow CORS. We are building a decentralised world after all.`,
-				{cause: {type: 'CORS?'}}
+				{cause: {type: 'CORS?'}},
 			);
 		} else {
 			throw new Error(`Could not fetch token's metadata. ${err.message || err}`, {cause: {type: 'CORS?'}});

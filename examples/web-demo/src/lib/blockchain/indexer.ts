@@ -15,7 +15,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 	name: string,
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 	contracts: readonly ContractData<ABI>[] | AllContractData<ABI>,
-	chainId: string | undefined
+	chainId: string | undefined,
 ) {
 	const indexer = createIndexerState(processor, {
 		trackNumRequests: true,
@@ -79,7 +79,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 						`Error making newHeads subscription: ${err.message}.
 					 Code: ${err.code}. Data: ${err.data}
 					 Falling back on timeout
-					 `
+					 `,
 					);
 					startAutoIndexing();
 				});
@@ -93,7 +93,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 		config?: {
 			parseConfig?: LogParseConfig;
 			processorConfig?: ProcessorConfig;
-		}
+		},
 	) {
 		const provider = connection.ethereum;
 		init(
@@ -105,7 +105,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				},
 				config: config?.parseConfig ? {stream: {parse: config.parseConfig}} : undefined,
 			},
-			config?.processorConfig
+			config?.processorConfig,
 		).then(() => {
 			indexToLatest().then(() => {});
 			indexContinuously(connection.ethereum);
