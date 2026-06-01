@@ -74,6 +74,15 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	protected indexing: boolean = false;
 	protected indexingTimeout: NodeJS.Timeout | undefined;
 
+	// Last error from the auto-index loop, surfaced in the `/` status so a stuck/retrying server is
+	// observable instead of silently reporting `indexing: true`.
+	protected lastError: {message: string; at: number} | undefined;
+	// Number of consecutive auto-index failures, used to compute exponential backoff.
+	protected consecutiveErrors: number = 0;
+	// Serializes ALL indexing entrypoints (auto loop, manual /indexMore, /feed, /replay) so they do
+	// not run concurrently on the same indexer instance. Holds the in-flight operation's promise.
+	protected inFlightIndexing: Promise<unknown> | undefined;
+
 	protected source: IndexingSource<ABI> | undefined;
 
 	constructor(config: UserConfig<ABI>) {
@@ -281,20 +290,21 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			lastSyncObject.totalPercentage = Math.floor((lastToBlock * 1000000) / latestBlock) / 10000;
 
 			// allow to get state whole
+			const lastError = this.lastError;
 			const data = (this.processor as any).json;
 			if (data) {
 				const _data = (this.processor as any)._json;
 				if (_data) {
-					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, data, _data});
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, lastError, data, _data});
 				} else {
-					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, data});
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, lastError, data});
 				}
 			} else {
 				const _data = (this.processor as any)._json;
 				if (_data) {
-					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, _data});
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, lastError, _data});
 				} else {
-					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing});
+					ctx.body = bnReplacer({lastSync: lastSyncObject, indexing: this.indexing, lastError});
 				}
 			}
 
@@ -344,7 +354,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			} else if (!this.cache) {
 				ctx.body = {error: {code: 223, message: 'Cache is disabled'}};
 			} else {
-				await this.cache.replay();
+				await this.serializeIndexing(() => this.cache!.replay());
 				ctx.body = {lastSync: this.lastSync};
 			}
 			await next();
@@ -380,7 +390,9 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 				if (this.indexing) {
 					ctx.body = {error: {code: 4040, message: 'Indexing Already'}};
 				} else {
-					this.lastSync = await this.indexer.indexMore();
+					// Serialize against any other in-flight indexing op (auto loop / another /indexMore /
+					// /feed / /replay) so two do not run concurrently on the same indexer.
+					this.lastSync = await this.serializeIndexing(() => this.indexer!.indexMore());
 					ctx.body = {lastSync: this.lastSync};
 				}
 			}
@@ -405,7 +417,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 				} else if (eventStream.length === 0) {
 					ctx.body = {success: true};
 				} else {
-					await this.indexer.feed(eventStream as any);
+					await this.serializeIndexing(() => this.indexer!.feed(eventStream as any));
 					ctx.body = {success: true};
 				}
 			}
@@ -443,6 +455,35 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 		});
 	}
 
+	// Serializes an indexing operation against any other in-flight indexing entrypoint (the auto
+	// loop, manual /indexMore, /feed, /replay) so two never run concurrently on the same indexer.
+	// Returns the operation's result. If another op is already in flight, this one waits for it.
+	protected async serializeIndexing<T>(fn: () => Promise<T>): Promise<T> {
+		while (this.inFlightIndexing) {
+			try {
+				await this.inFlightIndexing;
+			} catch {
+				// ignore the previous op's failure; we still get our turn
+			}
+		}
+		const run = (async () => fn())();
+		this.inFlightIndexing = run;
+		try {
+			return await run;
+		} finally {
+			if (this.inFlightIndexing === run) {
+				this.inFlightIndexing = undefined;
+			}
+		}
+	}
+
+	// Compute the exponential backoff delay (ms) for the Nth consecutive error, capped.
+	protected backoffDelay(consecutiveErrors: number): number {
+		const base = 1000;
+		const max = 60000;
+		return Math.min(max, base * Math.pow(2, Math.max(0, consecutiveErrors - 1)));
+	}
+
 	async index() {
 		if (!this.indexer) {
 			throw new Error(`no indexer`);
@@ -450,10 +491,17 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 		this.indexing = true;
 		try {
 			namedLogger.info('server indexing more...');
-			this.lastSync = await this.indexer.indexMore();
+			this.lastSync = await this.serializeIndexing(() => this.indexer!.indexMore());
+			// success: clear the error state and reset backoff
+			this.lastError = undefined;
+			this.consecutiveErrors = 0;
 		} catch (err) {
-			namedLogger.info('server error: ', err);
-			this.indexingTimeout = setTimeout(this.index.bind(this), 1000);
+			this.consecutiveErrors++;
+			const message = err instanceof Error ? err.message : String(err);
+			this.lastError = {message, at: Date.now()};
+			const delay = this.backoffDelay(this.consecutiveErrors);
+			namedLogger.error(`server indexing error (attempt ${this.consecutiveErrors}), retry in ${delay}ms: `, err);
+			this.indexingTimeout = setTimeout(this.index.bind(this), delay);
 			return;
 		}
 
