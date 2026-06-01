@@ -2,7 +2,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createFileKeepState, filepaths} from '../src/keepState.js';
+import {createFileKeepState, filepaths, SNAPSHOT_FORMAT} from '../src/keepState.js';
 
 // Minimal ProcessorContext for filename derivation (contextFilenames hashes source/config/version).
 const CONTEXT: any = {
@@ -66,6 +66,59 @@ describe('createFileKeepState — characterization (current behaviour)', () => {
 		const {stateFile, lastSyncFile} = filepaths(folder, CONTEXT);
 		expect(fs.existsSync(stateFile)).toBe(true);
 		expect(fs.existsSync(lastSyncFile)).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// HIGH-2 / MEDIUM-3: snapshot envelope (format/version) + don't silently
+// swallow corrupt files. Backward-compatible: legacy bare snapshots still read.
+// ---------------------------------------------------------------------------
+
+describe('createFileKeepState — snapshot envelope (HIGH-2)', () => {
+	it('writes an envelope with a format version and the processor hash', async () => {
+		const ks = createFileKeepState(folder);
+		const all = makeAll({
+			lastSync: {
+				lastToBlock: 10,
+				latestBlock: 10,
+				lastFromBlock: 0,
+				unconfirmedBlocks: [],
+				context: {source: [], config: 'c', processor: 'hash-abc'},
+			},
+		});
+		await ks.save(CONTEXT, all as any);
+
+		const {stateFile} = filepaths(folder, CONTEXT);
+		const raw = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+		expect(raw.format).toBe(SNAPSHOT_FORMAT);
+		expect(raw.processor).toBe('hash-abc');
+		expect(typeof raw.savedAt).toBe('string');
+		// and it still round-trips
+		const fetched = await ks.fetch(CONTEXT);
+		expect(fetched.state).toEqual(all.state);
+	});
+
+	it('still reads a legacy bare snapshot (no envelope)', async () => {
+		const {stateFile} = filepaths(folder, CONTEXT);
+		fs.mkdirSync(folder, {recursive: true});
+		// legacy format: bare {lastSync, state, history}, no `format` field
+		fs.writeFileSync(
+			stateFile,
+			JSON.stringify({lastSync: {lastToBlock: 1}, state: {count: 9}, history: {h: 2}}),
+		);
+		const ks = createFileKeepState(folder);
+		const fetched = await ks.fetch(CONTEXT);
+		expect(fetched.state).toEqual({count: 9});
+		expect(fetched.history).toEqual({h: 2});
+	});
+
+	it('returns undefined (does not throw) for a present-but-corrupt snapshot', async () => {
+		const {stateFile} = filepaths(folder, CONTEXT);
+		fs.mkdirSync(folder, {recursive: true});
+		fs.writeFileSync(stateFile, '{ this is not valid json');
+		const ks = createFileKeepState(folder);
+		const fetched = await ks.fetch(CONTEXT);
+		expect(fetched).toBeUndefined();
 	});
 });
 

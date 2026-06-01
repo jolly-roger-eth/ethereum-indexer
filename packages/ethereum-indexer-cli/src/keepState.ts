@@ -2,8 +2,17 @@ import {Abi, KeepState, ProcessorContext} from 'ethereum-indexer';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {logs} from 'named-logs';
 import {contextFilenames} from 'ethereum-indexer-utils';
 import {bnReplacer, bnReviver} from './utils/bn.js';
+
+const logger = logs('ei:keepState');
+
+// Current on-disk snapshot envelope version. The state file is written as
+// `{format, processor, savedAt, lastSync, state, history}`. Reads accept both this enveloped form
+// and the legacy bare `{lastSync, state, history}` form (format === undefined) for backward compat
+// with snapshots written by older versions.
+export const SNAPSHOT_FORMAT = 1;
 
 export function filepaths(folder: string, context: ProcessorContext<Abi, any>) {
 	const {stateFile, lastSyncFile} = contextFilenames(context);
@@ -44,29 +53,53 @@ export function createFileKeepState<ABI extends Abi>(folder: string): KeepState<
 	return {
 		fetch: async (context: ProcessorContext<ABI, any>) => {
 			const {stateFile} = filepaths(folder, context);
+			let content: string;
 			try {
-				const content = fs.readFileSync(stateFile, 'utf-8');
+				content = fs.readFileSync(stateFile, 'utf-8');
+			} catch (err: any) {
+				if (err && err.code === 'ENOENT') {
+					// No snapshot yet: normal first-run / changed-context case.
+					return undefined as any; // TODO fix type in KeepState to allow undefined
+				}
+				// File exists but could not be read (permissions, etc.): surface it instead of
+				// silently treating it as a cold start.
+				logger.error(`could not read snapshot at ${stateFile}, treating as no snapshot:`, err);
+				return undefined as any;
+			}
+			try {
 				const json = JSON.parse(content, bnReviver);
+				// Both the enveloped (format>=1) and legacy bare form carry state/lastSync/history at the
+				// top level, so the same destructuring works for both.
 				return {
 					state: json.state,
 					lastSync: json.lastSync,
 					history: json.history,
 				};
-			} catch {
-				return undefined as any; // TODO fix type in KeepState to allow undefined
+			} catch (err) {
+				// Present-but-corrupt (e.g. truncated by an old non-atomic write or a bad commit):
+				// do NOT silently swallow — log so it is diagnosable, then cold-start.
+				logger.error(`snapshot at ${stateFile} is present but could not be parsed, treating as no snapshot:`, err);
+				return undefined as any;
 			}
 		},
 		save: async (context, all) => {
 			const {stateFile, lastSyncFile} = filepaths(folder, context);
-			const data = {lastSync: all.lastSync, state: all.state, history: all.history};
+			const envelope = {
+				format: SNAPSHOT_FORMAT,
+				processor: (all.lastSync as any)?.context?.processor,
+				savedAt: new Date().toISOString(),
+				lastSync: all.lastSync,
+				state: all.state,
+				history: all.history,
+			};
 			const dirname = path.dirname(stateFile);
 			if (!fs.existsSync(dirname)) {
 				fs.mkdirSync(dirname, {recursive: true});
 			}
 			// Write both files atomically (temp + rename) so an interrupted save never leaves a
 			// truncated/invalid snapshot on disk.
-			atomicWriteFileSync(lastSyncFile, JSON.stringify(data.lastSync, bnReplacer, 2));
-			atomicWriteFileSync(stateFile, JSON.stringify(data, bnReplacer, 2));
+			atomicWriteFileSync(lastSyncFile, JSON.stringify(all.lastSync, bnReplacer, 2));
+			atomicWriteFileSync(stateFile, JSON.stringify(envelope, bnReplacer, 2));
 		},
 		clear: async () => {},
 	};
