@@ -1,0 +1,59 @@
+layout {
+	pane split_direction="vertical" {
+		// Library packages, one pane each (split into two columns)
+		pane split_direction="horizontal" {
+			pane name="indexer" command="pnpm" cwd="packages/ethereum-indexer" {
+				args "dev"
+			}
+			pane name="browser" command="pnpm" cwd="packages/ethereum-indexer-browser" {
+				args "dev"
+			}
+			pane name="cli" command="pnpm" cwd="packages/ethereum-indexer-cli" {
+				args "dev"
+			}
+			pane name="db-processors" command="pnpm" cwd="packages/ethereum-indexer-db-processors" {
+				args "dev"
+			}
+			pane name="db-utils" command="pnpm" cwd="packages/ethereum-indexer-db-utils" {
+				args "dev"
+			}
+		}
+		pane split_direction="horizontal" {
+			pane name="fs" command="pnpm" cwd="packages/ethereum-indexer-fs" {
+				args "dev"
+			}
+			pane name="fs-cache" command="pnpm" cwd="packages/ethereum-indexer-fs-cache" {
+				args "dev"
+			}
+			pane name="js-processor" command="pnpm" cwd="packages/ethereum-indexer-js-processor" {
+				args "dev"
+			}
+			pane name="server" command="pnpm" cwd="packages/ethereum-indexer-server" {
+				args "dev"
+			}
+			pane name="utils" command="pnpm" cwd="packages/ethereum-indexer-utils" {
+				args "dev"
+			}
+		}
+
+		// web-demo dependencies (event processors), one pane each
+		pane split_direction="horizontal" {
+			pane name="bleeps" command="pnpm" cwd="examples/event-processor-bleeps" {
+				args "dev"
+			}
+			pane name="conquest-eth" command="pnpm" cwd="examples/event-processor-conquest-eth" {
+				args "dev"
+			}
+			pane name="nfts" command="pnpm" cwd="examples/event-processor-nfts" {
+				args "watch"
+			}
+		}
+
+		// the web-demo itself
+		pane split_direction="horizontal" {
+			pane name="web-demo" command="pnpm" cwd="examples/web-demo" {
+				args "dev"
+			}
+		}
+	}
+}
