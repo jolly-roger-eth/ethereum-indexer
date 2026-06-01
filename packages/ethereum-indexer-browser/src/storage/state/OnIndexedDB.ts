@@ -60,7 +60,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 								const text = await response.text();
 								const json: {
 									state: ProcessResultType;
-									lastSync: LastSync<ABI>;
+									lastSync: LastSync<Abi>;
 								} = JSON.parse(text, bnReviver);
 
 								if (

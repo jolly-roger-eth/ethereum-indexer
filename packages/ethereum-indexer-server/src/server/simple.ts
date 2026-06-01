@@ -179,7 +179,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 		}
 
 		let rootProcessor: EventProcessor<ABI, ProcessResultType> = this.processor;
-		let streamKeeper: ExistingStream<Abi> | undefined;
+		let streamKeeper: ExistingStream<ABI> | undefined;
 		if (this.config.useCache) {
 			const eventCacheDB = new PouchDatabase(`${this.config.folder}/event-stream.db`);
 			this.cache = new EventCache(this.processor, eventCacheDB);

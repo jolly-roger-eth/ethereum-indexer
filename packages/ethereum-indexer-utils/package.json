@@ -7,20 +7,27 @@
 	"type": "module",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
 	"license": "MIT",
 	"dependencies": {
-		"named-logs": "^0.2.2"
+		"named-logs": "^0.4.1"
 	},
 	"devDependencies": {
-		"@types/node": "^20.10.0",
-		"ethereum-indexer": "workspace:*",
+		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
+		"ethereum-indexer": "workspace:*",
 		"tsx": "^4.21.0",
-		"typescript": "^5.3.3"
+		"typescript": "^6.0.3"
 	},
 	"scripts": {
 		"build": "tsc",
 		"dev": "as-soon -w src pnpm build",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "echo \"Error: no test specified\""
 	}
 }

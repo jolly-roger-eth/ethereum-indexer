@@ -2,7 +2,7 @@ import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, UsedStreamConfi
 import fs from 'fs';
 import path from 'path';
 import {logs} from 'named-logs';
-import {lexicographicNumber15} from './utils';
+import {lexicographicNumber15} from './utils.js';
 const namedLogger = logs('EventListFSStore');
 
 function identity(arg: any): any {

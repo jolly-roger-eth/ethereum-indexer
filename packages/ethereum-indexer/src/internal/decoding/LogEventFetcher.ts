@@ -109,10 +109,15 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 				abi: _allABIEvents,
 				eventName: item.name as ExtractAbiEventNames<ABI>,
 			} as any); // TODO types ?
-			if (topics.length > 0) {
+			// encodeEventTopics returns (Hex | Hex[] | null)[]; when called with only an
+			// eventName (no args), the signature topic is always a single Hex string.
+			if (topics.length > 0 && typeof topics[0] === 'string') {
 				_nameToTopic.set(item.name, topics[0]);
 			}
 			for (const v of topics) {
+				if (typeof v !== 'string') {
+					continue;
+				}
 				if (!_abiEventPerTopic.get(v)) {
 					_abiEventPerTopic.set(v, item);
 					eventNameTopics.push(v);
@@ -187,7 +192,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 
 				if (parsed) {
 					(event as ParsedLogEvent<ABI>).args = parsed.args as any;
-					(event as ParsedLogEvent<ABI>).eventName = parsed.eventName;
+					(event as ParsedLogEvent<ABI>).eventName = parsed.eventName as ParsedLogEvent<ABI>['eventName'];
 				} else {
 					(event as LogEventWithParsingFailure).decodeError = `parsing did not return any results`;
 				}

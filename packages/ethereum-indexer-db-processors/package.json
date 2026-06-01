@@ -7,23 +7,30 @@
 	"type": "module",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
 	"license": "MIT",
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
 		"ethereum-indexer-db-utils": "workspace:*",
-		"named-logs": "^0.2.2",
-		"pouchdb": "^8.0.1",
-		"pouchdb-find": "^8.0.1"
+		"named-logs": "^0.4.1",
+		"pouchdb": "^9.0.0",
+		"pouchdb-find": "^9.0.0"
 	},
 	"devDependencies": {
 		"@types/pouchdb": "^6.4.2",
 		"as-soon": "^0.1.5",
 		"tsx": "^4.21.0",
-		"typescript": "^5.3.3"
+		"typescript": "^6.0.3"
 	},
 	"scripts": {
 		"build": "tsc",
 		"dev": "as-soon -w src pnpm build",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "echo \"Error: no test specified\""
 	}
 }

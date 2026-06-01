@@ -7,23 +7,30 @@
 	"type": "module",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
 	"typedoc": {
 		"entryPoint": "src/index.ts"
 	},
 	"devDependencies": {
-		"eip-1193": "^0.4.7",
 		"as-soon": "^0.1.5",
+		"eip-1193": "^0.6.5",
 		"tsx": "^4.21.0",
-		"typescript": "^5.3.3",
-		"vitest": "^1.6.0"
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
 	},
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
 		"ethereum-indexer-utils": "workspace:*",
-		"idb-keyval": "^6.2.1",
-		"named-logs": "^0.2.2",
+		"idb-keyval": "^6.2.4",
+		"named-logs": "^0.4.1",
 		"sveltore": "^0.0.2",
-		"use-stores": "^0.1.0"
+		"use-stores": "^0.2.1"
 	},
 	"scripts": {
 		"build": "tsc",

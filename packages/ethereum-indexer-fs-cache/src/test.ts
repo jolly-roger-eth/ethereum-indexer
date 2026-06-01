@@ -1,5 +1,5 @@
 import {Abi, ParsedLogEvent} from 'ethereum-indexer';
-import {exportEvents, loadAll} from '.';
+import {exportEvents, loadAll} from './index.js';
 import fs from 'fs-extra';
 
 let hashCounter = 1;
@@ -17,7 +17,7 @@ function mutateViaTmpRandomEvent<ABI extends Abi>(events: ParsedLogEvent<ABI>[],
 	const mutated = {...event};
 	mutated.blockHash = randomHash();
 	mutated.transactionHash = randomHash();
-	mutated.args = {...event.args};
+	mutated.args = {...(event.args as Record<string, unknown>)} as typeof event.args;
 	(mutated.args as any).to = randomAddress(); // TODO test types: this need to be typed
 	events.splice(index, 1, ...[mutated, {...mutated, removed: true}, event]);
 	return events;

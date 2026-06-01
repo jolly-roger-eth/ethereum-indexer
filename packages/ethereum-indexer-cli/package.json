@@ -8,31 +8,38 @@
   "type": "module",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "ei": "dist/cli.js"
   },
   "dependencies": {
-    "commander": "^11.1.0",
-    "eip-1193-jsonrpc-provider": "^0.3.0",
+    "commander": "^15.0.0",
+    "eip-1193-jsonrpc-provider": "^0.4.3",
     "ethereum-indexer": "workspace:*",
     "ethereum-indexer-utils": "workspace:*",
-    "ldenv": "^0.3.7",
-    "named-logs": "^0.2.2",
-    "named-logs-console": "^0.3.0"
+    "ldenv": "^0.5.0",
+    "named-logs": "^0.4.1",
+    "named-logs-console": "^0.5.1"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
-    "@types/node": "^20.10.0",
+    "@types/node": "^25.9.1",
     "as-soon": "^0.1.5",
-    "eip-1193": "^0.4.7",
-    "fs-extra": "^11.1.1",
+    "eip-1193": "^0.6.5",
+    "fs-extra": "^11.3.5",
     "tsx": "^4.21.0",
-    "typescript": "^5.3.3"
+    "typescript": "^6.0.3"
   },
   "scripts": {
     "build": "tsc",
     "dev": "as-soon -w src pnpm build",
     "cli": "node ./dist/cli.js",
-    "test": "ldenv -m localhost node ./dist/cli.js -p ../../../../../wighawag/jolly-roger/indexer/dist/index.js -n @@RPC_URL_:DEPLOYMENT_CONTEXT,RPC_URL -f output.json -d ../../../../wighawag/jolly-roger/contracts/deployments/@@DEPLOYMENT_CONTEXT @@"
+    "test:manual": "ldenv -m localhost node ./dist/cli.js -p ../../../../../wighawag/jolly-roger/indexer/dist/index.js -n @@RPC_URL_:DEPLOYMENT_CONTEXT,RPC_URL -f output.json -d ../../../../wighawag/jolly-roger/contracts/deployments/@@DEPLOYMENT_CONTEXT @@"
   }
 }

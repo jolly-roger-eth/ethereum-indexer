@@ -8,22 +8,29 @@
 	"type": "module",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
 	"typedoc": {
 		"entryPoint": "src/index.ts"
 	},
 	"devDependencies": {
 		"as-soon": "^0.1.5",
 		"tsx": "^4.21.0",
-		"typescript": "^5.3.3"
+		"typescript": "^6.0.3"
 	},
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
-		"immer": "^10.0.3",
-		"named-logs": "^0.2.2"
+		"immer": "^11.1.8",
+		"named-logs": "^0.4.1"
 	},
 	"scripts": {
 		"build": "tsc",
 		"dev": "as-soon -w src pnpm build",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "echo \"Error: no test specified\""
 	}
 }
