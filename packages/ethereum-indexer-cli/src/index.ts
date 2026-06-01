@@ -122,12 +122,62 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 	return {lastSync, indexer, eip1193Provider, processor};
 }
 
+// Minimal shape needed to drive the batch loop (the real EthereumIndexer satisfies it). Kept loose
+// so `indexToTip` can be unit-tested with a fake indexer.
+type IndexMoreLike = {
+	indexMore(): Promise<{lastToBlock: number; latestBlock: number} & Record<string, any>>;
+};
+
+const wait = (seconds: number) => new Promise<void>((resolve) => setTimeout(resolve, seconds * 1000));
+
+// Drive `indexMore()` until the indexer reaches the chain tip (lastToBlock >= latestBlock), with
+// bounded retry on transient errors so a single RPC blip does not abort the whole batch.
+//
+// Termination contract: this follows the *live* tip each iteration (indexMore re-fetches the latest
+// block), i.e. it indexes "up to the current head" rather than a head pinned at start. For the
+// snapshot use case (snapshots are taken behind finality) this is the intended behaviour.
+export async function indexToTip(
+	indexer: IndexMoreLike,
+	opts?: {
+		maxRetriesPerStep?: number;
+		retryDelaySeconds?: number;
+		onError?: (err: unknown, attempt: number) => void;
+		waitFn?: (seconds: number) => Promise<void>;
+	},
+): Promise<{lastToBlock: number; latestBlock: number} & Record<string, any>> {
+	const maxRetries = opts?.maxRetriesPerStep ?? 5;
+	const retryDelay = opts?.retryDelaySeconds ?? 1;
+	const waitFn = opts?.waitFn ?? wait;
+	const onError = opts?.onError ?? ((err, attempt) => console.error(`indexMore failed (attempt ${attempt})`, err));
+
+	async function indexMoreWithRetry() {
+		let attempt = 0;
+		// eslint-disable-next-line no-constant-condition
+		while (true) {
+			try {
+				return await indexer.indexMore();
+			} catch (err) {
+				attempt++;
+				onError(err, attempt);
+				if (attempt > maxRetries) {
+					throw err;
+				}
+				await waitFn(retryDelay);
+			}
+		}
+	}
+
+	// First pass establishes the current tip (latestBlock) without a separate eth_blockNumber call.
+	let newLastSync = await indexMoreWithRetry();
+	while (newLastSync.lastToBlock < newLastSync.latestBlock) {
+		newLastSync = await indexMoreWithRetry();
+	}
+	return newLastSync;
+}
+
 export async function run(options: Options) {
 	logger.info(JSON.stringify(options, null, 2));
-	const {indexer, lastSync, eip1193Provider, processor} = await init(options);
-	const latestBlockNumberAsHex: string = await eip1193Provider.request({method: 'eth_blockNumber'});
-	const lastBlockNumber = parseInt(latestBlockNumberAsHex.slice(2), 16);
-	let newLastSync = {...lastSync, latestBlock: lastBlockNumber};
+	const {indexer, processor} = await init(options);
 	let state: any;
 	indexer.onStateUpdated = (newState) => {
 		state = newState;
@@ -136,9 +186,7 @@ export async function run(options: Options) {
 		console.log(`${sync.lastToBlock} / ${sync.latestBlock}`);
 	};
 
-	while (newLastSync.lastToBlock < newLastSync.latestBlock) {
-		newLastSync = await indexer.indexMore();
-	}
+	await indexToTip(indexer);
 }
 
 // Run the indexer and resolve the process exit code: 0 on success, 1 on failure. The `run`,
