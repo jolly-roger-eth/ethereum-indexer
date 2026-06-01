@@ -9,11 +9,7 @@ import type {IndexingSource, LastSync, LogEvent} from '../src/types';
 
 // Minimal EIP-1193 provider mock. Returns deterministic data and records calls.
 // Block timestamps are derived from the blockHash so we can assert per-hash mapping.
-function makeProvider(opts: {
-	chainId?: string;
-	latestBlock: number;
-	timestamps: {[blockHash: string]: number};
-}) {
+function makeProvider(opts: {chainId?: string; latestBlock: number; timestamps: {[blockHash: string]: number}}) {
 	const chainIdHex = '0x' + parseInt(opts.chainId || '1', 10).toString(16);
 	const calls: {method: string; params?: any}[] = [];
 	const provider = {

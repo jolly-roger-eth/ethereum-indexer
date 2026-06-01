@@ -33,14 +33,14 @@ export function keepStateOnLocalStorage<ABI extends Abi, ProcessResultType, Proc
 			all: {
 				state: ProcessResultType;
 				lastSync: LastSync<ABI>;
-			}
+			},
 		) => {
 			const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
 			localStorage.setItem(
 				storageID,
 				JSON.stringify({...all, __VERSION__: context.version}, (_, value) =>
-					typeof value === 'bigint' ? value.toString() + 'n' : value
-				)
+					typeof value === 'bigint' ? value.toString() + 'n' : value,
+				),
 			);
 		},
 		clear: async (context: ProcessorContext<ABI, ProcessorConfig>) => {

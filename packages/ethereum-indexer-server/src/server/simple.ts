@@ -31,7 +31,7 @@ import {
 	Query,
 	setupCache,
 } from 'ethereum-indexer-db-utils';
-import {adminPage} from '../pages';
+import {adminPage} from '../pages/index.js';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {createRequire} from 'module';
 import {clean, formatLastSync, removeUndefinedValuesFromObject} from 'ethereum-indexer-utils';
@@ -75,7 +75,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	constructor(config: UserConfig<ABI>) {
 		this.config = Object.assign(
 			{useCache: false, disableSecurity: false, useFSCache: false, port: 14385},
-			removeUndefinedValuesFromObject(config)
+			removeUndefinedValuesFromObject(config),
 		);
 		this.source = config.source;
 	}
@@ -104,12 +104,12 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 		}
 
 		const processorFactory = processorModule.createProcessor as (
-			config?: any
+			config?: any,
 		) => QueriableEventProcessor<ABI, ProcessResultType>;
 
 		if (!processorFactory) {
 			throw new Error(
-				`processor field could not be found: check module at ${this.config.processorPath} if it exports a "processor" field`
+				`processor field could not be found: check module at ${this.config.processorPath} if it exports a "processor" field`,
 			);
 		}
 
@@ -118,7 +118,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 			if (!this.processor) {
 				throw new Error(
-					`Processor could not be created, check the function exported as "processor" in module ${this.config.processorPath}`
+					`Processor could not be created, check the function exported as "processor" in module ${this.config.processorPath}`,
 				);
 			}
 		} else {
@@ -134,7 +134,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			if (processorModule.contractsDataPerChain) {
 				let chainIDAsHex;
 				try {
-					chainIDAsHex = await eip1193Provider.request({method: 'eth_chainId'}) as `0x${string}`;
+					chainIDAsHex = (await eip1193Provider.request({method: 'eth_chainId'})) as `0x${string}`;
 				} catch (err) {
 					console.error(`could not fetch chainID`);
 					throw err;
@@ -150,7 +150,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 			if (processorModule.contractsDataPerChain && !contractsData) {
 				console.error(
-					`field "contractsDataPerChain" found but no contracts data found for chainID: ${chainIDAsDecimal}`
+					`field "contractsDataPerChain" found but no contracts data found for chainID: ${chainIDAsDecimal}`,
 				);
 			}
 
@@ -174,7 +174,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 
 		if (!this.source || !this.source.contracts) {
 			throw new Error(
-				`contracts data not found in the processor module, it needs to be provided either as exported field named "contractsData" or as field "contractsDataPerChain" indexed by chainID`
+				`contracts data not found in the processor module, it needs to be provided either as exported field named "contractsData" or as field "contractsDataPerChain" indexed by chainID`,
 			);
 		}
 
@@ -199,7 +199,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			{
 				providerSupportsETHBatch: true,
 				keepStream: streamKeeper,
-			}
+			},
 		);
 
 		namedLogger.info(`LOADING....`);

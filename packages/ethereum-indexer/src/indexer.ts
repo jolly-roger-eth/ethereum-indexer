@@ -5,7 +5,7 @@ import {
 	getTransactionData,
 	getTransactionDataFromMultipleHashes,
 	LogTransactionData,
-} from './internal/engine/ethereum';
+} from './internal/engine/ethereum.js';
 
 import {EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 
@@ -21,12 +21,12 @@ import type {
 	ProvidedStreamConfig,
 	UsedStreamConfig,
 	LogEvent,
-} from './types';
-import {LogEventFetcher} from './internal/decoding/LogEventFetcher';
+} from './types.js';
+import {LogEventFetcher} from './internal/decoding/LogEventFetcher.js';
 import type {Abi} from 'abitype';
-import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './internal/engine/utils';
-import {CancelOperations, createAction} from './internal/utils/promises';
-import {simple_hash} from './utils';
+import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './internal/engine/utils.js';
+import {CancelOperations, createAction} from './internal/utils/promises.js';
+import {simple_hash} from './utils/index.js';
 
 const namedLogger = logs('ethereum-indexer');
 

@@ -39,7 +39,6 @@ export function bnReviver(k: string, v: any): any {
 	return v;
 }
 
-
 export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, ProcessorConfig>(
 	name: string,
 	remote?: IndexedStateLocation | string | IndexedStateLocation[],
@@ -63,8 +62,12 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 									state: ProcessResultType;
 									lastSync: LastSync<ABI>;
 								} = JSON.parse(text, bnReviver);
-								
-								if (!latest || !latest.lastSync || (json.lastSync && json.lastSync.lastToBlock > latest.lastSync.lastToBlock)) {
+
+								if (
+									!latest ||
+									!latest.lastSync ||
+									(json.lastSync && json.lastSync.lastToBlock > latest.lastSync.lastToBlock)
+								) {
 									latest = {
 										index: i,
 										lastSync: json.lastSync,
@@ -106,7 +109,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 						latest = {
 							index: 0,
 						};
-					} 
+					}
 					// else {
 					// 	console.log(`Using ${latest.index}`)
 					// }

@@ -19,7 +19,7 @@ export function loadAll<ABI extends Abi>(folder: string): LogEvent<ABI>[] {
 export function exportEvents<ABI extends Abi>(
 	folder: string,
 	eventStream: LogEvent<ABI>[],
-	config?: {batchSize?: number; overrideLastSync?: boolean}
+	config?: {batchSize?: number; overrideLastSync?: boolean},
 ) {
 	folder = path.join(folder, 'logs');
 	config = Object.assign(
@@ -27,7 +27,7 @@ export function exportEvents<ABI extends Abi>(
 			batchSize: 9000,
 			overrideLastSync: false,
 		},
-		config || {}
+		config || {},
 	);
 
 	const maxBatchSize = config.batchSize;
@@ -58,8 +58,8 @@ export function exportEvents<ABI extends Abi>(
 			JSON.stringify(
 				parsed,
 				(_, value) => (typeof value === 'bigint' ? value.toString() : value), // return everything else unchanged)}
-				2
-			)
+				2,
+			),
 		);
 	}
 }

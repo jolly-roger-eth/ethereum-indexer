@@ -1,10 +1,13 @@
 import {Abi, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
 import {PouchDatabase, QueriableEventProcessor, PutAndGetDatabase, Database} from 'ethereum-indexer-db-utils';
-import {SingleEventProcessor, EventProcessorOnDatabase} from './EventProcessorOnDatabase';
-import {EventProcessorWithBatchDBUpdate, SingleEventProcessorWithBatchSupport} from './EventProcessorWithBatchDBUpdate';
+import {SingleEventProcessor, EventProcessorOnDatabase} from './EventProcessorOnDatabase.js';
+import {
+	EventProcessorWithBatchDBUpdate,
+	SingleEventProcessorWithBatchSupport,
+} from './EventProcessorWithBatchDBUpdate.js';
 
 export function fromSingleEventProcessor<ABI extends Abi>(
-	v: SingleEventProcessor<ABI> | (() => SingleEventProcessor<ABI>)
+	v: SingleEventProcessor<ABI> | (() => SingleEventProcessor<ABI>),
 ): (config?: {folder: string}) => QueriableEventProcessor<ABI, void> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
@@ -47,19 +50,19 @@ export class SingleEventProcessorWrapper<ABI extends Abi> implements SingleEvent
 }
 
 export function fromSingleEventProcessorObject<ABI extends Abi>(
-	v: SingleEventProcessorObject<ABI> | (() => SingleEventProcessorObject<ABI>)
+	v: SingleEventProcessorObject<ABI> | (() => SingleEventProcessorObject<ABI>),
 ): (config?: {folder: string}) => QueriableEventProcessor<ABI, void> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);
 		return new EventProcessorOnDatabase(
 			typeof v === 'function' ? new SingleEventProcessorWrapper(v()) : new SingleEventProcessorWrapper(v),
-			db
+			db,
 		);
 	};
 }
 
 export function fromSingleEventProcessorWithBatchSupportObject<ABI extends Abi>(
-	v: SingleEventProcessorWithBatchSupport<ABI> | (() => SingleEventProcessorWithBatchSupport<ABI>)
+	v: SingleEventProcessorWithBatchSupport<ABI> | (() => SingleEventProcessorWithBatchSupport<ABI>),
 ): (config?: {folder: string}) => QueriableEventProcessor<ABI, void> {
 	return (config?: {folder: string}) => {
 		const db = new PouchDatabase(`${config?.folder || '__db__'}/data.db`);

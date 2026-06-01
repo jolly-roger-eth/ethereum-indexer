@@ -1,6 +1,6 @@
-import {JSObjectEventProcessor} from './JSObjectEventProcessor';
+import {JSObjectEventProcessor} from './JSObjectEventProcessor.js';
 import {Abi, ExtractAbiEvent, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
-import {EventFunctions, InputValues, JSObject} from './types';
+import {EventFunctions, InputValues, JSObject} from './types.js';
 
 export type EventWithArgs<ABI extends Abi, Property extends string> = LogEvent<ABI> & {
 	args: InputValues<ExtractAbiEvent<ABI, Property>>;
@@ -9,7 +9,7 @@ export type EventWithArgs<ABI extends Abi, Property extends string> = LogEvent<A
 export type JSProcessor<
 	ABI extends Abi,
 	ProcessResultType extends JSObject,
-	ProcessorConfig = undefined
+	ProcessorConfig = undefined,
 > = EventFunctions<ABI, ProcessResultType, ProcessorConfig> & {
 	version?: string;
 	construct(): ProcessResultType;
@@ -52,11 +52,13 @@ class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends
 }
 
 export function fromJSProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig>(
-	v: (() => JSProcessor<ABI, ProcessResultType, ProcessorConfig>) | JSProcessor<ABI, ProcessResultType, ProcessorConfig>
+	v:
+		| (() => JSProcessor<ABI, ProcessResultType, ProcessorConfig>)
+		| JSProcessor<ABI, ProcessResultType, ProcessorConfig>,
 ): () => JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig> {
 	return () => {
 		return new JSObjectEventProcessor<ABI, ProcessResultType, ProcessorConfig>(
-			new SingleJSONEventProcessorWrapper(typeof v === 'function' ? v() : v)
+			new SingleJSONEventProcessorWrapper(typeof v === 'function' ? v() : v),
 		);
 	};
 }

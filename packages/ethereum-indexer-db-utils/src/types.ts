@@ -1,5 +1,5 @@
-import {Abi, EventProcessor} from 'ethereum-indexer';
-import {FromDB, JSONObject, Query, Result} from './db/Database';
+import type {Abi, EventProcessor} from 'ethereum-indexer';
+import type {FromDB, JSONObject, Query, Result} from './db/Database.js';
 
 export type Queriable = {
 	query<T>(request: Query | (Query & ({blockHash: string} | {blockNumber: number}))): Promise<Result>;

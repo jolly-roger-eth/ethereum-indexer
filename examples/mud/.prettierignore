@@ -1,0 +1,7 @@
+# .gitignore ----------------
+dist/
+node_modules/
+# -----------------------------
+pnpm-lock.yaml
+*.md
+*.json

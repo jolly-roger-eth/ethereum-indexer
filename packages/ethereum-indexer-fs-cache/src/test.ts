@@ -1,18 +1,18 @@
-import {Abi, EventWithId} from 'ethereum-indexer';
+import {Abi, ParsedLogEvent} from 'ethereum-indexer';
 import {exportEvents, loadAll} from '.';
 import fs from 'fs-extra';
 
 let hashCounter = 1;
-function randomHash(): string {
-	return '0x4200000000000000000000000000000000000000' + (hashCounter++).toString().padStart(24, '0');
+function randomHash(): `0x${string}` {
+	return ('0x4200000000000000000000000000000000000000' + (hashCounter++).toString().padStart(24, '0')) as `0x${string}`;
 }
 
 let addressCounter = 1;
-function randomAddress(): string {
-	return '0x4200000000000000' + (addressCounter++).toString().padStart(24, '0');
+function randomAddress(): `0x${string}` {
+	return ('0x4200000000000000' + (addressCounter++).toString().padStart(24, '0')) as `0x${string}`;
 }
 
-function mutateViaTmpRandomEvent<ABI extends Abi>(events: EventWithId<ABI>[], index: number): EventWithId<ABI>[] {
+function mutateViaTmpRandomEvent<ABI extends Abi>(events: ParsedLogEvent<ABI>[], index: number): ParsedLogEvent<ABI>[] {
 	const event = events[index];
 	const mutated = {...event};
 	mutated.blockHash = randomHash();
@@ -23,7 +23,7 @@ function mutateViaTmpRandomEvent<ABI extends Abi>(events: EventWithId<ABI>[], in
 	return events;
 }
 
-function mutateViaTmpReversal<ABI extends Abi>(events: EventWithId<ABI>[], index: number): EventWithId<ABI>[] {
+function mutateViaTmpReversal<ABI extends Abi>(events: ParsedLogEvent<ABI>[], index: number): ParsedLogEvent<ABI>[] {
 	const event = events[index];
 	const sameInANewBlock = {...event};
 	sameInANewBlock.blockHash = randomHash();
@@ -42,9 +42,10 @@ function main() {
 	const startStr = args[2];
 	let eventStream = loadAll(srcFolder);
 
+	// TODO fix type, had to use any here
 	// -------------------------------------------------------
-	mutateViaTmpRandomEvent(eventStream, 0);
-	mutateViaTmpReversal(eventStream, 2);
+	mutateViaTmpRandomEvent(eventStream as any, 0);
+	mutateViaTmpReversal(eventStream as any, 2);
 	// ------------------------------------------------------
 
 	if (numEventsStr) {

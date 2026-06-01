@@ -1,30 +1,42 @@
 {
   "name": "ethereum-indexer-monorepo",
   "private": true,
-  "version": "0.0.1",
+  "type": "module",
   "devDependencies": {
-    "@changesets/cli": "^2.26.2",
+    "@changesets/cli": "^2.29.8",
     "ipfs-gateway-emulator": "4.2.1-ipfs.2",
+    "ldenv": "^0.3.16",
     "pwag": "^0.2.0",
-    "set-defaults": "^0.0.2",
-    "syncpack": "^11.2.1",
     "typedoc": "^0.25.3",
     "typedoc-plugin-markdown": "4.0.0-next.18",
     "typedoc-vitepress-theme": "1.0.0-next.3",
     "typescript": "^5.3.2",
-    "vitepress": "1.0.0-rc.30"
-  },
-  "volta": {
-    "node": "18.7.0"
+    "vitepress": "1.0.0-rc.30",
+    "zellij-launcher": "^0.0.1"
   },
   "scripts": {
-    "prepare": "set-defaults .vscode",
-    "build": "pnpm -r build",
-    "sync-deps": "syncpack fix-mismatches",
+    "prepare": "pnpm build",
+    "preinstall": "npx only-allow pnpm",
+    "cleandep": "rm -rf node_modules && pnpm -r exec rm -rf node_modules",
+    "---------------------- PUBLISH --------------------": "",
+    "prepublishOnly": "pnpm format:check && pnpm build",
+    "release": "pnpm prepublishOnly && git push --all && pnpm changeset publish && git push --tags",
+    "---------------------- FORMAT ----------------------": "",
+    "format": "pnpm -r format",
+    "format:check": "pnpm -r format:check",
+    "---------------------- DEV ----------------------": "",
+    "dev": "ldenv pnpm --filter './packages/*' dev",
+    "build": "ldenv pnpm --filter './packages/*' build",
+    "build:examples": "ldenv pnpm --filter './examples/*' build",
+    "---------------------- DOCUMENTATION ----------------------": "",
     "publish-typedoc": "typedoc --options typedoc.json ",
     "serve-docs": "ipfs-emulator --only -d docs -p 8080",
     "docs:dev": "pwag docs/public/icon.svg docs/web-config.json -o docs/public && npm run publish-typedoc && vitepress dev docs",
     "docs:build": "pwag docs/public/icon.svg docs/web-config.json -o docs/public && npm run publish-typedoc && vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "---------------------- RUN FULL LOCAL SETUP ----------------------": "",
+    "stop": "zellij kill-session $npm_package_name",
+    "start:pnpm": "pnpm -r dev",
+    "start": "zellij-launcher a $npm_package_name || zellij -n zellij.kdl -s $npm_package_name"
   }
 }

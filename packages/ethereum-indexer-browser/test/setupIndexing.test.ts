@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi, EventProcessorWithInitialState, IndexingSource, LastSync, LogEvent} from 'ethereum-indexer';
-import {createIndexerState} from '../src/IndexerState';
+import {createIndexerState} from '../src/IndexerState.js';
 
 // chainId '1' as the 0x-hex the provider returns
 const CHAIN_ID_HEX = '0x1';

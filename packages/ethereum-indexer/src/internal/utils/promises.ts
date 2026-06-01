@@ -28,9 +28,9 @@ export function createCancellablePromise<T>(
 		resolve: ResolveFunction<T>,
 		reject: RejectFunction,
 		unlessCancelled: UnlessCancelledFunction,
-		cancel: () => void
+		cancel: () => void,
 	) => void,
-	onCancel?: () => void
+	onCancel?: () => void,
 ): CancellablePromise<T> {
 	let resolve: ResolveFunction<T>;
 	let reject: RejectFunction;
@@ -77,7 +77,7 @@ export function createCancellablePromise<T>(
 			resolveIfNotCancelledAlready,
 			rejectIfNotCancelledAlready,
 			unlessCancelled as UnlessCancelledFunction,
-			cancel
+			cancel,
 		);
 	});
 
@@ -114,7 +114,7 @@ export type ActionOperations<T> = CancelOperations & {
 export function createAction<T, U = undefined, C = undefined>(
 	execute: U extends undefined
 		? (action: ActionOperations<T>) => void | Promise<T>
-		: (args: U, action: ActionOperations<T>) => void | Promise<T>
+		: (args: U, action: ActionOperations<T>) => void | Promise<T>,
 ) {
 	let _context: C | undefined;
 	let _promise: CancellablePromise<T> | undefined;
@@ -130,7 +130,7 @@ export function createAction<T, U = undefined, C = undefined>(
 		// object in the first slot instead.
 		const callExecutor = (
 			executeFn: (...a: any[]) => void | Promise<T>,
-			promiseAction: ActionOperations<T>
+			promiseAction: ActionOperations<T>,
 		): void | Promise<T> => {
 			return hasArgs ? executeFn(args, promiseAction) : executeFn(promiseAction);
 		};
@@ -156,7 +156,7 @@ export function createAction<T, U = undefined, C = undefined>(
 							},
 							() => {
 								p.cancel();
-							}
+							},
 						);
 					}) as CancellablePromise<T>;
 					// The queued execution is chained onto the in-flight one above.

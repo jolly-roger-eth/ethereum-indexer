@@ -1,7 +1,6 @@
 import {Abi, IndexingSource} from 'ethereum-indexer';
-import path from 'path';
-import fs from 'fs';
-import {SimpleServer} from './server/simple';
+import fs from 'node:fs';
+import {SimpleServer} from './server/simple.js';
 import {loadContracts} from 'ethereum-indexer-utils';
 
 export function runServer<ABI extends Abi>(
@@ -16,7 +15,7 @@ export function runServer<ABI extends Abi>(
 		disableSecurity: boolean;
 		useFSCache: boolean;
 		port?: string;
-	}
+	},
 ) {
 	let source: IndexingSource<ABI> | undefined;
 	if (args.deployments) {

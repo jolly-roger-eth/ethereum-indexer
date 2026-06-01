@@ -9,12 +9,12 @@ import type {
 	ProvidedIndexerConfig,
 } from 'ethereum-indexer';
 import {EthereumIndexer} from 'ethereum-indexer';
-import {createRootStore, createStore} from './utils/stores';
+import {createRootStore, createStore} from './utils/stores.js';
 import {ReactHooks, useStores} from 'use-stores';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {formatLastSync} from './utils/format';
+import {formatLastSync} from './utils/format.js';
 import {logs} from 'named-logs';
-import {wait} from './utils/time';
+import {wait} from './utils/time.js';
 const namedLogger = logs('ethereum-indexer-browser');
 
 export type ExtendedLastSync<ABI extends Abi> = LastSync<ABI> & {
@@ -46,15 +46,15 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
 			provider: EIP1193ProviderWithoutEvents;
 			source: IndexingSource<ABI>;
 			config?: ProvidedIndexerConfig<ABI>;
-	  }) => Promise<void>
+		}) => Promise<void>
 	: (
 			indexerSetup: {
 				provider: EIP1193ProviderWithoutEvents;
 				source: IndexingSource<ABI>;
 				config?: ProvidedIndexerConfig<ABI>;
 			},
-			processorConfig: ProcessorConfig
-	  ) => Promise<void>;
+			processorConfig: ProcessorConfig,
+		) => Promise<void>;
 
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
@@ -72,9 +72,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			provider: EIP1193ProviderWithoutEvents,
 			processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
 			source: IndexingSource<ABI>,
-			config: ProvidedIndexerConfig<ABI>
+			config: ProvidedIndexerConfig<ABI>,
 		) => EthereumIndexer<ABI, ProcessResultType>;
-	}
+	},
 ) {
 	const {
 		$state: $syncing,
@@ -116,7 +116,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		// keep the chain alive even if this step rejects (so a failure does not poison the queue)
 		reconfigureQueue = run.then(
 			() => undefined,
-			() => undefined
+			() => undefined,
 		);
 		return run;
 	}
@@ -127,7 +127,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			source: IndexingSource<ABI>;
 			config?: ProvidedIndexerConfig<ABI>;
 		},
-		processorConfig?: ProcessorConfig
+		processorConfig?: ProcessorConfig,
 	) {
 		if (indexer) {
 			throw new Error(`already initialised`);
@@ -151,7 +151,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					}
 					return (target as any)[p];
 				},
-			})
+			});
 		} else if (options?.logRequests) {
 			provider = new Proxy(indexerSetup.provider, {
 				get(target, p, receiver) {
@@ -166,8 +166,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 							let response;
 							try {
 								response = await target[p](args as any);
-								console.log(`  =>`, JSON.stringify(response))
-							} catch(err) {
+								console.log(`  =>`, JSON.stringify(response));
+							} catch (err) {
 								console.error(`  error:`, err);
 								throw err;
 							}
@@ -176,7 +176,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					}
 					return (target as any)[p];
 				},
-			})
+			});
 		}
 
 		if (processor.configure && processorConfig) {
@@ -235,14 +235,12 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no indexer`);
 		}
 		indexer.onLoad = async (loadingState) => {
-			
 			if (loadingState === 'Loading') {
 				setStatus({state: 'Loading'});
 			} else if (loadingState === 'FetchingEventStream') {
 				setSyncing({fetchingLogs: true});
 				setStatus({state: 'FetchingEventStream'});
 			} else if (loadingState === 'ProcessingEventStream') {
-				
 				setSyncing({fetchingLogs: false, processingFetchedLogs: true});
 				setStatus({state: 'ProcessingEventStream'});
 			} else if (loadingState === 'Loaded') {
@@ -322,7 +320,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no indexer`);
 		}
 
-		
 		try {
 			lastSync = await indexer.indexMore();
 			setLastSync(lastSync);
@@ -340,7 +337,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no lastSync`);
 		}
 
-
 		while (lastSync.lastToBlock !== lastSync.latestBlock) {
 			try {
 				lastSync = await indexer.indexMore();
@@ -352,7 +348,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				});
 			}
 		}
-		
+
 		return lastSync;
 	}
 
@@ -385,7 +381,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		if (!indexer) {
 			throw new Error(`no indexer`);
 		}
-		return indexer.reset()
+		return indexer.reset();
 	}
 
 	async function _auto_index() {
@@ -435,7 +431,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		reset,
 		updateProcessor(
 			newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
-			options?: {force?: boolean}
+			options?: {force?: boolean},
 		) {
 			if (!indexer) {
 				throw new Error(`no indexer setup, call init`);

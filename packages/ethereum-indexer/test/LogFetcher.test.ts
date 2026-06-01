@@ -12,7 +12,7 @@ describe('getNewToBlockFromError', () => {
 			// 0xEC23F5 === 15475701
 			const err = rpcError(
 				-32005,
-				'query returned more than 10000 results. Try with this block range [0xEC23E8, 0xEC23F5].'
+				'query returned more than 10000 results. Try with this block range [0xEC23E8, 0xEC23F5].',
 			);
 			expect(getNewToBlockFromError(err)).toBe(0xec23f5);
 		});

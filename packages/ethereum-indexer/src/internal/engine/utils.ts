@@ -1,5 +1,5 @@
-import {Abi} from 'abitype';
-import {EventBlock, LastSync, LogEvent} from '../../types';
+import type {Abi} from 'abitype';
+import type {EventBlock, LastSync, LogEvent} from '../../types.js';
 
 export function wait(seconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
@@ -40,7 +40,7 @@ export function generateStreamToAppend<ABI extends Abi>(
 		newLastFromBlock,
 		newLastToBlock,
 		finality,
-	}: {newLatestBlock: number; newLastFromBlock: number; newLastToBlock: number; finality: number}
+	}: {newLatestBlock: number; newLastFromBlock: number; newLastToBlock: number; finality: number},
 ): {eventStream: LogEvent<ABI>[]; newLastSync: LastSync<ABI>} {
 	const expectedFromBlock = getFromBlock(lastSync, defaultFromBlock, finality);
 
@@ -91,10 +91,10 @@ export function generateStreamToAppend<ABI extends Abi>(
 	const startingBlockForNewEvent = reorgBlock
 		? reorgBlock.number
 		: lastUnconfirmedBlocks.length > 0
-		? lastUnconfirmedBlocks[lastUnconfirmedBlocks.length - 1].number + 1
-		: logEventsGroupedPerBlock.length > 0
-		? logEventsGroupedPerBlock[0].number
-		: 0;
+			? lastUnconfirmedBlocks[lastUnconfirmedBlocks.length - 1].number + 1
+			: logEventsGroupedPerBlock.length > 0
+				? logEventsGroupedPerBlock[0].number
+				: 0;
 	// the case for 0 is a void case as none of the loop below will be triggered
 
 	// new events and new unconfirmed blocks
@@ -145,7 +145,7 @@ export function generateStreamToAppend<ABI extends Abi>(
 export function getFromBlock<ABI extends Abi>(
 	lastSync: LastSync<ABI>,
 	defaultFromBlock: number,
-	finality: number
+	finality: number,
 ): number {
 	return lastSync.latestBlock === 0
 		? defaultFromBlock

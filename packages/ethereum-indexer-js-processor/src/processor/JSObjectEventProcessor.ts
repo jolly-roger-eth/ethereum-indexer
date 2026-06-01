@@ -11,9 +11,9 @@ import {
 	UsedStreamConfig,
 } from 'ethereum-indexer';
 import {logs} from 'named-logs';
-import {History, HistoryJSObject} from './history';
-import {EventFunctions, JSObject} from './types';
-import {Draft, Immer} from './immer';
+import {History, HistoryJSObject} from './history.js';
+import {EventFunctions, JSObject} from './types.js';
+import {Draft, Immer} from './immer.js';
 
 // we do not auto freeze so we can reuse the raw state and modifiy it when needed (if events are known to be immutably included)
 const immer = new Immer({autoFreeze: false});
@@ -23,7 +23,7 @@ const namedLogger = logs('JSObjectEventProcessor');
 export type SingleEventJSONProcessor<
 	ABI extends Abi,
 	ProcessResultType extends JSObject,
-	ProcessorConfig = undefined
+	ProcessorConfig = undefined,
 > = EventFunctions<ABI, ProcessResultType> & {
 	version?: string;
 	createInitialState(): ProcessResultType;
@@ -31,9 +31,11 @@ export type SingleEventJSONProcessor<
 	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void | Promise<void>;
 };
 
-export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig = undefined>
-	implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>
-{
+export class JSObjectEventProcessor<
+	ABI extends Abi,
+	ProcessResultType extends JSObject,
+	ProcessorConfig = undefined,
+> implements EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig> {
 	protected _json: Partial<AllData<ABI, ProcessResultType, {history: HistoryJSObject}>>;
 	protected history: History;
 	protected keeper?: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
@@ -120,7 +122,7 @@ export class JSObjectEventProcessor<ABI extends Abi, ProcessResultType extends J
 
 	async load(
 		source: IndexingSource<ABI>,
-		streamConfig: UsedStreamConfig
+		streamConfig: UsedStreamConfig,
 	): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
 		this.finality = streamConfig.finality;
 		this.history.setFinality(this.finality);

@@ -1,5 +1,5 @@
 import {Abi, IndexingSource, LastSync, LogEvent} from 'ethereum-indexer';
-import { storage } from '../../utils/fs';
+import {storage} from '../../utils/fs.js';
 
 type StreamData<ABI extends Abi> = {
 	lastSync: LastSync<ABI>;
@@ -7,7 +7,7 @@ type StreamData<ABI extends Abi> = {
 };
 
 export function keepStreamOnFile<ABI extends Abi>(folder: string, name: string) {
-	const {get,set,del} = storage(folder);
+	const {get, set, del} = storage(folder);
 	return {
 		fetchFrom: async (source: IndexingSource<ABI>, fromBlock: number) => {
 			const storageID = `stream_${name}_${source.chainId}`;
@@ -17,7 +17,7 @@ export function keepStreamOnFile<ABI extends Abi>(folder: string, name: string) 
 				? {
 						eventStream: existingStream.eventStream.filter((v: any) => v.blockNumber >= fromBlock),
 						lastSync: existingStream.lastSync,
-				  }
+					}
 				: undefined;
 		},
 		saveNewEvents: async (source: IndexingSource<ABI>, stream: StreamData<ABI>) => {

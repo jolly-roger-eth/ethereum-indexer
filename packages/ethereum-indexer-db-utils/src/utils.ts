@@ -1,4 +1,4 @@
-import {Abi, LogEvent} from 'ethereum-indexer';
+import type {Abi, LogEvent} from 'ethereum-indexer';
 
 export function computeArchiveID(id: string, endBlock: number): string {
 	return `archive_${endBlock}_${id}`;

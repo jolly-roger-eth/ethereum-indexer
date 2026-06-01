@@ -16,7 +16,7 @@ export function keepStreamOnIndexedDB<ABI extends Abi>(name: string) {
 				? {
 						eventStream: existingStream.eventStream.filter((v: any) => v.blockNumber >= fromBlock),
 						lastSync: existingStream.lastSync,
-				  }
+					}
 				: undefined;
 		},
 		saveNewEvents: async (source: IndexingSource<ABI>, stream: StreamData<ABI>) => {

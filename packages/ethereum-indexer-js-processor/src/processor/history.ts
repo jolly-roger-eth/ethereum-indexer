@@ -1,5 +1,5 @@
-import {Patch, applyPatches} from './immer';
-import {JSObject} from './types';
+import {Patch, applyPatches} from './immer.js';
+import {JSObject} from './types.js';
 
 export type HistoryJSObject = {
 	reversals: {[blockHash: string]: Patch[][]};

@@ -102,7 +102,7 @@ describe('generateStreamToAppend', () => {
 				newLastToBlock: 600,
 				newLastFromBlock: 400, // wrong
 				finality,
-			})
+			}),
 		).toThrow();
 	});
 

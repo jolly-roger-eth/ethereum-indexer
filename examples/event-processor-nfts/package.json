@@ -1,10 +1,7 @@
 {
   "name": "event-processor-nfts",
   "private": true,
-  "version": "0.0.57",
-  "description": "",
   "type": "module",
-  "main": "dist/index.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "keywords": [],
@@ -16,14 +13,14 @@
     "named-logs": "^0.2.2"
   },
   "devDependencies": {
+    "as-soon": "^0.1.5",
     "ethereum-indexer-server": "workspace:*",
-    "tsup": "^8.0.1",
     "typescript": "^5.3.2"
   },
   "scripts": {
     "eis": "eis",
-    "test": "eis run -p ./dist/index.cjs --disableCache",
-    "build": "tsup src/index.ts --dts --format esm,cjs",
-    "watch": "tsup src/index.ts --dts --format esm,cjs --watch"
+    "test": "eis run -p ./dist/index.js --disableCache",
+    "build": "tsc && node scripts/version.mjs",
+		"watch": "as-soon -w src pnpm build"
   }
 }

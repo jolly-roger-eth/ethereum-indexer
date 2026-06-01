@@ -27,14 +27,14 @@ export type EventFunctions<ABI extends Abi, ProcessResultType extends JSObject, 
 		: (
 				json: ProcessResultType,
 				event: LogEvent<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>},
-				config: ProcessorConfig
-		  ) => Promise<void> | void;
+				config: ProcessorConfig,
+			) => Promise<void> | void;
 };
 
 export type MergedEventFunctions<
 	T extends {[name: string]: {abi: Abi}},
 	ProcessResultType extends JSObject,
-	ProcessorConfig = undefined
+	ProcessorConfig = undefined,
 > = EventFunctions<MergedAbis<T>, ProcessResultType, ProcessorConfig>;
 
 export type MergedAbis<T extends {[name: string]: {abi: Abi}}> = [...T[keyof T]['abi']];

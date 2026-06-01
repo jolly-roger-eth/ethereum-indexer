@@ -1,6 +1,6 @@
 import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
-import eip721 from './eip721';
-import {Data, NFT} from './types';
+import eip721 from './eip721.js';
+import {Data, NFT} from './types.js';
 
 // we just need to define as a JSProcessor type to get type safety automatically added
 // including event argument types
@@ -53,4 +53,4 @@ export const contractsData = {
 } as const;
 
 // export the types used so that it can be reused in the app using the indexer
-export * from './types';
+export * from './types.js';

@@ -1,11 +1,12 @@
-import {DBObjectWithRev, getID, ID, Database, DBObject, FromDB, JSONObject, JSONValue, Result} from './Database';
+import type {DBObjectWithRev, ID, Database, DBObject, FromDB, JSONObject, Result} from './Database.js';
+import {getID} from './Database.js';
 
 import PouchDB from 'pouchdb';
 import PouchDBFindPlugin from 'pouchdb-find';
 PouchDB.plugin(PouchDBFindPlugin);
 
 import {logs} from 'named-logs';
-import {bnReplacer, bnReviver} from '../utils';
+import {bnReplacer, bnReviver} from '../utils.js';
 const console = logs('PouchDatabase');
 
 export class PouchDatabase implements Database {
@@ -59,7 +60,9 @@ export class PouchDatabase implements Database {
 
 	async batchGet<T extends JSONObject>(ids: string[]): Promise<FromDB<T>[]> {
 		const {rows} = await this.pouchDB.allDocs({keys: ids, include_docs: true});
-		return rows.filter((v) => !('error' in v) && !v.value.deleted).map((v) => bnReviver((v as any).doc)) as unknown as FromDB<T>[];
+		return rows
+			.filter((v) => !('error' in v) && !v.value.deleted)
+			.map((v) => bnReviver((v as any).doc)) as unknown as FromDB<T>[];
 	}
 	async batchPut(objects: FromDB<JSONObject>[]): Promise<void> {
 		const response = await this.pouchDB.bulkDocs(bnReplacer(objects));
@@ -67,8 +70,8 @@ export class PouchDatabase implements Database {
 			JSON.stringify(
 				response,
 				(_, value) => (typeof value === 'bigint' ? value.toString() : value), // return everything else unchanged)}
-				2
-			)
+				2,
+			),
 		);
 	}
 	async batchDelete(ids: ID[]): Promise<void> {

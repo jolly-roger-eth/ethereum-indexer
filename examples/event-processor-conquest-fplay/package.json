@@ -1,10 +1,7 @@
 {
 	"name": "event-processor-conquest-fplay",
 	"private": true,
-	"version": "0.0.57",
-	"description": "",
 	"type": "module",
-	"main": "dist/index.cjs",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"keywords": [],
@@ -16,13 +13,14 @@
 		"named-logs": "^0.2.2"
 	},
 	"devDependencies": {
+		"as-soon": "^0.1.5",
 		"ethereum-indexer-server": "workspace:*",
-		"tsup": "^8.0.1",
 		"typescript": "^5.3.2"
 	},
 	"scripts": {
 		"eis": "eis",
 		"test": "eis run -p ./dist/index.js --disable-cache",
-		"build": "tsup-node src/index.ts --dts --format esm,cjs"
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build"
 	}
 }

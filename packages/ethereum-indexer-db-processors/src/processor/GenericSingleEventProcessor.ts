@@ -1,6 +1,6 @@
 import {Abi, LogEvent} from 'ethereum-indexer';
 import {PutAndGetDatabase} from 'ethereum-indexer-db-utils';
-import {SingleEventProcessor} from './EventProcessorOnDatabase';
+import {SingleEventProcessor} from './EventProcessorOnDatabase.js';
 
 export abstract class GenericSingleEventProcessor<ABI extends Abi> implements SingleEventProcessor<ABI> {
 	protected db: PutAndGetDatabase | undefined;

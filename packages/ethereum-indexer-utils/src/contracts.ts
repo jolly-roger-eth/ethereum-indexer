@@ -1,6 +1,6 @@
 import type {Abi, ContractData, IndexingSource} from 'ethereum-indexer';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 function mergeABIs(abi1: any[], abi2: any[]): any[] {
 	const namesUsed: {[name: string]: boolean} = {};
@@ -22,13 +22,11 @@ export function loadContracts<ABI extends Abi>(folderOrFile: string): IndexingSo
 	if (fs.statSync(folderOrFile).isDirectory()) {
 		return loadContractsFromFolder(folderOrFile);
 	} else {
-		return loadContractsFromFile(folderOrFile)
+		return loadContractsFromFile(folderOrFile);
 	}
 }
 
-
 export function loadContractsFromFile<ABI extends Abi>(file: string): IndexingSource<ABI> {
-
 	let contractSTR = fs.readFileSync(file, 'utf-8');
 	if (contractSTR.startsWith('export default {') && contractSTR.endsWith('} as const;')) {
 		contractSTR = contractSTR.slice(15, -10);
@@ -37,14 +35,10 @@ export function loadContractsFromFile<ABI extends Abi>(file: string): IndexingSo
 
 	return {
 		chainId: contracts.chainId,
-			contracts: Object.keys(contracts.contracts).map(
-				(name) => (contracts as any).contracts[name],
-			),
-		genesisHash: contracts.genesisHash
-	}
+		contracts: Object.keys(contracts.contracts).map((name) => (contracts as any).contracts[name]),
+		genesisHash: contracts.genesisHash,
+	};
 }
-
-
 
 export function loadContractsFromFolder<ABI extends Abi>(folder: string): IndexingSource<ABI> {
 	const contractsAdded: {[address: string]: {index: number}} = {};
@@ -101,6 +95,6 @@ export function loadContractsFromFolder<ABI extends Abi>(folder: string): Indexi
 	return {
 		chainId,
 		contracts: contractsData,
-		genesisHash
+		genesisHash,
 	};
 }

@@ -1,5 +1,5 @@
 import {Abi, AllData, simple_hash, LastSync, ProcessorContext} from 'ethereum-indexer';
-import { storage } from '../../utils/fs';
+import {storage} from '../../utils/fs.js';
 
 function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
 	const configHash = config ? simple_hash(config) : undefined;
@@ -10,18 +10,13 @@ type StateData<ABI extends Abi, ProcessResultType, Extra> = AllData<ABI, Process
 
 export type IndexedStateLocation = {url: string} | {prefix: string};
 
-
-
-export function keepStateOnFile<ABI extends Abi, ProcessResultType, ProcessorConfig>(
-	folder: string,
-	name: string
-) {
-	const {get,set,del} = storage(folder);
+export function keepStateOnFile<ABI extends Abi, ProcessResultType, ProcessorConfig>(folder: string, name: string) {
+	const {get, set, del} = storage(folder);
 	return {
 		fetch: async (context: ProcessorContext<ABI, ProcessorConfig>) => {
 			const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
-			
-			const existingState = await get<StateData<ABI, ProcessResultType, unknown>>(storageID)
+
+			const existingState = await get<StateData<ABI, ProcessResultType, unknown>>(storageID);
 
 			return existingState;
 		},
@@ -37,7 +32,7 @@ export function keepStateOnFile<ABI extends Abi, ProcessResultType, ProcessorCon
 		},
 		clear: async (context: ProcessorContext<ABI, ProcessorConfig>) => {
 			const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
-			await del(storageID)
+			await del(storageID);
 		},
 	};
 }

@@ -1,28 +1,26 @@
 {
   "name": "event-processor-conquest-eth",
   "private": true,
-  "version": "0.0.57",
-  "description": "",
   "type": "module",
-  "main": "dist/index.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "keywords": [],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "as-soon": "^0.1.5",
     "dotenv": "^16.3.1",
     "ethereum-indexer-js-processor": "workspace:*",
     "named-logs": "^0.2.2"
   },
   "devDependencies": {
     "ethereum-indexer-server": "workspace:*",
-    "tsup": "^8.0.1",
     "typescript": "^5.3.2"
   },
   "scripts": {
     "eis": "eis",
     "test": "eis run -p ./dist/index.js --disable-cache",
-    "build": "tsup-node src/index.ts --dts --format esm,cjs"
+    "build": "tsc",
+		"dev": "as-soon -w src pnpm build"
   }
 }

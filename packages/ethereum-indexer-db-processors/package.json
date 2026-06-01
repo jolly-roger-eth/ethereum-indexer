@@ -1,20 +1,13 @@
 {
 	"name": "ethereum-indexer-db-processors",
 	"version": "0.6.21",
-	"description": "",
 	"publishConfig": {
 		"access": "public"
 	},
 	"type": "module",
-	"main": "dist/index.cjs",
 	"module": "dist/index.js",
 	"types": "dist/index.d.ts",
-	"keywords": [],
-	"author": "",
 	"license": "MIT",
-	"volta": {
-		"node": "18.7.0"
-	},
 	"dependencies": {
 		"ethereum-indexer": "workspace:*",
 		"ethereum-indexer-db-utils": "workspace:*",
@@ -24,11 +17,16 @@
 	},
 	"devDependencies": {
 		"@types/pouchdb": "^6.4.2",
-		"tsup": "^8.0.1",
-		"typescript": "^5.3.2"
+		"as-soon": "^0.1.5",
+		"prettier": "^3.8.0",
+		"tsx": "^4.21.0",
+		"typescript": "^5.3.3"
 	},
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
-		"build": "tsup src/index.ts --dts --format esm,cjs"
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build",
+		"test": "echo \"Error: no test specified\" && exit 1"
 	}
 }

@@ -1,19 +1,15 @@
 {
   "name": "ethereum-indexer-cli",
   "version": "0.6.30",
-  "description": "",
-  "keywords": [],
-  "author": "",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
-  "main": "dist/index.cjs",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "ei": "dist/cli.cjs"
+    "ei": "dist/cli.js"
   },
   "dependencies": {
     "commander": "^11.1.0",
@@ -27,15 +23,19 @@
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.10.0",
+    "as-soon": "^0.1.5",
     "eip-1193": "^0.4.7",
     "fs-extra": "^11.1.1",
-    "tsup": "^8.0.1",
-    "typescript": "^5.3.2"
+		"prettier": "^3.8.0",
+		"tsx": "^4.21.0",
+		"typescript": "^5.3.3"
   },
   "scripts": {
-    "build": "tsup --entry src/index.ts --entry src/cli.ts --dts --format esm,cjs",
-    "dev": "tsup --entry src/index.ts --entry src/cli.ts --dts --watch --format esm,cjs",
-    "cli": "node ./dist/cli.cjs",
-    "test": "ldenv -m localhost node ./dist/cli.cjs -p ../../../../../wighawag/jolly-roger/indexer/dist/index.cjs -n @@RPC_URL_:DEPLOYMENT_CONTEXT,RPC_URL -f output.json -d ../../../../wighawag/jolly-roger/contracts/deployments/@@DEPLOYMENT_CONTEXT @@"
+    "format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build",
+    "cli": "node ./dist/cli.js",
+    "test": "ldenv -m localhost node ./dist/cli.js -p ../../../../../wighawag/jolly-roger/indexer/dist/index.js -n @@RPC_URL_:DEPLOYMENT_CONTEXT,RPC_URL -f output.json -d ../../../../wighawag/jolly-roger/contracts/deployments/@@DEPLOYMENT_CONTEXT @@"
   }
 }

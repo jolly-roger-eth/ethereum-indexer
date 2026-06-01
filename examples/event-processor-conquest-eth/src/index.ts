@@ -2,9 +2,9 @@ import {JSProcessor, fromJSProcessor} from 'ethereum-indexer-js-processor';
 
 import {logs} from 'named-logs';
 
-import OuterSpace from './abis/OuterSpace';
-import erc20 from './abis/erc20';
-import {Data, Planet, Player, StakedPlanet} from './types/db';
+import OuterSpace from './abis/OuterSpace.js';
+import erc20 from './abis/erc20.js';
+import {Data, Planet, Player, StakedPlanet} from './types/db.js';
 
 const namedLogger = logs('ConquestEventProcessor');
 
@@ -292,7 +292,7 @@ const ConquestEventProcessor: JSProcessor<typeof OuterSpace, Data> = {
 				console.log(
 					`planet ${locationToXYID(event.args.destination.toString())} exit is interupted... ${
 						stakedPlanet.stakeDeposited
-					}`
+					}`,
 				);
 				data.currentStakeMinusPendingExit += stakedPlanet.stakeDeposited;
 			}

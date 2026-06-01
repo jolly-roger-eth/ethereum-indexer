@@ -1,10 +1,10 @@
-import {Abi} from 'abitype';
-import {EIP1193DATA, EIP1193Log, EIP1193QUANTITY} from 'eip-1193';
-import {DecodeEventLogReturnType} from 'viem';
-import {NumberifiedLog} from './internal/decoding/LogEventFetcher';
-import {LogTransactionData} from './internal/engine/ethereum';
-import {LogFetcherConfig} from './internal/engine/LogFetcher';
-import {JSONObject} from './internal/types';
+import type {Abi} from 'abitype';
+import type {EIP1193DATA, EIP1193Log, EIP1193QUANTITY} from 'eip-1193';
+import type {DecodeEventLogReturnType} from 'viem';
+import type {NumberifiedLog} from './internal/decoding/LogEventFetcher.js';
+import type {LogTransactionData} from './internal/engine/ethereum.js';
+import type {LogFetcherConfig} from './internal/engine/LogFetcher.js';
+import type {JSONObject} from './internal/types.js';
 
 export type EventBlock<ABI extends Abi> = {
 	number: number;
@@ -33,7 +33,7 @@ export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	getVersionHash(): string;
 	load: (
 		source: IndexingSource<ABI>,
-		streamConfig: UsedStreamConfig
+		streamConfig: UsedStreamConfig,
 	) => Promise<{state: ProcessResultType; lastSync: LastSync<ABI>} | undefined>;
 	process: (eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) => Promise<ProcessResultType>;
 	reset: () => Promise<void>;
@@ -85,14 +85,14 @@ export type IndexingSource<ABI extends Abi> = {
 
 export type StreamFetcher<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
-	fromBlock: number
+	fromBlock: number,
 ) => Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]} | undefined>;
 export type StreamSaver<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	stream: {
 		lastSync: LastSync<ABI>;
 		eventStream: LogEvent<ABI>[];
-	}
+	},
 ) => Promise<void>;
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
@@ -151,12 +151,12 @@ export type ProcessorContext<ABI extends Abi, ProcessorConfig> = ProcessorConfig
 	? {
 			readonly source: IndexingSource<ABI>;
 			version?: string;
-	  }
+		}
 	: {
 			readonly source: IndexingSource<ABI>;
 			readonly config: ProcessorConfig;
 			version?: string;
-	  };
+		};
 
 export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
 	state: ProcessResultType;
@@ -164,11 +164,11 @@ export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
 } & Extra;
 
 export type ExistingStateFetcher<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
-	context: ProcessorContext<ABI, ProcessorConfig>
+	context: ProcessorContext<ABI, ProcessorConfig>,
 ) => Promise<AllData<ABI, ProcessResultType, Extra>>;
 export type StateSaver<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
 	context: ProcessorContext<ABI, ProcessorConfig>,
-	all: AllData<ABI, ProcessResultType, Extra>
+	all: AllData<ABI, ProcessResultType, Extra>,
 ) => Promise<void>;
 
 export type KeepState<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = {

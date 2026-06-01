@@ -1,4 +1,3 @@
-
 export type JSONObject = {
 	[key: string]: JSONType;
 };

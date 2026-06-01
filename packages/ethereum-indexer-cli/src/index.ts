@@ -8,15 +8,14 @@ import {
 	KeepState,
 	ProcessorContext,
 } from 'ethereum-indexer';
-import type {Options} from './types';
+import type {Options} from './types.js';
 import {logs} from 'named-logs';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import {contextFilenames, loadContracts} from 'ethereum-indexer-utils';
-import {bnReplacer, bnReviver} from './utils/bn';
-import {createRequire} from 'module';
+import {bnReplacer, bnReviver} from './utils/bn.js';
 
 const logger = logs('ei');
 
@@ -25,8 +24,8 @@ type ProcessorWithKeepState<ABI extends Abi> = {
 };
 
 function filepaths(folder: string, context: ProcessorContext<Abi, any>) {
-	const {stateFile, lastSyncFile} = contextFilenames(context)
-	return {stateFile: path.join(folder, stateFile),lastSyncFile:path.join(folder, lastSyncFile)}
+	const {stateFile, lastSyncFile} = contextFilenames(context);
+	return {stateFile: path.join(folder, stateFile), lastSyncFile: path.join(folder, lastSyncFile)};
 }
 
 // TODO ethereum-indexer-server could reuse
@@ -42,19 +41,13 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 	if (path.isAbsolute(options.processor)) {
 		processorModule = await import(options.processor);
 	} else {
-		try {
-			processorModule = await import(path.join(process.cwd(), options.processor));
-		} catch (err: any) {
-			processorModule = await import(
-				createRequire(`${process.cwd()}/node_modules/`).resolve(options.processor)
-			);
-		}
+		processorModule = await import(path.join(process.cwd(), options.processor));
 	}
 	const processorFactory = processorModule.createProcessor as (config?: any) => EventProcessor<ABI, ProcessResultType>;
 
 	if (!processorFactory) {
 		throw new Error(
-			`processor field could not be found: check module at ${options.processor} if it exports a "processor" field`
+			`processor field could not be found: check module at ${options.processor} if it exports a "processor" field`,
 		);
 	}
 
@@ -64,7 +57,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 
 		if (!processor) {
 			throw new Error(
-				`Processor could not be created, check the function exported as "processor" in module ${options.processor}`
+				`Processor could not be created, check the function exported as "processor" in module ${options.processor}`,
 			);
 		}
 	} else {
@@ -75,14 +68,11 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 		throw new Error(`this processor do not support "keepState" config`);
 	}
 
-	
-
 	(processor as unknown as ProcessorWithKeepState<ABI>).keepState({
 		fetch: async (context: ProcessorContext<ABI, any>) => {
 			const {stateFile} = filepaths(options.folder, context);
 			// console.log({reading: stateFile});
 			try {
-				
 				const content = fs.readFileSync(stateFile, 'utf-8');
 				const json = JSON.parse(content, bnReviver);
 				return {
@@ -96,7 +86,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 			}
 		},
 		save: async (context, all) => {
-			const {stateFile,lastSyncFile} = filepaths(options.folder, context);
+			const {stateFile, lastSyncFile} = filepaths(options.folder, context);
 			// console.log({saving: stateFile, sync: lastSyncFile});
 			const data = {lastSync: all.lastSync, state: all.state, history: all.history};
 			const dirname = path.dirname(stateFile);
@@ -121,7 +111,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 		if (processorModule.contractsDataPerChain) {
 			let chainIDAsHex: `0x${string}`;
 			try {
-				chainIDAsHex = await eip1193Provider.request({method: 'eth_chainId'}) as `0x${string}`;
+				chainIDAsHex = (await eip1193Provider.request({method: 'eth_chainId'})) as `0x${string}`;
 			} catch (err) {
 				console.error(`could not fetch chainID`);
 				throw err;
@@ -155,7 +145,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 
 	if (!source || !source.contracts) {
 		throw new Error(
-			`contracts data not found in the processor module, it needs to be provided either as exported field named "contractsData" or as field "contractsDataPerChain" indexed by chainID`
+			`contracts data not found in the processor module, it needs to be provided either as exported field named "contractsData" or as field "contractsDataPerChain" indexed by chainID`,
 		);
 	}
 

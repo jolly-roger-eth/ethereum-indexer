@@ -1,6 +1,6 @@
 import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, UsedStreamConfig} from 'ethereum-indexer';
 import {logs} from 'named-logs';
-import {Database, FromDB, JSONObject, Query, Result} from '../db/Database';
+import {Database, FromDB, JSONObject, Query, Result} from '../db/Database.js';
 const console = logs('EventCache');
 
 function lexicographicNumber15(num: number): string {
@@ -10,7 +10,10 @@ function lexicographicNumber15(num: number): string {
 export class EventCache<ABI extends Abi, ProcessResultType> implements EventProcessor<ABI, ProcessResultType> {
 	protected eventDB: Database;
 	protected initialization: Promise<void> | undefined;
-	constructor(protected processor: EventProcessor<ABI, ProcessResultType>, database: Database) {
+	constructor(
+		protected processor: EventProcessor<ABI, ProcessResultType>,
+		database: Database,
+	) {
 		this.eventDB = database;
 		this.initialization = this.init();
 	}
@@ -42,7 +45,7 @@ export class EventCache<ABI extends Abi, ProcessResultType> implements EventProc
 
 	async load(
 		source: IndexingSource<ABI>,
-		streamConfig: UsedStreamConfig
+		streamConfig: UsedStreamConfig,
 	): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
 		const lastSyncFromProcessor = await this.processor.load(source, streamConfig);
 		if (lastSyncFromProcessor) {
@@ -85,8 +88,8 @@ export class EventCache<ABI extends Abi, ProcessResultType> implements EventProc
 				JSON.stringify(
 					lastSync,
 					(_, value) => (typeof value === 'bigint' ? value.toString() : value), // return everything else unchanged)}
-					2
-				)
+					2,
+				),
 			);
 
 			for (let i = 0; i < lastSync.batch; i++) {

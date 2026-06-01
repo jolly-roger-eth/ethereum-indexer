@@ -1,6 +1,6 @@
-export * from './types';
-export * from './indexer';
-export * from './utils';
+export * from './types.js';
+export * from './indexer.js';
+export * from './utils/index.js';
 
 export type {
 	Abi,
@@ -35,7 +35,7 @@ export type {
 	TypedDataType,
 } from 'abitype';
 
-export { Register, DefaultRegister, ResolvedRegister } from 'abitype'
+export {Register, DefaultRegister, ResolvedRegister} from 'abitype';
 
 export type {
 	AbiParameterToPrimitiveType,

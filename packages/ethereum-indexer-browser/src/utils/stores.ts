@@ -1,7 +1,7 @@
 import {writable, type Readable} from 'sveltore';
 
 export function createStore<T extends {[field: string]: unknown}>(
-	$state: T
+	$state: T,
 ): {
 	set(data: Partial<T>): void;
 	readonly $state: T;

@@ -1,9 +1,9 @@
-export * from './IndexerState';
+export * from './IndexerState.js';
 
 export {simple_hash} from 'ethereum-indexer';
-export * from './storage/state/OnIndexedDB';
-export * from './storage/state/OnLocalStorage';
-export * from './storage/stream/OnIndexedDB';
+export * from './storage/state/OnIndexedDB.js';
+export * from './storage/state/OnLocalStorage.js';
+export * from './storage/stream/OnIndexedDB.js';
 
 // convenience : export type from ethereum-indexer and incidently from abitype
 

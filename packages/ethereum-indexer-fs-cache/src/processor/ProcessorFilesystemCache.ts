@@ -9,11 +9,15 @@ function identity(arg: any): any {
 	return arg;
 }
 
-export class ProcessorFilesystemCache<ABI extends Abi, ProcessResultType>
-	implements EventProcessor<ABI, ProcessResultType>
-{
+export class ProcessorFilesystemCache<ABI extends Abi, ProcessResultType> implements EventProcessor<
+	ABI,
+	ProcessResultType
+> {
 	protected folder: string;
-	constructor(protected processor: EventProcessor<ABI, ProcessResultType>, folder: string) {
+	constructor(
+		protected processor: EventProcessor<ABI, ProcessResultType>,
+		folder: string,
+	) {
 		this.folder = path.join(folder, 'logs');
 		try {
 			fs.mkdirSync(this.folder, {recursive: true});
@@ -44,7 +48,7 @@ export class ProcessorFilesystemCache<ABI extends Abi, ProcessResultType>
 
 	async load(
 		source: IndexingSource<ABI>,
-		streamConfig: UsedStreamConfig
+		streamConfig: UsedStreamConfig,
 	): Promise<{lastSync: LastSync<ABI>; state: ProcessResultType} | undefined> {
 		let lastSync: LastSync<ABI> | undefined;
 		try {

@@ -1,5 +1,5 @@
 import type {Abi, ExistingStream, LastSync, LogEvent} from 'ethereum-indexer';
-import {Database} from '../db/Database';
+import {Database} from '../db/Database.js';
 
 export async function setupCache<ABI extends Abi>(database: Database): Promise<ExistingStream<ABI>> {
 	await database.setup({

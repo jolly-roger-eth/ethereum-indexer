@@ -24,7 +24,10 @@ export type Block = BlockWithOnlyNumber & {hash: string};
 export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWithBatchSupport {
 	protected currentEvent: LogEvent<ABI> | undefined;
 	protected finality: number | undefined;
-	constructor(protected db: Database, protected keepAllHistory?: boolean) {}
+	constructor(
+		protected db: Database,
+		protected keepAllHistory?: boolean,
+	) {}
 
 	setFinality(finality: number) {
 		this.finality = finality;
@@ -223,7 +226,7 @@ export class RevertableDatabase<ABI extends Abi> implements PutAndGetDatabaseWit
 		const {docs: list} = await this.db.query(query);
 		return {
 			docs: list.filter(
-				(v) => (v.startBlock as number) <= (blockNumber as number) && (v.endBlock as number) >= (blockNumber as number)
+				(v) => (v.startBlock as number) <= (blockNumber as number) && (v.endBlock as number) >= (blockNumber as number),
 			),
 		};
 		// return { docs: list };

@@ -18,7 +18,7 @@ export type Planet = {
 
 export type StakedPlanet = {
 	location: string;
-	owner: string;
+	owner?: string;
 	flagTime: number;
 	stakeDeposited: bigint;
 	exitTime: number;

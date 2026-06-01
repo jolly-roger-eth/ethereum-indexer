@@ -9,8 +9,8 @@ import {
 } from 'eip-1193';
 
 import {logs} from 'named-logs';
-import {IncludedEIP1193Log} from '../../types';
-import {UnlessCancelledFunction} from '../utils/promises';
+import type {IncludedEIP1193Log} from '../../types.js';
+import {UnlessCancelledFunction} from '../utils/promises.js';
 const namedLogger = logs('ethereum-utils');
 
 /**
@@ -51,7 +51,7 @@ export async function getChainId(provider: EIP1193ProviderWithoutEvents): Promis
 // NOTE: only interested in the timestamp for now
 export async function getBlockData(
 	provider: EIP1193ProviderWithoutEvents,
-	hash: EIP1193DATA
+	hash: EIP1193DATA,
 ): Promise<{timestamp: number}> {
 	const blockWithHexStringFields = await provider.request({method: 'eth_getBlockByHash', params: [hash, false]});
 	if (!blockWithHexStringFields) {
@@ -65,7 +65,7 @@ export async function getBlockData(
 // NOTE: only interested in the timestamp for now
 export async function getBlockDataFromMultipleHashes(
 	provider: EIP1193ProviderWithoutEvents,
-	hashes: string[]
+	hashes: string[],
 ): Promise<{timestamp: number}[]> {
 	const requests: EIP1193GenericRequest[] = [];
 	for (const hash of hashes) {
@@ -86,7 +86,7 @@ export async function getBlockDataFromMultipleHashes(
 
 export async function getTransactionData(
 	provider: EIP1193ProviderWithoutEvents,
-	hash: EIP1193DATA
+	hash: EIP1193DATA,
 ): Promise<LogTransactionData> {
 	const transactionReceiptWithHexStringFields = await provider.request({
 		method: 'eth_getTransactionReceipt',
@@ -106,7 +106,7 @@ export async function getTransactionData(
 
 export async function getTransactionDataFromMultipleHashes(
 	provider: EIP1193ProviderWithoutEvents,
-	hashes: string[]
+	hashes: string[],
 ): Promise<LogTransactionData[]> {
 	const requests: EIP1193GenericRequest[] = [];
 	for (const hash of hashes) {
@@ -135,7 +135,7 @@ export function generateLogRequestForTopicsAndFiltersCombinations(
 	eventNameTopics: EIP1193DATA[],
 	filters?: {
 		[topicSignature: `0x${string}`]: {contractAddresses?: `0x${string}`[]; list: (`0x${string}` | `0x${string}`[])[][]};
-	}
+	},
 ): LogRequest[] {
 	if (!filters) {
 		return [{topics: [eventNameTopics], contractAddresses}];
@@ -173,7 +173,7 @@ export async function getLogsWithVariousFilters(
 	eventNameTopics: EIP1193DATA[] | null,
 	filters: ExtraFilters | null,
 	options: {fromBlock: number; toBlock: number},
-	unlessCancelled: UnlessCancelledFunction
+	unlessCancelled: UnlessCancelledFunction,
 ): Promise<IncludedEIP1193Log[]> {
 	if (!eventNameTopics) {
 		return getLogs(provider, contractAddresses, eventNameTopics ? [eventNameTopics] : null, options);
@@ -181,7 +181,7 @@ export async function getLogsWithVariousFilters(
 	const requestList = generateLogRequestForTopicsAndFiltersCombinations(
 		contractAddresses,
 		eventNameTopics,
-		filters ? filters : undefined
+		filters ? filters : undefined,
 	);
 
 	const logs: IncludedEIP1193Log[] = [];
@@ -229,7 +229,7 @@ export async function getLogs(
 	provider: EIP1193ProviderWithoutEvents,
 	contractAddresses: EIP1193Account[] | null,
 	topics: (EIP1193DATA | EIP1193DATA[])[] | null,
-	options: {fromBlock: number; toBlock: number}
+	options: {fromBlock: number; toBlock: number},
 ): Promise<IncludedEIP1193Log[]> {
 	const logs: EIP1193Log[] = await provider.request({
 		method: 'eth_getLogs',

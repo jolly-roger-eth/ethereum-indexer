@@ -1,7 +1,7 @@
 import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
 
-import eip721 from './eip721';
-import {Data, Bleep} from './types';
+import eip721 from './eip721.js';
+import {Data, Bleep} from './types.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -17,7 +17,7 @@ const BleepsEventProcessor: JSProcessor<typeof eip721, Data> = {
 
 		const tokenID = event.args.id.toString();
 
-		let bleep: Bleep;
+		let bleep: Bleep | undefined;
 		let index = data.bleeps.findIndex((v) => v.tokenID === tokenID);
 		if (index !== -1) {
 			bleep = data.bleeps[index];

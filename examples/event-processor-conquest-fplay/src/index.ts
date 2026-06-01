@@ -1,7 +1,7 @@
 import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
 
-import eip20 from './eip20';
-import {Account, Data} from './types';
+import eip20 from './eip20.js';
+import {Account, Data} from './types.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 

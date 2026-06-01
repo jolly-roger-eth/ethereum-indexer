@@ -1,10 +1,10 @@
-import {Abi} from 'abitype';
-import {EIP1193Account, EIP1193DATA, EIP1193Provider, EIP1193QUANTITY} from 'eip-1193';
+import type {Abi} from 'abitype';
+import type {EIP1193Account, EIP1193DATA, EIP1193Provider, EIP1193QUANTITY} from 'eip-1193';
 import {decodeFunctionResult, encodeFunctionData} from 'viem';
 import {logs} from 'named-logs';
-import {JSONType} from '../types';
-import {LogEvent} from '../../types';
-import {normalizeAddress} from './address';
+import type {JSONType} from '../types.js';
+import type {LogEvent} from '../../types.js';
+import {normalizeAddress} from './address.js';
 
 const namedLogger = logs('ethereum-indexer');
 
@@ -73,7 +73,7 @@ export function getmMulti165CallData(contractAddresses: EIP1193Account[]): {
 
 export async function multi165(
 	provider: EIP1193Provider,
-	contractAddresses: EIP1193Account[]
+	contractAddresses: EIP1193Account[],
 ): Promise<readonly boolean[]> {
 	const callData = getmMulti165CallData(contractAddresses);
 	// TODO specify blockHash for event post the deployment of Multi165 ?
@@ -106,7 +106,7 @@ export async function splitCallAndJoin(provider: EIP1193Provider, contractAddres
 
 export function createER721Filter<ABI extends Abi>(
 	provider: EIP1193Provider,
-	options?: {skipUnParsedEvents?: boolean}
+	options?: {skipUnParsedEvents?: boolean},
 ): (eventsFetched: LogEvent<ABI>[]) => Promise<LogEvent<ABI>[]> {
 	const erc721Contracts: {[address: EIP1193Account]: boolean} = {};
 	return async (eventsFetched: LogEvent<ABI>[]): Promise<LogEvent<ABI>[]> => {
@@ -131,7 +131,7 @@ export function createER721Filter<ABI extends Abi>(
 			}
 		}
 
-		const events = [];
+		const events: LogEvent<ABI>[] = [];
 		for (const event of eventsFetched) {
 			const eventAddress = normalizeAddress(event.address);
 			const inCache = erc721Contracts[eventAddress];
@@ -172,7 +172,7 @@ export async function tokenURI(
 	provider: EIP1193Provider,
 	contract: EIP1193Account,
 	tokenID: bigint,
-	blockHash: EIP1193DATA
+	blockHash: EIP1193DATA,
 ): Promise<string> {
 	const data = encodeFunctionData({abi: tokenURIInterface, functionName: 'tokenURI', args: [tokenID]});
 	const response = await provider.request({method: 'eth_call', params: [{to: contract, data}, {blockHash}]});
@@ -181,7 +181,7 @@ export async function tokenURI(
 }
 
 export function createER721TokenURIFetcher<ABI extends Abi>(
-	provider: EIP1193Provider
+	provider: EIP1193Provider,
 ): (event: LogEvent<ABI>) => Promise<JSONType | undefined> {
 	return async (event: LogEvent<ABI>): Promise<JSONType | undefined> => {
 		if (!('args' in event)) {

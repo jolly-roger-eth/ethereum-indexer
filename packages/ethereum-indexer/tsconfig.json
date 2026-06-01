@@ -1,12 +1,22 @@
 {
 	"compilerOptions": {
-		"moduleResolution": "node",
-		"lib": ["ES6", "DOM", "ES2017.String"],
-		"target": "ES6",
+		"target": "ESNext",
+		"module": "NodeNext",
+		"lib": ["ESNext", "dom"],
+		"moduleResolution": "NodeNext",
 		"declaration": true,
 		"declarationMap": true,
 		"sourceMap": true,
 		"strict": true,
-		"skipLibCheck": true
-	}
+		"strictNullChecks": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"resolveJsonModule": true,
+		"forceConsistentCasingInFileNames": true,
+		"allowImportingTsExtensions": false,
+		"rootDir": "./src",
+		"outDir": "./dist"
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules", "dist"]
 }

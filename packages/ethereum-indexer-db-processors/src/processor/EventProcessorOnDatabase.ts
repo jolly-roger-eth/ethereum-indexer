@@ -9,7 +9,7 @@ import {
 	Result,
 } from 'ethereum-indexer-db-utils';
 import {logs} from 'named-logs';
-import {RevertableDatabase} from './RevertableDatabase';
+import {RevertableDatabase} from './RevertableDatabase.js';
 
 const console = logs('EventProcessorOnDatabase');
 
@@ -23,7 +23,10 @@ export interface SingleEventProcessor<ABI extends Abi> {
 export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEventProcessor<ABI, void> {
 	private initialization: Promise<void> | undefined;
 	private revertableDatabase: RevertableDatabase<ABI>;
-	constructor(private singleEventProcessor: SingleEventProcessor<ABI>, protected db: Database) {
+	constructor(
+		private singleEventProcessor: SingleEventProcessor<ABI>,
+		protected db: Database,
+	) {
 		this.initialization = this.init();
 		// this.revertableDatabase = new RevertableDatabase(db, true); // this allow time-travel queries but requires processing and will not scale
 		this.revertableDatabase = new RevertableDatabase(db);
@@ -54,7 +57,7 @@ export class EventProcessorOnDatabase<ABI extends Abi> implements QueriableEvent
 
 	async load(
 		source: IndexingSource<ABI>,
-		streamConfig: UsedStreamConfig
+		streamConfig: UsedStreamConfig,
 	): Promise<{lastSync: LastSync<ABI>; state: void} | undefined> {
 		this.revertableDatabase.setFinality(streamConfig.finality);
 		// TODO check if source matches old sync

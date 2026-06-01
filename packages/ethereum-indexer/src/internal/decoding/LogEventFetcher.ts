@@ -1,13 +1,19 @@
 import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {ExtraFilters} from '../engine/ethereum';
-import {LogFetcher, LogFetcherConfig} from '../engine/LogFetcher';
+import {ExtraFilters} from '../engine/ethereum.js';
+import {LogFetcher, LogFetcherConfig} from '../engine/LogFetcher.js';
 import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
 import {decodeEventLog, encodeEventTopics} from 'viem';
-import {deepEqual} from '../utils/compare';
-import {IncludedEIP1193Log, LogEvent, LogEventWithParsingFailure, LogParseConfig, ParsedLogEvent} from '../../types';
-import {normalizeAddress} from '../utils/address';
-import {UnlessCancelledFunction} from '../utils/promises';
+import {deepEqual} from '../utils/compare.js';
+import type {
+	IncludedEIP1193Log,
+	LogEvent,
+	LogEventWithParsingFailure,
+	LogParseConfig,
+	ParsedLogEvent,
+} from '../../types.js';
+import {normalizeAddress} from '../utils/address.js';
+import {UnlessCancelledFunction} from '../utils/promises.js';
 
 function deleteDuplicateEvents(events: AbiEvent[], failOnIdenticalNameButDifferentInputs: boolean) {
 	const map = new Map();
@@ -57,7 +63,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 		readonly provider: EIP1193ProviderWithoutEvents,
 		readonly contractsData: ContractList<ABI> | OneABI<ABI>,
 		readonly fetcherConfig: LogFetcherConfig = {},
-		private readonly parseConfig?: LogParseConfig
+		private readonly parseConfig?: LogParseConfig,
 	) {
 		const _abiEventPerTopic: Map<`0x${string}`, AbiEvent> = new Map();
 		const _nameToTopic: Map<string, `0x${string}`> = new Map();
@@ -139,7 +145,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 
 	async getLogEvents(
 		options: {fromBlock: number; toBlock: number; retry?: number},
-		unlessCancelled: UnlessCancelledFunction
+		unlessCancelled: UnlessCancelledFunction,
 	): Promise<ParsedLogsResult<ABI>> {
 		const {logs, toBlockUsed} = await this.getLogs(options, unlessCancelled);
 		const events = this.parse(logs);

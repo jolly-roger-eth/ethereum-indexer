@@ -3,9 +3,9 @@ import {loadEnv} from 'ldenv';
 loadEnv();
 
 import {Command} from 'commander';
-import pkg from '../package.json';
-import {run} from '.';
-import type {Options} from './types';
+import pkg from '../package.json' with {type: 'json'};
+import {run} from './index.js';
+import type {Options} from './types.js';
 
 const program = new Command();
 
@@ -16,23 +16,20 @@ program
 	.description('Run The Indexer And Write To File')
 	.requiredOption(
 		'-p, --processor <path>',
-		`path to the event processor module (need to export a field named "createProcessor")`
+		`path to the event processor module (need to export a field named "createProcessor")`,
 	)
 	.requiredOption('-f, --folder <value>', 'folder to read and write to')
 	.option(
 		'-d, --deployments <value>',
-		"path the folder containing contract deployments, use hardhat-deploy/rocketh format, optional if processor's module provide it"
+		"path the folder containing contract deployments, use hardhat-deploy/rocketh format, optional if processor's module provide it",
 	)
-	.option(
-		'--rps <value>',
-		"request per seconds"
-	);
+	.option('--rps <value>', 'request per seconds');
 
 if (process.env.ETHEREUM_NODE) {
 	program.option(
 		'-n, --node-url <value>',
 		`ethereum's node url (fallback on ETHEREUM_NODE env variable)`,
-		process.env.ETHEREUM_NODE
+		process.env.ETHEREUM_NODE,
 	);
 } else {
 	program.requiredOption('-n, --node-url <value>', `ethereum's node url (fallback on ETHEREUM_NODE env variable)`);

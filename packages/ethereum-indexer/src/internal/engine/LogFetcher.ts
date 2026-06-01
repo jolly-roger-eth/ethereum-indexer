@@ -1,8 +1,8 @@
 import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {logs} from 'named-logs';
-import {IncludedEIP1193Log} from '../../types';
-import {UnlessCancelledFunction} from '../utils/promises';
-import {ExtraFilters, getLogs, getLogsWithVariousFilters} from './ethereum';
+import {IncludedEIP1193Log} from '../../types.js';
+import {UnlessCancelledFunction} from '../utils/promises.js';
+import {ExtraFilters, getLogs, getLogsWithVariousFilters} from './ethereum.js';
 
 const namedLogger = logs('ethereum-indexer');
 
@@ -31,8 +31,7 @@ export function getNewToBlockFromError(error: any): number | undefined {
 	// -32602: invalid params, but some providers use it to signal a too-large range.
 	//   We only treat it as a range hint when the message actually mentions a result/range limit,
 	//   otherwise a generic "invalid params" error could be mis-parsed into a bogus toBlock.
-	const looksLikeRangeHint =
-		!!message && (message.indexOf('results') !== -1 || message.indexOf('block range') !== -1);
+	const looksLikeRangeHint = !!message && (message.indexOf('results') !== -1 || message.indexOf('block range') !== -1);
 	if (error.code === -32005 || (error.code === -32602 && looksLikeRangeHint)) {
 		if (message && message.startsWith('query returned more than 10000 results.')) {
 			// query returned more than 10000 results. Try with this block range [0xEC23E8, 0xEC23F5].
@@ -64,7 +63,7 @@ export class LogFetcher {
 		protected provider: EIP1193ProviderWithoutEvents,
 		protected contractAddresses: EIP1193Account[] | null,
 		protected eventNameTopics: EIP1193DATA[] | null,
-		readonly conf: LogFetcherConfig = {}
+		readonly conf: LogFetcherConfig = {},
 	) {
 		this.config = Object.assign(
 			{
@@ -74,14 +73,14 @@ export class LogFetcher {
 				maxBlocksPerFetch: 100000,
 				numRetry: 3,
 			},
-			conf
+			conf,
 		);
 		this.numBlocksToFetch = Math.min(this.config.numBlocksToFetchAtStart, this.config.maxBlocksPerFetch);
 	}
 
 	async getLogs(
 		options: {fromBlock: number; toBlock: number; retry?: number},
-		unlessCancelled: UnlessCancelledFunction
+		unlessCancelled: UnlessCancelledFunction,
 	): Promise<LogsResult> {
 		let retry = options.retry !== undefined ? options.retry : this.config.numRetry;
 		let logs: IncludedEIP1193Log[];
@@ -99,14 +98,14 @@ export class LogFetcher {
 						fromBlock,
 						toBlock,
 					},
-					unlessCancelled
+					unlessCancelled,
 				);
 			} else {
 				logs = await unlessCancelled(
 					getLogs(this.provider, this.contractAddresses, this.eventNameTopics ? [this.eventNameTopics] : null, {
 						fromBlock,
 						toBlock,
-					})
+					}),
 				);
 			}
 		} catch (err: any) {
@@ -126,22 +125,18 @@ export class LogFetcher {
 			} else {
 				const totalNumOfBlocksThatWasFetched = toBlock - fromBlock;
 				// "block range too large"
-				if (
-					err.code === -32603 &&
-					err.data &&
-					err.data.message
-				) {
+				if (err.code === -32603 && err.data && err.data.message) {
 					if (err.data.message.indexOf('block range is too wide') !== -1) {
 						// found on polygon rpc
 						this.foundNumBlockToHigh = Math.min(
 							this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
-							totalNumOfBlocksThatWasFetched
+							totalNumOfBlocksThatWasFetched,
 						);
-					} else if (err.data.message.indexOf("block range too large") !== -1) {
+					} else if (err.data.message.indexOf('block range too large') !== -1) {
 						// found on base rpc
 						this.foundNumBlockToHigh = Math.min(
 							this.foundNumBlockToHigh || this.config.maxBlocksPerFetch,
-							totalNumOfBlocksThatWasFetched
+							totalNumOfBlocksThatWasFetched,
 						);
 					}
 				}
@@ -159,7 +154,7 @@ export class LogFetcher {
 				if (this.safeNumBlock) {
 					this.numBlocksToFetch = Math.min(
 						Math.floor((this.foundNumBlockToHigh - this.safeNumBlock) / 2),
-						this.foundNumBlockToHigh - 1
+						this.foundNumBlockToHigh - 1,
 					);
 				} else {
 					this.numBlocksToFetch = this.foundNumBlockToHigh - 1;
@@ -173,7 +168,7 @@ export class LogFetcher {
 					toBlock,
 					retry: retry - 1,
 				},
-				unlessCancelled
+				unlessCancelled,
 			);
 			logs = result.logs;
 			toBlock = result.toBlockUsed;
@@ -181,7 +176,7 @@ export class LogFetcher {
 
 		const targetNumberOfLog = Math.max(
 			1,
-			Math.floor((this.config.maxEventsPerFetch * this.config.percentageToReach) / 100)
+			Math.floor((this.config.maxEventsPerFetch * this.config.percentageToReach) / 100),
 		);
 		const totalNumOfBlocksThatWasFetched = toBlock - fromBlock + 1;
 
@@ -191,7 +186,7 @@ export class LogFetcher {
 			if (this.safeNumBlock) {
 				this.numBlocksToFetch = Math.min(
 					this.safeNumBlock + Math.floor((this.foundNumBlockToHigh - this.safeNumBlock) / 2),
-					this.foundNumBlockToHigh - 1
+					this.foundNumBlockToHigh - 1,
 				);
 			} else {
 				this.numBlocksToFetch = this.foundNumBlockToHigh - 1;
@@ -202,7 +197,7 @@ export class LogFetcher {
 			} else {
 				this.numBlocksToFetch = Math.min(
 					this.config.maxBlocksPerFetch,
-					Math.max(1, Math.floor((targetNumberOfLog * totalNumOfBlocksThatWasFetched) / logs.length))
+					Math.max(1, Math.floor((targetNumberOfLog * totalNumOfBlocksThatWasFetched) / logs.length)),
 				);
 			}
 		}

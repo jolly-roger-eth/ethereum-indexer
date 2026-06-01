@@ -1,3 +1,3 @@
-export * from './contracts';
-export * from './javascript';
-export * from './indexer';
+export * from './contracts.js';
+export * from './javascript.js';
+export * from './indexer.js';
