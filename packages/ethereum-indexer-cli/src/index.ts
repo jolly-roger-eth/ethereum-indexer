@@ -6,27 +6,20 @@ import {
 	EventProcessor,
 	IndexingSource,
 	KeepState,
-	ProcessorContext,
 } from 'ethereum-indexer';
 import type {Options} from './types.js';
 import {logs} from 'named-logs';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
-import fs from 'node:fs';
 import path from 'node:path';
-import {contextFilenames, loadContracts} from 'ethereum-indexer-utils';
-import {bnReplacer, bnReviver} from './utils/bn.js';
+import {loadContracts} from 'ethereum-indexer-utils';
+import {createFileKeepState} from './keepState.js';
 
 const logger = logs('ei');
 
 type ProcessorWithKeepState<ABI extends Abi> = {
 	keepState(keeper: KeepState<ABI, any, {history: any}, any>): void;
 };
-
-function filepaths(folder: string, context: ProcessorContext<Abi, any>) {
-	const {stateFile, lastSyncFile} = contextFilenames(context);
-	return {stateFile: path.join(folder, stateFile), lastSyncFile: path.join(folder, lastSyncFile)};
-}
 
 // TODO ethereum-indexer-server could reuse
 export async function init<ABI extends Abi, ProcessResultType>(options: Options) {
@@ -68,36 +61,7 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 		throw new Error(`this processor do not support "keepState" config`);
 	}
 
-	(processor as unknown as ProcessorWithKeepState<ABI>).keepState({
-		fetch: async (context: ProcessorContext<ABI, any>) => {
-			const {stateFile} = filepaths(options.folder, context);
-			// console.log({reading: stateFile});
-			try {
-				const content = fs.readFileSync(stateFile, 'utf-8');
-				const json = JSON.parse(content, bnReviver);
-				return {
-					state: json.state,
-					lastSync: json.lastSync,
-					history: json.history,
-				};
-			} catch {
-				// console.log(`no ${stateFile}`);
-				return undefined as any; // TODO fix type in KeepState to allow undefined
-			}
-		},
-		save: async (context, all) => {
-			const {stateFile, lastSyncFile} = filepaths(options.folder, context);
-			// console.log({saving: stateFile, sync: lastSyncFile});
-			const data = {lastSync: all.lastSync, state: all.state, history: all.history};
-			const dirname = path.dirname(stateFile);
-			if (!fs.existsSync(dirname)) {
-				fs.mkdirSync(dirname, {recursive: true});
-			}
-			fs.writeFileSync(lastSyncFile, JSON.stringify(data.lastSync, bnReplacer, 2));
-			fs.writeFileSync(stateFile, JSON.stringify(data, bnReplacer, 2));
-		},
-		clear: async () => {},
-	});
+	(processor as unknown as ProcessorWithKeepState<ABI>).keepState(createFileKeepState<ABI>(options.folder));
 
 	logger.info({
 		nodeUrl: options.nodeUrl,

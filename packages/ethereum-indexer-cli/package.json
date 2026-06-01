@@ -34,11 +34,14 @@
     "eip-1193": "^0.6.5",
     "fs-extra": "^11.3.5",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   },
   "scripts": {
     "build": "tsc",
     "dev": "as-soon -w src pnpm build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "cli": "node ./dist/cli.js",
     "test:manual": "ldenv -m localhost node ./dist/cli.js -p ../../../../../wighawag/jolly-roger/indexer/dist/index.js -n @@RPC_URL_:DEPLOYMENT_CONTEXT,RPC_URL -f output.json -d ../../../../wighawag/jolly-roger/contracts/deployments/@@DEPLOYMENT_CONTEXT @@"
   }
