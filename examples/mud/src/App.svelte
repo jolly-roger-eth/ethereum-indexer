@@ -175,11 +175,11 @@
 	{#if !ethereum}
 		<p>To test this app, you need to have a ethereum wallet installed</p>
 	{:else if $syncing.waitingForProvider}
-		<button on:click={start} style="background-color: #45ffbb; color: black;">Start</button>
+		<button onclick={start} style="background-color: #45ffbb; color: black;">Start</button>
 	{:else}
 		<p>{$syncing.lastSync?.syncPercentage || 0}</p>
 		{#if $syncing.lastSync}
-			<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style="width: 100%" />
+			<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style="width: 100%"></progress>
 		{:else}
 			<p>Please wait...</p>
 		{/if}

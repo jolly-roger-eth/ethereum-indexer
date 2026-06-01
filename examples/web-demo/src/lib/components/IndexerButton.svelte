@@ -16,7 +16,7 @@
 	<h1>{$web3.error}</h1>
 {/if}
 {#if $web3.state === 'Idle'}
-	<button on:click={() => web3.start(chainId, accountsToUse).then(initialize)}>Start</button>
+	<button onclick={() => web3.start(chainId, accountsToUse).then(initialize)}>Start</button>
 {:else if $web3.state === 'Loading'}
 	Loading...
 {:else if $web3.state === 'SwithingChain'}

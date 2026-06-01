@@ -36,7 +36,7 @@
 			class:ellipsis={option.type === 'symbol' && option.symbol === SymbolType.ELLIPSIS}
 			class:active={option.type === 'number' && option.value === currentPage}
 			role="presentation"
-			on:click={() => handleOptionClick(option)}
+			onclick={() => handleOptionClick(option)}
 		>
 			{#if option.type === 'number'}
 				<slot name="number" value={option.value}>
