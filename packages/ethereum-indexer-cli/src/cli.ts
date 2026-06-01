@@ -4,7 +4,7 @@ loadEnv();
 
 import {Command} from 'commander';
 import pkg from '../package.json' with {type: 'json'};
-import {run} from './index.js';
+import {main} from './index.js';
 import type {Options} from './types.js';
 
 const program = new Command();
@@ -39,6 +39,6 @@ program.parse(process.argv);
 
 const options: Options = program.opts();
 
-run(options).then(() => {
-	console.log('DONE');
-});
+// `main` resolves the exit code: 0 on success, 1 on failure (so CI does not treat a failed index as
+// success). It calls `process.exit`, which also avoids the process lingering on provider timers.
+main(options);

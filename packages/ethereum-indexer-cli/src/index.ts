@@ -140,3 +140,29 @@ export async function run(options: Options) {
 		newLastSync = await indexer.indexMore();
 	}
 }
+
+// Run the indexer and resolve the process exit code: 0 on success, 1 on failure. The `run`,
+// `exit`, `log` and `error` collaborators are injectable so the success/failure contract can be
+// unit-tested without driving the real process. `cli.ts` calls this with `process.exit`.
+export async function main(
+	options: Options,
+	deps?: {
+		run?: (options: Options) => Promise<unknown>;
+		exit?: (code: number) => void;
+		log?: (...args: any[]) => void;
+		error?: (...args: any[]) => void;
+	},
+): Promise<void> {
+	const runFn = deps?.run ?? run;
+	const exit = deps?.exit ?? ((code: number) => process.exit(code));
+	const log = deps?.log ?? console.log;
+	const error = deps?.error ?? console.error;
+	try {
+		await runFn(options);
+		log('DONE');
+		exit(0);
+	} catch (err) {
+		error(err);
+		exit(1);
+	}
+}
