@@ -3,7 +3,17 @@
 **Area:** `packages/ethereum-indexer-cli`, `packages/ethereum-indexer-server` (and the `keepState`
 snapshot format they rely on)
 **Type:** Implementation (TDD)
-**Status:** todo
+**Status:** done
+
+> Completed. All HIGH/MEDIUM issues and LOW-1/LOW-2 implemented via TDD (characterization tests
+> first, then a failing test, then the fix), each with a changeset:
+> HIGH-3 server `/feed` body; HIGH-1 CLI atomic state write (temp+rename); MEDIUM-1 CLI exit codes;
+> HIGH-2/MEDIUM-3 backward-compatible snapshot envelope + don't-swallow-corrupt; MEDIUM-4/5 server
+> backoff + `lastError` in status + serialized indexing entrypoints; MEDIUM-2 CLI bounded retry +
+> dropped redundant `eth_blockNumber` (`indexToTip`); LOW-1 constant-time api-key compare; LOW-2
+> shaped 503s. Vitest stood up in both packages (cli 18 tests, server 12). Deferred: LOW-3
+> (`bnReviver` heuristic, documented), LOW-4 (cli↔server duplication — own refactor task), LOW-5
+> (orphaned snapshot pruning). See `tasks/findings/server-cli-batch.md` for the per-item status.
 
 ## Context
 

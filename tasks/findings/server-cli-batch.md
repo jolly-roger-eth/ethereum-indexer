@@ -217,17 +217,26 @@ committed-snapshots repo it means dead files get committed unless pruned.
 
 ## Suggested priority order for fixes (each via TDD-with-confirmation-gates)
 
-1. **HIGH-3** server `/feed` body bug — tiny, isolated, clearly wrong. (`ethereum-indexer-server`)
-2. **HIGH-1** CLI atomic write (temp + rename) — directly protects the snapshots CI.
-   (`ethereum-indexer-cli`)
-3. **MEDIUM-1** CLI exit codes (`.catch` → `exit(1)`, success → `exit(0)`) — protects CI from
-   publishing on failure. (`ethereum-indexer-cli`)
-4. **HIGH-2 / MEDIUM-3** snapshot envelope + don't-swallow-parse-errors — bigger; design first,
-   coordinate with the core `context.processor` check. (`ethereum-indexer-cli`, maybe core)
-5. **MEDIUM-4 / MEDIUM-5** server retry backoff + single in-flight indexing guard + surface errors in
-   status. (`ethereum-indexer-server`)
-6. **MEDIUM-2** CLI loop termination contract + bounded retry — decide semantics with maintainer.
-7. **LOW-1..5** — opportunistic / document.
+_Status: implemented in `tasks/fix-server-cli-batch.md` (now archived). Each fix landed via TDD
+(characterization tests first, then a failing test, then the fix) with a changeset._
+
+1. ✅ **HIGH-3** server `/feed` body bug — fixed (reads `ctx.request.body`, validates array).
+2. ✅ **HIGH-1** CLI atomic write (temp + rename) — fixed; extracted `createFileKeepState`.
+3. ✅ **MEDIUM-1** CLI exit codes — fixed via `main()` (`exit(0)` success / `exit(1)` failure).
+4. ✅ **HIGH-2 / MEDIUM-3** snapshot envelope + don't-swallow-parse-errors — done, backward-compatible
+   (envelope `{format,processor,savedAt,...}`; reads legacy bare form; logs corrupt files).
+5. ✅ **MEDIUM-4 / MEDIUM-5** server backoff + single in-flight indexing guard + `lastError` in status.
+6. ✅ **MEDIUM-2** CLI loop bounded retry + dropped redundant `eth_blockNumber` (extracted
+   `indexToTip`; live-tip termination contract documented/kept).
+7. ✅ **LOW-1 / LOW-2** — constant-time api-key compare; shaped `503` instead of thrown `500`.
+
+**Deferred (not done):**
+- **LOW-3** heuristic `bnReviver` — left as a documented known limitation; changing the encoding is
+  risky and better folded into a future explicit-encoding change.
+- **LOW-4** CLI↔server setup duplication — better as its own refactor task (extract a shared helper
+  in `ethereum-indexer-utils`); the server's testability seams (`createProvider`) are a first step.
+- **LOW-5** orphaned snapshot files — pruning has its own "which files are safe to delete" risk;
+  deferred.
 
 **Out of scope** (per the task): adding `updateIndexer`/`updateProcessor`/auto-reconfigure to server
 or CLI. They are intentionally restart-to-reconfigure.
