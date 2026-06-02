@@ -233,9 +233,11 @@ _Status: implemented in `tasks/fix-server-cli-batch.md` (now archived). Each fix
 **Deferred (not done):**
 - **LOW-3** heuristic `bnReviver` — left as a documented known limitation; changing the encoding is
   risky and better folded into a future explicit-encoding change.
-- **LOW-4** CLI↔server setup duplication — spun out to `tasks/refactor-cli-server-setup-duplication.md`
-  (extract a shared helper in `ethereum-indexer-utils`); the server's `createProvider` seam is a
-  first step.
+- ~~**LOW-4** CLI↔server setup duplication~~ — ✅ done (`tasks/refactor-cli-server-setup-duplication.md`):
+  extracted `resolveProcessorAndSource` (+ `loadProcessorModule` / `instantiateProcessor` /
+  `resolveSource`) into `ethereum-indexer-utils` with characterization tests; both `init()` and
+  `setupIndexing()` now call it. Kept the `createRequire` fallback as the superset and made the
+  processor-factory arg an explicit `processorConfig` parameter.
 - **LOW-5** orphaned snapshot files — spun out to `tasks/snapshot-prune-script.md` (a manually-run
   prune script; needs investigation into how to safely *detect* outdated snapshots first).
 

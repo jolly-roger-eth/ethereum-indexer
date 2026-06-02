@@ -23,11 +23,13 @@
 		"as-soon": "^0.1.5",
 		"ethereum-indexer": "workspace:*",
 		"tsx": "^4.21.0",
-		"typescript": "^6.0.3"
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
 	},
 	"scripts": {
 		"build": "tsc",
 		"dev": "as-soon -w src pnpm build",
-		"test": "echo \"Error: no test specified\""
+		"test": "vitest run",
+		"test:watch": "vitest"
 	}
 }

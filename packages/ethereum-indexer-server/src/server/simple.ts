@@ -8,16 +8,7 @@ import logger from 'koa-logger';
 import json from 'koa-json';
 import bodyParser from 'koa-bodyparser';
 
-import {
-	IndexingSource,
-	EthereumIndexer,
-	EventProcessor,
-	LastSync,
-	AllContractData,
-	ContractData,
-	Abi,
-	ExistingStream,
-} from 'ethereum-indexer';
+import {IndexingSource, EthereumIndexer, EventProcessor, LastSync, Abi, ExistingStream} from 'ethereum-indexer';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
 
@@ -33,9 +24,12 @@ import {
 } from 'ethereum-indexer-db-utils';
 import {getAdminPage} from '../pages/index.js';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {createRequire} from 'module';
-import {clean, formatLastSync, removeUndefinedValuesFromObject} from 'ethereum-indexer-utils';
-import path from 'path';
+import {
+	clean,
+	formatLastSync,
+	removeUndefinedValuesFromObject,
+	resolveProcessorAndSource,
+} from 'ethereum-indexer-utils';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -107,95 +101,21 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 	}
 
 	private async setupIndexing() {
-		let processorModule: any | undefined;
-		if (path.isAbsolute(this.config.processorPath)) {
-			processorModule = await import(this.config.processorPath);
-		} else {
-			try {
-				processorModule = await import(path.join(process.cwd(), this.config.processorPath));
-			} catch (err: any) {
-				processorModule = await import(
-					createRequire(`${process.cwd()}/node_modules/`).resolve(this.config.processorPath)
-				);
-			}
-		}
-
-		const processorFactory = processorModule.createProcessor as (
-			config?: any,
-		) => QueriableEventProcessor<ABI, ProcessResultType>;
-
-		if (!processorFactory) {
-			throw new Error(
-				`processor field could not be found: check module at ${this.config.processorPath} if it exports a "processor" field`,
-			);
-		}
-
-		if (typeof processorFactory === 'function') {
-			this.processor = processorFactory(this.config.folder);
-
-			if (!this.processor) {
-				throw new Error(
-					`Processor could not be created, check the function exported as "processor" in module ${this.config.processorPath}`,
-				);
-			}
-		} else {
-			this.processor = processorFactory;
-		}
-
 		const eip1193Provider = this.createProvider
 			? this.createProvider(this.config.nodeURL)
 			: (new JSONRPCHTTPProvider(this.config.nodeURL) as unknown as EIP1193ProviderWithoutEvents);
 
-		let contractsData: AllContractData<ABI> | ContractData<ABI>[] | undefined;
-		if (!this.source) {
-			let chainIDAsDecimal: string | undefined;
-
-			if (processorModule.contractsDataPerChain) {
-				let chainIDAsHex;
-				try {
-					chainIDAsHex = (await eip1193Provider.request({method: 'eth_chainId'})) as `0x${string}`;
-				} catch (err) {
-					console.error(`could not fetch chainID`);
-					throw err;
-				}
-				chainIDAsDecimal = '' + parseInt(chainIDAsHex.slice(2), 16);
-				namedLogger.info(processorModule.contractsDataPerChain);
-				namedLogger.info({chainIDAsHex, chainIDAsDecimal});
-				contractsData = processorModule.contractsDataPerChain[chainIDAsDecimal];
-			}
-			if (!contractsData) {
-				contractsData = processorModule.contractsData;
-			}
-
-			if (processorModule.contractsDataPerChain && !contractsData) {
-				console.error(
-					`field "contractsDataPerChain" found but no contracts data found for chainID: ${chainIDAsDecimal}`,
-				);
-			}
-
-			// if (!this.contractsData && processorModule.getContractData) {
-			//   this.contractsData = await processorModule.getContractData();
-			// }
-
-			if (!chainIDAsDecimal) {
-				throw new Error(`no chainId found`);
-			}
-
-			if (!contractsData) {
-				throw new Error(`no contracts data found`);
-			}
-
-			this.source = {
-				chainId: chainIDAsDecimal,
-				contracts: contractsData,
-			};
-		}
-
-		if (!this.source || !this.source.contracts) {
-			throw new Error(
-				`contracts data not found in the processor module, it needs to be provided either as exported field named "contractsData" or as field "contractsDataPerChain" indexed by chainID`,
-			);
-		}
+		// Processor/source resolution is shared with the CLI via `resolveProcessorAndSource` in
+		// ethereum-indexer-utils. The server intentionally passes its `folder` as the processor factory
+		// argument (the CLI passes nothing) — this difference is now an explicit `processorConfig`.
+		const {processor, source} = await resolveProcessorAndSource<ABI, ProcessResultType>({
+			processorPath: this.config.processorPath,
+			provider: eip1193Provider as unknown as EIP1193ProviderWithoutEvents,
+			source: this.source,
+			processorConfig: this.config.folder,
+		});
+		this.processor = processor as QueriableEventProcessor<ABI, ProcessResultType>;
+		this.source = source;
 
 		let rootProcessor: EventProcessor<ABI, ProcessResultType> = this.processor;
 		let streamKeeper: ExistingStream<ABI> | undefined;

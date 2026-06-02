@@ -1,18 +1,9 @@
-import {
-	Abi,
-	AllContractData,
-	ContractData,
-	EthereumIndexer,
-	EventProcessor,
-	IndexingSource,
-	KeepState,
-} from 'ethereum-indexer';
+import {Abi, EthereumIndexer, IndexingSource, KeepState} from 'ethereum-indexer';
 import type {Options} from './types.js';
 import {logs} from 'named-logs';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
-import path from 'node:path';
-import {loadContracts} from 'ethereum-indexer-utils';
+import {instantiateProcessor, loadContracts, loadProcessorModule, resolveSource} from 'ethereum-indexer-utils';
 import {createFileKeepState} from './keepState.js';
 
 const logger = logs('ei');
@@ -21,41 +12,23 @@ type ProcessorWithKeepState<ABI extends Abi> = {
 	keepState(keeper: KeepState<ABI, any, {history: any}, any>): void;
 };
 
-// TODO ethereum-indexer-server could reuse
 export async function init<ABI extends Abi, ProcessResultType>(options: Options) {
-	let processor: EventProcessor<ABI, ProcessResultType> | undefined;
-	let source: IndexingSource<ABI> | undefined;
+	// The CLI owns its provider construction (rate-limited JSON-RPC). The processor/source resolution
+	// logic is shared with the server via the helpers in ethereum-indexer-utils.
+	logger.info({
+		nodeUrl: options.nodeUrl,
+	});
+	const eip1193Provider = new JSONRPCHTTPProvider(options.nodeUrl, {requestsPerSecond: options.rps});
 
-	if (options.deployments) {
-		source = loadContracts(options.deployments);
-	}
+	let source: IndexingSource<ABI> | undefined = options.deployments ? loadContracts(options.deployments) : undefined;
 
-	let processorModule: any | undefined;
-	if (path.isAbsolute(options.processor)) {
-		processorModule = await import(options.processor);
-	} else {
-		processorModule = await import(path.join(process.cwd(), options.processor));
-	}
-	const processorFactory = processorModule.createProcessor as (config?: any) => EventProcessor<ABI, ProcessResultType>;
-
-	if (!processorFactory) {
-		throw new Error(
-			`processor field could not be found: check module at ${options.processor} if it exports a "processor" field`,
-		);
-	}
-
-	if (typeof processorFactory === 'function') {
-		// TODO processor options
-		processor = processorFactory();
-
-		if (!processor) {
-			throw new Error(
-				`Processor could not be created, check the function exported as "processor" in module ${options.processor}`,
-			);
-		}
-	} else {
-		processor = processorFactory;
-	}
+	// Use the granular helpers (rather than the bundled `resolveProcessorAndSource`) so the original
+	// CLI ordering is preserved exactly: instantiate the processor and run the keepState check BEFORE
+	// resolving the source. This keeps a missing-keepState processor failing without first issuing an
+	// `eth_chainId` RPC, matching the previous behaviour. The CLI intentionally constructs the
+	// processor with NO factory argument (the server passes its folder); see MEDIUM-3.
+	const processorModule = await loadProcessorModule<ABI, ProcessResultType>(options.processor);
+	const processor = instantiateProcessor<ABI, ProcessResultType>(processorModule, {processorPath: options.processor});
 
 	if (!(processor as any).keepState) {
 		throw new Error(`this processor do not support "keepState" config`);
@@ -63,48 +36,11 @@ export async function init<ABI extends Abi, ProcessResultType>(options: Options)
 
 	(processor as unknown as ProcessorWithKeepState<ABI>).keepState(createFileKeepState<ABI>(options.folder));
 
-	logger.info({
-		nodeUrl: options.nodeUrl,
-	});
-	const eip1193Provider = new JSONRPCHTTPProvider(options.nodeUrl, {requestsPerSecond: options.rps});
-
-	let contractsData: AllContractData<ABI> | ContractData<ABI>[] | undefined;
 	if (!source) {
-		let chainIDAsDecimal: string | undefined;
-
-		if (processorModule.contractsDataPerChain) {
-			let chainIDAsHex: `0x${string}`;
-			try {
-				chainIDAsHex = (await eip1193Provider.request({method: 'eth_chainId'})) as `0x${string}`;
-			} catch (err) {
-				console.error(`could not fetch chainID`);
-				throw err;
-			}
-			chainIDAsDecimal = '' + parseInt(chainIDAsHex.slice(2), 16);
-			logger.info(processorModule.contractsDataPerChain);
-			logger.info({chainIDAsHex, chainIDAsDecimal});
-			contractsData = processorModule.contractsDataPerChain[chainIDAsDecimal];
-		}
-		if (!contractsData) {
-			contractsData = processorModule.contractsData;
-		}
-
-		if (processorModule.contractsDataPerChain && !contractsData) {
-			console.error(`field "contractsDataPerChain" found but no contracts data found for chainID: ${chainIDAsDecimal}`);
-		}
-
-		if (!chainIDAsDecimal) {
-			throw new Error(`no chainId found`);
-		}
-
-		if (!contractsData) {
-			throw new Error(`no contracts data found`);
-		}
-
-		source = {
-			chainId: chainIDAsDecimal,
-			contracts: contractsData,
-		};
+		source = await resolveSource<ABI, ProcessResultType>(
+			processorModule,
+			eip1193Provider as unknown as EIP1193ProviderWithoutEvents,
+		);
 	}
 
 	if (!source || !source.contracts) {

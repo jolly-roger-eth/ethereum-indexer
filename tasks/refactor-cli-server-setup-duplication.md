@@ -2,7 +2,7 @@
 
 **Area:** `packages/ethereum-indexer-cli`, `packages/ethereum-indexer-server`, `packages/ethereum-indexer-utils`
 **Type:** Refactor (TDD)
-**Status:** todo
+**Status:** done
 
 ## Context
 
