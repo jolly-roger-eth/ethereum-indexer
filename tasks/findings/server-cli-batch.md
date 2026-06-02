@@ -233,10 +233,11 @@ _Status: implemented in `tasks/fix-server-cli-batch.md` (now archived). Each fix
 **Deferred (not done):**
 - **LOW-3** heuristic `bnReviver` — left as a documented known limitation; changing the encoding is
   risky and better folded into a future explicit-encoding change.
-- **LOW-4** CLI↔server setup duplication — better as its own refactor task (extract a shared helper
-  in `ethereum-indexer-utils`); the server's testability seams (`createProvider`) are a first step.
-- **LOW-5** orphaned snapshot files — pruning has its own "which files are safe to delete" risk;
-  deferred.
+- **LOW-4** CLI↔server setup duplication — spun out to `tasks/refactor-cli-server-setup-duplication.md`
+  (extract a shared helper in `ethereum-indexer-utils`); the server's `createProvider` seam is a
+  first step.
+- **LOW-5** orphaned snapshot files — spun out to `tasks/snapshot-prune-script.md` (a manually-run
+  prune script; needs investigation into how to safely *detect* outdated snapshots first).
 
 **Out of scope** (per the task): adding `updateIndexer`/`updateProcessor`/auto-reconfigure to server
 or CLI. They are intentionally restart-to-reconfigure.
