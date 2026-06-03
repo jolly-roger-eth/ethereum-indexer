@@ -10,6 +10,15 @@ places (`_rev`). No tests. Not obviously "unfinished" so much as "early / not ha
 > This file captures ground-truth about how reorg/revert + historical state work **today**, to feed
 > into `plan-historical-state-database.md` (and `plan-trigger-system.md`, which needs as-of-block
 > state). See "Implications for the historical-state DB plan" at the bottom.
+>
+> **Live revert contract (the behavior the new store must mirror):** the production path is NOT this
+> PouchDB prototype but the in-memory JS-object reducer in `ethereum-indexer-js-processor`
+> (`JSObjectEventProcessor` -> `History.reverseBlock`), used by stratagems-world ->
+> stratagems-snapshots. Its revert-and-reapply contract is now pinned by characterization tests in
+> `packages/ethereum-indexer-js-processor/test/reorg.test.ts` (apply, single-block revert, multi-block
+> revert-restores-prior-state, below-finality immutable path). The indexer-side reorg engine
+> (`generateStreamToAppend`) is likewise characterized in `packages/ethereum-indexer/test/utils.test.ts`.
+> Together these two test files ARE the "revert and re-apply" the SQLite `revertTo(N)` must reproduce.
 
 ## How it works today
 
@@ -85,7 +94,12 @@ data-model options the historical-state plan is meant to compare. Key mechanics:
   back to the triggering log's block, which is within finality if processed promptly — but not if the
   processor lags).
 - **Reorg revert = "restore previous archived version".** The plan's reorg section should adopt/refine
-  this inverse-operation approach rather than inventing a new one.
+  this inverse-operation approach rather than inventing a new one. The semantics to mirror are pinned
+  by `ethereum-indexer-js-processor/test/reorg.test.ts` (live path) and
+  `ethereum-indexer/test/utils.test.ts` (the `generateStreamToAppend` stream-shaping that produces the
+  `removed: true` markers those reverts consume) — check the SQLite `revertTo(N)` against the same
+  cases (single-block reorg restores end-of-prior-block state; below-finality events are not
+  revertable).
 - **Block hash → number mapping** is needed for hash-based queries; today stored as `block_<hash>`
   docs. The plan should specify this table explicitly (and consider pruning alongside history).
 - **`queryAtBlock` semantics** (range-contains + relative/negative block) are a usable starting point
