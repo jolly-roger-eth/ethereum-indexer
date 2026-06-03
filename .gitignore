@@ -50,3 +50,5 @@ indexed/
 # this need to be copied in
 /docs/examples
 /docs/media
+
+prompts
