@@ -205,7 +205,7 @@ source construction are **copy-pasted** between `cli/src/index.ts` and `server/s
 (the CLI even has a `// TODO ethereum-indexer-server could reuse`). Divergence risk: e.g. the server
 passes `this.config.folder` to the processor factory, the CLI passes nothing (see MEDIUM-3). Worth
 extracting a shared helper in `ethereum-indexer-utils`. (Also flagged in
-`tasks/findings/todo-triage.md` under "Server / streams packages".)
+`docs/reviews/todo-triage.md` under "Server / streams packages".)
 
 ### LOW-5 — CLI: old snapshot files are never cleaned up
 Because the filename is content-hashed (source/config/version), changing any of them produces a
