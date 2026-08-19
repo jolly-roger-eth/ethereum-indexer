@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 520" width="1280" height="520">
+  <defs><clipPath id="ei-lk"><path d="M 230 64 L 282 64 L 394 220 L 394 292 L 282 448 L 230 448 L 118 292 L 118 220 Z"/></clipPath></defs>
+  <g fill="#64748B">
+    <g transform="translate(60,43) scale(0.85)">
+      <g clip-path="url(#ei-lk)">
+        <rect x="60" y="76" width="392" height="36"/>
+      <rect x="60" y="130" width="392" height="36"/>
+      <rect x="60" y="184" width="392" height="36"/>
+      <rect x="60" y="292" width="392" height="36"/>
+      <rect x="60" y="346" width="392" height="36"/>
+      <rect x="60" y="400" width="392" height="36"/>
+      </g>
+      <path d="M76 236 H436 L468 256 L436 276 H76 L44 256 Z"/>
+    </g>
+    <text x="530" y="230" font-family="Audiowide" font-weight="400" font-size="120">ethereum</text>
+    <text x="530" y="386" font-family="Audiowide" font-weight="400" font-size="120">indexer</text>
+  </g>
+</svg>

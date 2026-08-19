@@ -7,8 +7,8 @@ hero:
   # text: "In-Browser Indexer"
   tagline: "A modular indexer system for ethereum and other blockchain following the same RPC standard (EIP-1193)."
   image:
-    dark: /icon-white.svg
-    light: /icon.svg
+    dark: /icon-accent-white.svg
+    light: /icon-accent.svg
     width: 512
     height: 512
     alt: Logo
