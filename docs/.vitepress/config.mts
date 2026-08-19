@@ -77,6 +77,14 @@ export default defineConfig({
 		['meta', {property: 'twitter:image', content: preview}],
 	],
 	description,
+	// API pages are generated from the source: their titles are class, interface and
+	// type names. Tag them so the theme can keep them in the default font instead of
+	// the Audiowide display face (see .vitepress/theme/custom.css).
+	transformPageData(pageData) {
+		if (pageData.relativePath.startsWith('api/')) {
+			pageData.frontmatter.pageClass = 'api-page';
+		}
+	},
 	themeConfig: {
 		// https://vitepress.dev/reference/default-theme-config
 		logo: {dark: '/icon-white.svg', light: '/icon.svg', alt: 'ethereun-indexer'},
