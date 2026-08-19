@@ -1,11 +1,10 @@
 {
 	"plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
-	"entryPointStrategy": "legacy-packages",
+	"entryPointStrategy": "packages",
 	"entryPoints": [
 		"packages/ethereum-indexer",
 		"packages/ethereum-indexer-browser",
 		"packages/ethereum-indexer-js-processor"
 	],
-	"media": "media",
 	"out": "docs/api"
 }
