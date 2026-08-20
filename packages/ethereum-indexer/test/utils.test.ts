@@ -187,6 +187,73 @@ describe('generateStreamToAppend', () => {
 		expect(eventStream[0].blockHash).toBe('0xBBB');
 	});
 
+	// Regression: a reorg that REMOVES an unconfirmed block's logs without replacing them at
+	// another block-with-logs (e.g. the tx went back to the mempool and is not re-mined yet).
+	// The re-fetch legitimately returns a SHORTER list than unconfirmedBlocks, so a comparison
+	// driven by the incoming list alone never looks at the vanished block.
+	it('detects a reorg when a trailing unconfirmed block vanishes from the re-fetch', () => {
+		const event100 = makeEvent(100, '0xAAA');
+		const event105 = makeEvent(105, '0xBBB');
+		const ls = lastSync({
+			latestBlock: 105,
+			lastToBlock: 105,
+			unconfirmedBlocks: [block(100, '0xAAA', [event100]), block(105, '0xBBB', [event105])],
+		});
+		const expectedFrom = getFromBlock(ls, 0, finality); // 93, covers both unconfirmed blocks
+		// Block 105 was reorged out; its log is gone. Block 100 is untouched and still returned.
+		const {eventStream, newLastSync} = generateStreamToAppend(ls, 0, [makeEvent(100, '0xAAA')], {
+			newLatestBlock: 106,
+			newLastToBlock: 106,
+			newLastFromBlock: expectedFrom,
+			finality,
+		});
+		// The vanished block's event must be retracted...
+		expect(eventStream).toHaveLength(1);
+		expect(eventStream[0].removed).toBe(true);
+		expect(eventStream[0].blockHash).toBe('0xBBB');
+		// ...and it must not linger in the unconfirmed set (where it would later be pruned silently).
+		expect(newLastSync.unconfirmedBlocks.map((b) => b.hash)).toEqual(['0xAAA']);
+	});
+
+	it('detects a reorg when ALL unconfirmed blocks vanish (empty re-fetch)', () => {
+		const prevEvent = makeEvent(100, '0xAAA');
+		const ls = lastSync({
+			latestBlock: 100,
+			lastToBlock: 100,
+			unconfirmedBlocks: [block(100, '0xAAA', [prevEvent])],
+		});
+		const expectedFrom = getFromBlock(ls, 0, finality);
+		const {eventStream, newLastSync} = generateStreamToAppend(ls, 0, [], {
+			newLatestBlock: 101,
+			newLastToBlock: 101,
+			newLastFromBlock: expectedFrom,
+			finality,
+		});
+		expect(eventStream).toHaveLength(1);
+		expect(eventStream[0].removed).toBe(true);
+		expect(eventStream[0].blockHash).toBe('0xAAA');
+		expect(newLastSync.unconfirmedBlocks).toHaveLength(0);
+	});
+
+	it('does not treat an unconfirmed block as reorged when it is outside the re-fetched range', () => {
+		// Defensive: only blocks the re-fetch actually covered can be judged missing.
+		const prevEvent = makeEvent(100, '0xAAA');
+		const ls = lastSync({
+			latestBlock: 100,
+			lastToBlock: 100,
+			unconfirmedBlocks: [block(100, '0xAAA', [prevEvent])],
+		});
+		const expectedFrom = getFromBlock(ls, 0, finality);
+		// A narrow re-fetch that stops BELOW the unconfirmed block.
+		const {eventStream} = generateStreamToAppend(ls, 0, [], {
+			newLatestBlock: 100,
+			newLastToBlock: 95,
+			newLastFromBlock: expectedFrom,
+			finality,
+		});
+		expect(eventStream).toHaveLength(0);
+	});
+
 	it('produces an empty stream when there are no new events and nothing to reorg', () => {
 		const ls = lastSync({latestBlock: 1000, lastToBlock: 1000});
 		const expectedFrom = getFromBlock(ls, 0, finality);

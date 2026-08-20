@@ -60,20 +60,36 @@ export function generateStreamToAppend<ABI extends Abi>(
 	const lastUnconfirmedBlocks = lastSync.unconfirmedBlocks;
 
 	// find reorgs
+	//
+	// This is driven by the blocks we previously held as unconfirmed, NOT by the incoming list.
+	// A reorg can REMOVE a block's logs without replacing them at another block-with-logs (the
+	// transaction went back to the mempool and is not re-mined yet), in which case the re-fetch
+	// legitimately returns FEWER blocks than we hold. Iterating the incoming list would then
+	// never look at the vanished block, so its events would never be retracted and it would
+	// later be pruned from unconfirmedBlocks silently, baking the dead branch into the state.
+	//
+	// Incoming blocks are therefore matched by block NUMBER: a missing entry (block no longer
+	// has any of our logs) and a differing hash (block replaced) are both a reorg at that block.
+	const newBlockHashPerNumber = new Map<number, string>();
+	for (const block of logEventsGroupedPerBlock) {
+		newBlockHashPerNumber.set(block.number, block.hash);
+	}
+
 	let reorgBlock: EventBlock<ABI> | undefined;
 	let reorgedBlockIndex = 0;
-	for (const block of logEventsGroupedPerBlock) {
-		// if a reorg happen a new blockHash will be given to all subsequent event
-		if (reorgedBlockIndex < lastUnconfirmedBlocks.length) {
-			const unconfirmedBlockAtIndex = lastUnconfirmedBlocks[reorgedBlockIndex];
-			if (unconfirmedBlockAtIndex.hash !== block.hash) {
-				reorgBlock = unconfirmedBlockAtIndex;
-				break;
-			}
-			reorgedBlockIndex++;
-		} else {
-			break; // no matching // TODO use a while loop instead
+	for (let i = 0; i < lastUnconfirmedBlocks.length; i++) {
+		const unconfirmedBlock = lastUnconfirmedBlocks[i];
+		if (unconfirmedBlock.number < newLastFromBlock || unconfirmedBlock.number > newLastToBlock) {
+			// the re-fetch did not cover this block, so its absence proves nothing
+			reorgedBlockIndex = i + 1;
+			continue;
 		}
+		if (newBlockHashPerNumber.get(unconfirmedBlock.number) !== unconfirmedBlock.hash) {
+			reorgBlock = unconfirmedBlock;
+			reorgedBlockIndex = i;
+			break;
+		}
+		reorgedBlockIndex = i + 1;
 	}
 
 	if (reorgBlock) {
