@@ -58,18 +58,6 @@ export interface NumberifiedLog {
 	blockTimestamp?: number;
 }
 
-/**
- * A log as it arrives, widened with the field the spec added.
- *
- * `eip-1193` <= 0.6.5's `EIP1193Log` predates `execution-apis#639` and has no
- * `blockTimestamp`, so it is declared here rather than waited on: the value is
- * on the wire today whatever the type says, and dropping it would cost a second
- * round-trip per block for no reason. The field has since been added upstream;
- * this local widening can be deleted once the dependency range moves past the
- * release that carries it.
- */
-type LogWithOptionalTimestamp = IncludedEIP1193Log & {blockTimestamp?: `0x${string}` | string | number};
-
 const HEX_QUANTITY = /^0[xX][0-9a-fA-F]+$/;
 const DECIMAL_QUANTITY = /^[0-9]+$/;
 
@@ -77,12 +65,17 @@ const DECIMAL_QUANTITY = /^[0-9]+$/;
  * Read a log's `blockTimestamp` into seconds, or `undefined` if it is absent or
  * unreadable.
  *
- * The spec says QUANTITY, so 0x-prefixed hex, but at least one client has served
- * it in decimal, and the prefix is the ONLY signal that separates the two:
+ * The parameter is `unknown` rather than `EIP1193QUANTITY` on purpose, and the
+ * gap between the two is the point. The spec says QUANTITY, so 0x-prefixed hex,
+ * and `eip-1193` types it that way; but at least one client has served it in
+ * decimal, and the prefix is the ONLY signal that separates the two:
  * `'1705366720'` is valid hex as well as valid decimal and the readings are
- * millennia apart. Anything that is neither is dropped rather than coerced,
- * because a wrong timestamp is worse than a missing one: the caller can fall
- * back on a missing one and cannot detect a wrong one.
+ * millennia apart. The type says what the spec says, this says what the wire
+ * does.
+ *
+ * Anything that is neither is dropped rather than coerced, because a wrong
+ * timestamp is worse than a missing one: the caller can fall back on a missing
+ * one and cannot detect a wrong one.
  */
 export function parseLogBlockTimestamp(value: unknown): number | undefined {
 	if (typeof value === 'number') return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
@@ -208,7 +201,7 @@ export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
 	parse(logs: IncludedEIP1193Log[]): LogEvent<ABI>[] {
 		const events: LogEvent<ABI>[] = [];
 		for (let i = 0; i < logs.length; i++) {
-			const log = logs[i] as LogWithOptionalTimestamp;
+			const log = logs[i];
 			const eventAddress = normalizeAddress(log.address);
 			const blockTimestamp = parseLogBlockTimestamp(log.blockTimestamp);
 			const event: NumberifiedLog = {

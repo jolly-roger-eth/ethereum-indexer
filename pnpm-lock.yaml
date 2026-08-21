@@ -323,8 +323,8 @@ importers:
         specifier: ^0.1.5
         version: 0.1.6
       eip-1193:
-        specifier: ^0.6.5
-        version: 0.6.5
+        specifier: ^0.6.6
+        version: 0.6.6
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -2814,6 +2814,9 @@ packages:
 
   eip-1193@0.6.5:
     resolution: {integrity: sha512-KXCSdjFLIT5/06rMD2pMqoAZhZcTg4EofiCI70ovIOy8L/6twGJFE+RtW89S/hMFKDoNEGJ/WK8jQv7CpuGDgg==}
+
+  eip-1193@0.6.6:
+    resolution: {integrity: sha512-pnEP5TRFfK0v0EbPsrOuJ1RvKDh8Ykh5OyvB+jlIgkJGdUt0nhC3fM/k2TsrOq6Qk+q1E0dpaikfdRzJ6/fi5g==}
 
   electron-to-chromium@1.5.364:
     resolution: {integrity: sha512-G/dYE3+AYhyHwzTwg8UbnXf7zqMERYh7l2jJ3QujhFsH8agSYwtnGAR2aZ7f0AakIKJXd5En/Hre4igIUrdlYw==}
@@ -7000,6 +7003,8 @@ snapshots:
       promise-throttle: 1.1.2
 
   eip-1193@0.6.5: {}
+
+  eip-1193@0.6.6: {}
 
   electron-to-chromium@1.5.364:
     optional: true
