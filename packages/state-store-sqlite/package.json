@@ -1,0 +1,41 @@
+{
+	"name": "@ethereum-indexer/state-store-sqlite",
+	"version": "0.0.0",
+	"description": "Versioned-row state store for ethereum-indexer: entity state kept with half-open block-validity ranges on the remote-sql interface, with as-of reads and reorg revert.",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"typedoc": {
+		"entryPoint": "src/index.ts"
+	},
+	"license": "MIT",
+	"dependencies": {
+		"named-logs": "^0.4.1",
+		"remote-sql": "^0.0.7"
+	},
+	"devDependencies": {
+		"@libsql/client": "^0.17.3",
+		"@types/node": "^25.9.1",
+		"as-soon": "^0.1.5",
+		"remote-sql-libsql": "^0.0.7",
+		"tsx": "^4.21.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	}
+}
