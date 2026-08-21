@@ -1,3 +1,4 @@
+import {normalizeBlockHash} from './blocks.js';
 import {BLOCKS_TABLE, LOWER, UPPER} from './ddl.js';
 import {mustGet, normalizeEntities} from './internal/identifiers.js';
 import type {BlockPointer, EntityDeclaration, EntityId, Mutation, NormalizedEntity, Statement} from './types.js';
@@ -15,6 +16,42 @@ export const AS_OF_PREDICATE = `${LOWER} <= ? AND (${UPPER} IS NULL OR ? < ${UPP
 
 /** The live version: the open-row special case, served by the partial index. */
 export const CURRENT_PREDICATE = `${UPPER} IS NULL`;
+
+/** The columns of one recorded block, in `RecordedBlock` order. */
+const BLOCK_COLUMNS = 'number, hash, parentHash, timestamp';
+
+/**
+ * Look a block up by hash: the reorg-proof axis.
+ *
+ * `hash` is UNIQUE, so this is a one-row index probe, and an empty result means
+ * "no such block" rather than "no such entity" (see `blocks.ts`).
+ */
+export function blockByHashStatement(hash: string): Statement {
+	return {sql: `SELECT ${BLOCK_COLUMNS} FROM ${BLOCKS_TABLE} WHERE hash = ? LIMIT 1`, args: [normalizeBlockHash(hash)]};
+}
+
+/** Look a block up by height. Only recorded blocks have a row; heights need none. */
+export function blockByNumberStatement(number: number): Statement {
+	return {sql: `SELECT ${BLOCK_COLUMNS} FROM ${BLOCKS_TABLE} WHERE number = ? LIMIT 1`, args: [number]};
+}
+
+/**
+ * The latest recorded block at or before `timestamp`, riding the timestamp index.
+ *
+ * `number DESC` breaks a tie rather than leaving it to the engine: several
+ * blocks may carry the same timestamp (an L2 issuing more than one block per
+ * second, or a chain that repeats one), and the answer must be the LATEST state
+ * at that instant, deterministically.
+ *
+ * Nothing at or before T resolves to no row, never to the first recorded block:
+ * the state before we started indexing is not the state at our first block.
+ */
+export function blockAtOrBeforeStatement(timestamp: number): Statement {
+	return {
+		sql: `SELECT ${BLOCK_COLUMNS} FROM ${BLOCKS_TABLE} WHERE timestamp <= ? ORDER BY timestamp DESC, number DESC LIMIT 1`,
+		args: [timestamp],
+	};
+}
 
 export function idPredicate(entity: NormalizedEntity): string {
 	return entity.id.map((column) => `${column} = ?`).join(' AND ');
@@ -53,7 +90,9 @@ export function applyBlockStatements(
 	const statements: Statement[] = [
 		{
 			sql: `INSERT INTO ${BLOCKS_TABLE} (number, hash, parentHash, timestamp) VALUES (?, ?, ?, ?)`,
-			args: [block.number, block.hash, block.parentHash ?? '', block.timestamp],
+			// the hash is folded to one spelling here, since it is the identity a
+			// consumer pins and later looks up (see `normalizeBlockHash`).
+			args: [block.number, normalizeBlockHash(block.hash), block.parentHash ?? '', block.timestamp],
 		},
 	];
 

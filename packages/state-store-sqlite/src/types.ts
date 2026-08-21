@@ -32,8 +32,14 @@ export type NormalizedEntity = {
 /**
  * A block, as recorded in the canonical block table.
  *
- * `timestamp` is seconds since the epoch, as the chain reports it. Resolving a
- * hash or a timestamp back to a number is deliberately not part of this module.
+ * `timestamp` is seconds since the epoch, as the chain reports it, and it is a
+ * NUMBER here on purpose: `blockTimestamp` arrives off a log as hex from most
+ * clients and as decimal from at least one, so it is normalised once at the
+ * ingestion seam (`normalizeBlockTimestamp`) rather than being guessed at by
+ * every reader. `hash` is folded to lower case on write, since it is the
+ * identity consumers pin and look up again (`normalizeBlockHash`).
+ *
+ * Reading state back out as of a hash, a height or a timestamp is `blocks.ts`.
  */
 export type BlockPointer = {
 	number: number;

@@ -32,11 +32,25 @@ await store.applyBlock({number: 100, hash: '0xaa', parentHash: '0x99', timestamp
 ]);
 
 await store.getAsOf('token', {id: '1'}, 100); // who owned it at block 100
+await store.getAsOf('token', {id: '1'}, {hash: '0xaa'}); // ...at that block hash
+await store.getAsOf('token', {id: '1'}, {timestamp: 1_700_000_000}); // ...at that instant
 await store.getCurrent('token', {id: '1'}); // who owns it at the tip
 await store.revertTo(99); // a reorg forked at 99
 ```
 
-Reading state as of a block **hash** or a **timestamp** resolves to a block number through the canonical `_blocks` table this package writes, and is layered on top of these reads rather than being part of them.
+## Addressing state: hash, height, or time
+
+All three axes resolve to a block number through the canonical `_blocks` table, and then run the one as-of predicate, so they answer identically when they identify the same block. There is one addressing mechanism, not three.
+
+- **hash** is the reorg-proof identifier, and **the one consumers should store**. Pin a *height* and a reorg silently changes what "state at 18,000,123" means: the read still succeeds and quietly answers about a different chain. Pin the *hash* and the same reorg answers "no such block", which is itself the signal that whatever was derived from it is invalid.
+- **height** resolves to itself, with no lookup.
+- **timestamp** is the latest recorded block with `timestamp <= T`; before the first recorded block it resolves to nothing, never to the first block.
+
+**"No such block" is a distinct answer from "block known, entity absent."** `undefined` keeps its ordinary meaning (the block is known, the entity was not there), and an address that identifies no block throws `NoSuchBlockError` carrying a `reason`. `resolveBlockNumber(address)` is the soft form for callers that want to branch instead of catch, and `getBlock(address)` hands back the recorded row so a consumer can turn a time or a height into the hash it should pin. The reasoning and the rejected alternatives are `docs/adr/0015`.
+
+**`_blocks` holds rows only for blocks that carry our logs**, not every chain header: state only changes at blocks where our events occur, so the latest recorded block at or before T holds exactly the state the true block at T held, and a consumer only ever pins a hash it saw on a log we delivered. Storing every header would be tens of millions of rows for no additional answer. Which blocks those are is **the caller's judgement**: every block handed to `applyBlock` gets a row, including one with no mutations, because "carries our logs" is not "produces a state mutation" and the hash of a log that changed nothing is still pinnable.
+
+`blockTimestamp` comes off the log itself (standardised in `execution-apis#639`), so time addressing needs no extra round-trip. It arrives 0x-prefixed hex from most clients and decimal from at least one, so ingestion normalises it once with `normalizeBlockTimestamp`; the prefix is the only signal, since `'1705375936'` is a valid hex string too and the two readings are millennia apart.
 
 ## Things that are load-bearing
 
@@ -56,7 +70,7 @@ This package ports a verified prototype (`~/dev/github/wighawag/research/ethereu
 - **Declarations are validated.** The prototype interpolated table and field names straight into SQL, which was safe for its own hand-written declaration. Here they arrive from whatever a processor declares, so identifiers are checked once, at declaration time, and the `_` namespace is reserved for the store.
 - **Statements are built as data, then prepared.** The prototype prepared statements as it went. Building `{sql, args}` first is what lets the batch bound count and size a batch before sending it, and lets a test assert the ordering inside `revertTo` instead of trusting a comment.
 - **The batch bound and `applyBlocks` are new.** The prototype was one block per batch with no limits; the design calls for packing many blocks per batch under a configurable bound.
-- **Block addressing is not here.** The prototype's `resolveBlock` (hash and timestamp to a block number) belongs to the block-addressing work, which layers on top of the range predicate. This package writes the canonical `_blocks` rows and prunes them on revert, and reads by block number.
+- **An unresolvable address throws, and hashes are case-folded.** The prototype's `resolveBlock` returned a number or nothing, and the caller decided what that meant. Here "no such block" is a `NoSuchBlockError` on the read path so it cannot be mistaken for an absent entity (`docs/adr/0015`), and block hashes are stored and looked up lower-cased so an echoed-back upper-case hash cannot masquerade as a reorg.
 - **`id` may be a single string.** `{id: 'id'}` and `{id: ['id']}` both work; composite keys behave as in the prototype.
 
 ## Tests

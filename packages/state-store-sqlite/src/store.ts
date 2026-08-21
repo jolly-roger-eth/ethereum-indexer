@@ -1,12 +1,22 @@
 import {logs} from 'named-logs';
 import type {RemoteSQL, SQLPreparedStatement} from 'remote-sql';
 import {DEFAULT_BATCH_BOUNDS, planBatches, type BatchBounds} from './batching.js';
+import {
+	NoSuchBlockError,
+	parseBlockAddress,
+	type BlockAddress,
+	type ParsedBlockAddress,
+	type RecordedBlock,
+} from './blocks.js';
 import {migrationStatements} from './ddl.js';
 import {mustGet, normalizeEntities} from './internal/identifiers.js';
 import {
 	AS_OF_PREDICATE,
 	CURRENT_PREDICATE,
 	applyBlockStatements,
+	blockAtOrBeforeStatement,
+	blockByHashStatement,
+	blockByNumberStatement,
 	idPredicate,
 	idValues,
 	revertToStatements,
@@ -102,6 +112,16 @@ export class VersionedStateStore {
 	 * since `remote-sql` exposes a transaction only as a batch, so a failure
 	 * anywhere in it leaves no part of the block applied. And it is the
 	 * round-trip boundary, which is what actually costs on a remote backend.
+	 *
+	 * **Which blocks get a row is the CALLER's judgement, not the store's.** Every
+	 * block handed to this method is recorded, including one with no mutations,
+	 * and nothing else is. The contract is therefore that the caller hands over
+	 * exactly the blocks that carried our logs, because "carries our logs" is not
+	 * "produces a state mutation": a block can carry a log of ours that changes
+	 * nothing, and a consumer can legitimately pin that block's hash. The store
+	 * cannot make that call, since it sees mutations and not logs, and inferring
+	 * it from a non-empty mutation list would make exactly those pinnable hashes
+	 * unresolvable. Pinned by `test/batch.test.ts` and `test/block-addressing.test.ts`.
 	 */
 	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = []): Promise<void> {
 		const statements = applyBlockStatements(this.entities, block, mutations);
@@ -146,21 +166,91 @@ export class VersionedStateStore {
 		await this.db.batch(this.prepare(statements));
 	}
 
+	// -- block addressing ----------------------------------------------------
+
+	/**
+	 * Resolve any of the three axes to the block number the reads are keyed on,
+	 * or `undefined` if it identifies no block this store can answer about.
+	 *
+	 * This is the soft form of the resolution the reads do: it branches instead of
+	 * throwing (`NoSuchBlockError`), which is what a caller wants when an unknown
+	 * hash is an expected outcome rather than an alarm.
+	 *
+	 * - **hash** probes the unique index. Unknown means never indexed or reorged
+	 *   out, and those are the same answer: not a block we can speak for.
+	 * - **height** resolves to itself, with NO lookup. Only blocks carrying our
+	 *   logs have rows, while every height is a valid point on the version ranges.
+	 * - **timestamp** is the latest recorded block at or before T; before the first
+	 *   recorded block it is `undefined`, never the first block.
+	 */
+	async resolveBlockNumber(address: BlockAddress): Promise<number | undefined> {
+		const parsed = parseBlockAddress(address);
+		if (parsed.axis === 'height') return parsed.number;
+		return (await this.lookupBlock(parsed))?.number;
+	}
+
+	/**
+	 * The recorded block an address identifies, with its hash, or `undefined` if
+	 * no row matches.
+	 *
+	 * The intended use is turning a soft address into the hard one: a consumer
+	 * asks by time or by height, and stores the `hash` it gets back, so that a
+	 * later reorg answers "no such block" instead of silently answering about a
+	 * different chain. Note that a height with no row is `undefined` here while
+	 * being perfectly readable through `getAsOf`, which is the asymmetry documented
+	 * in `blocks.ts`: we record blocks that carry our logs, not chain headers.
+	 */
+	async getBlock(address: BlockAddress): Promise<RecordedBlock | undefined> {
+		return this.lookupBlock(parseBlockAddress(address));
+	}
+
+	private async lookupBlock(parsed: ParsedBlockAddress): Promise<RecordedBlock | undefined> {
+		const statement =
+			parsed.axis === 'hash'
+				? blockByHashStatement(parsed.hash)
+				: parsed.axis === 'timestamp'
+					? blockAtOrBeforeStatement(parsed.timestamp)
+					: blockByNumberStatement(parsed.number);
+		const result = await this.db
+			.prepare(statement.sql)
+			.bind(...statement.args)
+			.all<RecordedBlock>();
+		return result.results[0];
+	}
+
+	/**
+	 * The resolution the reads use: a block number, or a thrown `NoSuchBlockError`.
+	 *
+	 * Costs one extra round-trip on the hash and timestamp axes, and none on the
+	 * height axis. Folding the resolution into the read as a sub-select would save
+	 * that trip, but a sub-select that matched nothing would make the as-of
+	 * predicate false and return an empty result, which is the one confusion this
+	 * whole seam exists to prevent: "no such block" would become "entity absent".
+	 */
+	private async resolveForRead(address: BlockAddress): Promise<number> {
+		const parsed = parseBlockAddress(address);
+		if (parsed.axis === 'height') return parsed.number;
+		const found = await this.lookupBlock(parsed);
+		if (found) return found.number;
+		throw new NoSuchBlockError(address, parsed.axis === 'hash' ? 'unknown-hash' : 'no-recorded-block-at-or-before');
+	}
+
 	// -- read side (time travel) ---------------------------------------------
 
 	/**
-	 * One entity as of a block number.
+	 * One entity as of a block hash, a height, or a timestamp.
 	 *
-	 * Reading by hash or by timestamp resolves to a block number through the
-	 * canonical block table and is added on top of this predicate; it is not part
-	 * of this module.
+	 * All three resolve to a block number (`resolveBlockNumber`) and then run the
+	 * one as-of predicate, so they answer identically when they identify the same
+	 * block.
+	 *
+	 * `undefined` means the block is known and the entity was absent from it. An
+	 * address that identifies no block THROWS `NoSuchBlockError` instead, because
+	 * those two are not the same news: see `blocks.ts`.
 	 */
-	async getAsOf<T = Record<string, unknown>>(
-		entity: string,
-		id: EntityId,
-		blockNumber: number,
-	): Promise<T | undefined> {
+	async getAsOf<T = Record<string, unknown>>(entity: string, id: EntityId, at: BlockAddress): Promise<T | undefined> {
 		const declaration = mustGet(this.entities, entity);
+		const blockNumber = await this.resolveForRead(at);
 		const result = await this.db
 			.prepare(`SELECT * FROM ${declaration.name} WHERE ${idPredicate(declaration)} AND ${AS_OF_PREDICATE} LIMIT 1`)
 			.bind(...idValues(declaration, id), blockNumber, blockNumber)
@@ -178,13 +268,20 @@ export class VersionedStateStore {
 		return result.results[0];
 	}
 
-	/** A whole entity table as of a block number. */
+	/**
+	 * A whole entity table as of a block hash, a height, or a timestamp.
+	 *
+	 * Same resolution and the same "no such block" contract as `getAsOf`: an empty
+	 * array means the block is known and nothing matched, while an address that
+	 * identifies no block throws.
+	 */
 	async queryAsOf<T = Record<string, unknown>>(
 		entity: string,
-		blockNumber: number,
+		at: BlockAddress,
 		options: QueryOptions = {},
 	): Promise<T[]> {
 		const declaration = mustGet(this.entities, entity);
+		const blockNumber = await this.resolveForRead(at);
 		const {tail, tailArgs} = paginate(options);
 		const result = await this.db
 			.prepare(`SELECT * FROM ${declaration.name} WHERE ${AS_OF_PREDICATE}${filter(options)}${order(options)}${tail}`)
