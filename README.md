@@ -93,9 +93,12 @@ type State = {greetings: {account: `0x${string}`; message: string}[]};
 // the processor is given the type of the ABI as Generic type to get generated
 // it also specify the type which represent the current state
 const processor: JSProcessor<typeof contract.abi, State> = {
-	// you can set a version, ideally you would generate it so that it changes for each change
+	// the version is REQUIRED, and ideally you would generate it so that it changes for each change
 	// when a version changes, the indexer will detect that and clear the state
 	// if it has the event stream cached, it will repopulate the state automatically
+	// if you edit a handler and forget to bump it, the indexer says so at load time (an error-level
+	// drift report, plus the `onProcessorDrift` callback); set `strictProcessorDrift: true` in the
+	// indexer config to refuse to start instead of merely reporting
 	version: '1.0.1',
 	// this function set the starting state
 	// this allow the app to always have access to a state, no undefined needed

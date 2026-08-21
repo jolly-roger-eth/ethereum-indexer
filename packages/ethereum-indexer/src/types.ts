@@ -31,6 +31,27 @@ export type LogEvent<ABI extends Abi, Extra extends JSONObject | undefined = und
 
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	getVersionHash(): string;
+	/**
+	 * A hash of the processor's own handler SOURCE, or `undefined` when it cannot
+	 * be derived.
+	 *
+	 * Advisory, and deliberately NOT part of `getVersionHash()`: it moves when a
+	 * minifier or a transpiler re-emits the same behaviour differently, and
+	 * folding that into the version hash would force a full state rebuild on a
+	 * deploy that changed no logic. The core only compares it, reports when it
+	 * differs at an UNCHANGED version hash (the "forgot to bump" case), and never
+	 * discards state because of it.
+	 *
+	 * REQUIRED, unlike the value it returns. An optional method is a hole with a
+	 * polite name: an implementation that simply never wrote one would lose drift
+	 * detection silently, and a WRAPPER (a cache, a decorator) that forgot to
+	 * forward it would take the wrapped processor's detection down with it,
+	 * invisibly. Being required makes both a compile error instead. Returning
+	 * `undefined` is still allowed, because "cannot tell" is a real answer (a
+	 * processor whose handlers are all bound or proxied has no readable source),
+	 * and the core reads it as "do not report" rather than as "unchanged".
+	 */
+	getCodeFingerprint(): string | undefined;
 	load: (
 		source: IndexingSource<ABI>,
 		streamConfig: UsedStreamConfig,
@@ -56,7 +77,43 @@ export type IncludedEIP1193Log = EIP1193Log & {
 	transactionHash: EIP1193DATA;
 };
 
-export type ContextIdentifier = {source: {startBlock: number; hash: string}[]; config: string; processor: string};
+export type ContextIdentifier = {
+	source: {startBlock: number; hash: string}[];
+	config: string;
+	processor: string;
+	/**
+	 * The `getCodeFingerprint()` of the processor that computed this state.
+	 *
+	 * OPTIONAL, and it must stay optional: every cursor persisted before
+	 * fingerprints existed lacks the field, so absence has to mean "unknown, do
+	 * not report" rather than "drifted". Otherwise every existing deployment
+	 * reports drift once on upgrade and the report stops being believed.
+	 *
+	 * It rides inside `ContextIdentifier` rather than beside it because
+	 * `lastSync` is the one thing EVERY persistence path round-trips whole (the
+	 * fs / localStorage / IndexedDB keepers, the CLI snapshot envelope, and the
+	 * `_sync` row in `@ethereum-indexer/processor-sqlite`). It is NOT part of
+	 * `indexerMatches`, which decides whether to discard state.
+	 */
+	processorFingerprint?: string;
+};
+
+/**
+ * What the core reports when a processor's declared version says "unchanged"
+ * and its code says otherwise. Advisory: the state is still adopted, unless
+ * `strictProcessorDrift` is set.
+ */
+export type ProcessorDriftReport = {
+	/** The version hash both sides agree on, which is what makes this drift rather than an upgrade. */
+	processorHash: string;
+	/** The fingerprint of the code that computed the persisted state. */
+	storedFingerprint: string;
+	/** The fingerprint of the code loaded now. */
+	currentFingerprint: string;
+	/** The same thing in words, as logged. */
+	message: string;
+};
+
 export type LastSync<ABI extends Abi> = {
 	context: ContextIdentifier;
 	latestBlock: number;
@@ -121,6 +178,17 @@ export type ProvidedIndexerConfig<ABI extends Abi> = {
 	feedBatchSize?: number;
 	keepStream?: ExistingStream<ABI>;
 	skipGenesisCheck?: boolean;
+	/**
+	 * Turn a processor-drift report into a refusal to start (`load()` rejects).
+	 *
+	 * Off by default, because the fingerprint has real false positives: a
+	 * re-minification changes handler source without changing behaviour. Fail
+	 * loud by default, fail stop by choice. It sits here, next to
+	 * `skipGenesisCheck`, because it is the same kind of thing: a load-time
+	 * safety gate belonging to the deployment, not to the processor an author
+	 * ships.
+	 */
+	strictProcessorDrift?: boolean;
 	logLevel?: number;
 };
 
@@ -147,15 +215,24 @@ export type LogParseConfig = {
 	};
 };
 
+/**
+ * What a `KeepState` keeper is told about the processor whose state it is
+ * storing.
+ *
+ * `version` is REQUIRED, because every processor now has one: it is validated at
+ * construction (`assertProcessorVersion`), so an optional field here would only
+ * describe a state that can no longer exist, and every keeper that reads it
+ * would keep carrying a defensive branch for it.
+ */
 export type ProcessorContext<ABI extends Abi, ProcessorConfig> = ProcessorConfig extends undefined
 	? {
 			readonly source: IndexingSource<ABI>;
-			version?: string;
+			version: string;
 		}
 	: {
 			readonly source: IndexingSource<ABI>;
 			readonly config: ProcessorConfig;
-			version?: string;
+			version: string;
 		};
 
 export type AllData<ABI extends Abi, ProcessResultType, Extra> = {

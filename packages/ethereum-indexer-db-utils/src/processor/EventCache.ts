@@ -22,6 +22,18 @@ export class EventCache<ABI extends Abi, ProcessResultType> implements EventProc
 		return this.processor.getVersionHash();
 	}
 
+	/**
+	 * Forwarded, like the version hash.
+	 *
+	 * A wrapper that answered for ITSELF would fingerprint this cache's methods,
+	 * which are the same for every processor it ever wraps: a constant, so no
+	 * handler change could move it and drift detection would silently die behind
+	 * the wrapper.
+	 */
+	getCodeFingerprint(): string | undefined {
+		return this.processor.getCodeFingerprint?.();
+	}
+
 	protected init(): Promise<void> {
 		this.initialization = this.eventDB.setup({
 			indexes: [{fields: ['batch', 'blockNumber', 'logIndex']}], // 'blockNumber', 'blockHash', 'address', 'transactionHash', 'name', 'signature', 'topic'

@@ -74,6 +74,9 @@ const passThrough = <T>(p: Promise<T>) => p;
 function makeIndexer(provider: any, logsToReturn: any[], latestBlock: number) {
 	const processor: any = {
 		getVersionHash: () => 'proc',
+		// required on `EventProcessor`: a fake that omits it is a fake that would
+		// lose drift detection without anybody noticing
+		getCodeFingerprint: () => undefined,
 		load: async () => undefined,
 		process: async () => undefined,
 		reset: async () => {},

@@ -60,7 +60,18 @@ export type EventHandlers<ABI extends Abi, ProcessorConfig = undefined> = {
  * creates from `entities`.
  */
 export type SQLProcessor<ABI extends Abi, ProcessorConfig = undefined> = EventHandlers<ABI, ProcessorConfig> & {
-	version?: string;
+	/**
+	 * REQUIRED. The identity of this processor's logic.
+	 *
+	 * The indexer discards state computed by a previous version by comparing
+	 * `getVersionHash()`, of which this is the author-declared part. The entity
+	 * declarations are hashed in alongside it, so a SCHEMA change invalidates
+	 * without a bump; handlers are functions, not data, so a HANDLER change does
+	 * not. Ideally generate this (from a content hash, a build id, a git sha) so
+	 * it cannot be forgotten; when you do forget, the advisory code fingerprint
+	 * is what says so.
+	 */
+	version: string;
 	/** `{name, id, fields}` per entity: the store owns the version columns, the DDL and the revert. */
 	entities: readonly EntityDeclaration[];
 	handleUnparsedEvent?(state: MutationContext, event: LogEventWithParsingFailure): void | Promise<void>;

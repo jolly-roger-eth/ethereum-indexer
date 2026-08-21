@@ -18,6 +18,7 @@ import type {
 	LastSync,
 	AllContractData,
 	ContextIdentifier,
+	ProcessorDriftReport,
 	ProvidedStreamConfig,
 	UsedStreamConfig,
 	LogEvent,
@@ -71,6 +72,17 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	public onLoad: ((state: LoadingState) => Promise<void>) | undefined;
 	public onStateUpdated: ((state: ProcessResultType) => void) | undefined;
 	public onLastSyncUpdated: ((lastSync: LastSync<ABI>) => void) | undefined;
+	/**
+	 * Called when the processor's declared version is unchanged but its code is
+	 * not: the "author edited a handler and forgot to bump `version`" case.
+	 *
+	 * The report is ALSO logged at error level through `named-logs`, so a host
+	 * that sets nothing is never silent; this exists because a log line is hard to
+	 * alert on, and routing a drift to a pager or a CI failure is a decision only
+	 * the host can make. Set `strictProcessorDrift` in the config to refuse to
+	 * start instead.
+	 */
+	public onProcessorDrift: ((report: ProcessorDriftReport) => void) | undefined;
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// INTERNAL VARIABLES
@@ -380,6 +392,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				processorHash === loadedLastSync.context.processor &&
 				this.indexerMatches(loadedLastSync.lastToBlock, loadedLastSync.context)
 			) {
+				// The state is about to be ADOPTED, which is the only branch where drift can
+				// matter: a differing version hash discards the state anyway (a deliberate
+				// bump is never a drift), and no persisted state means nothing stale to
+				// serve. Checked BEFORE adopting, so strict mode refuses without ever
+				// handing the stale state to a listener.
+				this.reportProcessorDriftIfAny(loadedLastSync.context, processorHash);
 				currentLastSync = loadedLastSync;
 				this._onStateUpdated(state);
 			} else {
@@ -800,12 +818,60 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return indexerMatches(this.sourceHashes, this.streamConfigHash, lastToBlock, context);
 	}
 
+	/**
+	 * Compare the fingerprint of the code that computed the persisted state with
+	 * the code loaded now, and report if they differ.
+	 *
+	 * Either side missing means "unknown", never "drifted": a cursor written
+	 * before this field existed, or a processor that cannot fingerprint itself,
+	 * must not report on every boot. The stored fingerprint is deliberately NOT
+	 * refreshed afterwards, because it describes the code that produced the state, so the
+	 * report repeats every boot until the author bumps `version` (which discards
+	 * the state) rather than going quiet after being seen once.
+	 */
+	protected reportProcessorDriftIfAny(context: ContextIdentifier, processorHash: string): void {
+		const storedFingerprint = context.processorFingerprint;
+		const currentFingerprint = this.processor.getCodeFingerprint();
+		if (!storedFingerprint || !currentFingerprint || storedFingerprint === currentFingerprint) {
+			return;
+		}
+
+		const message =
+			`PROCESSOR DRIFT: the processor's version hash is unchanged (${processorHash}) but its handler code is not ` +
+			`(state was computed by ${storedFingerprint}, running ${currentFingerprint}). ` +
+			`The persisted state was computed by DIFFERENT logic and is being reused as if it were current. ` +
+			`Bump the processor's \`version\` to discard and recompute it. ` +
+			`If no logic changed, this is a re-minification or a transpiler change and can be ignored ` +
+			`(the fingerprint is advisory and never discards state on its own).`;
+		const report: ProcessorDriftReport = {processorHash, storedFingerprint, currentFingerprint, message};
+
+		namedLogger.error(message);
+		if (this.onProcessorDrift) {
+			try {
+				this.onProcessorDrift(report);
+			} catch (err) {
+				namedLogger.error(`onProcessorDrift listener threw`, err);
+			}
+		}
+		if (this.config.strictProcessorDrift) {
+			throw new Error(message);
+		}
+	}
+
 	protected freshLastSync(processorHash: string): LastSync<ABI> {
 		if (!this.sourceHashes || !this.streamConfigHash) {
 			throw new Error(`no sourceHashes or configHash computed, please load first`);
 		}
 		return {
-			context: {source: this.sourceHashes, config: this.streamConfigHash, processor: processorHash},
+			context: {
+				source: this.sourceHashes,
+				config: this.streamConfigHash,
+				processor: processorHash,
+				// Recorded on the FRESH cursor, so that the state this run computes carries
+				// the identity of the code that computed it, and the next boot has something
+				// to compare against.
+				processorFingerprint: this.processor.getCodeFingerprint(),
+			},
 			lastToBlock: 0,
 			lastFromBlock: 0,
 			latestBlock: 0,

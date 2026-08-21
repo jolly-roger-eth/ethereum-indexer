@@ -30,6 +30,9 @@ type State = {count: number};
 function makeProcessor(versionHash = 'v1'): EventProcessorWithInitialState<Abi, State, undefined> {
 	return {
 		getVersionHash: () => versionHash,
+		// required on `EventProcessor`: a fake that omits it is a fake that would
+		// lose drift detection without anybody noticing
+		getCodeFingerprint: () => undefined,
 		createInitialState: () => ({count: 0}),
 		configure: () => {},
 		load: async () => undefined,

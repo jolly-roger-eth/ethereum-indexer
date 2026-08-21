@@ -6,6 +6,10 @@ import {Account, Data} from './types.js';
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const FPLAYEventProcessor: JSProcessor<typeof eip20, Data> = {
+	// REQUIRED: the identity of this processor's logic. The indexer discards state computed by a
+	// previous version by comparing it, so bump it whenever a handler changes. Generating it (as
+	// `event-processor-nfts` does, from a hash of the built file) is better than remembering to.
+	version: '1.0.0',
 	construct(): Data {
 		return {
 			accounts: [],

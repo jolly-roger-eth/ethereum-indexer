@@ -31,6 +31,9 @@ type Hooks = {clearGate?: Promise<void>; resetGate?: Promise<void>};
 function makeProcessor(versionHash: string, hooks: Hooks = {}): EventProcessor<Abi, void> {
 	return {
 		getVersionHash: () => versionHash,
+		// required on `EventProcessor`: a fake that omits it is a fake that would
+		// lose drift detection without anybody noticing
+		getCodeFingerprint: () => undefined,
 		load: async () => undefined,
 		process: async () => undefined,
 		reset: async () => {

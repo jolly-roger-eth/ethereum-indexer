@@ -3,6 +3,7 @@ import {
 	LastSync,
 	LogEvent,
 	Abi,
+	assertProcessorVersion,
 	EventProcessorWithInitialState,
 	AllData,
 	ProcessorContext,
@@ -25,10 +26,18 @@ export type SingleEventJSONProcessor<
 	ProcessResultType extends JSObject,
 	ProcessorConfig = undefined,
 > = EventFunctions<ABI, ProcessResultType> & {
-	version?: string;
+	/**
+	 * REQUIRED. The identity of this processor's logic, and the only thing that
+	 * makes the core discard state computed by a previous version. It used to be
+	 * optional with an `unknown` fallback, so a processor whose author never
+	 * declared a version looked exactly like an unchanged one, forever.
+	 */
+	version: string;
 	createInitialState(): ProcessResultType;
 	configure(config: ProcessorConfig): void;
 	processEvent(json: ProcessResultType, event: LogEvent<ABI>): void | Promise<void>;
+	/** The advisory fingerprint of the AUTHOR's handlers; see `EventProcessor.getCodeFingerprint`. */
+	getCodeFingerprint?(): string | undefined;
 };
 
 export class JSObjectEventProcessor<
@@ -41,10 +50,13 @@ export class JSObjectEventProcessor<
 	protected keeper?: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>;
 	protected source: IndexingSource<ABI> | undefined;
 	protected config: ProcessorConfig | undefined;
-	protected version: string | undefined;
-	protected configHash: string | undefined;
+	protected version: string;
 	protected finality: number | undefined;
 	constructor(private singleEventProcessor: SingleEventJSONProcessor<ABI, ProcessResultType, ProcessorConfig>) {
+		// The backstop: `fromJSProcessor` checks the AUTHOR's object (where the handler
+		// names make a better message), but this class is exported and can be handed a
+		// hand-rolled `SingleEventJSONProcessor` that never went through it.
+		assertProcessorVersion(singleEventProcessor, 'JSObjectEventProcessor');
 		this.version = singleEventProcessor.version;
 		const state = singleEventProcessor.createInitialState();
 		const history = {
@@ -65,13 +77,29 @@ export class JSObjectEventProcessor<
 		this.keeper = otherProcessor.keeper;
 		this.source = otherProcessor.source;
 		this.config = otherProcessor.config;
-		this.configHash = otherProcessor.configHash;
 		this.singleEventProcessor.configure(this.config as ProcessorConfig);
 		this.finality = otherProcessor.finality; // this will be discarded on load
 	}
 
+	/**
+	 * Identity of the processor's LOGIC, which is what invalidates stored state.
+	 *
+	 * There is no fallback constant anywhere in it, by construction. `version` is
+	 * validated at construction, so the old `${version || 'unknown'}` has nothing
+	 * left to fall back to. The config half is now hashed the SAME way whether or
+	 * not `configure()` was ever called, rather than substituting a
+	 * `'not-configured'` literal: an unconfigured processor and one configured
+	 * with `undefined` are the same processor, and the old form gave them
+	 * different hashes, discarding perfectly good state on the difference between
+	 * a call that was made and a call that was not.
+	 */
 	getVersionHash(): string {
-		return `${this.version || 'unknown'}-${this.configHash || 'not-configured'}`;
+		return `${this.version}-${simple_hash({config: this.config})}`;
+	}
+
+	/** Advisory; see `EventProcessor.getCodeFingerprint`. Delegated to the author's own object. */
+	getCodeFingerprint(): string | undefined {
+		return this.singleEventProcessor.getCodeFingerprint?.();
 	}
 
 	createInitialState(): ProcessResultType {
@@ -81,7 +109,6 @@ export class JSObjectEventProcessor<
 	configure(config: ProcessorConfig) {
 		this.config = config;
 		this.singleEventProcessor.configure(config);
-		this.configHash = simple_hash(this.config);
 	}
 
 	keepState(keeper: KeepState<ABI, ProcessResultType, {history: HistoryJSObject}, ProcessorConfig>) {
@@ -91,7 +118,6 @@ export class JSObjectEventProcessor<
 	async reset() {
 		namedLogger.info('JSObjectEventProcessor reseting...');
 		const state = this.singleEventProcessor.createInitialState();
-		this.version = this.singleEventProcessor.version;
 		const history = {
 			blockHashes: {},
 			reversals: {},

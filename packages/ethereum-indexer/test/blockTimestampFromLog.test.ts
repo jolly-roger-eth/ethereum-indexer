@@ -164,6 +164,9 @@ function event(blockNumber: number, blockHash: string, blockTimestamp?: number):
 function makeIndexer(provider: any, events: any[] | (() => any[]), alwaysFetchTimestamps = true) {
 	const processor: any = {
 		getVersionHash: () => 'proc',
+		// required on `EventProcessor`: a fake that omits it is a fake that would
+		// lose drift detection without anybody noticing
+		getCodeFingerprint: () => undefined,
 		load: async () => undefined,
 		process: async () => undefined,
 		reset: async () => {},

@@ -1,5 +1,12 @@
 import {JSObjectEventProcessor} from './JSObjectEventProcessor.js';
-import {Abi, ExtractAbiEvent, LogEvent, LogEventWithParsingFailure} from 'ethereum-indexer';
+import {
+	Abi,
+	assertProcessorVersion,
+	ExtractAbiEvent,
+	LogEvent,
+	LogEventWithParsingFailure,
+	processorCodeFingerprint,
+} from 'ethereum-indexer';
 import {EventFunctions, InputValues, JSObject} from './types.js';
 
 export type EventWithArgs<ABI extends Abi, Property extends string> = LogEvent<ABI> & {
@@ -11,15 +18,40 @@ export type JSProcessor<
 	ProcessResultType extends JSObject,
 	ProcessorConfig = undefined,
 > = EventFunctions<ABI, ProcessResultType, ProcessorConfig> & {
-	version?: string;
+	/**
+	 * REQUIRED. The identity of this processor's logic.
+	 *
+	 * The indexer discards state computed by a previous version by comparing
+	 * this, so a processor with no version can never invalidate anything: every
+	 * edit to a handler would keep serving state computed by the code you
+	 * replaced. Ideally generate it (from a content hash, a build id, a git sha)
+	 * so it cannot be forgotten; if you edit it by hand, bump it whenever a
+	 * handler changes, and watch for the drift report when you forget.
+	 */
+	version: string;
 	construct(): ProcessResultType;
 	handleUnparsedEvent?(json: ProcessResultType, event: LogEventWithParsingFailure): void | Promise<void>;
 };
 
 class SingleJSONEventProcessorWrapper<ABI extends Abi, ProcessResultType extends JSObject, ProcessorConfig> {
-	version: string | undefined;
+	version: string;
 	constructor(protected obj: JSProcessor<ABI, ProcessResultType, ProcessorConfig>) {
+		// Asserted HERE as well as in `JSObjectEventProcessor`, because this is the
+		// last place the author's own object is visible: the message can name the
+		// processor by its handlers, which is the only name a plain object has.
+		assertProcessorVersion(obj, 'JSObjectEventProcessor');
 		this.version = obj.version;
+	}
+
+	/**
+	 * The advisory fingerprint of the AUTHOR's handlers, not of this wrapper.
+	 *
+	 * Fingerprinting the wrapper would be worse than useless: its methods are the
+	 * same four functions for every processor ever written, so it would hash to a
+	 * constant and no edit could ever move it.
+	 */
+	getCodeFingerprint(): string | undefined {
+		return processorCodeFingerprint(this.obj);
 	}
 
 	createInitialState(): ProcessResultType {

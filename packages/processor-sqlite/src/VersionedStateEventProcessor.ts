@@ -6,6 +6,8 @@ import {
 	type Mutation,
 } from '@ethereum-indexer/state-store-sqlite';
 import {
+	assertProcessorVersion,
+	processorCodeFingerprint,
 	simple_hash,
 	type Abi,
 	type EventProcessor,
@@ -50,8 +52,7 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 > {
 	private readonly store: VersionedStateStore;
 	private readonly view: VersionedStateView;
-	private readonly version: string | undefined;
-	private configHash: string | undefined;
+	private readonly version: string;
 	private config: ProcessorConfig | undefined;
 	/** Kept for the context a future rebuild/upgrade path will need; not read on the hot path. */
 	protected source: IndexingSource<ABI> | undefined;
@@ -62,6 +63,9 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 		private readonly db: RemoteSQL,
 		private readonly processor: SQLProcessor<ABI, ProcessorConfig>,
 	) {
+		// Refused at construction, not at load: a version-less processor's hash is a
+		// constant, and a constant invalidates nothing, ever.
+		assertProcessorVersion(processor, 'VersionedStateEventProcessor');
 		this.version = processor.version;
 		this.store = new VersionedStateStore(db, processor.entities);
 		this.view = new VersionedStateView(this.store);
@@ -81,14 +85,33 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 	 * previously written rows mean something else, and a stale `version` string
 	 * would let the core adopt them. The core compares this against the stored
 	 * cursor's `context.processor` and clears on a mismatch.
+	 *
+	 * There is no fallback constant left in it. `version` is validated at
+	 * construction, so `${version || 'unknown'}` has nothing to fall back to, and
+	 * the config half is hashed the same way whether or not `configure()` was
+	 * called rather than substituting a `'not-configured'` literal: an
+	 * unconfigured processor and one configured with `undefined` are the same
+	 * processor, and the old form discarded state on the difference between them.
 	 */
 	getVersionHash(): string {
-		return `${this.version || 'unknown'}-${simple_hash(this.processor.entities)}-${this.configHash || 'not-configured'}`;
+		return `${this.version}-${simple_hash({entities: this.processor.entities, config: this.config})}`;
+	}
+
+	/**
+	 * Advisory; see `EventProcessor.getCodeFingerprint`.
+	 *
+	 * The entity declarations are already in the version hash, and this covers
+	 * what they cannot: the handlers. A schema change here invalidates state on
+	 * its own; a handler change is invisible to every hash the author controls,
+	 * which is exactly the gap this fills. Taken from the author's object, whose
+	 * `on<Event>` functions and `handleUnparsedEvent` are the logic.
+	 */
+	getCodeFingerprint(): string | undefined {
+		return processorCodeFingerprint(this.processor);
 	}
 
 	configure(config: ProcessorConfig): void {
 		this.config = config;
-		this.configHash = simple_hash(this.config);
 	}
 
 	async load(

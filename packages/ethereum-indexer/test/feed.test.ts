@@ -94,6 +94,9 @@ function recordingProcessor() {
 	const batches: LogEvent<Abi>[][] = [];
 	const processor: any = {
 		getVersionHash: () => 'proc',
+		// required on `EventProcessor`: a fake that omits it is a fake that would
+		// lose drift detection without anybody noticing
+		getCodeFingerprint: () => undefined,
 		load: async () => undefined,
 		process: async (list: LogEvent<Abi>[]) => {
 			batches.push(list);
@@ -202,6 +205,9 @@ describe('feed() delivers retractions to the processor', () => {
 		const seen: number[] = [];
 		const processor: any = {
 			getVersionHash: () => 'proc',
+			// required on `EventProcessor`: a fake that omits it is a fake that would
+			// lose drift detection without anybody noticing
+			getCodeFingerprint: () => undefined,
 			load: async () => undefined,
 			process: async (_list: LogEvent<Abi>[], ls: LastSync<Abi>) => {
 				seen.push(ls.lastToBlock);
