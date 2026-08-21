@@ -21,7 +21,7 @@ export function block(
 	hash = `0x${number.toString(16)}`,
 	timestamp = 1_700_000_000 + number * 12,
 ): BlockPointer {
-	return {number, hash, parentHash: `0x${(number - 1).toString(16)}`, timestamp};
+	return {number, hash, timestamp};
 }
 
 export function owns(id: string, owner: string, transferCount: number): Mutation {

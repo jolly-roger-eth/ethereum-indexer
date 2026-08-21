@@ -95,7 +95,7 @@ describe('addressing by hash', () => {
 		const db = createTestDB();
 		const store = new VersionedStateStore(db, [TOKEN]);
 		await store.migrate();
-		await store.applyBlock({number: 100, hash: '0xAbCd', parentHash: '0x99', timestamp: 1_700_000_000}, []);
+		await store.applyBlock({number: 100, hash: '0xAbCd', timestamp: 1_700_000_000}, []);
 
 		expect(await store.resolveBlockNumber({hash: '0xabcd'})).toBe(100);
 		expect(await store.resolveBlockNumber({hash: '0xABCD'})).toBe(100);

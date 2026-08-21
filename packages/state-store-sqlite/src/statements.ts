@@ -18,7 +18,7 @@ export const AS_OF_PREDICATE = `${LOWER} <= ? AND (${UPPER} IS NULL OR ? < ${UPP
 export const CURRENT_PREDICATE = `${UPPER} IS NULL`;
 
 /** The columns of one recorded block, in `RecordedBlock` order. */
-const BLOCK_COLUMNS = 'number, hash, parentHash, timestamp';
+const BLOCK_COLUMNS = 'number, hash, timestamp';
 
 /**
  * Look a block up by hash: the reorg-proof axis.
@@ -89,10 +89,10 @@ export function applyBlockStatements(
 	const entities = asEntityMap(declarations);
 	const statements: Statement[] = [
 		{
-			sql: `INSERT INTO ${BLOCKS_TABLE} (number, hash, parentHash, timestamp) VALUES (?, ?, ?, ?)`,
+			sql: `INSERT INTO ${BLOCKS_TABLE} (number, hash, timestamp) VALUES (?, ?, ?)`,
 			// the hash is folded to one spelling here, since it is the identity a
 			// consumer pins and later looks up (see `normalizeBlockHash`).
-			args: [block.number, normalizeBlockHash(block.hash), block.parentHash ?? '', block.timestamp],
+			args: [block.number, normalizeBlockHash(block.hash), block.timestamp],
 		},
 	];
 

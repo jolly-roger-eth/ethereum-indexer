@@ -48,8 +48,8 @@ describe('applying a block', () => {
 		// A statement that violates the _blocks primary key, appended to the batch
 		// AFTER the store's own statements.
 		const db = new FailingTailSQL(real, {
-			sql: `INSERT INTO _blocks (number, hash, parentHash, timestamp) VALUES (?, ?, ?, ?)`,
-			args: [1, '0xdup', '0x0', 1],
+			sql: `INSERT INTO _blocks (number, hash, timestamp) VALUES (?, ?, ?)`,
+			args: [1, '0xdup', 1],
 		});
 		const store = new VersionedStateStore(db, [TOKEN]);
 		await store.migrate();

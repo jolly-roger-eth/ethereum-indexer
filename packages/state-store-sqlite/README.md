@@ -27,7 +27,7 @@ const store = new VersionedStateStore(db /* a RemoteSQL */, [
 await store.migrate();
 
 // one block is one atomic batch
-await store.applyBlock({number: 100, hash: '0xaa', parentHash: '0x99', timestamp: 1_700_000_000}, [
+await store.applyBlock({number: 100, hash: '0xaa', timestamp: 1_700_000_000}, [
 	{type: 'upsert', entity: 'token', id: {id: '1'}, values: {owner: '0xAlice', transferCount: 1}},
 ]);
 

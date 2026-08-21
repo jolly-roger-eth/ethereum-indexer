@@ -30,12 +30,22 @@ export const BLOCKS_TABLE = '_blocks';
 /**
  * Rows exist here only for blocks that carry our logs, not for every chain
  * block: state only changes where our events occur.
+ *
+ * There is deliberately no `parentHash`. It is not on a log, so recording it
+ * would cost the extra `eth_getBlockByHash` round-trip per block that this whole
+ * design exists to avoid (ADR-0002 makes the in-browser path primary, and a
+ * browser provider cannot even batch those calls). It would also be close to
+ * meaningless if it were stored: this table is SPARSE, holding only blocks that
+ * carry our logs, so consecutive rows are almost never parent and child and the
+ * linkage a `parentHash` implies would not exist to check. The chain-linkage
+ * cross-check it would serve (`verifyBlocks`, ADR-0004) is deferred in the
+ * design's §9, and if it is ever built it needs the field plumbed onto the log
+ * stream first, not reconstructed here.
  */
 export const FIXED_SCHEMA_DDL: string[] = [
 	`CREATE TABLE IF NOT EXISTS ${BLOCKS_TABLE} (
 	number INTEGER PRIMARY KEY,
 	hash TEXT NOT NULL UNIQUE,
-	parentHash TEXT NOT NULL,
 	timestamp INTEGER NOT NULL
 )`,
 	`CREATE INDEX IF NOT EXISTS ${BLOCKS_TABLE}_timestamp ON ${BLOCKS_TABLE} (timestamp)`,

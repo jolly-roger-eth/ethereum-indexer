@@ -39,12 +39,15 @@ export type NormalizedEntity = {
  * every reader. `hash` is folded to lower case on write, since it is the
  * identity consumers pin and look up again (`normalizeBlockHash`).
  *
+ * There is no `parentHash`, and its absence is a decision rather than an
+ * omission: it is not on a log, so it would cost a round-trip per block, and it
+ * would describe a linkage this sparse table does not have. See `ddl.ts`.
+ *
  * Reading state back out as of a hash, a height or a timestamp is `blocks.ts`.
  */
 export type BlockPointer = {
 	number: number;
 	hash: string;
-	parentHash?: string;
 	timestamp: number;
 };
 

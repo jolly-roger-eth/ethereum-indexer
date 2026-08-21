@@ -37,7 +37,6 @@
 export type RecordedBlock = {
 	number: number;
 	hash: string;
-	parentHash: string;
 	/** Seconds since the epoch, as the chain reports it. */
 	timestamp: number;
 };

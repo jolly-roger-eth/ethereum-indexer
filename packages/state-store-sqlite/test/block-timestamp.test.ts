@@ -42,13 +42,12 @@ describe('normalising blockTimestamp off the log', () => {
 		await store.migrate();
 
 		// two blocks, the same instant expressed differently by two clients
-		await store.applyBlock({number: 100, hash: '0x64', parentHash: '0x63', timestamp: normalizeBlockTimestamp(HEX)}, [
+		await store.applyBlock({number: 100, hash: '0x64', timestamp: normalizeBlockTimestamp(HEX)}, [
 			owns('1', '0xAlice', 1),
 		]);
-		await store.applyBlock(
-			{number: 101, hash: '0x65', parentHash: '0x64', timestamp: normalizeBlockTimestamp(String(SECONDS + 12))},
-			[owns('1', '0xBob', 2)],
-		);
+		await store.applyBlock({number: 101, hash: '0x65', timestamp: normalizeBlockTimestamp(String(SECONDS + 12))}, [
+			owns('1', '0xBob', 2),
+		]);
 
 		expect(await store.resolveBlockNumber({timestamp: SECONDS})).toBe(100);
 		expect(await store.resolveBlockNumber({timestamp: SECONDS + 11})).toBe(100);
