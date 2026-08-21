@@ -7,6 +7,15 @@ taskedAfter: [historical-state-database]
 
 > Launch snapshot — records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 
+> **PARTLY SUPERSEDED. Read `docs/adr/0005`, `docs/adr/0006` and `docs/adr/0007` first.**
+>
+> - **Open question 5 is answered NO (ADR-0005).** Triggers do **not** evaluate in the processor. They run in independent consumer services, each owning its cursor, gate, outbox, webhooks and auth. The indexer-server holds no trigger state at all.
+> - **Open question 4 relocates (ADR-0005).** The durable queue is a transactional outbox in *each consumer's own* database, pairing that consumer's cursor advance with its delivery rows. A managed queue is transport, never the source of truth.
+> - **Open question 3 is answered (ADR-0007).** Consumers gate themselves in a `safe` or `fast` lane. `fast` reads the retraction-aware stream and cancels before firing; `safe` reads the canonical gated view. The feed is at-least-once, so actions need **semantic** idempotency keys.
+> - **Consequence for user stories 3, 4, 6 and 7:** these are now requirements of the reference *trigger service*, not of the platform. The platform guarantees the feed (ordered, resumable, no silent loss), not the delivery.
+>
+> Unchanged: a state condition is still evaluated as of the triggering log's block, so the historical-state database still lands first. Open questions 1, 2 and 6 remain open.
+
 <!-- open-questions -->
 <!--
   TRANSIENT BLOCK — stripped by the apply rung on full resolution.

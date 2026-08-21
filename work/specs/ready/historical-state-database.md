@@ -6,6 +6,14 @@ needsAnswers: true
 
 > Launch snapshot — records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks. (The technical-detail sections below are trimmed by `to-task` once the work is tasked — they move into tasks/ADRs and this spec settles to its durable framing: Problem / Solution / User Stories / Out of Scope.)
 
+> **PARTLY SUPERSEDED. Read `docs/adr/0003` through `docs/adr/0008` first.** A design session revisited this spec's architecture. Three deltas, so the text below is not current truth:
+>
+> - **Component split (ADR-0003).** The watcher is now a *stateless* **log-fetcher** (chain calls only). Reorg detection and the event stream move to a **stream-builder** hosted with the processor in the **indexer-server**. "Processor" stays reserved for the existing `EventProcessor` reducer.
+> - **User story 5 is reversed (ADR-0004).** The fetcher does **not** push `removed` markers or `unconfirmedBlocks`. The wire carries raw logs plus `{context, fromBlock, toBlock, latestBlock}`; the receiver derives all reorg information and is authoritative about the cursor. Open question 4 is answered there.
+> - **Scope grew (ADR-0006).** The indexer-server also stores the emission stream and serves it as a feed, not only state queries. This is what lets trigger consumers live outside it (ADR-0005).
+>
+> Unchanged: state conditions are still read **as of the triggering log's block** by block hash, which is why this spec still lands first. Open questions 1, 2, 3, 5 and 6 remain open.
+
 <!-- open-questions -->
 <!--
   TRANSIENT BLOCK — stripped by the apply rung on full resolution.
