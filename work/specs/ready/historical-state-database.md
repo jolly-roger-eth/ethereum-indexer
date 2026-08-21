@@ -1,7 +1,6 @@
 ---
 title: Historical-state database (query state at block hash / height / time)
 slug: historical-state-database
-needsAnswers: true
 ---
 
 > Launch snapshot — records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks. (The technical-detail sections below are trimmed by `to-task` once the work is tasked — they move into tasks/ADRs and this spec settles to its durable framing: Problem / Solution / User Stories / Out of Scope.)
@@ -12,26 +11,9 @@ needsAnswers: true
 > - **User story 5 is reversed (ADR-0004).** The fetcher does **not** push `removed` markers or `unconfirmedBlocks`. The wire carries raw logs plus `{context, fromBlock, toBlock, latestBlock}`; the receiver derives all reorg information and is authoritative about the cursor. Open question 4 is answered there.
 > - **Scope grew (ADR-0006).** The indexer-server also stores the emission stream and serves it as a feed, not only state queries. This is what lets trigger consumers live outside it (ADR-0005).
 >
-> Unchanged: state conditions are still read **as of the triggering log's block** by block hash, which is why this spec still lands first. Open questions 1, 2, 3, 5 and 6 remain open.
-
-<!-- open-questions -->
-<!--
-  TRANSIENT BLOCK — stripped by the apply rung on full resolution.
-  This spec is a DESIGN task (produce the design doc), so its open questions ARE the
-  design decisions to make. It is flagged needsAnswers so it is not auto-tasked before
-  the design lands. Clear the flag + delete this block once the design doc exists.
--->
-
-## Open questions
-
-1. Which query axes (block hash / height / time) are in scope for v1, and which are deferred (justify by feasibility — esp. time, given block-timestamp availability)?
-2. Data model: versioned-rows / valid-block-range (`_lower/_upper`) vs. append-only replay vs. snapshots vs. hybrid — confirm the versioned-rows choice and its retention policy.
-3. Reorg semantics at the DB layer: confirm `revertTo(N)` (DELETE opened-above-fork, re-open closed-above-fork) and the DELETE-before-re-open ordering; how it mirrors the indexer's existing revert-and-reapply.
-4. Watcher ↔ processor wire contract: how `removed`/reorg + `LastSync`/unconfirmed-block info cross the authenticated HTTP boundary; delivery semantics (at-least-once?), idempotency, resumption.
-5. Serverless (Cloudflare Worker) constraints for the log-processor; `remote-sql` / D1 / SQLite schema within D1 limits.
-6. ~~Migration: is `ethereum-indexer-db-processors` DELETED or EVOLVED once this lands?~~ **ANSWERED, see `docs/adr/0010`:** deleted (it had no consumers); `ethereum-indexer-db-utils` is on a retirement path, absorbed by the stream-builder when the indexer-server lands.
-
-<!-- /open-questions -->
+> Unchanged: state conditions are still read **as of the triggering log's block** by block hash, which is why this spec still lands first.
+>
+> **The design this spec asked for now exists: `docs/design/historical-state-database.md`.** All six open questions are answered (1, 2, 3 and 5 in the design doc; 4 in ADR-0004; 6 in ADR-0010), so the `needsAnswers` gate is cleared and the transient block is stripped. Next step is tasking the build, not more design.
 
 ## Problem Statement
 
