@@ -38,25 +38,15 @@ Reorg at the DB layer = `revertTo(blockNumber)` then re-apply — the DB-level m
 6. As an operator, I want the log-processor to run as a serverless worker against `remote-sql`/D1, so that it deploys on the edge within D1 constraints.
 7. ~~As a maintainer, I want the design to state whether `ethereum-indexer-db-processors` is deleted or evolved, so that the old prototype does not linger as a second source of truth.~~ **DONE:** deleted, see `docs/adr/0010`.
 
-## Implementation Decisions
-
-- Target architecture (maintainer decision): the **log-watcher / log-processor split**; storage via `remote-sql` (D1 / Turso / SQLite); versioned-rows data model favoured over replay-on-read.
-- Prior art to study first (already reviewed in `docs/reviews/`): `RevertableDatabase` (the closest existing prototype of validity-range history — see `docs/reviews/revertable-database.md`), `EventCache`/`keepStream` (`docs/reviews/event-cache.md`), and the existing TODOs (`docs/reviews/todo-triage.md`).
-- Runnable, verified research example lives outside this repo at `~/dev/github/wighawag/research/ethereum-indexer-historical-state-db/` (versioned-rows + reorg proof on real libSQL).
-
-> Trimmed at tasking-time: this detail moves into the tasks (what to build) and, where it's a durable rationale, into an ADR (`docs/adr/`).
-
-## Testing Decisions
-
-- The new SQLite `revertTo(N)` MUST be checked against the revert contract pinned in `packages/ethereum-indexer-js-processor/test/reorg.test.ts` and `packages/ethereum-indexer/test/utils.test.ts` (single-block reorg restores end-of-prior-block state; below-finality events are not revertable).
-- Test the store against local SQLite/libSQL (the dialect D1/Turso run), including a reorg-then-replay assertion that pre-fork history stays intact.
-
 ## Out of Scope
 
-- Implementation. This spec's first output is the DESIGN DOCUMENT (`docs/design/historical-state-database.md`); building follows once tasked.
-- The trigger system that consumes this (separate spec `trigger-system`, `taskedAfter` this one).
+- Implementation detail: the design landed as `docs/design/historical-state-database.md`, and the build is decomposed into tasks (see below).
+- **Storing and serving the log stream, and rebuilding state on a processor upgrade.** That scope arrived via ADR-0006 and ADR-0008 and is covered by none of the stories above, so it is a separate spec: `indexer-server-feed`, `taskedAfter` this one.
+- The trigger system that consumes all of this (separate spec `trigger-system`).
 
 ## Further Notes
+
+> **Tasked.** Technical detail moved into `work/tasks/backlog/` (8 tasks: `sql-versioned-state-store`, `block-addressing-hash-height-time`, `sql-backed-event-processor`, `agnostic-server-skeleton`, `ingest-wire-receiving-side`, `agnostic-log-fetcher`, `server-platform-adapters`, `fetcher-platform-adapters`); durable rationale moved into `docs/design/historical-state-database.md` and ADR-0003, 0004, 0006, 0010.
 
 - This spec supersedes the old ad-hoc plan `tasks/plan-historical-state-database.md`.
 - Related deferred architecture deepenings (from the architecture review) are NOT part of this spec: splitting the `EthereumIndexer` god class, a processor-lifecycle base, unifying storage adapters. Consider them only once this store's interface needs are known.
