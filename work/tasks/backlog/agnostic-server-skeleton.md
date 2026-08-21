@@ -2,26 +2,15 @@
 title: Platform-agnostic indexer-server skeleton
 slug: agnostic-server-skeleton
 spec: historical-state-database
-needsAnswers: true
 blockedBy: []
 covers: [6]
 ---
 
-<!-- open-questions -->
-<!--
-  TRANSIENT BLOCK. One naming decision a human should make, since it concerns a
-  published package name and a deprecation path.
--->
-
-## Open questions
-
-1. **What is the new server package called?** `ethereum-indexer-server` is taken by the existing Koa/PouchDB long-running server, which is on a retirement path with `ethereum-indexer-db-utils` (ADR-0010) but is still published and still works. Options: (a) a new name now and rename later, which means two renames; (b) a new name permanently, leaving the old name deprecated; (c) take the name now and move the old one aside, which breaks existing consumers immediately. This is an expand/migrate/contract sequencing choice on a public package, so a human should pick.
-
-<!-- /open-questions -->
-
 ## What to build
 
 The HTTP surface for the indexer-server, following the house model in `~/dev/github/wighawag/template-agnositic-server`: **core server logic is platform-agnostic and receives its database and environment by injection**, while host adapters live separately.
+
+The package is **`@ethereum-indexer/server`**, in `packages/server/`. The naming question this task used to carry (that `ethereum-indexer-server` is taken by the retiring Koa/PouchDB server) is answered by ADR-0014: packages move to the `@ethereum-indexer` scope, which is a fresh namespace, so the new server takes the obvious name while the old unscoped package keeps working until it is deprecated. Set `publishConfig.access: "public"`, which is mandatory rather than decorative for a scoped package.
 
 Concretely, a Hono app whose options are `{getDB, getEnv}`, depending on `remote-sql` and never on a runtime. No Cloudflare imports, no Node built-ins, no D1 references. `wighawag/push-notification` follows the same model and is a working second reference.
 
@@ -47,7 +36,7 @@ No chain logic and no store dependency: this task is deliberately buildable in p
 
 > Build the platform-agnostic indexer-server skeleton in the `ethereum-indexer` monorepo.
 >
-> FIRST, check this task against current reality, and note it carries an open question about the package name that must be answered before you start (see the task body). Read `docs/adr/0003` (the log-fetcher / stream-builder / processor split, and why "processor" stays reserved for the existing reducer) and `docs/adr/0010` (the old server's retirement path).
+> FIRST, check this task against current reality. Read `docs/adr/0003` (the log-fetcher / stream-builder / processor split, and why "processor" stays reserved for the existing reducer), `docs/adr/0010` (the old server's retirement path) and `docs/adr/0014` (the `@ethereum-indexer` scope, which settles that this package is `@ethereum-indexer/server` in `packages/server/`).
 >
 > Follow the house model in `~/dev/github/wighawag/template-agnositic-server`: `packages/server` holds a Hono app that knows only `RemoteSQL` and receives `{getDB, getEnv}` by injection; `platforms/*` holds thin host adapters that supply them. `~/dev/github/wighawag/push-notification` is a second working reference of the same shape. The point is that the server runs on Node, Bun, Workers or anything else, so **D1 is one backend among several, never the target**: no Cloudflare imports, no Node built-ins, no D1 references anywhere in this package.
 >
