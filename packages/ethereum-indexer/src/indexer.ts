@@ -88,6 +88,24 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected lastSync: LastSync<ABI> | undefined;
 
+	/**
+	 * Block timestamps already fetched, so the unconfirmed window is not re-fetched
+	 * every round.
+	 *
+	 * Only ever populated on the fallback path, for nodes that do not put
+	 * `blockTimestamp` on the log. Those nodes cost one `eth_getBlockByHash` per
+	 * block, and `getFromBlock` deliberately re-scans back to
+	 * `latestBlock - finality` on every round to catch reorgs, so without a cache
+	 * the same unconfirmed blocks are fetched again on every single round.
+	 *
+	 * **Keyed by block HASH, and that is what makes it safe.** A hash uniquely
+	 * determines a block, so a cached timestamp cannot become wrong: a reorged-out
+	 * block's hash simply never appears again. Keying by NUMBER would be silently
+	 * wrong across exactly the reorgs the re-scan exists to detect, since the same
+	 * height would return the dead branch's timestamp.
+	 */
+	protected blockTimestampCache = new Map<string, {number: number; timestamp: number}>();
+
 	// ------------------------------------------------------------------------------------------------------------------
 	// ACTIONS
 	// ------------------------------------------------------------------------------------------------------------------
@@ -630,8 +648,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		const blockTimestamps: {[hash: string]: number} = {};
 		const transactions: {[hash: string]: LogTransactionData} = {};
-		let anyFetch = false;
+		let anyTransactionFetched = false;
+		let anyTimestampResolved = false;
 
+		// needed to prune the timestamp cache, which is keyed by hash but bounded by height
+		const blockNumberPerHash = new Map<string, number>();
 		const blockHashes: string[] = [];
 		const transactionHashes: string[] = [];
 		// We deduplicate by hash (not by block number / position) so that every distinct
@@ -655,7 +676,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			// ADR-0002 makes that saving matter, since the in-browser path is primary
 			// and cannot even batch these calls.
 			if (this.config.stream.alwaysFetchTimestamps && event.blockTimestamp === undefined) {
-				if (!seenBlockHashes.has(event.blockHash)) {
+				blockNumberPerHash.set(event.blockHash, event.blockNumber);
+				const cached = this.blockTimestampCache.get(event.blockHash);
+				if (cached) {
+					// already paid for on an earlier round: the re-scan window overlaps
+					blockTimestamps[event.blockHash] = cached.timestamp;
+					anyTimestampResolved = true;
+				} else if (!seenBlockHashes.has(event.blockHash)) {
 					seenBlockHashes.add(event.blockHash);
 					blockHashes.push(event.blockHash);
 				}
@@ -668,9 +695,25 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			namedLogger.info(`...got  ${blocks.length} blocks back`);
 
 			for (let i = 0; i < blockHashes.length; i++) {
-				blockTimestamps[blockHashes[i]] = blocks[i].timestamp;
+				const hash = blockHashes[i];
+				const timestamp = blocks[i].timestamp;
+				blockTimestamps[hash] = timestamp;
+				const number = blockNumberPerHash.get(hash);
+				if (number !== undefined) {
+					this.blockTimestampCache.set(hash, {number, timestamp});
+				}
 			}
-			anyFetch = true;
+			anyTimestampResolved = true;
+		}
+
+		// Bounded by the reorg window, not by the length of the chain. `getFromBlock`
+		// never re-scans below `latestBlock - finality`, so an entry below it can
+		// never be needed again. This is also what evicts reorged-out hashes, which
+		// nothing else would ever ask for.
+		for (const [hash, block] of this.blockTimestampCache) {
+			if (latestBlock - block.number > this.finality) {
+				this.blockTimestampCache.delete(hash);
+			}
 		}
 
 		if (transactionHashes.length > 0) {
@@ -682,10 +725,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			for (let i = 0; i < transactionHashes.length; i++) {
 				transactions[transactionHashes[i]] = transactionReceipts[i];
 			}
-			anyFetch = true;
+			anyTransactionFetched = true;
 		}
 
-		if (anyFetch) {
+		if (anyTransactionFetched || anyTimestampResolved) {
 			for (const event of eventsFetched) {
 				if (this.config.stream.alwaysFetchTransactions) {
 					event.transaction = transactions[event.transactionHash];

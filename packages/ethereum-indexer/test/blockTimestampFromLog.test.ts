@@ -151,7 +151,17 @@ function event(blockNumber: number, blockHash: string, blockTimestamp?: number):
 	};
 }
 
-function makeIndexer(provider: any, events: any[], alwaysFetchTimestamps = true) {
+/**
+ * `events` may be an array or a FACTORY, and the factory form matters.
+ *
+ * `fetchLogsFromProvider` assigns `blockTimestamp` onto the event objects it is
+ * given. A stub handing back the same array on every round would therefore carry
+ * round 1's timestamps into round 2, and a "did not re-fetch" assertion would
+ * pass because the events were already stamped rather than because anything was
+ * cached. A real fetcher returns freshly decoded objects every time, so the
+ * factory form is the honest one for any multi-round test.
+ */
+function makeIndexer(provider: any, events: any[] | (() => any[]), alwaysFetchTimestamps = true) {
 	const processor: any = {
 		getVersionHash: () => 'proc',
 		load: async () => undefined,
@@ -162,7 +172,9 @@ function makeIndexer(provider: any, events: any[], alwaysFetchTimestamps = true)
 	const indexer = new EthereumIndexer<Abi>(provider, processor, SOURCE, {
 		stream: {finality: 12, alwaysFetchTimestamps},
 	});
-	(indexer as any).logEventFetcher = {getLogEvents: async () => ({events, toBlockUsed: 200})};
+	(indexer as any).logEventFetcher = {
+		getLogEvents: async () => ({events: typeof events === 'function' ? events() : events, toBlockUsed: 200}),
+	};
 	return indexer;
 }
 
@@ -200,6 +212,88 @@ describe('the indexer only fetches blocks whose logs lack a timestamp', () => {
 
 		expect(calls.filter((c) => c.method === 'eth_getBlockByHash')).toHaveLength(2);
 		expect(eventStream.map((e: any) => e.blockTimestamp)).toEqual([1000, 2000]);
+	});
+
+	it('does not re-fetch a block it already has a timestamp for', async () => {
+		// `getFromBlock` deliberately re-scans back to `latestBlock - finality` every
+		// round to catch reorgs, so on a node that does not supply timestamps the same
+		// unconfirmed blocks come back round after round. Without a cache each one is
+		// re-fetched every time: 3 blocks over 5 rounds cost 15 `eth_getBlockByHash`.
+		const {provider, calls} = makeProvider({'0xaaa': 1000, '0xbbb': 2000, '0xccc': 3000});
+		// blocks 195/196 against latestBlock 200 and finality 12: inside the re-scan
+		// window, so they legitimately come back round after round
+		let withNewBlock = false;
+		const indexer = makeIndexer(provider, () =>
+			withNewBlock
+				? [event(195, '0xaaa'), event(196, '0xbbb'), event(197, '0xccc')]
+				: [event(195, '0xaaa'), event(196, '0xbbb')],
+		);
+
+		const first = await (indexer as any).fetchLogsFromProvider(freshLastSync(), passThrough);
+		expect(calls.filter((c) => c.method === 'eth_getBlockByHash')).toHaveLength(2);
+		expect(first.eventStream.map((e: any) => e.blockTimestamp)).toEqual([1000, 2000]);
+
+		// the re-scan returns both blocks again, plus one genuinely new one
+		withNewBlock = true;
+		calls.length = 0;
+		const second = await (indexer as any).fetchLogsFromProvider(first.lastSync, passThrough);
+
+		// only the NEW block costs a round-trip; the two re-scanned ones are cached
+		const fetched = calls.filter((c) => c.method === 'eth_getBlockByHash');
+		expect(fetched).toHaveLength(1);
+		expect(fetched[0].params[0]).toBe('0xccc');
+		// and only the new block is appended, still correctly stamped
+		expect(second.eventStream.map((e: any) => e.blockTimestamp)).toEqual([3000]);
+	});
+
+	it('fetches a REORGED block again, because the cache is keyed by hash not height', async () => {
+		// The load-bearing property. Keying by block number would answer block 100's
+		// new hash with the DEAD branch's timestamp, and it would do so silently,
+		// across exactly the reorg the re-scan window exists to detect.
+		const {provider, calls} = makeProvider({'0xaaa': 1000, '0xdead': 9999});
+		const indexer = makeIndexer(provider, () => [event(195, '0xaaa')]);
+
+		const first = await (indexer as any).fetchLogsFromProvider(freshLastSync(), passThrough);
+		expect(first.eventStream[0].blockTimestamp).toBe(1000);
+
+		// block 195 is replaced: same height, different hash, different timestamp
+		(indexer as any).logEventFetcher = {
+			getLogEvents: async () => ({events: [event(195, '0xdead')], toBlockUsed: 200}),
+		};
+		calls.length = 0;
+		const second = await (indexer as any).fetchLogsFromProvider(first.lastSync, passThrough);
+
+		const fetched = second.eventStream.filter((e: any) => !e.removed);
+		expect(fetched[0].blockTimestamp).toBe(9999);
+		expect(calls.filter((c) => c.method === 'eth_getBlockByHash')).toHaveLength(1);
+	});
+
+	it('does not grow without bound: entries below finality are evicted', async () => {
+		// `getFromBlock` never re-scans below `latestBlock - finality`, so an entry
+		// below it can never be needed again. That bound is what keeps a long sync
+		// from accumulating one entry per block of the whole chain.
+		const {provider} = makeProvider({'0xaaa': 1000, '0xbbb': 2000});
+		// block 195 is inside the window against latestBlock 200...
+		const indexer = makeIndexer(provider, () => [event(195, '0xaaa')]);
+		await (indexer as any).fetchLogsFromProvider(freshLastSync(), passThrough);
+		expect((indexer as any).blockTimestampCache.size).toBe(1);
+
+		// ...and block 100 is not: 200 - 100 = 100 > finality, so it is evicted in the
+		// same round it would have been cached, never mind later ones.
+		const other = makeIndexer(provider, () => [event(100, '0xbbb')]);
+		await (other as any).fetchLogsFromProvider(freshLastSync(), passThrough);
+		expect((other as any).blockTimestampCache.size).toBe(0);
+	});
+
+	it('caches nothing on a node that puts the timestamp on the log', async () => {
+		// The cache exists only for the fallback path; a compliant node should not pay
+		// even the memory for it.
+		const {provider} = makeProvider({});
+		const indexer = makeIndexer(provider, () => [event(195, '0xaaa', 1000)]);
+
+		await (indexer as any).fetchLogsFromProvider(freshLastSync(), passThrough);
+
+		expect((indexer as any).blockTimestampCache.size).toBe(0);
 	});
 
 	it('keeps the log timestamp even without alwaysFetchTimestamps, for free', async () => {
