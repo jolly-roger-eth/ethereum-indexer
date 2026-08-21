@@ -1,5 +1,5 @@
 ---
-title: <Human Readable Title>
+title: '<Human Readable Title>'
 slug: <url-safe-slug>
 # issue: 123          # optional: the issue this spec was spawned from (the surviving thread)
 # humanOnly: true     # optional: a HUMAN must drive the tasking of this spec (a decision). OMIT otherwise.

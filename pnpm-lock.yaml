@@ -11,6 +11,9 @@ importers:
       '@changesets/cli':
         specifier: ^2.29.8
         version: 2.31.0(@types/node@25.9.1)
+      dorfl:
+        specifier: ^0.13.0
+        version: 0.13.0
       ipfs-gateway-emulator:
         specifier: 4.2.1-ipfs.2
         version: 4.2.1-ipfs.2
@@ -417,37 +420,6 @@ importers:
       vitest:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/ethereum-indexer-db-processors:
-    dependencies:
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
-      ethereum-indexer-db-utils:
-        specifier: workspace:*
-        version: link:../ethereum-indexer-db-utils
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
-      pouchdb:
-        specifier: ^9.0.0
-        version: 9.0.0
-      pouchdb-find:
-        specifier: ^9.0.0
-        version: 9.0.0
-    devDependencies:
-      '@types/pouchdb':
-        specifier: ^6.4.2
-        version: 6.4.2
-      as-soon:
-        specifier: ^0.1.5
-        version: 0.1.6
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.4
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
 
   packages/ethereum-indexer-db-utils:
     dependencies:
@@ -2672,6 +2644,11 @@ packages:
 
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
+
+  dorfl@0.13.0:
+    resolution: {integrity: sha512-o1oY9ydIA3BdRXTmkltPc8a1tXzk++E+XJMxS68IYyT/LAQTiNyVOU+DrEFYYSoJUFkpmI5Va7H/SW5jS4Ff1w==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   dotenv-expand@10.0.0:
     resolution: {integrity: sha512-GopVGCpVS1UKH75VKHGuQFqS1Gusej0z4FyQkPdwjil2gNIv+LNsqBlboOzpJFZKVT95GkCyWJbBSdFEFUWI2A==}
@@ -6774,6 +6751,10 @@ snapshots:
       dom-serializer: 2.0.0
       domelementtype: 2.3.0
       domhandler: 5.0.3
+
+  dorfl@0.13.0:
+    dependencies:
+      commander: 14.0.3
 
   dotenv-expand@10.0.0: {}
 

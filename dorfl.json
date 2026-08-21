@@ -1,7 +1,17 @@
 {
+	"dorflCmd": "node_modules/.bin/dorfl",
 	"prepare": "pnpm install",
-	"verify": "pnpm format:check && pnpm build && pnpm test",
+	"verify": "pnpm format:check && { [ \"$GITHUB_HEAD_REF\" = \"changeset-release/main\" ] && echo 'skip changeset status on the Version PR (it consumes changesets)' || pnpm changeset status --since=main; } && pnpm build && pnpm typecheck && pnpm test",
 	"harness": "pi",
 	"autoBuild": false,
-	"autoTask": false
+	"autoTask": false,
+	"promptGuidance": {"testFirst": true},
+	"surfaceBlockers": false,
+	"review": false,
+	"integration": "propose",
+	"tasksLandIn": "ready",
+	"specsLandIn": "ready",
+	"untrustedTasksLandIn": "ready",
+	"untrustedSpecsLandIn": "ready",
+	"agentDeadlineMinutes": 90
 }

@@ -147,14 +147,23 @@ code itself (it affects nothing outside this task), resolve and proceed silently
 But a choice that touches ANOTHER command/flag/task, introduces a new
 ERROR/REFUSAL, or sets a USER-VISIBLE DEFAULT is a DESIGN decision, NOT a small
 factual gap — do NOT bury it in code. If it is load-bearing AND hard to reverse,
-STOP (above). Otherwise PROCEED but RECORD it DURABLY and LINK it from the done
-record, one entry per decision — what you chose + why + the alternative(s) you
-considered + what it touches (which other flag/command/task). Any durable home
-is acceptable: a module JSDoc at the choice site (best when there is an obvious
-code site the decision governs), a "## Decisions" block in the done record / PR
-body (the recommended fallback when there is no natural code site), or a dated
-observation note under work/notes/observations/. Whichever home you pick, LINK
-it from the done record so it is discoverable. This does NOT stop the build; it
+STOP (above). Otherwise PROCEED but RECORD it in a "## Decisions"
+block in your FINAL REPORT, one entry per decision: what you chose + why + the
+alternative(s) you considered + what it touches (which other flag/command/task).
+
+That block is the ONE sanctioned channel for build-time rationale, and the runner
+TRANSCRIBES it verbatim into the done record (work/tasks/done/<slug>.md) in the
+SAME commit as the done-move. Emit it as a plain "## Decisions" heading in the
+report you end with; everything under it up to the next "## " heading is captured.
+Do NOT try to write the rationale into the done record yourself: you must not
+edit the task body and you do no git, so the report is the only surface you own.
+Do NOT open a work/notes/observations/decisions-<slug>.md note for it either: an
+observation is a SPOTTED, UNVERIFIED signal, not a decision you made (WORK-CONTRACT,
+"Where a BUILDER's RATIONALE lives"). If a decision meets the ADR gate (hard to
+reverse + surprising without context + a real trade-off), ALSO write it as an ADR
+in docs/adr/ (creating that file is ordinary work, not git) and name it in the
+block. A short JSDoc at the choice site is welcome as the code-adjacent copy, but
+it does not replace the block. This does NOT stop the build; it
 makes the choice visible so the reviewer + the human can ratify or reverse it.
 The bar is "would another task / a user / a reviewer be surprised this was
 decided here?" — if yes, record it. A real ambiguity or stale premise, STOP.
@@ -169,8 +178,7 @@ step vs the explicit verb a human typed)? (3) does it DUPLICATE/overlap an exist
 concept you should reuse or rename instead of forking? If a new concept conflicts
 with, re-means, or duplicates an existing one — or sits at the wrong layer — that is
 NOT a "small factual gap": STOP if it is load-bearing/hard-to-reverse, else RECORD
-it durably per the rule above (JSDoc at the choice site, a `## Decisions` entry
-in the done record, or an observation note — linked from the done record), noting
+it in your `## Decisions` block per the rule above, noting
 what concept, what it overlaps, why your placement. This is
 the prevention half of the review's conceptual-coherence lens — a muddled concept
 that compiles is far more expensive than the question, because every later artifact
@@ -212,9 +220,10 @@ The classic case: a change that touched a package but added no changeset entry
 conventions doc; it is the repo's source of truth for these standing rules.
 
 When the acceptance criteria are met and the repo's build/test/format checks are
-green, STOP and report what you did. The runner handles the durable `git mv` of the
-body tasks/ready/ -> work/tasks/done/, the completion commit, the lock release, and
-integration.
+green, STOP and report what you did, ending with your "## Decisions" block if you
+made any in-scope decisions (above). The runner handles the durable `git mv` of the
+body tasks/ready/ -> work/tasks/done/, transcribing your "## Decisions" block into
+that done record, the completion commit, the lock release, and integration.
 ```
 
 The "no git" line is **in-band** in the prompt (not delegated to a host config like a global `AGENTS.md`): a portable runner cannot assume the target machine has any such rule, so the boundary travels with the prompt. This keeps the acceptance-test gate authoritative (the agent can't commit/merge around it) and the runner the single owner of git state.
