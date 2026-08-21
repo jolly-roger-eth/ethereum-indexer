@@ -667,6 +667,46 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/processor-sqlite:
+    dependencies:
+      '@ethereum-indexer/state-store-sqlite':
+        specifier: workspace:*
+        version: link:../state-store-sqlite
+      ethereum-indexer:
+        specifier: workspace:*
+        version: link:../ethereum-indexer
+      named-logs:
+        specifier: ^0.4.1
+        version: 0.4.1
+      remote-sql:
+        specifier: ^0.0.7
+        version: 0.0.7
+    devDependencies:
+      '@libsql/client':
+        specifier: ^0.17.3
+        version: 0.17.4
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      ethereum-indexer-js-processor:
+        specifier: workspace:*
+        version: link:../ethereum-indexer-js-processor
+      remote-sql-libsql:
+        specifier: ^0.0.7
+        version: 0.0.7(@libsql/core@0.17.4)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/state-store-sqlite:
     dependencies:
       named-logs:
