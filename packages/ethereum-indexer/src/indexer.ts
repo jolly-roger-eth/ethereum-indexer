@@ -24,7 +24,7 @@ import type {
 } from './types.js';
 import {LogEventFetcher} from './internal/decoding/LogEventFetcher.js';
 import type {Abi} from 'abitype';
-import {generateStreamToAppend, getFromBlock, groupLogsPerBlock, wait} from './internal/engine/utils.js';
+import {generateStreamToAppend, getFromBlock, groupStreamPerBlock, wait} from './internal/engine/utils.js';
 import {CancelOperations, createAction} from './internal/utils/promises.js';
 import {simple_hash} from './utils/index.js';
 
@@ -463,12 +463,28 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			finality: this.finality,
 		});
 
-		const eventsInGroups = groupLogsPerBlock(eventStream);
+		// Retractions are delivered, not dropped. `groupLogsPerBlock` skips `removed`
+		// events, which is right for logs coming in from a fetch and wrong here: this
+		// stream is what the PROCESSOR consumes, and a `removed` marker is the only
+		// instruction it ever gets to revert. Dropping them meant the feed path could
+		// apply a reorged-out block and never take it back, so a processor fed through
+		// `feed()` (the kept-stream replay on load, and the server's import route)
+		// silently kept state derived from a dead branch, while the same stream through
+		// `indexMore()` reverted correctly.
+		const eventsInGroups = groupStreamPerBlock(eventStream);
 		const batchSize = this.config.feedBatchSize;
 		let currentLastSync = {...newLastSync};
 		while (eventsInGroups.length > 0) {
 			const list: LogEvent<ABI>[] = [];
-			while (eventsInGroups.length > 0 && list.length < batchSize) {
+			// Every retraction goes in ONE batch, whatever `feedBatchSize` says. A revert
+			// is a single decision about a fork point: splitting it across two `process`
+			// calls would leave the processor briefly holding half a dead branch, and a
+			// processor that reverts to the lowest retracted block (rather than per
+			// event) would compute that fork point from a partial view.
+			while (eventsInGroups.length > 0 && eventsInGroups[0].removed) {
+				list.push(...(eventsInGroups.shift() as {events: LogEvent<ABI>[]}).events);
+			}
+			while (eventsInGroups.length > 0 && !eventsInGroups[0].removed && list.length < batchSize) {
 				const blockGroup = eventsInGroups.shift();
 				if (blockGroup) {
 					list.push(...blockGroup.events);
@@ -476,7 +492,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 
 			if (list.length > 0) {
-				currentLastSync.lastToBlock = list[list.length - 1].blockNumber;
+				// a retraction-only batch must not drag the cursor backwards
+				const applied = list.filter((event) => !event.removed);
+				if (applied.length > 0) {
+					currentLastSync.lastToBlock = applied[applied.length - 1].blockNumber;
+				}
 				const outcome = await unlessCancelled(this.processor.process(list, currentLastSync));
 				this.lastSync = currentLastSync;
 				this._onLastSyncUpdated();

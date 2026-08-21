@@ -47,6 +47,41 @@ export function groupLogsPerBlock<ABI extends Abi>(logEvents: LogEvent<ABI>[]): 
 	return logEventsGroupedPerBlock;
 }
 
+/**
+ * Group an ALREADY-GENERATED stream for delivery, retractions included.
+ *
+ * This is the counterpart to `groupLogsPerBlock`, and the difference is the
+ * whole point. `groupLogsPerBlock` groups logs coming IN from a fetch, where a
+ * `removed` marker has no business existing and is dropped. This groups the
+ * stream going OUT to a processor, where a `removed` marker is the retraction
+ * itself and dropping it loses the only instruction to revert.
+ *
+ * Retracted and applied events are kept in SEPARATE groups even when they share
+ * a block hash, which they genuinely can: when a reorg is detected at the first
+ * unconfirmed block, every later unconfirmed block is retracted too, and a
+ * re-fetch that still contains one of them re-applies it under the same hash.
+ * Merging those two into one group would hand the processor a block that is
+ * simultaneously retracted and applied.
+ */
+export function groupStreamPerBlock<ABI extends Abi>(
+	stream: LogEvent<ABI>[],
+): (BlockOfEvents<ABI> & {removed: boolean})[] {
+	const groups = new Map<string, BlockOfEvents<ABI> & {removed: boolean}>();
+	const ordered: (BlockOfEvents<ABI> & {removed: boolean})[] = [];
+	for (const event of stream) {
+		const removed = event.removed ? true : false;
+		const key = `${removed ? 'R' : 'A'}:${event.blockHash}`;
+		let group = groups.get(key);
+		if (!group) {
+			group = {hash: event.blockHash, number: event.blockNumber, events: [], removed};
+			groups.set(key, group);
+			ordered.push(group);
+		}
+		group.events.push(event);
+	}
+	return ordered;
+}
+
 export function generateStreamToAppend<ABI extends Abi>(
 	lastSync: LastSync<ABI>,
 	defaultFromBlock: number,
