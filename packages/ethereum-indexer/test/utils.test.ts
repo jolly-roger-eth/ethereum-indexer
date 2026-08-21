@@ -215,6 +215,53 @@ describe('generateStreamToAppend', () => {
 		expect(newLastSync.unconfirmedBlocks.map((b) => b.hash)).toEqual(['0xAAA']);
 	});
 
+	// A reorg is concluded in two very different ways, and ADR-0004 requires them to be
+	// distinguishable: a CONTRADICTION (the same height now has a different hash) is proof,
+	// while an ABSENCE (a block we hold is simply not in the payload) is an inference, and it
+	// is the inference that silently deletes state when a sender under-delivers a range.
+	it('reports a hash contradiction as the reorg cause', () => {
+		const prevEvent = makeEvent(100, '0xAAA');
+		const ls = lastSync({
+			latestBlock: 100,
+			lastToBlock: 100,
+			unconfirmedBlocks: [block(100, '0xAAA', [prevEvent])],
+		});
+		const {reorg} = generateStreamToAppend(ls, 0, [makeEvent(100, '0xBBB')], {
+			newLatestBlock: 101,
+			newLastToBlock: 101,
+			newLastFromBlock: getFromBlock(ls, 0, finality),
+			finality,
+		});
+		expect(reorg).toEqual({cause: 'contradiction', blockNumber: 100, blockHash: '0xAAA'});
+	});
+
+	it('reports a vanished block as an absence, not a contradiction', () => {
+		const prevEvent = makeEvent(100, '0xAAA');
+		const ls = lastSync({
+			latestBlock: 100,
+			lastToBlock: 100,
+			unconfirmedBlocks: [block(100, '0xAAA', [prevEvent])],
+		});
+		const {reorg} = generateStreamToAppend(ls, 0, [], {
+			newLatestBlock: 101,
+			newLastToBlock: 101,
+			newLastFromBlock: getFromBlock(ls, 0, finality),
+			finality,
+		});
+		expect(reorg).toEqual({cause: 'absence', blockNumber: 100, blockHash: '0xAAA'});
+	});
+
+	it('reports no reorg when nothing was reverted', () => {
+		const ls = lastSync({latestBlock: 1000, lastToBlock: 1000});
+		const {reorg} = generateStreamToAppend(ls, 0, [], {
+			newLatestBlock: 1001,
+			newLastToBlock: 1001,
+			newLastFromBlock: getFromBlock(ls, 0, finality),
+			finality,
+		});
+		expect(reorg).toBeUndefined();
+	});
+
 	it('detects a reorg when ALL unconfirmed blocks vanish (empty re-fetch)', () => {
 		const prevEvent = makeEvent(100, '0xAAA');
 		const ls = lastSync({

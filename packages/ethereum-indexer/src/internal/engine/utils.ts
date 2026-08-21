@@ -1,5 +1,21 @@
 import type {Abi} from 'abitype';
+import {logs} from 'named-logs';
 import type {EventBlock, LastSync, LogEvent} from '../../types.js';
+
+const namedLogger = logs('ethereum-indexer');
+
+/**
+ * How a reorg was concluded.
+ *
+ * - `contradiction`: the same block height now carries a DIFFERENT hash. This is proof.
+ * - `absence`: a block we held is simply not present in the re-fetched range. This is an
+ *   INFERENCE, and it is indistinguishable from a sender that under-delivered the range
+ *   (a truncated `eth_getLogs`, a wrong address/topic filter). It still reverts state, so
+ *   it is reported separately and loudly. See `docs/adr/0004`.
+ */
+export type ReorgCause = 'contradiction' | 'absence';
+
+export type ReorgDetection = {cause: ReorgCause; blockNumber: number; blockHash: string};
 
 export function wait(seconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
@@ -41,7 +57,7 @@ export function generateStreamToAppend<ABI extends Abi>(
 		newLastToBlock,
 		finality,
 	}: {newLatestBlock: number; newLastFromBlock: number; newLastToBlock: number; finality: number},
-): {eventStream: LogEvent<ABI>[]; newLastSync: LastSync<ABI>} {
+): {eventStream: LogEvent<ABI>[]; newLastSync: LastSync<ABI>; reorg?: ReorgDetection} {
 	const expectedFromBlock = getFromBlock(lastSync, defaultFromBlock, finality);
 
 	if (newLastFromBlock !== expectedFromBlock) {
@@ -76,6 +92,7 @@ export function generateStreamToAppend<ABI extends Abi>(
 	}
 
 	let reorgBlock: EventBlock<ABI> | undefined;
+	let reorgCause: ReorgCause | undefined;
 	let reorgedBlockIndex = 0;
 	for (let i = 0; i < lastUnconfirmedBlocks.length; i++) {
 		const unconfirmedBlock = lastUnconfirmedBlocks[i];
@@ -84,12 +101,38 @@ export function generateStreamToAppend<ABI extends Abi>(
 			reorgedBlockIndex = i + 1;
 			continue;
 		}
-		if (newBlockHashPerNumber.get(unconfirmedBlock.number) !== unconfirmedBlock.hash) {
+		const newHashAtSameHeight = newBlockHashPerNumber.get(unconfirmedBlock.number);
+		if (newHashAtSameHeight !== unconfirmedBlock.hash) {
 			reorgBlock = unconfirmedBlock;
+			// A CONTRADICTION is proof: the same height now carries a different block.
+			// An ABSENCE is an inference: the block simply is not in the payload, which is
+			// indistinguishable from a sender that under-delivered the range (a truncated
+			// eth_getLogs, a wrong filter). Both revert state, so the two are reported
+			// separately: a rising rate of absence-driven reverts means truncation or
+			// misconfiguration, not chain activity. See docs/adr/0004.
+			reorgCause = newHashAtSameHeight === undefined ? 'absence' : 'contradiction';
 			reorgedBlockIndex = i;
 			break;
 		}
 		reorgedBlockIndex = i + 1;
+	}
+
+	if (reorgBlock && reorgCause) {
+		const detail = {
+			cause: reorgCause,
+			blockNumber: reorgBlock.number,
+			blockHash: reorgBlock.hash,
+			fromBlock: newLastFromBlock,
+			toBlock: newLastToBlock,
+		};
+		if (reorgCause === 'absence') {
+			namedLogger.error(
+				`reorg concluded from ABSENCE: block ${reorgBlock.number} (${reorgBlock.hash}) carries no logs in the re-fetched range [${newLastFromBlock}, ${newLastToBlock}]. State will be reverted. If this is frequent, suspect a truncated log fetch or a wrong filter rather than chain reorgs.`,
+				detail,
+			);
+		} else {
+			namedLogger.info(`reorg detected at block ${reorgBlock.number} (${reorgBlock.hash} replaced)`, detail);
+		}
 	}
 
 	if (reorgBlock) {
@@ -155,6 +198,10 @@ export function generateStreamToAppend<ABI extends Abi>(
 			lastToBlock: newLastToBlock,
 			unconfirmedBlocks: newUnconfirmedBlocks,
 		},
+		reorg:
+			reorgBlock && reorgCause
+				? {cause: reorgCause, blockNumber: reorgBlock.number, blockHash: reorgBlock.hash}
+				: undefined,
 	};
 }
 
