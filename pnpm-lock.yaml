@@ -309,6 +309,12 @@ importers:
 
   packages/ethereum-indexer:
     dependencies:
+      abitype:
+        specifier: ^1.2.4
+        version: 1.2.4(typescript@6.0.3)
+      eip-1193:
+        specifier: ^0.6.6
+        version: 0.6.6
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -316,15 +322,9 @@ importers:
         specifier: ^2.52.0
         version: 2.52.0(typescript@6.0.3)
     devDependencies:
-      abitype:
-        specifier: ^1.2.4
-        version: 1.2.4(typescript@6.0.3)
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      eip-1193:
-        specifier: ^0.6.6
-        version: 0.6.6
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -337,6 +337,9 @@ importers:
 
   packages/ethereum-indexer-browser:
     dependencies:
+      eip-1193:
+        specifier: ^0.6.5
+        version: 0.6.5
       ethereum-indexer:
         specifier: workspace:*
         version: link:../ethereum-indexer
@@ -359,9 +362,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      eip-1193:
-        specifier: ^0.6.5
-        version: 0.6.5
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -547,6 +547,9 @@ importers:
       commander:
         specifier: ^15.0.0
         version: 15.0.0
+      eip-1193:
+        specifier: ^0.6.5
+        version: 0.6.5
       eip-1193-jsonrpc-provider:
         specifier: ^0.4.3
         version: 0.4.3
@@ -626,9 +629,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      eip-1193:
-        specifier: ^0.6.5
-        version: 0.6.5
       fs-extra:
         specifier: ^11.3.5
         version: 11.3.5
@@ -644,6 +644,9 @@ importers:
 
   packages/ethereum-indexer-utils:
     dependencies:
+      ethereum-indexer:
+        specifier: workspace:*
+        version: link:../ethereum-indexer
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -654,9 +657,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
       tsx:
         specifier: ^4.21.0
         version: 4.22.4

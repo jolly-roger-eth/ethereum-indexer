@@ -21,6 +21,7 @@
 	"dependencies": {
 		"@ethersproject/bignumber": "^5.8.0",
 		"commander": "^15.0.0",
+		"eip-1193": "^0.6.5",
 		"eip-1193-jsonrpc-provider": "^0.4.3",
 		"ethereum-indexer": "workspace:*",
 		"ethereum-indexer-db-utils": "workspace:*",
@@ -49,7 +50,6 @@
 		"@types/node": "^25.9.1",
 		"@types/pouchdb": "^6.4.2",
 		"as-soon": "^0.1.5",
-		"eip-1193": "^0.6.5",
 		"fs-extra": "^11.3.5",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",

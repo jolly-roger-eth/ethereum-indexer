@@ -18,14 +18,14 @@
 		"entryPoint": "src/index.ts"
 	},
 	"devDependencies": {
-		"abitype": "^1.2.4",
 		"as-soon": "^0.1.5",
-		"eip-1193": "^0.6.6",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
+		"abitype": "^1.2.4",
+		"eip-1193": "^0.6.6",
 		"named-logs": "^0.4.1",
 		"viem": "^2.52.0"
 	},

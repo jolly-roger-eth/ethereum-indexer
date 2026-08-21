@@ -16,12 +16,12 @@
 	},
 	"license": "MIT",
 	"dependencies": {
+		"ethereum-indexer": "workspace:*",
 		"named-logs": "^0.4.1"
 	},
 	"devDependencies": {
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
-		"ethereum-indexer": "workspace:*",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"

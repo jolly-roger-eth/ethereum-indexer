@@ -19,12 +19,12 @@
 	},
 	"devDependencies": {
 		"as-soon": "^0.1.5",
-		"eip-1193": "^0.6.5",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
+		"eip-1193": "^0.6.5",
 		"ethereum-indexer": "workspace:*",
 		"ethereum-indexer-utils": "workspace:*",
 		"idb-keyval": "^6.2.4",
