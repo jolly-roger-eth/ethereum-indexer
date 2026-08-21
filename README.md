@@ -30,9 +30,11 @@ It is for example possible to instead of indexing all ERC721, to simply index th
 
 ## Caveats
 
-Due to the limitation of EIP-1193 (no batch request) and the current JSON RPC spec (no timestamp available in eth_getLogs result (See [improvement proposal's discussion](https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests/11183))) the indexer processors are expected to not make use of these features.
+Due to the limitation of EIP-1193 (no batch request), anything that needs an extra request per block or per transaction is expensive in the browser, so indexer processors are expected to not make use of such features.
 
-Using these features would work in a server environment where results can be cached across load-balanced instanced, but in a browser environment where each user would have its own instance, these would slow down the indexing too much.
+Using them would work in a server environment where results can be cached across load-balanced instances, but in a browser environment where each user would have its own instance, they would slow down the indexing too much.
+
+**Block timestamps are no longer one of those features.** `blockTimestamp` is now part of the log object itself, standardised in [`ethereum/execution-apis#639`](https://github.com/ethereum/execution-apis/pull/639) and served by go-ethereum (>= 1.16.0), reth, besu, erigon, anvil and ethereumjs, so a processor can read `event.blockTimestamp` for free. It is not universal — Hardhat's EDR does not emit it as of hardhat 3.14.0 ([edr#1643](https://github.com/NomicFoundation/edr/issues/1643)) — so the field stays optional, and `stream.alwaysFetchTimestamps` remains as the fallback: it now fetches only the blocks whose logs arrived without one, and costs nothing on a node that supplies them.
 
 Having said that an hybrid approach is possible where a server index and the in-browser indexer exists only as a backup when every server instances are unavailable expect for a cache (which could even be shared across user in p2p manner).
 
