@@ -14,7 +14,12 @@ taskedAfter: [historical-state-database]
 > - **Open question 3 is answered (ADR-0007).** Consumers gate themselves in a `safe` or `fast` lane. `fast` reads the retraction-aware stream and cancels before firing; `safe` reads the canonical gated view. The feed is at-least-once, so actions need **semantic** idempotency keys.
 > - **Consequence for user stories 3, 4, 6 and 7:** these are now requirements of the reference *trigger service*, not of the platform. The platform guarantees the feed (ordered, resumable, no silent loss), not the delivery.
 >
-> Unchanged: a state condition is still evaluated as of the triggering log's block, so the historical-state database still lands first. Open questions 1, 2 and 6 remain open.
+> - **Open question 1 is answered (ADR-0013).** Conditions are declarative data referencing operator-deployed code: a matcher over a log's **decoded** arguments (topics are only a fast path, since the argument a trigger cares about is often not indexed), plus a *named* state predicate parameterised by the registration. No bespoke DSL, and user-supplied code is never executed.
+> - **Open question 6 is partly answered.** Registration proves address ownership via a registered/delegated signer, sharing one implementation with `push-notification`'s `/register`; recipient identity is `(address, domain)`, already decided by that service. Payload signing and per-target webhook validation for non-push actions remain open. Abuse control is ADR-0011 (rate-based) and lifecycle is ADR-0012.
+>
+> Also decided since: the action primitive and delivery policy (ADR-0009), cost bounding and digests (ADR-0011), trigger lifecycle (ADR-0012).
+>
+> Unchanged: a state condition is still evaluated as of the triggering log's block, so the historical-state database still lands first. Open question 2 is unchanged (it was always the as-of-block requirement, now underpinned by `docs/design/historical-state-database.md`).
 
 <!-- open-questions -->
 <!--
