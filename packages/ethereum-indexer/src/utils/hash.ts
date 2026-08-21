@@ -1,3 +1,17 @@
+/**
+ * Turn an object into a key-sorted array form, so that two objects differing
+ * only in key ORDER hash alike.
+ *
+ * `undefined` values are dropped, and NOTHING else is. That distinction is the
+ * whole of this function's care: dropping `undefined` matches what
+ * `JSON.stringify` does anyway, so a value hashed before being persisted and the
+ * same value hashed after a JSON round-trip agree. Dropping the other falsy
+ * values, which this used to do with a bare `if (value)`, made `{fee: 0}` hash
+ * identically to `{}` and `{enabled: false}` identically to `{}`. Those are
+ * different configurations, and a processor configured with one while its state
+ * was computed under the other would have the state adopted as current: the same
+ * silent lie the `unknown` version fallback used to tell, one layer down.
+ */
 function normalizeAsArray(obj: object): any {
 	if (obj === null) {
 		return null;
@@ -9,7 +23,7 @@ function normalizeAsArray(obj: object): any {
 		const keys = Object.keys(obj).sort();
 		for (const key of keys) {
 			const value = (obj as any)[key];
-			if (value) {
+			if (value !== undefined) {
 				arr.push([key, normalizeAsArray(value)]);
 			}
 		}
@@ -18,14 +32,40 @@ function normalizeAsArray(obj: object): any {
 		return obj;
 	}
 }
+
+/**
+ * A short, stable, order-insensitive digest of any JSON-ish value.
+ *
+ * BigInt values are stringified with an `n` suffix on the way in, because
+ * `JSON.stringify` throws on them outright and a processor config holding a
+ * `uint256` is ordinary.
+ *
+ * Note the size: 32 bits, rendered base36. It is a change DETECTOR, not a
+ * cryptographic commitment, and it is compared against exactly one other value
+ * at a time.
+ *
+ * The leading `h` is not decoration. A digest is persisted inside `LastSync`
+ * (as `context.processor`, `context.config`, `context.source[].hash`) and this
+ * repo's storage adapters revive BigInts from the `"123n"` string convention.
+ * A bare base36 digest of all digits ending in `n` (`8918n`) IS that shape, so
+ * it came back from storage as a BigInt rather than a string, and
+ * `processorHash === context.processor` then compared a string to a BigInt and
+ * discarded good state. No guard in the reviver can fix that one, because at
+ * that point the two are genuinely indistinguishable; only the digest can, by
+ * never having the shape.
+ */
 export function simple_hash(obj: any): string {
-	const str = typeof obj === 'string' ? obj : JSON.stringify(normalizeAsArray(obj as object)).replace(/\s+/g, '');
+	const str =
+		typeof obj === 'string'
+			? obj
+			: JSON.stringify(normalizeAsArray(obj as object), (_, value) =>
+					typeof value === 'bigint' ? `${value}n` : value,
+				).replace(/\s+/g, '');
 	let hash = 0;
 	for (let i = 0; i < str.length; i++) {
 		const char = str.charCodeAt(i);
 		hash = (hash << 5) - hash + char;
 		hash &= hash; // Convert to 32bit integer
 	}
-	const result = new Uint32Array([hash])[0].toString(36);
-	return result;
+	return `h${new Uint32Array([hash])[0].toString(36)}`;
 }

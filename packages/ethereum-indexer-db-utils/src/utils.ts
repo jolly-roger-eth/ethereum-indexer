@@ -1,3 +1,4 @@
+import {isBigIntLiteral} from 'ethereum-indexer';
 import type {Abi, LogEvent} from 'ethereum-indexer';
 
 export function computeArchiveID(id: string, endBlock: number): string {
@@ -30,11 +31,7 @@ export function bnReplacer(v: any): any {
 }
 
 export function bnReviver(v: any): any {
-	if (
-		typeof v === 'string' &&
-		(v.startsWith('-') ? !isNaN(parseInt(v.charAt(1))) : !isNaN(parseInt(v.charAt(0)))) &&
-		v.charAt(v.length - 1) === 'n'
-	) {
+	if (isBigIntLiteral(v)) {
 		return BigInt(v.slice(0, -1));
 	} else {
 		if (typeof v === 'object') {

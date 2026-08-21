@@ -1,4 +1,4 @@
-import {Abi, AllData, simple_hash, LastSync, ProcessorContext} from 'ethereum-indexer';
+import {Abi, AllData, isBigIntLiteral, simple_hash, LastSync, ProcessorContext} from 'ethereum-indexer';
 import {contextFilenames} from 'ethereum-indexer-utils';
 import {get, set, del} from 'idb-keyval';
 
@@ -29,14 +29,7 @@ function getURL(remote: IndexedStateLocation | string, context: ProcessorContext
 }
 
 export function bnReviver(k: string, v: any): any {
-	if (
-		typeof v === 'string' &&
-		(v.startsWith('-') ? !isNaN(parseInt(v.charAt(1))) : !isNaN(parseInt(v.charAt(0)))) &&
-		v.charAt(v.length - 1) === 'n'
-	) {
-		return BigInt(v.slice(0, -1));
-	}
-	return v;
+	return isBigIntLiteral(v) ? BigInt(v.slice(0, -1)) : v;
 }
 
 export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, ProcessorConfig>(
