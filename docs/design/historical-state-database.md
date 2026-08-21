@@ -61,9 +61,11 @@ The raw stream is still kept (§4), but as the re-derivation source, not as the 
 
 ```sql
 CREATE TABLE _blocks (number INTEGER PRIMARY KEY, hash TEXT NOT NULL UNIQUE,
-                      parentHash TEXT NOT NULL, timestamp INTEGER NOT NULL);
+                      timestamp INTEGER NOT NULL);
 CREATE INDEX _blocks_timestamp ON _blocks (timestamp);
 ```
+
+**No `parentHash`** (removed when the store was built). It is not on a log, so it would cost the extra block round-trip this section is about avoiding, and it would describe a linkage a sparse table does not have: rows exist only for blocks carrying our logs, so consecutive rows are almost never parent and child. The `verifyBlocks` cross-check it would serve is deferred in §9 anyway, and if it is ever built it needs the field on the log stream rather than reconstructed here.
 
 - **Hash is the truth, and the identifier consumers should store.** If a consumer pins a block *number* and a reorg happens, "state at 18,000,123" silently changes meaning. If it pins the *hash*, the lookup correctly returns "no such block", which is itself the signal that whatever it recorded is now invalid. That asymmetry is the whole argument.
 - **Number** is what the range columns are keyed on, ergonomic, and unambiguous once finalized.
@@ -71,7 +73,21 @@ CREATE INDEX _blocks_timestamp ON _blocks (timestamp);
 
 `_blocks` only needs rows for **blocks that carry our logs**, not every chain block. State only changes at blocks where our events occur, so "state as of time T" is exactly "state as of the latest indexed block with `timestamp <= T`", and a consumer only ever pins a hash it saw on a log we delivered. This avoids storing tens of millions of header rows against D1's size ceiling.
 
-Timestamps come free: modern clients return `blockTimestamp` directly on logs (reth 2024, go-ethereum 1.16, standardised in `execution-apis#639`), so no second round-trip. Normalise on ingestion, since at least one client returned it decimal rather than hex.
+Timestamps come free **on most clients**: `blockTimestamp` is returned directly on logs, standardised in `execution-apis#639` (merged 2025-08-25). Normalise on ingestion, since at least one client returns it decimal rather than hex.
+
+It is not universal, so ingestion is opportunistic rather than assuming: take the timestamp off the log, and fall back to `eth_getBlockByHash` only for the blocks whose logs carried none. Verified by running each client, since the answer changes with releases:
+
+| client | `blockTimestamp` on logs | since |
+|---|---|---|
+| reth | yes | PR #7606, Apr 2024 |
+| go-ethereum | yes | PR #31887, milestone 1.15.12, shipped 1.16.0 |
+| besu | yes | issue #9276, docs updated Nov 2025 |
+| erigon | yes | issue #4951 closed |
+| anvil (foundry) | yes | **verified empirically on 1.5.1** |
+| ethereumjs | yes | PR #4074 |
+| **Hardhat / EDR** | **no** | **verified empirically on hardhat 3.14.0 / edr 0.3.8** |
+
+On the client side, `viem` added `blockTimestamp` to its `Log` type in 2.x (PR #4157); `ethers.js` has not (issue #5011, open). `eip-1193`'s `EIP1193Log` does not carry it either, so the ingestion seam widens the type locally rather than waiting on a release.
 
 ---
 

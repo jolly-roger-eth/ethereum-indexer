@@ -628,7 +628,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				}
 			}
 
-			if (this.config.stream.alwaysFetchTimestamps) {
+			// The log itself carries `blockTimestamp` on any node implementing
+			// execution-apis#639 (geth >= 1.16.0, reth, besu, erigon, anvil), so only
+			// the blocks whose logs did NOT carry one cost a round-trip. Hardhat's EDR
+			// does not emit it as of 3.14.0, which is why the fallback still exists;
+			// ADR-0002 makes that saving matter, since the in-browser path is primary
+			// and cannot even batch these calls.
+			if (this.config.stream.alwaysFetchTimestamps && event.blockTimestamp === undefined) {
 				if (!seenBlockHashes.has(event.blockHash)) {
 					seenBlockHashes.add(event.blockHash);
 					blockHashes.push(event.blockHash);
@@ -636,7 +642,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 		}
 		if (blockHashes.length > 0) {
-			namedLogger.info(`fetching a batch of  ${blockHashes.length} blocks...`);
+			namedLogger.info(`fetching a batch of  ${blockHashes.length} blocks (no blockTimestamp on their logs)...`);
 			const blocks = await this.getBlocks(blockHashes, unlessCancelled);
 
 			namedLogger.info(`...got  ${blocks.length} blocks back`);
@@ -661,8 +667,14 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		if (anyFetch) {
 			for (const event of eventsFetched) {
-				event.transaction = transactions[event.transactionHash];
-				event.blockTimestamp = blockTimestamps[event.blockHash];
+				if (this.config.stream.alwaysFetchTransactions) {
+					event.transaction = transactions[event.transactionHash];
+				}
+				// a timestamp the node already put on the log always wins: it needed no
+				// fetch and it came from the same response as the log itself
+				if (event.blockTimestamp === undefined) {
+					event.blockTimestamp = blockTimestamps[event.blockHash];
+				}
 			}
 		}
 
