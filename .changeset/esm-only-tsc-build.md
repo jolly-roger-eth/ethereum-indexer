@@ -2,7 +2,6 @@
 'ethereum-indexer': minor
 'ethereum-indexer-browser': minor
 'ethereum-indexer-cli': minor
-'ethereum-indexer-db-processors': minor
 'ethereum-indexer-db-utils': minor
 'ethereum-indexer-fs': minor
 'ethereum-indexer-fs-cache': minor

@@ -1,6 +1,8 @@
 # Findings: RevertableDatabase review
 
 **Reviewed:**
+> **The reviewed code has since been DELETED** (see `docs/adr/0010`): `ethereum-indexer-db-processors` had no consumers and its role is taken by the SQL-backed store in `docs/adr/0006`. This review is retained deliberately, as the analysis of the prior art. Paths below refer to the code as it was; it remains in git history.
+
 - `packages/ethereum-indexer-db-processors/src/processor/RevertableDatabase.ts` (~231 LOC)
 - `packages/ethereum-indexer-db-processors/src/processor/EventProcessorOnDatabase.ts` (~148 LOC, the driver)
 

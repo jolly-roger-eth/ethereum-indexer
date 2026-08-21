@@ -1,5 +1,7 @@
 # Findings: existing TODO triage
 
+> **Partly resolved by deletion.** `ethereum-indexer-db-processors` has since been removed (`docs/adr/0010`), so every TODO below located in `db-processors/*` is moot: all of theme 5, and the `RevertableDatabase` half of theme 4. The themes themselves still matter, because the same requirements (context matching, batch/upsert/transactional primitives) now land on the SQL-backed store instead.
+
 A sweep of the existing `TODO` / `FIXME` markers (≈60 across the codebase) plus the root `TODO.md`.
 Grouped by theme, with cross-references to the review findings. The goal is to make these tracked
 rather than scattered, and to flag which feed the design plans vs. which are standalone cleanups.

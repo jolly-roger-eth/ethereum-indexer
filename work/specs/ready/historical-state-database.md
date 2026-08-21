@@ -29,7 +29,7 @@ needsAnswers: true
 3. Reorg semantics at the DB layer: confirm `revertTo(N)` (DELETE opened-above-fork, re-open closed-above-fork) and the DELETE-before-re-open ordering; how it mirrors the indexer's existing revert-and-reapply.
 4. Watcher ↔ processor wire contract: how `removed`/reorg + `LastSync`/unconfirmed-block info cross the authenticated HTTP boundary; delivery semantics (at-least-once?), idempotency, resumption.
 5. Serverless (Cloudflare Worker) constraints for the log-processor; `remote-sql` / D1 / SQLite schema within D1 limits.
-6. Migration: is `ethereum-indexer-db-processors` (`EventProcessorOnDatabase` / `RevertableDatabase`) DELETED or EVOLVED once this lands? (This spec's design owns that decision.)
+6. ~~Migration: is `ethereum-indexer-db-processors` DELETED or EVOLVED once this lands?~~ **ANSWERED, see `docs/adr/0010`:** deleted (it had no consumers); `ethereum-indexer-db-utils` is on a retirement path, absorbed by the stream-builder when the indexer-server lands.
 
 <!-- /open-questions -->
 
@@ -54,7 +54,7 @@ Reorg at the DB layer = `revertTo(blockNumber)` then re-apply — the DB-level m
 4. As the indexer, I want a `revertTo(N)` that reverts versioned rows on reorg and re-applies the canonical branch, so that historical state stays correct through reorgs.
 5. As an operator, I want the log-watcher to push the stream (incl. reorg/`removed` + `LastSync`/unconfirmed-block info) to the processor over an authenticated HTTP API with at-least-once + idempotency, so that delivery is reliable and resumable.
 6. As an operator, I want the log-processor to run as a serverless worker against `remote-sql`/D1, so that it deploys on the edge within D1 constraints.
-7. As a maintainer, I want the design to state whether `ethereum-indexer-db-processors` is deleted or evolved, so that the old prototype does not linger as a second source of truth.
+7. ~~As a maintainer, I want the design to state whether `ethereum-indexer-db-processors` is deleted or evolved, so that the old prototype does not linger as a second source of truth.~~ **DONE:** deleted, see `docs/adr/0010`.
 
 ## Implementation Decisions
 
