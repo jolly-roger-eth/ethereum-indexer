@@ -47,12 +47,12 @@ importers:
 
   examples/basic:
     dependencies:
-      ethereum-indexer-browser:
+      '@etherfold/browser':
         specifier: workspace:^0.7.0
-        version: link:../../packages/ethereum-indexer-browser
-      ethereum-indexer-js-processor:
+        version: link:../../packages/browser
+      '@etherfold/js-processor':
         specifier: workspace:^0.7.0
-        version: link:../../packages/ethereum-indexer-js-processor
+        version: link:../../packages/js-processor
       react:
         specifier: ^19.2.6
         version: 19.2.6
@@ -81,12 +81,12 @@ importers:
 
   examples/event-processor-bleeps:
     dependencies:
+      '@etherfold/js-processor':
+        specifier: workspace:*
+        version: link:../../packages/js-processor
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
-      ethereum-indexer-js-processor:
-        specifier: workspace:*
-        version: link:../../packages/ethereum-indexer-js-processor
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -103,15 +103,15 @@ importers:
 
   examples/event-processor-conquest-eth:
     dependencies:
+      '@etherfold/js-processor':
+        specifier: workspace:*
+        version: link:../../packages/js-processor
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
-      ethereum-indexer-js-processor:
-        specifier: workspace:*
-        version: link:../../packages/ethereum-indexer-js-processor
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -125,12 +125,12 @@ importers:
 
   examples/event-processor-conquest-fplay:
     dependencies:
+      '@etherfold/js-processor':
+        specifier: workspace:*
+        version: link:../../packages/js-processor
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
-      ethereum-indexer-js-processor:
-        specifier: workspace:*
-        version: link:../../packages/ethereum-indexer-js-processor
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -147,12 +147,12 @@ importers:
 
   examples/event-processor-nfts:
     dependencies:
+      '@etherfold/js-processor':
+        specifier: workspace:*
+        version: link:../../packages/js-processor
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
-      ethereum-indexer-js-processor:
-        specifier: workspace:*
-        version: link:../../packages/ethereum-indexer-js-processor
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -169,15 +169,15 @@ importers:
 
   examples/mud:
     dependencies:
-      ethereum-indexer:
+      '@etherfold/browser':
         specifier: workspace:*
-        version: link:../../packages/ethereum-indexer
-      ethereum-indexer-browser:
+        version: link:../../packages/browser
+      '@etherfold/core':
         specifier: workspace:*
-        version: link:../../packages/ethereum-indexer-browser
-      ethereum-indexer-js-processor:
+        version: link:../../packages/core
+      '@etherfold/js-processor':
         specifier: workspace:*
-        version: link:../../packages/ethereum-indexer-js-processor
+        version: link:../../packages/js-processor
       event-processor-bleeps:
         specifier: workspace:*
         version: link:../event-processor-bleeps
@@ -242,12 +242,12 @@ importers:
 
   examples/web-demo:
     dependencies:
-      ethereum-indexer:
+      '@etherfold/browser':
         specifier: workspace:*
-        version: link:../../packages/ethereum-indexer
-      ethereum-indexer-browser:
+        version: link:../../packages/browser
+      '@etherfold/core':
         specifier: workspace:*
-        version: link:../../packages/ethereum-indexer-browser
+        version: link:../../packages/core
       event-processor-bleeps:
         specifier: workspace:*
         version: link:../event-processor-bleeps
@@ -307,7 +307,93 @@ importers:
         specifier: ^6.1.1
         version: 6.1.1(typescript@6.0.3)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/ethereum-indexer:
+  packages/browser:
+    dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      '@etherfold/utils':
+        specifier: workspace:*
+        version: link:../utils
+      eip-1193:
+        specifier: ^0.6.5
+        version: 0.6.6
+      idb-keyval:
+        specifier: ^6.2.4
+        version: 6.2.4
+      named-logs:
+        specifier: ^0.4.1
+        version: 0.4.1
+      sveltore:
+        specifier: ^0.0.2
+        version: 0.0.2
+      use-stores:
+        specifier: ^0.2.1
+        version: 0.2.1
+    devDependencies:
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/cli:
+    dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      '@etherfold/utils':
+        specifier: workspace:*
+        version: link:../utils
+      commander:
+        specifier: ^15.0.0
+        version: 15.0.0
+      eip-1193-jsonrpc-provider:
+        specifier: ^0.4.3
+        version: 0.4.3
+      ldenv:
+        specifier: ^0.5.0
+        version: 0.5.0
+      named-logs:
+        specifier: ^0.4.1
+        version: 0.4.1
+      named-logs-console:
+        specifier: ^0.5.1
+        version: 0.5.1
+    devDependencies:
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      eip-1193:
+        specifier: ^0.6.5
+        version: 0.6.6
+      fs-extra:
+        specifier: ^11.3.5
+        version: 11.3.5
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/core:
     dependencies:
       abitype:
         specifier: ^1.2.4
@@ -335,97 +421,11 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/ethereum-indexer-browser:
-    dependencies:
-      eip-1193:
-        specifier: ^0.6.5
-        version: 0.6.5
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
-      ethereum-indexer-utils:
-        specifier: workspace:*
-        version: link:../ethereum-indexer-utils
-      idb-keyval:
-        specifier: ^6.2.4
-        version: 6.2.4
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
-      sveltore:
-        specifier: ^0.0.2
-        version: 0.0.2
-      use-stores:
-        specifier: ^0.2.1
-        version: 0.2.1
-    devDependencies:
-      as-soon:
-        specifier: ^0.1.5
-        version: 0.1.6
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.4
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4.1.8
-        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/ethereum-indexer-cli:
-    dependencies:
-      commander:
-        specifier: ^15.0.0
-        version: 15.0.0
-      eip-1193-jsonrpc-provider:
-        specifier: ^0.4.3
-        version: 0.4.3
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
-      ethereum-indexer-utils:
-        specifier: workspace:*
-        version: link:../ethereum-indexer-utils
-      ldenv:
-        specifier: ^0.5.0
-        version: 0.5.0
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
-      named-logs-console:
-        specifier: ^0.5.1
-        version: 0.5.1
-    devDependencies:
-      '@types/fs-extra':
-        specifier: ^11.0.4
-        version: 11.0.4
-      '@types/node':
-        specifier: ^25.9.1
-        version: 25.9.1
-      as-soon:
-        specifier: ^0.1.5
-        version: 0.1.6
-      eip-1193:
-        specifier: ^0.6.5
-        version: 0.6.5
-      fs-extra:
-        specifier: ^11.3.5
-        version: 11.3.5
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.4
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4.1.8
-        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
-
   packages/ethereum-indexer-db-utils:
     dependencies:
-      ethereum-indexer:
+      '@etherfold/core':
         specifier: workspace:*
-        version: link:../ethereum-indexer
+        version: link:../core
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -448,99 +448,18 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
-
-  packages/ethereum-indexer-fs:
-    dependencies:
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
-      ethereum-indexer-utils:
-        specifier: workspace:*
-        version: link:../ethereum-indexer-utils
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
-    devDependencies:
-      '@types/node':
-        specifier: ^25.9.1
-        version: 25.9.1
-      as-soon:
-        specifier: ^0.1.5
-        version: 0.1.6
-      eip-1193:
-        specifier: ^0.6.5
-        version: 0.6.5
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.4
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-
-  packages/ethereum-indexer-fs-cache:
-    dependencies:
-      '@types/fs-extra':
-        specifier: ^11.0.4
-        version: 11.0.4
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
-      fs-extra:
-        specifier: ^11.3.5
-        version: 11.3.5
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
-      pouchdb:
-        specifier: ^9.0.0
-        version: 9.0.0
-      pouchdb-find:
-        specifier: ^9.0.0
-        version: 9.0.0
-    devDependencies:
-      '@types/node':
-        specifier: ^25.9.1
-        version: 25.9.1
-      '@types/pouchdb':
-        specifier: ^6.4.2
-        version: 6.4.2
-      as-soon:
-        specifier: ^0.1.5
-        version: 0.1.6
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.4
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-
-  packages/ethereum-indexer-js-processor:
-    dependencies:
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
-      immer:
-        specifier: ^11.1.8
-        version: 11.1.8
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
-    devDependencies:
-      as-soon:
-        specifier: ^0.1.5
-        version: 0.1.6
-      tsx:
-        specifier: ^4.21.0
-        version: 4.22.4
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4.1.8
-        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/ethereum-indexer-server:
     dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      '@etherfold/fs-cache':
+        specifier: workspace:*
+        version: link:../fs-cache
+      '@etherfold/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@ethersproject/bignumber':
         specifier: ^5.8.0
         version: 5.8.0
@@ -553,18 +472,9 @@ importers:
       eip-1193-jsonrpc-provider:
         specifier: ^0.4.3
         version: 0.4.3
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
       ethereum-indexer-db-utils:
         specifier: workspace:*
         version: link:../ethereum-indexer-db-utils
-      ethereum-indexer-fs-cache:
-        specifier: workspace:*
-        version: link:../ethereum-indexer-fs-cache
-      ethereum-indexer-utils:
-        specifier: workspace:*
-        version: link:../ethereum-indexer-utils
       figlet:
         specifier: ^1.11.0
         version: 1.11.0
@@ -642,11 +552,14 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/ethereum-indexer-utils:
+  packages/fs:
     dependencies:
-      ethereum-indexer:
+      '@etherfold/core':
         specifier: workspace:*
-        version: link:../ethereum-indexer
+        version: link:../core
+      '@etherfold/utils':
+        specifier: workspace:*
+        version: link:../utils
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -654,6 +567,68 @@ importers:
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      eip-1193:
+        specifier: ^0.6.5
+        version: 0.6.6
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  packages/fs-cache:
+    dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
+      fs-extra:
+        specifier: ^11.3.5
+        version: 11.3.5
+      named-logs:
+        specifier: ^0.4.1
+        version: 0.4.1
+      pouchdb:
+        specifier: ^9.0.0
+        version: 9.0.0
+      pouchdb-find:
+        specifier: ^9.0.0
+        version: 9.0.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      '@types/pouchdb':
+        specifier: ^6.4.2
+        version: 6.4.2
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  packages/js-processor:
+    dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      immer:
+        specifier: ^11.1.8
+        version: 11.1.8
+      named-logs:
+        specifier: ^0.4.1
+        version: 0.4.1
+    devDependencies:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
@@ -669,12 +644,12 @@ importers:
 
   packages/processor-sqlite:
     dependencies:
-      '@ethereum-indexer/state-store-sqlite':
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      '@etherfold/state-store-sqlite':
         specifier: workspace:*
         version: link:../state-store-sqlite
-      ethereum-indexer:
-        specifier: workspace:*
-        version: link:../ethereum-indexer
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
@@ -682,6 +657,9 @@ importers:
         specifier: ^0.0.7
         version: 0.0.7
     devDependencies:
+      '@etherfold/js-processor':
+        specifier: workspace:*
+        version: link:../js-processor
       '@libsql/client':
         specifier: ^0.17.3
         version: 0.17.4
@@ -691,9 +669,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      ethereum-indexer-js-processor:
-        specifier: workspace:*
-        version: link:../ethereum-indexer-js-processor
       remote-sql-libsql:
         specifier: ^0.0.7
         version: 0.0.7(@libsql/core@0.17.4)
@@ -728,6 +703,31 @@ importers:
       remote-sql-libsql:
         specifier: ^0.0.7
         version: 0.0.7(@libsql/core@0.17.4)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/utils:
+    dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      named-logs:
+        specifier: ^0.4.1
+        version: 0.4.1
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -8186,7 +8186,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@6.0.3)
+      abitype: 1.2.4(typescript@6.0.3)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 6.0.3

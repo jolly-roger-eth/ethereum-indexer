@@ -1,4 +1,4 @@
-import type {Abi, ExistingStream, LastSync, LogEvent} from 'ethereum-indexer';
+import type {Abi, ExistingStream, LastSync, LogEvent} from '@etherfold/core';
 import {Database} from '../db/Database.js';
 
 export async function setupCache<ABI extends Abi>(database: Database): Promise<ExistingStream<ABI>> {

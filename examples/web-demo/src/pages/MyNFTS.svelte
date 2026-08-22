@@ -63,8 +63,8 @@
 			connection.chainId === '1'
 				? 'https://etherscan.io'
 				: connection.chainId === '42161'
-				  ? 'https://arbiscan.io'
-				  : undefined;
+					? 'https://arbiscan.io'
+					: undefined;
 		// TODO padStart
 		const accountAs32Bytes = `0x000000000000000000000000${connection.accounts[0].slice(2)}` as const;
 		return initialize(connection, {

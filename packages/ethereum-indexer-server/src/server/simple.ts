@@ -8,9 +8,9 @@ import logger from 'koa-logger';
 import json from 'koa-json';
 import bodyParser from 'koa-bodyparser';
 
-import {IndexingSource, EthereumIndexer, EventProcessor, LastSync, Abi, ExistingStream} from 'ethereum-indexer';
+import {IndexingSource, EthereumIndexer, EventProcessor, LastSync, Abi, ExistingStream} from '@etherfold/core';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
-import {ProcessorFilesystemCache} from 'ethereum-indexer-fs-cache';
+import {ProcessorFilesystemCache} from '@etherfold/fs-cache';
 
 import {logs} from 'named-logs';
 
@@ -24,12 +24,7 @@ import {
 } from 'ethereum-indexer-db-utils';
 import {getAdminPage} from '../pages/index.js';
 import {EIP1193ProviderWithoutEvents} from 'eip-1193';
-import {
-	clean,
-	formatLastSync,
-	removeUndefinedValuesFromObject,
-	resolveProcessorAndSource,
-} from 'ethereum-indexer-utils';
+import {clean, formatLastSync, removeUndefinedValuesFromObject, resolveProcessorAndSource} from '@etherfold/utils';
 
 const namedLogger = logs('ethereum-index-server');
 
@@ -106,7 +101,7 @@ export class SimpleServer<ABI extends Abi, ProcessResultType> {
 			: (new JSONRPCHTTPProvider(this.config.nodeURL) as unknown as EIP1193ProviderWithoutEvents);
 
 		// Processor/source resolution is shared with the CLI via `resolveProcessorAndSource` in
-		// ethereum-indexer-utils. The server intentionally passes its `folder` as the processor factory
+		// @etherfold/utils. The server intentionally passes its `folder` as the processor factory
 		// argument (the CLI passes nothing) — this difference is now an explicit `processorConfig`.
 		const {processor, source} = await resolveProcessorAndSource<ABI, ProcessResultType>({
 			processorPath: this.config.processorPath,

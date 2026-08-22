@@ -9,7 +9,7 @@ import {
 } from './Database.js';
 
 import {logs} from 'named-logs';
-import {Abi, LogEvent} from 'ethereum-indexer';
+import {Abi, LogEvent} from '@etherfold/core';
 
 import {computeEventID} from '../utils.js';
 const namedLogger = logs('SyncDB');

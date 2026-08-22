@@ -3,7 +3,7 @@
 layout: home
 
 hero:
-  name: "ethereum-indexer"
+  name: "etherfold"
   # text: "In-Browser Indexer"
   tagline: "A modular indexer system for ethereum and other blockchain following the same RPC standard (EIP-1193)."
   image:

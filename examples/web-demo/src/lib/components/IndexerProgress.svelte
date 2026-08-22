@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type {Abi, SyncingState} from 'ethereum-indexer-browser';
+	import type {Abi, SyncingState} from '@etherfold/browser';
 	export let syncing: Readable<SyncingState<Abi>>;
 	import type {Readable} from 'svelte/store';
 </script>

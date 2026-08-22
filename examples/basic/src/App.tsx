@@ -1,6 +1,6 @@
 import './App.css';
-import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
-import {createIndexerState, keepStateOnIndexedDB} from 'ethereum-indexer-browser';
+import {fromJSProcessor, JSProcessor} from '@etherfold/js-processor';
+import {createIndexerState, keepStateOnIndexedDB} from '@etherfold/browser';
 import {connect} from './utils/web3';
 import react from 'react';
 

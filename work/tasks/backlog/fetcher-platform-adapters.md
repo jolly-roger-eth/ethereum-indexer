@@ -32,7 +32,7 @@ Each adapter supplies configuration (the provider endpoint, the server URL, cred
 
 ## Prompt
 
-> Build the two host adapters for the log-fetcher in the `ethereum-indexer` monorepo, under `platforms/`.
+> Build the two host adapters for the log-fetcher in the `etherfold` monorepo, under `platforms/`.
 >
 > FIRST, check this task against current reality: confirm `agnostic-log-fetcher` landed with the "fetch a range and push it" shape assumed here, and read `docs/adr/0003` and `docs/adr/0004`.
 >

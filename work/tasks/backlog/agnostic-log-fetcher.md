@@ -35,7 +35,7 @@ Behaviour:
 
 ## Prompt
 
-> Build the stateless log-fetcher core for the `ethereum-indexer` monorepo.
+> Build the stateless log-fetcher core for the `etherfold` monorepo.
 >
 > FIRST, check this task against current reality: read `docs/adr/0003` and `docs/adr/0004`, and confirm `ingest-wire-receiving-side` landed with the contract assumed here. If not, route to needs-attention.
 >

@@ -33,7 +33,7 @@ Writing these is ordinary work. **Deploying** them, which needs an account, D1 p
 
 ## Prompt
 
-> Build the two host adapters for the indexer-server in the `ethereum-indexer` monorepo, under `platforms/`.
+> Build the two host adapters for the indexer-server in the `etherfold` monorepo, under `platforms/`.
 >
 > FIRST, check this task against current reality: confirm `agnostic-server-skeleton` landed and that `pnpm-workspace.yaml` already globs `platforms/*`. Read `docs/adr/0003`.
 >

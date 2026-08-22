@@ -2,16 +2,13 @@ layout {
 	pane split_direction="vertical" {
 		// Library packages, one pane each (split into two columns)
 		pane split_direction="horizontal" {
-			pane name="indexer" command="pnpm" cwd="packages/ethereum-indexer" {
+			pane name="indexer" command="pnpm" cwd="packages/core" {
 				args "dev"
 			}
-			pane name="browser" command="pnpm" cwd="packages/ethereum-indexer-browser" {
+			pane name="browser" command="pnpm" cwd="packages/browser" {
 				args "dev"
 			}
-			pane name="cli" command="pnpm" cwd="packages/ethereum-indexer-cli" {
-				args "dev"
-			}
-			pane name="db-processors" command="pnpm" cwd="packages/ethereum-indexer-db-processors" {
+			pane name="cli" command="pnpm" cwd="packages/cli" {
 				args "dev"
 			}
 			pane name="db-utils" command="pnpm" cwd="packages/ethereum-indexer-db-utils" {
@@ -19,19 +16,19 @@ layout {
 			}
 		}
 		pane split_direction="horizontal" {
-			pane name="fs" command="pnpm" cwd="packages/ethereum-indexer-fs" {
+			pane name="fs" command="pnpm" cwd="packages/fs" {
 				args "dev"
 			}
-			pane name="fs-cache" command="pnpm" cwd="packages/ethereum-indexer-fs-cache" {
+			pane name="fs-cache" command="pnpm" cwd="packages/fs-cache" {
 				args "dev"
 			}
-			pane name="js-processor" command="pnpm" cwd="packages/ethereum-indexer-js-processor" {
+			pane name="js-processor" command="pnpm" cwd="packages/js-processor" {
 				args "dev"
 			}
 			pane name="server" command="pnpm" cwd="packages/ethereum-indexer-server" {
 				args "dev"
 			}
-			pane name="utils" command="pnpm" cwd="packages/ethereum-indexer-utils" {
+			pane name="utils" command="pnpm" cwd="packages/utils" {
 				args "dev"
 			}
 		}

@@ -1,8 +1,8 @@
 {
-	"name": "ethereum-indexer",
-	"title": "ethereum-indexer",
+	"name": "etherfold",
+	"title": "etherfold",
 	"description": "A modular indexer system for ethereum and other blockchain following the same RPC standard.",
-	"canonicalURL": "https://ethereum-indexer.dev",
+	"canonicalURL": "https://etherfold.dev",
 	"themeColor": "#000000",
 	"appleStatusBarStyle": "black-translucent",
 	"icon": "public/icon.svg",

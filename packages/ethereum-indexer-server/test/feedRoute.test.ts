@@ -124,7 +124,10 @@ describe('SimpleServer /feed route — HIGH-3 (reads wrong body)', () => {
 		const {httpServer, base, indexer} = await startTestServer();
 		openServers.push(httpServer);
 
-		const events = [{blockNumber: 1, foo: 'a'}, {blockNumber: 2, foo: 'b'}];
+		const events = [
+			{blockNumber: 1, foo: 'a'},
+			{blockNumber: 2, foo: 'b'},
+		];
 		const res = await post(base, '/feed', {events}, {authorization: API_KEY});
 
 		expect(res.json).toEqual({success: true});

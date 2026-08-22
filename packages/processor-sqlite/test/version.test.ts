@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {EthereumIndexer, simple_hash, type ProcessorDriftReport} from 'ethereum-indexer';
+import {EthereumIndexer, simple_hash, type ProcessorDriftReport} from '@etherfold/core';
 import {VersionedStateEventProcessor, type SQLProcessor} from '../src/index.js';
 import {deserializeLastSync, serializeLastSync} from '../src/sync.js';
 import {createTestDB, rows} from './utils/db.js';
@@ -8,7 +8,7 @@ import {finality, freshProcessor, lastSync, processor, SOURCE, transfer, type Te
 // ---------------------------------------------------------------------------
 // A PROCESSOR'S VERSION HASH CANNOT SILENTLY LIE: the SQL path
 // ---------------------------------------------------------------------------
-// The mirror of `ethereum-indexer-js-processor/test/version.test.ts`. This
+// The mirror of `@etherfold/js-processor/test/version.test.ts`. This
 // implementation reproduced the in-memory path's `unknown` fallback on the day
 // it was written, which is why the task covers both: a fix in one is a fix in
 // one.

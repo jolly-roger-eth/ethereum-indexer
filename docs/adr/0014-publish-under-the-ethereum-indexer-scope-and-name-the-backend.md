@@ -1,5 +1,7 @@
 # Packages move to the `@ethereum-indexer` scope, and a store names its backend
 
+> **Superseded in part by [ADR-0017](0017-rename-to-etherfold.md).** The scope is now `@etherfold`, and the CLI sits outside it under the flat name `etherfold`. Everything else below still holds: the move to a scope at all, the expand/migrate/contract mechanics, `<role>-store-<backend>`, directory-follows-leaf-name, and mandatory `publishConfig.access`. Read every `@ethereum-indexer` below as `@etherfold`.
+
 The published packages move from the flat `ethereum-indexer-*` prefix to the **`@ethereum-indexer` npm scope** (owned), and packages that implement a storage role take the shape **`<role>-store-<backend>`**. The first package born under it is `@ethereum-indexer/state-store-sqlite`, the versioned-row state store. Existing packages migrate by expand/migrate/contract rather than in one cut, so nothing published breaks on the day the scope arrives.
 
 ## Why a scope

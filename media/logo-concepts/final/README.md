@@ -1,4 +1,4 @@
-# ethereum-indexer logo
+# etherfold logo
 
 The mark is an ether diamond built out of stacked index rows, cut at the widest point by a single index beam that runs clean through both edges: the chain on one axis, the index on the other. The beam also reads as the live cursor sweeping the chain.
 

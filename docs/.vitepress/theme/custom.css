@@ -71,7 +71,7 @@
 }
 
 /* Audiowide is wide and has no real bold, so ease the weight and size the
-   hero down a notch to keep "ethereum-indexer" on a comfortable line. */
+   hero down a notch to keep "etherfold" on a comfortable line. */
 .VPHero .name {
 	font-weight: 400;
 	font-size: clamp(2rem, 6vw, 3.75rem);

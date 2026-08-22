@@ -1,4 +1,4 @@
-<p>This is a basic example of using ethereum-indexer in a browser context</p>
+<p>This is a basic example of using etherfold in a browser context</p>
 
 <p>You can check a different demo on each tab.</p>
 

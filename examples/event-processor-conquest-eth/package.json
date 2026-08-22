@@ -10,7 +10,7 @@
   "dependencies": {
     "as-soon": "^0.1.5",
     "dotenv": "^17.4.2",
-    "ethereum-indexer-js-processor": "workspace:*",
+    "@etherfold/js-processor": "workspace:*",
     "named-logs": "^0.4.1"
   },
   "devDependencies": {

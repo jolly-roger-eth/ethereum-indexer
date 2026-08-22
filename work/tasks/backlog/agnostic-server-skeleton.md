@@ -10,7 +10,7 @@ covers: [6]
 
 The HTTP surface for the indexer-server, following the house model in `~/dev/github/wighawag/template-agnositic-server`: **core server logic is platform-agnostic and receives its database and environment by injection**, while host adapters live separately.
 
-The package is **`@ethereum-indexer/server`**, in `packages/server/`. The naming question this task used to carry (that `ethereum-indexer-server` is taken by the retiring Koa/PouchDB server) is answered by ADR-0014: packages move to the `@ethereum-indexer` scope, which is a fresh namespace, so the new server takes the obvious name while the old unscoped package keeps working until it is deprecated. Set `publishConfig.access: "public"`, which is mandatory rather than decorative for a scoped package.
+The package is **`@etherfold/server`**, in `packages/server/`. The naming question this task used to carry (that `ethereum-indexer-server` is taken by the retiring Koa/PouchDB server) is answered by ADR-0014 and ADR-0017: packages move to the `@etherfold` scope, which is a fresh namespace, so the new server takes the obvious name while the old unscoped package keeps working until it is deprecated. Set `publishConfig.access: "public"`, which is mandatory rather than decorative for a scoped package.
 
 Concretely, a Hono app whose options are `{getDB, getEnv}`, depending on `remote-sql` and never on a runtime. No Cloudflare imports, no Node built-ins, no D1 references. `wighawag/push-notification` follows the same model and is a working second reference.
 
@@ -34,9 +34,9 @@ No chain logic and no store dependency: this task is deliberately buildable in p
 
 ## Prompt
 
-> Build the platform-agnostic indexer-server skeleton in the `ethereum-indexer` monorepo.
+> Build the platform-agnostic indexer-server skeleton in the `etherfold` monorepo.
 >
-> FIRST, check this task against current reality. Read `docs/adr/0003` (the log-fetcher / stream-builder / processor split, and why "processor" stays reserved for the existing reducer), `docs/adr/0010` (the old server's retirement path) and `docs/adr/0014` (the `@ethereum-indexer` scope, which settles that this package is `@ethereum-indexer/server` in `packages/server/`).
+> FIRST, check this task against current reality. Read `docs/adr/0003` (the log-fetcher / stream-builder / processor split, and why "processor" stays reserved for the existing reducer), `docs/adr/0010` (the old server's retirement path) and `docs/adr/0014` plus `docs/adr/0017` (the `@etherfold` scope, which settles that this package is `@etherfold/server` in `packages/server/`).
 >
 > Follow the house model in `~/dev/github/wighawag/template-agnositic-server`: `packages/server` holds a Hono app that knows only `RemoteSQL` and receives `{getDB, getEnv}` by injection; `platforms/*` holds thin host adapters that supply them. `~/dev/github/wighawag/push-notification` is a second working reference of the same shape. The point is that the server runs on Node, Bun, Workers or anything else, so **D1 is one backend among several, never the target**: no Cloudflare imports, no Node built-ins, no D1 references anywhere in this package.
 >

@@ -1,5 +1,5 @@
 {
-  "name": "ethereum-indexer-monorepo",
+  "name": "etherfold-monorepo",
   "private": true,
   "type": "module",
   "devDependencies": {

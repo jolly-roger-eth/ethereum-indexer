@@ -1,5 +1,5 @@
 export * from './types.js';
-export type {LogEvent, LastSync} from 'ethereum-indexer';
+export type {LogEvent, LastSync} from '@etherfold/core';
 
 export * from './db/Database.js';
 export * from './db/SyncDB.js';

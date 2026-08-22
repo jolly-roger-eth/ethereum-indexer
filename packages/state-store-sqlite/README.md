@@ -1,4 +1,4 @@
-# @ethereum-indexer/state-store-sqlite
+# @etherfold/state-store-sqlite
 
 Entity state kept as **versioned rows with a half-open block-validity range**, on the [`remote-sql`](https://github.com/wighawag/remote-sql) interface and nothing else, so the same code runs on a local SQLite file, on libSQL/Turso, and on hosted SQLite reached over HTTP.
 
@@ -18,7 +18,7 @@ An author declares only `{name, id, fields}`; the store owns the DDL, the versio
 ## Usage
 
 ```ts
-import {VersionedStateStore} from '@ethereum-indexer/state-store-sqlite';
+import {VersionedStateStore} from '@etherfold/state-store-sqlite';
 
 const store = new VersionedStateStore(db /* a RemoteSQL */, [
 	{name: 'token', id: ['id'], fields: {owner: 'text', transferCount: 'integer'}},
@@ -75,4 +75,4 @@ This package ports a verified prototype (`~/dev/github/wighawag/research/ethereu
 
 ## Tests
 
-`pnpm --filter @ethereum-indexer/state-store-sqlite test`, vitest, against a real in-memory libSQL database. Never a mock: the ordering rule above is a property of how SQLite enforces a partial index, and a fake would accept the broken order happily.
+`pnpm --filter @etherfold/state-store-sqlite test`, vitest, against a real in-memory libSQL database. Never a mock: the ordering rule above is a property of how SQLite enforces a partial index, and a fake would accept the broken order happily.

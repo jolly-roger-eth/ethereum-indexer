@@ -4,7 +4,7 @@
 
 	import Json from './JSON.svelte';
 	import type {Readable} from 'svelte/store';
-	import type {Abi, SyncingState} from 'ethereum-indexer-browser';
+	import type {Abi, SyncingState} from '@etherfold/browser';
 </script>
 
 {#if $state}

@@ -1,4 +1,4 @@
-- [ ] ethereum-indexer / ethereum-indexer-server : :add mechanism to inject fake event in the stream, could be a list provided by processor (so they are valid) and injection could pick a depth
-- [ ] ethereum-indexer : prefetch phase => allow processors to focus on core logic, might want to make db writes synchronous with actual writes happenign at the end of the batch / block
-- [ ] ethereum-indexer : group processing into block
+- [ ] @etherfold/core / ethereum-indexer-server : :add mechanism to inject fake event in the stream, could be a list provided by processor (so they are valid) and injection could pick a depth
+- [ ] @etherfold/core : prefetch phase => allow processors to focus on core logic, might want to make db writes synchronous with actual writes happenign at the end of the batch / block
+- [ ] @etherfold/core : group processing into block
 - [ ] ethereum-indexer-server : check filter is working

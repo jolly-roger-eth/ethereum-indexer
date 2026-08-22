@@ -1,5 +1,5 @@
-import {isBigIntLiteral} from 'ethereum-indexer';
-import type {Abi, LogEvent} from 'ethereum-indexer';
+import {isBigIntLiteral} from '@etherfold/core';
+import type {Abi, LogEvent} from '@etherfold/core';
 
 export function computeArchiveID(id: string, endBlock: number): string {
 	return `archive_${endBlock}_${id}`;

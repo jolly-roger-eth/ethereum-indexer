@@ -118,7 +118,7 @@ DELETE FROM _blocks            WHERE number > :keepUpTo;
 
 After `revertTo`, the store is the state as of `keepUpTo`, history below the fork is untouched and remains fully time-travellable, and the canonical branch replays normally.
 
-This must reproduce the revert-and-reapply contract already pinned by `packages/ethereum-indexer-js-processor/test/reorg.test.ts` and `packages/ethereum-indexer/test/utils.test.ts`. Note that contract gained a case on 2026-08-21 (`d24872f`): a reorg that **removes** a block's logs without replacing them must still retract them. A `revertTo` that only handles hash-replacement would reproduce the old bug at the DB layer.
+This must reproduce the revert-and-reapply contract already pinned by `packages/js-processor/test/reorg.test.ts` and `packages/core/test/utils.test.ts`. Note that contract gained a case on 2026-08-21 (`d24872f`): a reorg that **removes** a block's logs without replacing them must still retract them. A `revertTo` that only handles hash-replacement would reproduce the old bug at the DB layer.
 
 Reverts are only ever needed inside the unfinalized window, so below finality history is effectively immutable, which is also the natural pruning boundary if it is ever wanted.
 

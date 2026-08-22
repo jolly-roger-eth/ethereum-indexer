@@ -14,7 +14,7 @@ CONTENT_H=800
 render_preview() {
 	local src="$1" bg="$2" out="$3" # bg may be 'none' for transparency
 	local tmp
-	tmp="$(mktemp -t ei-logo-XXXXXX.png)"
+	tmp="$(mktemp -t ef-logo-XXXXXX.png)"
 	inkscape "$src" -o "$tmp" -w 3000
 	magick "$tmp" -trim +repage \
 		-resize "${CONTENT_W}x${CONTENT_H}" \

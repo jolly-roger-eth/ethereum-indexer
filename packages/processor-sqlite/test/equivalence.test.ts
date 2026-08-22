@@ -1,5 +1,5 @@
-import {fromJSProcessor, type JSProcessor} from 'ethereum-indexer-js-processor';
-import type {LastSync, LogEvent} from 'ethereum-indexer';
+import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
+import type {LastSync, LogEvent} from '@etherfold/core';
 import {describe, expect, it} from 'vitest';
 import {finality, freshProcessor, lastSync, SOURCE, transfer, type TestABI} from './utils/fixtures.js';
 

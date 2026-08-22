@@ -1,4 +1,4 @@
-import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
+import {fromJSProcessor, JSProcessor} from '@etherfold/js-processor';
 import eip721 from './eip721.js';
 import {Data, NFT} from './types.js';
 
@@ -44,7 +44,7 @@ const NFTEventProcessor: JSProcessor<typeof eip721, Data, {account: `0x${string}
 	},
 };
 
-// we export the processor as factory function expected by ethereum-indexer-browser
+// we export the processor as factory function expected by @etherfold/browser
 export const createProcessor = fromJSProcessor(NFTEventProcessor);
 
 // we expose contractsData as generic to be used on any chain

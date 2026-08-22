@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs><clipPath id="ei-clip-a"><path d="M 230 64 L 282 64 L 394 220 L 394 292 L 282 448 L 230 448 L 118 292 L 118 220 Z"/></clipPath></defs>
-  <g clip-path="url(#ei-clip-a)" fill="#e2e8f0">
+  <defs><clipPath id="ef-clip-a"><path d="M 230 64 L 282 64 L 394 220 L 394 292 L 282 448 L 230 448 L 118 292 L 118 220 Z"/></clipPath></defs>
+  <g clip-path="url(#ef-clip-a)" fill="#e2e8f0">
     <rect x="60" y="76" width="392" height="36"/>
       <rect x="60" y="130" width="392" height="36"/>
       <rect x="60" y="184" width="392" height="36"/>

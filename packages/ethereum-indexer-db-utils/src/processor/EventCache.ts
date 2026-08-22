@@ -1,4 +1,4 @@
-import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, UsedStreamConfig} from 'ethereum-indexer';
+import {IndexingSource, EventProcessor, LastSync, LogEvent, Abi, UsedStreamConfig} from '@etherfold/core';
 import {logs} from 'named-logs';
 import {Database, FromDB, JSONObject, Query, Result} from '../db/Database.js';
 const console = logs('EventCache');

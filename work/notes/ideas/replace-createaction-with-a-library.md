@@ -5,7 +5,7 @@ slug: replace-createaction-with-a-library
 
 ## The opportunity
 
-The core `EthereumIndexer` serializes its overlapping operations (`_index` / `_feed` / `_load` / `_save`) through a bespoke primitive, `createAction` (in `packages/ethereum-indexer/src/internal/utils/promises.ts`), built on a custom `createCancellablePromise`. It offers `queue` / `ifNotExecuting` / `now` / `once` / `cancel` / `block` semantics plus a context slot.
+The core `EthereumIndexer` serializes its overlapping operations (`_index` / `_feed` / `_load` / `_save`) through a bespoke primitive, `createAction` (in `packages/core/src/internal/utils/promises.ts`), built on a custom `createCancellablePromise`. It offers `queue` / `ifNotExecuting` / `now` / `once` / `cancel` / `block` semantics plus a context slot.
 
 Per ADR discussion this was **organic growth**, not a deliberate "no-dependencies" decision — no library evaluation was done at the time. So it is a candidate refactor, NOT an architectural decision (hence an idea, not an ADR).
 

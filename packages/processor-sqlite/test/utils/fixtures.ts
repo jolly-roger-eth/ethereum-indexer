@@ -1,10 +1,10 @@
-import type {Abi, LastSync, LogEvent} from 'ethereum-indexer';
+import type {Abi, LastSync, LogEvent} from '@etherfold/core';
 import type {RemoteSQL} from 'remote-sql';
 import {VersionedStateEventProcessor, type SQLProcessor} from '../../src/index.js';
 import {createTestDB} from './db.js';
 
 /**
- * The SAME fixture as `ethereum-indexer-js-processor/test/reorg.test.ts`, ported
+ * The SAME fixture as `@etherfold/js-processor/test/reorg.test.ts`, ported
  * to versioned rows: one `Transfer(from, to, id)` event, an owner per token, and
  * a global transfer counter.
  *

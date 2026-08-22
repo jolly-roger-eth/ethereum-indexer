@@ -1,0 +1,38 @@
+{
+  "name": "@etherfold/fs-cache",
+  "version": "0.6.21",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@etherfold/core": "workspace:*",
+    "fs-extra": "^11.3.5",
+    "named-logs": "^0.4.1",
+    "pouchdb": "^9.0.0",
+    "pouchdb-find": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/pouchdb": "^6.4.2",
+    "as-soon": "^0.1.5",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "as-soon -w src pnpm build",
+    "test": "echo \"Error: no test specified\""
+  }
+}

@@ -20,7 +20,7 @@ And here is the [Documentation Website](https://jolly-roger-eth.github.io/ethere
 
 ## Why ?
 
-The main reason for building `ethereum-indexer` is to have the indexing be performed in a fully decentralised manner: in the client.
+The main reason for building `etherfold` is to have the indexing be performed in a fully decentralised manner: in the client.
 
 This obviously does not scale for all use-case: try indexing all ERC20/ERC721 and the amount of log to fetch is too big to be useful, in a browser context.
 
@@ -42,18 +42,18 @@ It is also worth noting that for an indexer to work, it needs to index all event
 
 ## Usage
 
-install `ethereum-indexer-browser` and `ethereum-indexer-js-processor`
+install `@etherfold/browser` and `@etherfold/js-processor`
 
 ```
-npm i ethereum-indexer-browser ethereum-indexer-js-processor
+npm i @etherfold/browser @etherfold/js-processor
 ```
 
 If you use react, here is a mostly self-contained example from [App.tsx](https://github.com/jolly-roger-eth/ethereum-indexer/blob/main/examples/basic/src/App.tsx)
 
 ```tsx
 import './App.css';
-import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
-import {createIndexerState, keepStateOnIndexedDB} from 'ethereum-indexer-browser';
+import {fromJSProcessor, JSProcessor} from '@etherfold/js-processor';
+import {createIndexerState, keepStateOnIndexedDB} from '@etherfold/browser';
 import {connect} from './utils/web3';
 import react from 'react';
 

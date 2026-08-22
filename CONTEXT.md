@@ -1,8 +1,8 @@
-# CONTEXT — ethereum-indexer domain language
+# CONTEXT — etherfold domain language
 
-The domain glossary for `ethereum-indexer`. Agents and skills use THIS vocabulary when naming modules, tests, and discussing the system. Architectural rationale lives in `docs/adr/` (decisions); product framing lives in `work/specs/`.
+The domain glossary for `etherfold`. Agents and skills use THIS vocabulary when naming modules, tests, and discussing the system. Architectural rationale lives in `docs/adr/` (decisions); product framing lives in `work/specs/`.
 
-## What ethereum-indexer is
+## What etherfold is
 
 A modular, TypeScript indexer for Ethereum and other EIP-1193 / JSON-RPC chains that turns a contract's event logs into a derived application **state** via a **processor**, and can run either fully in-browser (client-side indexing over EIP-1193, no server) or server-side. It supports reorgs, caching, and hydrating clients from pre-computed snapshots instead of indexing from scratch.
 
@@ -10,10 +10,10 @@ A modular, TypeScript indexer for Ethereum and other EIP-1193 / JSON-RPC chains 
 
 - **IndexingSource** — what to index: `chainId`, the contracts (`abi`, `address`, `startBlock`), optional `genesisHash`. Hashed into the sync context so a source change invalidates stale state.
 - **EventProcessor** — the reducer contract the core drives: `load` / `process(eventStream, lastSync)` / `reset` / `clear` / `getVersionHash`. Given a stream of events, it produces the derived `ProcessResultType` state.
-- **JSObjectEventProcessor** (the LIVE path) — the in-memory JS-object reducer authored via `fromJSProcessor(...)` (`on<EventName>` handlers). This is the production path used by stratagems-world → stratagems-snapshots and via `ethereum-indexer-browser`. Reorg revert is done here through `History.reverseBlock` (immer reverse-patches).
+- **JSObjectEventProcessor** (the LIVE path) — the in-memory JS-object reducer authored via `fromJSProcessor(...)` (`on<EventName>` handlers). This is the production path used by stratagems-world → stratagems-snapshots and via `@etherfold/browser`. Reorg revert is done here through `History.reverseBlock` (immer reverse-patches).
 - **LogEvent** — a decoded (or parse-failed) log with block/tx coordinates; carries `removed: true` when an event is reorged out.
 - **LastSync** — the sync cursor: `latestBlock`, `lastFromBlock`, `lastToBlock`, the `context` hashes, and `unconfirmedBlocks` (the recent, reorg-eligible window).
-- **reorg / removed / finality** — the reorg model. `generateStreamToAppend` (core engine) shapes the fetched logs into an append stream, emitting `removed: true` markers for reorged-out blocks and pruning `unconfirmedBlocks` past the finality window. Processors consume that stream and revert-then-reapply. (Contract pinned by `packages/ethereum-indexer/test/utils.test.ts` and `packages/ethereum-indexer-js-processor/test/reorg.test.ts`.)
+- **reorg / removed / finality** — the reorg model. `generateStreamToAppend` (core engine) shapes the fetched logs into an append stream, emitting `removed: true` markers for reorged-out blocks and pruning `unconfirmedBlocks` past the finality window. Processors consume that stream and revert-then-reapply. (Contract pinned by `packages/core/test/utils.test.ts` and `packages/js-processor/test/reorg.test.ts`.)
 - **stream / keepStream (ExistingStream)** — the cached raw event stream seam, so a client can resume/re-derive without refetching all logs.
 - **KeepState** — the persisted-state seam (`fetch`/`save`/`clear`) backing in-browser (IndexedDB/localStorage) and fs storage adapters; also how snapshots hydrate a client.
 - **createAction** — the internal promise-serialization primitive in the core `EthereumIndexer` (`_index`/`_feed`/`_load`/`_save`) that keeps overlapping load/feed/index calls from interleaving.
@@ -34,7 +34,7 @@ The planned server-side split (decided in `docs/adr/0003`-`0008`; not built yet)
 Standing per-change rules agents must follow in this repo.
 
 - Changes that affect a published package's public API require a **changeset** (`.changeset/*.md`).
-- Logging goes through **named-logs** (`import {logs} from 'named-logs'`), not `console.*`, in the core `ethereum-indexer` package.
+- Logging goes through **named-logs** (`import {logs} from 'named-logs'`), not `console.*`, in the core `@etherfold/core` package.
 - Tests use **vitest**, in each package's `test/` folder; run via `pnpm --filter <pkg> test`.
 
 <!-- Reproducibility: consider PINNING the dorfl version via `dorflCmd` in dorfl.json (JS repo: add `dorfl` to root devDependencies + `"dorflCmd": "node_modules/.bin/dorfl"`). See docs/dorfl-cmd/README.md. -->

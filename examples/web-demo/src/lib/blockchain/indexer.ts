@@ -9,7 +9,7 @@ import {
 	type EventProcessorWithInitialState,
 	keepStateOnLocalStorage,
 	keepStreamOnIndexedDB,
-} from 'ethereum-indexer-browser';
+} from '@etherfold/browser';
 
 export function createIndexeInitializer<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
 	name: string,

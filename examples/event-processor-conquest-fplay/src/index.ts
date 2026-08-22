@@ -1,4 +1,4 @@
-import {fromJSProcessor, JSProcessor} from 'ethereum-indexer-js-processor';
+import {fromJSProcessor, JSProcessor} from '@etherfold/js-processor';
 
 import eip20 from './eip20.js';
 import {Account, Data} from './types.js';

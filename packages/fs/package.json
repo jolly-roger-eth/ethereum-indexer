@@ -1,0 +1,37 @@
+{
+	"name": "@etherfold/fs",
+	"version": "0.7.7",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"typedoc": {
+		"entryPoint": "src/index.ts"
+	},
+	"devDependencies": {
+		"@types/node": "^25.9.1",
+		"as-soon": "^0.1.5",
+		"eip-1193": "^0.6.5",
+		"tsx": "^4.21.0",
+		"typescript": "^6.0.3"
+	},
+	"dependencies": {
+		"@etherfold/core": "workspace:*",
+		"@etherfold/utils": "workspace:*",
+		"named-logs": "^0.4.1"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build",
+		"test": "echo \"Error: no test specified\""
+	}
+}

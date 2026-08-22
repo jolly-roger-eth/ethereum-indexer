@@ -119,7 +119,7 @@ describe('below-finality events', () => {
 	it('are never retracted, because the engine stops emitting retractions for them', async () => {
 		// This is the contract's real content and it is the ENGINE's half: past the
 		// finality window a block leaves `unconfirmedBlocks`, so no `removed: true`
-		// can be emitted for it (pinned in ethereum-indexer/test/utils.test.ts,
+		// can be emitted for it (pinned in core/test/utils.test.ts,
 		// "does not track blocks as unconfirmed when they are older than the
 		// finality window"). This processor therefore never sees one.
 		//

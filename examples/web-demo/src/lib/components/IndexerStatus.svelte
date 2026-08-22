@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type {Abi, StatusState, SyncingState} from 'ethereum-indexer-browser';
+	import type {Abi, StatusState, SyncingState} from '@etherfold/browser';
 
 	export let status: Readable<StatusState>;
 	export let syncing: Readable<SyncingState<Abi>>;

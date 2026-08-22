@@ -6,8 +6,8 @@ import type {
 	AbiEvent,
 	LogEvent,
 	LogEventWithParsingFailure,
-} from 'ethereum-indexer';
-import type {EntityDeclaration, EntityId} from '@ethereum-indexer/state-store-sqlite';
+} from '@etherfold/core';
+import type {EntityDeclaration, EntityId} from '@etherfold/state-store-sqlite';
 
 export type InputNames<T extends AbiEvent> = Extract<T['inputs'][number], {name: string}>['name'];
 export type InputValues<T extends AbiEvent> = {

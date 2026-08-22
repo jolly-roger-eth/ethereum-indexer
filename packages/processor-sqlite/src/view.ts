@@ -4,7 +4,7 @@ import type {
 	QueryOptions,
 	RecordedBlock,
 	VersionedStateStore,
-} from '@ethereum-indexer/state-store-sqlite';
+} from '@etherfold/state-store-sqlite';
 
 /**
  * ## What `process` returns, given that the state is a database

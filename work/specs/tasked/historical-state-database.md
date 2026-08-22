@@ -26,7 +26,7 @@ A server-side indexer split into two cooperating components, storing state in a 
 - **log-watcher** — watches the chain, produces the log/event stream (reusing the core engine's fetch + reorg detection), not public-facing, pushes the stream to the processor over an authenticated HTTP API.
 - **log-processor** — receives the stream, owns the database (including historical state), serves the query API (state at hash/height/time), deployable as a serverless worker (e.g. Cloudflare Worker).
 
-Reorg at the DB layer = `revertTo(blockNumber)` then re-apply — the DB-level mirror of the indexer's existing revert-and-reapply. The revert-and-reapply contract this MUST mirror is pinned by `packages/ethereum-indexer-js-processor/test/reorg.test.ts` (live path) and `packages/ethereum-indexer/test/utils.test.ts` (`generateStreamToAppend`).
+Reorg at the DB layer = `revertTo(blockNumber)` then re-apply — the DB-level mirror of the indexer's existing revert-and-reapply. The revert-and-reapply contract this MUST mirror is pinned by `packages/js-processor/test/reorg.test.ts` (live path) and `packages/core/test/utils.test.ts` (`generateStreamToAppend`).
 
 ## User Stories
 

@@ -16,7 +16,7 @@
 	},
 	"license": "MIT",
 	"dependencies": {
-		"ethereum-indexer": "workspace:*",
+		"@etherfold/core": "workspace:*",
 		"named-logs": "^0.4.1",
 		"pouchdb": "^9.0.0",
 		"pouchdb-find": "^9.0.0"

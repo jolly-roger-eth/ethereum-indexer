@@ -1,7 +1,7 @@
-import {Abi, IndexingSource} from 'ethereum-indexer';
+import {Abi, IndexingSource} from '@etherfold/core';
 import fs from 'node:fs';
 import {SimpleServer} from './server/simple.js';
-import {loadContracts} from 'ethereum-indexer-utils';
+import {loadContracts} from '@etherfold/utils';
 
 export function runServer<ABI extends Abi>(
 	processor: string,

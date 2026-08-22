@@ -5,7 +5,7 @@ import {freshProcessor, lastSync, ownerOf, transfer, transferCount} from './util
 // EQUIVALENCE TESTS — the SQL path against the live path's pinned contract
 // ---------------------------------------------------------------------------
 // Every `describe` below is a port of the same-named block in
-// `packages/ethereum-indexer-js-processor/test/reorg.test.ts`, running the SAME
+// `packages/js-processor/test/reorg.test.ts`, running the SAME
 // streams and asserting the SAME numbers. The in-memory tests are the
 // characterization of what the production path does; these are the check that
 // the database path does it too.

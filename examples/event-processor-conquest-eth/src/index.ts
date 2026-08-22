@@ -1,4 +1,4 @@
-import {JSProcessor, fromJSProcessor} from 'ethereum-indexer-js-processor';
+import {JSProcessor, fromJSProcessor} from '@etherfold/js-processor';
 
 import {logs} from 'named-logs';
 

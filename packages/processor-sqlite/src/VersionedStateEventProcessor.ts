@@ -4,7 +4,7 @@ import {
 	type BlockPointer,
 	type EntityId,
 	type Mutation,
-} from '@ethereum-indexer/state-store-sqlite';
+} from '@etherfold/state-store-sqlite';
 import {
 	assertProcessorVersion,
 	processorCodeFingerprint,
@@ -15,14 +15,14 @@ import {
 	type LastSync,
 	type LogEvent,
 	type UsedStreamConfig,
-} from 'ethereum-indexer';
+} from '@etherfold/core';
 import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
 import {deleteLastSyncStatement, readLastSync, SYNC_SCHEMA_DDL, writeLastSyncStatement} from './sync.js';
 import type {MutationContext, SQLProcessor} from './types.js';
 import {VersionedStateView} from './view.js';
 
-const logger = logs('@ethereum-indexer/processor-sqlite');
+const logger = logs('@etherfold/processor-sqlite');
 
 export type VersionedStateProcessorOptions = Record<string, never>;
 
@@ -44,7 +44,7 @@ export type VersionedStateProcessorOptions = Record<string, never>;
  *
  * The observable contract is unchanged, and that is asserted rather than
  * asserted-to: `test/reorg.test.ts` here runs the same scenarios as
- * `ethereum-indexer-js-processor/test/reorg.test.ts` and expects the same states.
+ * `@etherfold/js-processor/test/reorg.test.ts` and expects the same states.
  */
 export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = undefined> implements EventProcessor<
 	ABI,

@@ -1,4 +1,4 @@
-import type {Abi, EventProcessor} from 'ethereum-indexer';
+import type {Abi, EventProcessor} from '@etherfold/core';
 import type {FromDB, JSONObject, Query, Result} from './db/Database.js';
 
 export type Queriable = {

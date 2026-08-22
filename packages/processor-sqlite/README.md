@@ -1,9 +1,9 @@
-# @ethereum-indexer/processor-sqlite
+# @etherfold/processor-sqlite
 
-An `EventProcessor` whose derived state is versioned rows in [`@ethereum-indexer/state-store-sqlite`](../state-store-sqlite) rather than an object in memory. Indexing a chain normally leaves the state readable **as of any earlier block**, on the hash, height or time axis, without the processor author doing anything beyond declaring entities and writing handlers.
+An `EventProcessor` whose derived state is versioned rows in [`@etherfold/state-store-sqlite`](../state-store-sqlite) rather than an object in memory. Indexing a chain normally leaves the state readable **as of any earlier block**, on the hash, height or time axis, without the processor author doing anything beyond declaring entities and writing handlers.
 
 ```ts
-import {VersionedStateEventProcessor} from '@ethereum-indexer/processor-sqlite';
+import {VersionedStateEventProcessor} from '@etherfold/processor-sqlite';
 
 const processor = new VersionedStateEventProcessor(db, {
 	version: '1.0.0',
@@ -20,7 +20,7 @@ await view.getAsOf('token', {id: '1'}, {hash: '0x...'}); // state as it was at t
 
 ## What is different from the in-memory path
 
-`ethereum-indexer-js-processor` reverts a reorg with immer reverse-patches, because reverting by replay needs the state as of the fork block and the in-browser path cannot get it. ADR-0001 records that and names the condition for revisiting it: a store that can answer "state as of block N". This is that store. Reverting here is a single `revertTo(forkPoint)`, two SQL moves per table over the validity ranges, with no patch history and no replay.
+`@etherfold/js-processor` reverts a reorg with immer reverse-patches, because reverting by replay needs the state as of the fork block and the in-browser path cannot get it. ADR-0001 records that and names the condition for revisiting it: a store that can answer "state as of block N". This is that store. Reverting here is a single `revertTo(forkPoint)`, two SQL moves per table over the validity ranges, with no patch history and no replay.
 
 The observable behaviour is meant to be identical, and that is checked rather than claimed. `test/reorg.test.ts` runs the same scenarios as the in-memory package's characterization tests, and `test/equivalence.test.ts` runs both processors over the same streams and compares the resulting states directly, so divergence is a test failure rather than a discovery in production.
 

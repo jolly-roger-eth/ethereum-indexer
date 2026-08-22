@@ -1,0 +1,38 @@
+{
+	"name": "@etherfold/core",
+	"version": "0.6.21",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"typedoc": {
+		"entryPoint": "src/index.ts"
+	},
+	"devDependencies": {
+		"as-soon": "^0.1.5",
+		"tsx": "^4.21.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
+	},
+	"dependencies": {
+		"abitype": "^1.2.4",
+		"eip-1193": "^0.6.6",
+		"named-logs": "^0.4.1",
+		"viem": "^2.52.0"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	}
+}

@@ -1,4 +1,4 @@
-import type {Abi, LastSync} from 'ethereum-indexer';
+import type {Abi, LastSync} from '@etherfold/core';
 import type {RemoteSQL} from 'remote-sql';
 
 /**
@@ -6,14 +6,14 @@ import type {RemoteSQL} from 'remote-sql';
  *
  * `LastSync` is a FIXED table, so it follows this repo's static-schema
  * convention (the one documented at the top of
- * `@ethereum-indexer/state-store-sqlite`'s `ddl.ts`): literal SQL written where
+ * `@etherfold/state-store-sqlite`'s `ddl.ts`): literal SQL written where
  * the code is, moving to a `.sql` file the day a codegen migration step exists.
  *
  * It lives in THIS package, not in the state store, and that is not a filing
  * preference. The store is asserted to import nothing but `remote-sql` and
  * `named-logs` (`state-store-sqlite/test/no-platform-leakage.test.ts`), because
  * a versioned-row store is a storage primitive that must not know what an
- * Ethereum indexer is. `LastSync` is a core `ethereum-indexer` type carrying
+ * Ethereum indexer is. `LastSync` is a core `@etherfold/core` type carrying
  * `unconfirmedBlocks` and a `ContextIdentifier`; putting its table in the store
  * would either drag that dependency in or force a duplicated shape that then
  * drifts. The cursor belongs to the thing that keeps a cursor, which is the

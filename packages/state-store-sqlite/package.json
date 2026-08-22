@@ -1,7 +1,7 @@
 {
-	"name": "@ethereum-indexer/state-store-sqlite",
+	"name": "@etherfold/state-store-sqlite",
 	"version": "0.0.0",
-	"description": "Versioned-row state store for ethereum-indexer: entity state kept with half-open block-validity ranges on the remote-sql interface, with as-of reads and reorg revert.",
+	"description": "Versioned-row state store for @etherfold/core: entity state kept with half-open block-validity ranges on the remote-sql interface, with as-of reads and reorg revert.",
 	"publishConfig": {
 		"access": "public"
 	},

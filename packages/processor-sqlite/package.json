@@ -1,5 +1,5 @@
 {
-	"name": "@ethereum-indexer/processor-sqlite",
+	"name": "@etherfold/processor-sqlite",
 	"version": "0.0.0",
 	"description": "An EventProcessor whose derived state lives in the versioned-row state store instead of memory, so indexing a chain produces time-travellable state as a side effect of normal processing.",
 	"publishConfig": {
@@ -20,8 +20,8 @@
 	},
 	"license": "MIT",
 	"dependencies": {
-		"@ethereum-indexer/state-store-sqlite": "workspace:*",
-		"ethereum-indexer": "workspace:*",
+		"@etherfold/state-store-sqlite": "workspace:*",
+		"@etherfold/core": "workspace:*",
 		"named-logs": "^0.4.1",
 		"remote-sql": "^0.0.7"
 	},
@@ -29,7 +29,7 @@
 		"@libsql/client": "^0.17.3",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
-		"ethereum-indexer-js-processor": "workspace:*",
+		"@etherfold/js-processor": "workspace:*",
 		"remote-sql-libsql": "^0.0.7",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",

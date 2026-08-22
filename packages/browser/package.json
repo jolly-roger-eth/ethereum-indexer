@@ -1,0 +1,41 @@
+{
+	"name": "@etherfold/browser",
+	"version": "0.7.7",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"typedoc": {
+		"entryPoint": "src/index.ts"
+	},
+	"devDependencies": {
+		"as-soon": "^0.1.5",
+		"tsx": "^4.21.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
+	},
+	"dependencies": {
+		"eip-1193": "^0.6.5",
+		"@etherfold/core": "workspace:*",
+		"@etherfold/utils": "workspace:*",
+		"idb-keyval": "^6.2.4",
+		"named-logs": "^0.4.1",
+		"sveltore": "^0.0.2",
+		"use-stores": "^0.2.1"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	}
+}

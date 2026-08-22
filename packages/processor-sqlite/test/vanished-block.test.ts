@@ -15,7 +15,7 @@ import {freshProcessor, lastSync, ownerOf, transfer, transferCount} from './util
 // happened to land in the unconfirmed window first.
 //
 // The engine now emits the retraction (pinned in
-// `ethereum-indexer/test/utils.test.ts`: "detects a reorg when a trailing
+// `core/test/utils.test.ts`: "detects a reorg when a trailing
 // unconfirmed block vanishes from the re-fetch"). What is pinned HERE is that
 // this processor acts on it. A revert wired to "a new hash appeared at this
 // height" would reproduce the same bug in the database, where the symptom is a

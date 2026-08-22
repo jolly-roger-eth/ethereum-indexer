@@ -1,7 +1,7 @@
 import {logs} from 'named-logs';
 import type {Statement} from './types.js';
 
-const logger = logs('@ethereum-indexer/state-store-sqlite');
+const logger = logs('@etherfold/state-store-sqlite');
 
 /**
  * Backends that are reached over the network cap how much one request may carry:

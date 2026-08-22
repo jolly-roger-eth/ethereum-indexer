@@ -22,9 +22,9 @@
 		"vite-tsconfig-paths": "^6.1.1"
 	},
 	"dependencies": {
-		"ethereum-indexer": "workspace:*",
-		"ethereum-indexer-browser": "workspace:*",
-		"ethereum-indexer-js-processor": "workspace:*",
+		"@etherfold/core": "workspace:*",
+		"@etherfold/browser": "workspace:*",
+		"@etherfold/js-processor": "workspace:*",
 		"event-processor-bleeps": "workspace:*",
 		"event-processor-conquest-eth": "workspace:*",
 		"event-processor-nfts": "workspace:*",

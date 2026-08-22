@@ -38,7 +38,7 @@ The engine already enforces the cursor rule internally: `generateStreamToAppend`
 
 ## Prompt
 
-> Build the log ingestion endpoint for the indexer-server in the `ethereum-indexer` monorepo.
+> Build the log ingestion endpoint for the indexer-server in the `etherfold` monorepo.
 >
 > FIRST, check this task against current reality: read `docs/adr/0004` in full, since it is this task's specification, and confirm `sql-backed-event-processor` and `agnostic-server-skeleton` landed as assumed. If not, route to needs-attention.
 >

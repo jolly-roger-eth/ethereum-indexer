@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './App.css';
-	import {fromJSProcessor, type JSProcessor} from 'ethereum-indexer-js-processor';
-	import {createIndexerState, keepStateOnIndexedDB} from 'ethereum-indexer-browser';
+	import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
+	import {createIndexerState, keepStateOnIndexedDB} from '@etherfold/browser';
 	import {connect} from './lib/utils/web3';
 	import {parseAbi} from 'viem';
 
