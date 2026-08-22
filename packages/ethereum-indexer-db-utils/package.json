@@ -28,7 +28,7 @@
 		"typescript": "^6.0.3"
 	},
 	"scripts": {
-		"build": "tsc",
+		"build": "rm -rf dist && tsc",
 		"dev": "as-soon -w src pnpm build",
 		"test": "echo \"Error: no test specified\""
 	}

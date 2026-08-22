@@ -34,7 +34,7 @@
 	},
 	"scripts": {
 		"sql2ts": "node sql2ts.cjs ./src/schema/sql",
-		"build": "pnpm sql2ts && tsc",
+		"build": "rm -rf dist && pnpm sql2ts && tsc",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",
 		"test:watch": "vitest"

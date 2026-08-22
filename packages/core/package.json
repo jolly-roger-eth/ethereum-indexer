@@ -30,7 +30,7 @@
 		"viem": "^2.52.0"
 	},
 	"scripts": {
-		"build": "tsc",
+		"build": "rm -rf dist && tsc",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",
 		"test:watch": "vitest"

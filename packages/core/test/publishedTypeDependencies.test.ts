@@ -24,6 +24,16 @@ import {describe, expect, it} from 'vitest';
  * This lives in the core package's suite because there is no workspace-level
  * test harness, and it deliberately checks EVERY package: the failure message
  * names the offending one.
+ *
+ * A NOTE ON WHAT IT READS. This inspects `dist/`, which it does not build, so it
+ * is only as truthful as that directory. It was green for months against
+ * `dist/index.d.cts` files dated months before the sources beside them: leftovers
+ * from a build setup this repo no longer uses, which no current script emits.
+ * Every emitting package now cleans `dist` before building, so orphans cannot
+ * survive a build, and the two cases below make the remaining ways of lying
+ * loud: a package that should have declarations but has none is a FAILURE rather
+ * than a silent skip, and any artifact the build could not have produced is a
+ * failure naming the stale file.
  */
 
 const PACKAGES = new URL('../../', import.meta.url).pathname;
@@ -40,6 +50,15 @@ function declarationFiles(dir: string): string[] {
 		const path = join(dir, entry.name);
 		if (entry.isDirectory()) return declarationFiles(path);
 		return entry.name.endsWith('.d.ts') || entry.name.endsWith('.d.cts') ? [path] : [];
+	});
+}
+
+/** Everything under `dir`, used to spot artifacts no current build step emits. */
+function allFiles(dir: string): string[] {
+	if (!existsSync(dir)) return [];
+	return readdirSync(dir, {withFileTypes: true}).flatMap((entry) => {
+		const path = join(dir, entry.name);
+		return entry.isDirectory() ? allFiles(path) : [path];
 	});
 }
 
@@ -67,13 +86,38 @@ describe('published .d.ts files only import declared dependencies', () => {
 
 	for (const name of workspacePackages) {
 		const dist = join(PACKAGES, name, 'dist');
+		const manifestPath = join(PACKAGES, name, 'package.json');
+		const pkg = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+		// A package that publishes types out of `dist` MUST have them after a build.
+		// Skipping when the directory is empty is how a package that silently stopped
+		// building would go unnoticed here.
+		const publishesTypes = typeof pkg.types === 'string' && pkg.types.includes('dist');
+
+		if (publishesTypes) {
+			it(`${name} has the declarations it claims to publish`, () => {
+				expect(
+					declarationFiles(dist).length,
+					`${pkg.name} declares "types": "${pkg.types}" but dist/ has no declaration files. Run \`pnpm build\`.`,
+				).toBeGreaterThan(0);
+			});
+
+			it(`${name} has no build artifact its build cannot emit`, () => {
+				// Every build here is plain `tsc` on an ESM package, so it emits .js and
+				// .d.ts (plus maps). A .cts/.mts/.cjs/.mjs in dist is therefore an orphan
+				// of an older toolchain, which is exactly what made this suite lie before.
+				const orphans = allFiles(dist).filter((f) => /\.(c|m)(js|ts)$/.test(f) || /\.d\.(c|m)ts$/.test(f));
+				expect(
+					orphans.map((f) => f.slice(PACKAGES.length)),
+					`${pkg.name} has stale build output that no current build step produces. Remove dist/ and rebuild.`,
+				).toEqual([]);
+			});
+		}
+
 		const files = declarationFiles(dist);
-		// A package with no build output yet has nothing to say; `pnpm build` runs
-		// on install, so in practice these are populated.
 		const runner = files.length > 0 ? it : it.skip;
 
 		runner(`${name}`, () => {
-			const manifest = JSON.parse(readFileSync(join(PACKAGES, name, 'package.json'), 'utf-8'));
+			const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
 			const declared = new Set([
 				...Object.keys(manifest.dependencies ?? {}),
 				...Object.keys(manifest.peerDependencies ?? {}),
