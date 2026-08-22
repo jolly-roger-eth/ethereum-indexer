@@ -25,7 +25,9 @@ Most of this exists and must not be rebuilt: `ExistingStream` in `@etherfold/cor
 
 **Why stratagems and not the GreetingsRegistry example.** Its state is deeply nested and awkward on purpose: keyed maps (`cells`, `owners`, `commitments`), an ordered array (`placements`), a singleton (`points.global`), per-account submaps (`points.fixed`, `points.shared`) and derived values (`computedPoints`). That is exactly the shape that will either validate the entity model or break it. A toy processor would validate nothing.
 
-Port that processor to the spec's `MutationContext` API as a **throwaway prototype**, not production code, and record every place the entity model made you contort the design. Those contortions are the finding, as much as the milliseconds are.
+Port that processor to the spec's `MutationContext` API at **prototype quality**, and record every place the entity model made you contort the design. Those contortions are the finding, as much as the milliseconds are.
+
+**Do not delete the artifacts afterwards.** The captured stream, the ported processor and the state it produces are the conformance workload the spec's shared suite needs: a golden input every backend replays, a golden output every backend must agree on, and an equality oracle that is not our own reimplementation, since the existing `JSProcessor` computed it independently. A later task promotes them once the seam exists; this task only has to produce them and record their provenance (the stratagems commit, the contracts, the block range, the date). Promoting them is NOT in this task's scope, and they stay prototype-quality here.
 
 ### Measure
 
@@ -62,7 +64,8 @@ Across `opfs-sahpool` and `IDBBatchAtomicVFS`, on Chrome, Firefox and Safari. Sa
 - [ ] Every place the entity model forced a contortion is written up in the finding, naming what was awkward and what would have been natural. Report even if nothing was awkward: that is a result too.
 - [ ] The finding states a recommendation with its conditions, as "default to X; choose Y when Z", and names what would overturn it.
 - [ ] The finding answers all open questions in `one-processor-everywhere` explicitly enough that its flags can be cleared.
-- [ ] No production code changes beyond the stream-fixture capture/replay path, which is deliberately allowed to be real. The ported processor is a prototype and stays in the spike folder.
+- [ ] The fixture, the ported processor and the golden state are retained with provenance (stratagems commit, contracts, block range, date), so a later task can promote them into the conformance workload without recapturing anything.
+- [ ] No production code changes beyond the stream-fixture capture/replay path, which is deliberately allowed to be real. The ported processor stays prototype-quality in the spike folder; promoting it is a later task.
 
 ## Blocked by
 
@@ -82,7 +85,7 @@ Across `opfs-sahpool` and `IDBBatchAtomicVFS`, on Chrome, Firefox and Safari. Sa
 >
 > Report a recommendation WITH conditions and with what would overturn it. If the candidates are close enough that it does not matter, say so: that is a legitimate result meaning the seam absorbs the difference.
 >
-> The ported processor is a throwaway prototype and stays in the spike folder. The capture/replay path may be real code, because a replayable stream fixture is wanted anyway. Do no git operations.
+> The ported processor stays prototype-quality in the spike folder, but do NOT throw the artifacts away: the fixture, the port and the state it produces become the conformance workload later, so record their provenance (stratagems commit, contracts, block range, date). Promoting them is a later task, not yours. The capture/replay path may be real code, because a replayable stream fixture is wanted anyway. Do no git operations.
 
 ---
 
