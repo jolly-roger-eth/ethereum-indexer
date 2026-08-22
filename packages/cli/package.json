@@ -20,6 +20,7 @@
 	},
 	"dependencies": {
 		"@etherfold/core": "workspace:*",
+		"@etherfold/platform-nodejs": "workspace:*",
 		"@etherfold/utils": "workspace:*",
 		"commander": "^15.0.0",
 		"eip-1193-jsonrpc-provider": "^0.4.3",

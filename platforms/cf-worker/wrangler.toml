@@ -1,0 +1,12 @@
+name = "etherfold-server"
+main = "src/worker.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[env.production]
+d1_databases = [
+  { binding = "DB", database_name = "etherfold-db", database_id = "" }
+]

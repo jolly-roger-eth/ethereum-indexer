@@ -25,7 +25,13 @@ layout {
 			pane name="js-processor" command="pnpm" cwd="packages/js-processor" {
 				args "dev"
 			}
-			pane name="server" command="pnpm" cwd="packages/ethereum-indexer-server" {
+			pane name="old-server" command="pnpm" cwd="packages/ethereum-indexer-server" {
+				args "dev"
+			}
+			pane name="server" command="pnpm" cwd="packages/server" {
+				args "dev"
+			}
+			pane name="node-host" command="pnpm" cwd="platforms/nodejs" {
 				args "dev"
 			}
 			pane name="utils" command="pnpm" cwd="packages/utils" {

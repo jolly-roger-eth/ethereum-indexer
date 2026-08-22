@@ -1,0 +1,28 @@
+{
+	"name": "@etherfold/platform-cf-worker",
+	"version": "0.0.0",
+	"private": true,
+	"description": "Cloudflare Worker host for @etherfold/server: supplies a D1-backed RemoteSQL and the worker env. A deployable, not a library.",
+	"type": "module",
+	"license": "MIT",
+	"dependencies": {
+		"@etherfold/server": "workspace:*",
+		"named-logs": "^0.4.1",
+		"remote-sql": "^0.0.7",
+		"remote-sql-d1": "^0.0.7"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.22.0",
+		"@cloudflare/workers-types": "^4.20250109.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8",
+		"wrangler": "^4.42.0"
+	},
+	"scripts": {
+		"build": "tsc --noEmit && wrangler deploy --dry-run --env production --outdir /tmp/etherfold-cf-dryrun",
+		"dev": "wrangler dev",
+		"deploy:production": "wrangler deploy --env production",
+		"init-db": "wrangler d1 execute etherfold-db --command \"SELECT 1\"",
+		"test": "vitest run"
+	}
+}

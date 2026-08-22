@@ -8,6 +8,12 @@ covers: [6]
 
 ## What to build
 
+> **STATUS, 2026-08-22: mostly BUILT already, under `agnostic-server-skeleton`.** Both adapters exist and are verified: `platforms/nodejs` (`@etherfold/platform-nodejs`, libSQL, 3 tests over real HTTP) and `platforms/cf-worker` (`@etherfold/platform-cf-worker`, D1, 2 tests under `@cloudflare/vitest-pool-workers`, and `wrangler deploy --dry-run` passes). `platforms/*` is in the workspace and in the root build/test scripts. The server's runtime-agnosticism is now ASSERTED by `packages/server/test/platformAgnostic.test.ts`.
+>
+> **What remains is exactly one criterion**: D1's per-request statement and size limits expressed as adapter configuration feeding the store's chunk bound. That is NOT doable yet. The bound lives in `@etherfold/state-store-sqlite` (`BatchBounds`, `DEFAULT_BATCH_BOUNDS` in `src/batching.ts`, already parameterised), but the server has no store dependency: `agnostic-server-skeleton` deliberately excluded one, so there is no seam yet through which an adapter's limits could reach it. Do this when the store is wired into the server, and do not rebuild the adapters.
+>
+> Note for whoever picks this up: `@cloudflare/vitest-pool-workers` v0.22 removed the `./config` entry point and `defineWorkersConfig`; the pool is now a Vite plugin, `cloudflareTest(...)`. The house template still shows the old form because it is pinned to an older vitest.
+
 Two thin host adapters under `platforms/`, each supplying the `{getDB, getEnv}` the agnostic server expects, following `~/dev/github/wighawag/template-agnositic-server`:
 
 - **Node**: a real process, a libSQL/SQLite-backed `RemoteSQL`, environment from the process environment. This one is fully runnable and testable locally, which makes it the reference host.
@@ -19,13 +25,13 @@ Writing these is ordinary work. **Deploying** them, which needs an account, D1 p
 
 ## Acceptance criteria
 
-- [ ] The server runs under both adapters, serving the same routes with identical behaviour.
-- [ ] The Node adapter runs locally against libSQL/SQLite with no cloud account, and its tests exercise the real routes.
-- [ ] The Worker adapter builds under `wrangler` and passes its platform-local tests.
-- [ ] Neither adapter contains business logic: the diff between them is database and environment wiring only.
-- [ ] The server package still imports nothing platform-specific after this task, and that is asserted rather than assumed.
+- [x] The server runs under both adapters, serving the same routes with identical behaviour.
+- [x] The Node adapter runs locally against libSQL/SQLite with no cloud account, and its tests exercise the real routes.
+- [x] The Worker adapter builds under `wrangler` and passes its platform-local tests.
+- [x] Neither adapter contains business logic: the diff between them is database and environment wiring only.
+- [x] The server package still imports nothing platform-specific after this task, and that is asserted rather than assumed.
 - [ ] D1's per-request statement and size limits are expressed as adapter configuration feeding the store's existing chunk bound, not as constants inside shared code.
-- [ ] The repo installs, builds and tests cleanly with `platforms/*` in the workspace.
+- [x] The repo installs, builds and tests cleanly with `platforms/*` in the workspace.
 
 ## Blocked by
 

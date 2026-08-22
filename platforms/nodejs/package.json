@@ -1,0 +1,39 @@
+{
+	"name": "@etherfold/platform-nodejs",
+	"version": "0.0.0",
+	"description": "Node host adapter for @etherfold/server: supplies a libSQL-backed RemoteSQL and the process environment, and serves the app over HTTP.",
+	"publishConfig": {
+		"access": "public"
+	},
+	"type": "module",
+	"module": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"license": "MIT",
+	"dependencies": {
+		"@etherfold/server": "workspace:*",
+		"@hono/node-server": "^2.1.1",
+		"@libsql/client": "^0.17.3",
+		"named-logs": "^0.4.1",
+		"remote-sql": "^0.0.7",
+		"remote-sql-libsql": "^0.0.7"
+	},
+	"devDependencies": {
+		"@types/node": "^25.9.1",
+		"as-soon": "^0.1.5",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.8"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "as-soon -w src pnpm build",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	}
+}
