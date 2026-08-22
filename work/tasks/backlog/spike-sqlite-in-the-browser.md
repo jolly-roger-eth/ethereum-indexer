@@ -1,5 +1,5 @@
 ---
-title: 'Spike: what SQLite in the browser actually costs, against a real workload'
+title: 'Spike: does wasm SQLite ever beat the IndexedDB backend for OUR workload?'
 slug: spike-sqlite-in-the-browser
 spec: one-processor-everywhere
 blockedBy: []
@@ -8,84 +8,73 @@ covers: [1, 2, 6, 7]
 
 ## What to build
 
-A measurement, not a feature. `one-processor-everywhere` cannot pick a browser storage backend on judgement, because the disagreement is about numbers nobody here has. Produce them against a REAL workload, then write them up so the decision is made once and stays made.
+A measurement, not a feature, and a NARROWER one than it first appears: most of this question was already answered in `~/dev/github/wighawag/research/`, and this task exists to verify the standing recommendation against a workload that is ours and real, not to re-open it.
 
-The spike answers two questions, and the second one is the more dangerous to get wrong:
+### Read the prior work first. It is substantial and it already decided things.
 
-1. **What does each candidate backend cost** in payload, cold start, write throughput, read latency and footprint?
-2. **Can the entity model actually express a real processor?** The spec commits to scalars plus id-reference relations, with aggregations and interfaces parked. If that cannot carry a processor someone really wrote, the spec is wrong and this is the cheapest possible moment to find out.
+- **`research/browser-embedded-indexer/README.md`** asked exactly the architectural question this spec asks (should the storage seam sit at the raw `remote-sql` level, forcing wasm SQLite into the browser, or higher up so the browser can use a non-SQL store?) and **answered it on sourced evidence: put the seam higher, and run the browser on IndexedDB or in-memory rather than shipping ~1 MB of wasm.** That is the same seam placement `one-processor-everywhere` specifies, arrived at independently, which is corroboration rather than coincidence.
+- **`research/browser-embedded-indexer/tasks/in-browser-sqlite-spike.md`** is the open task this one continues. Its framing is the one to adopt: the IndexedDB backend is the **proven, measured default** (real-browser-verified on Chromium, Firefox and WebKit; storage adds roughly 3.3 KB gzipped; sub-millisecond to low-millisecond open), and what is missing is the **head-to-head crossover**: for our query shapes, does wasm SQLite ever win, at what dataset size, and is it worth the payload and the operational surface?
+- **`research/playwright-browser-test-harness/`**, published as the npm package **`playwright-browser-harness`**, already provides the COOP/COEP server, esbuild Worker bundling and a wasm-SQLite-OPFS fixture pattern, built and verified on Debian 13. **Do not rebuild harness plumbing.** It also covers WebKit, which is how this gets Safari-engine evidence from a Linux machine.
+- **`research/graphql-frontend-for-indexer-state/`** holds the query-layer decision (Yoga plus Pothos over the same model) and designed `LogFetcher` and `FeedCore` to be platform-agnostic for exactly this reuse.
 
-### The workload: stratagems on Base, replayed from a cached stream
+Already sourced, so do not spend the spike re-deriving it: wasm SQLite costs roughly **839 KB of wasm plus 560 KB of JS**, is **Worker-only**, needs either COOP/COEP or the single-connection `opfs-sahpool` VFS, opens asynchronously, and hits `SQLITE_BUSY` in multi-tab scenarios. Separately: `opfs-sahpool` needs no COOP/COEP and works on all major browsers since March 2023, IndexedDB backing for SQLite comes from wa-sqlite's `IDBBatchAtomicVFS`, and OPFS raises no permission prompt (the prompting API is File System Access, which is a different thing).
 
-Use `~/dev/github/wighawag/stratagems`. Its `indexer/` package is a real `JSProcessor` (13 handlers, ~160 lines) over deployed contracts on Base: `Stratagems` at `0xb99d938a722df8984722ab38732533130b4f3ec4` from block `11681933`, with `Gems` (`0xd1b76de5372bc47fc4b7ad918f11937fc17b7b46`, block `11681917`) and `GemsGenerator` (`0xbe2f7c303b53f16f447fd82bf549e65185bf3477`, block `11681921`) alongside.
+### What is actually missing: our workload
 
-**Capture the log stream once, then replay it offline for every measurement.** Querying the node per run makes the benchmark slow, rate-limited, non-deterministic and unfair between backends, because each candidate would see different bytes. A captured fixture makes every run identical by construction and removes the network from the measurement loop entirely.
+The prior evidence reasons about "small live set, current-state reads, block-paced writes". That is an assumption about our workload, and it has never been run against a real one.
 
-Most of this exists and must not be rebuilt: `ExistingStream` in `@etherfold/core` is the seam (`fetchFrom` / `saveNewEvents` / `clear`), `keepStreamOnFile` in `@etherfold/fs` implements it on disk, and `@etherfold/browser` implements it on IndexedDB. What is missing is a **portable fixture a browser harness can load**, since the fs implementation is not available there, and a **replay mode that bypasses fetching** so a benchmark run does not touch a node at all. That gap is worth closing properly rather than with a throwaway, because a replayable stream fixture is wanted anyway: it is the basis of deterministic processor tests, of comparing two processor versions on identical input, and of the blue-green rebuild ADR-0008 describes.
+Use `~/dev/github/wighawag/stratagems`. Its `indexer/` package is a real `JSProcessor` (13 handlers, ~160 lines) over contracts deployed on Base: `Stratagems` at `0xb99d938a722df8984722ab38732533130b4f3ec4` from block `11681933`, with `Gems` (`0xd1b76de5372bc47fc4b7ad918f11937fc17b7b46`, block `11681917`) and `GemsGenerator` (`0xbe2f7c303b53f16f447fd82bf549e65185bf3477`, block `11681921`).
 
-**Why stratagems and not the GreetingsRegistry example.** Its state is deeply nested and awkward on purpose: keyed maps (`cells`, `owners`, `commitments`), an ordered array (`placements`), a singleton (`points.global`), per-account submaps (`points.fixed`, `points.shared`) and derived values (`computedPoints`). That is exactly the shape that will either validate the entity model or break it. A toy processor would validate nothing.
+**Capture its log stream once, then replay it offline for every measurement.** Querying the node per run makes the benchmark slow, rate-limited, non-deterministic and unfair between candidates, since each would see different bytes. Most of this exists: `ExistingStream` in `@etherfold/core` is the seam, `keepStreamOnFile` in `@etherfold/fs` implements it on disk, and `@etherfold/browser` implements it over IndexedDB. What is missing is a fixture a **browser** harness can load (the fs implementation is not available there) and a replay mode that bypasses fetching. Build that part properly: deterministic replay is wanted anyway, for reproducible processor tests, for comparing two processor versions on identical input, and for ADR-0008's blue-green rebuild.
 
-Port that processor to the spec's `MutationContext` API at **prototype quality**, and record every place the entity model made you contort the design. Those contortions are the finding, as much as the milliseconds are.
+**Why stratagems and not the GreetingsRegistry example.** Its state is deliberately awkward: keyed maps (`cells`, `owners`, `commitments`), an ordered array (`placements`), a singleton (`points.global`), per-account submaps and derived values (`computedPoints`). It is the shape that will either validate the entity model or break it. A toy processor validates nothing.
 
-**Do not delete the artifacts afterwards.** The captured stream, the ported processor and the state it produces are the conformance workload the spec's shared suite needs: a golden input every backend replays, a golden output every backend must agree on, and an equality oracle that is not our own reimplementation, since the existing `JSProcessor` computed it independently. A later task promotes them once the seam exists; this task only has to produce them and record their provenance (the stratagems commit, the contracts, the block range, the date). Promoting them is NOT in this task's scope, and they stay prototype-quality here.
+### The two questions
+
+1. **Where is the crossover, if there is one?** With the real stratagems stream replayed at several dataset sizes, does wasm SQLite ever beat the IndexedDB backend behind the same seam, and at what size? The presumption going in is that it does not, and the honest outcome is very likely "IndexedDB stays the default", so the valuable result is the CONDITION under which that flips, stated precisely.
+2. **Can the entity model express a processor someone really wrote?** Port the stratagems processor to the spec's `MutationContext` API at prototype quality, and check it produces state equal to the existing `JSProcessor` on identical input. Record every place the model forced a contortion. This settles the spec's third open question and is the more dangerous one to get wrong, since everything else is built on it.
+
+Do not delete the artifacts. The captured stream, the port and the state it yields become the conformance workload (a golden input, a golden output, and an equality oracle computed independently by the existing processor). Record their provenance: stratagems commit, contracts, block range, date. Promoting them is a later task.
 
 ### Measure
 
-Against the shape the system really uses, one block as one batch, because that is how blocks are applied. A loop of single-row inserts flatters every candidate and predicts nothing.
+One block as one batch, because that is how blocks are applied; a loop of single-row inserts flatters everything and predicts nothing. Sustained write throughput over the replayed stream; point lookup by `(entity, id)` at the tip; an as-of read at depth; footprint as a function of retention window; and the backwards-replay cost of answering an as-of read from immer reverse patches across a finality-depth window, which settles the spec's second open question. Cold start on a mid-range device profile, not only a laptop. Multi-tab behaviour, since `SQLITE_BUSY` is a known failure mode and a browser indexer will meet it.
 
-- **Payload**: gzipped and brotli, for `@sqlite.org/sqlite-wasm` and for `wa-sqlite`, counting what actually reaches a browser.
-- **Cold start**: wasm compile plus database open, on a mid-range phone as well as a laptop. The laptop number alone is not decision-grade.
-- **Write throughput**: sustained blocks per second replaying the captured stream.
-- **Read latency**: point lookup by `(entity, id)` at the tip, and an as-of read at depth.
-- **Storage footprint** as a function of retention window, which is the knob the spec introduces.
-- **Backwards replay cost** for the patch-based light path: what it costs to answer an as-of read by replaying immer reverse patches across a finality-depth window. This settles the spec's second open question.
-- **Behaviour under pressure**: quota limits, and what `navigator.storage.persist()` changes.
-
-Across `opfs-sahpool` and `IDBBatchAtomicVFS`, on Chrome, Firefox and Safari. Safari is likeliest to embarrass the plan, so do not leave it until last.
-
-**Baseline against the incumbent**, today's whole-state JSON blob written to IndexedDB on every save, which is O(total state) per write. This is a comparison and a comparison needs both sides. Running the real stratagems state through it is also the only way to see how badly it degrades as state grows, which is the thing being fixed.
-
-### What is already established, so you do not re-derive it
-
-- IndexedDB backing comes from **wa-sqlite**'s `IDBBatchAtomicVFS`; the official `@sqlite.org/sqlite-wasm` build ships OPFS VFSes plus a small `kvvfs`.
-- The plain `opfs` VFS **requires COOP/COEP headers**; **`opfs-sahpool` does not**, and works on all major browsers released since March 2023.
-- OPFS is origin-private and raises **no permission prompt**. The prompting API is File System Access (`showDirectoryPicker`), a different thing. `navigator.storage.persist()` is the only prompt-adjacent call and applies to IndexedDB equally.
+**Baseline against the incumbent**, today's whole-state JSON blob written to IndexedDB on every save, which is O(total state) per write. Running real stratagems state through it is the only way to see how it degrades as state grows, which is the thing being fixed regardless of which backend wins.
 
 ## Acceptance criteria
 
-- [ ] A captured stratagems-on-Base log stream exists as a fixture that both a node and a browser harness can replay, with how it was captured written down (block range, contracts, date).
-- [ ] Every measurement replays that fixture. No benchmark run queries a node.
-- [ ] `docs/spikes/sqlite-in-the-browser/` holds a re-runnable harness plus raw output, with a README saying how to run it.
-- [ ] `work/notes/findings/sqlite-in-the-browser.md` carries a `source:` naming the script, commit, browsers and versions, device class, and date.
-- [ ] Payload, cold start, write throughput, read latency, footprint-by-retention and quota behaviour are reported for `opfs-sahpool` and `IDBBatchAtomicVFS` on Chrome, Firefox and Safari.
+- [ ] The prior research is read and its standing recommendation is either confirmed or overturned explicitly, with the numbers that decided it.
+- [ ] `playwright-browser-harness` is used for real-browser measurement; no harness plumbing is rebuilt.
+- [ ] A captured stratagems-on-Base stream exists as a fixture both a node and a browser harness can replay, with provenance recorded.
+- [ ] Every measurement replays that fixture; no benchmark run queries a node.
+- [ ] Write throughput, read latency, as-of cost, footprint-by-retention, cold start and multi-tab behaviour are reported for the IndexedDB backend and for wasm SQLite, on Chromium, Firefox and WebKit.
 - [ ] The whole-blob incumbent is measured on the same fixture and reported alongside.
 - [ ] Backwards-replay cost for the patch-based light path is measured across a finality-depth window.
-- [ ] The stratagems processor is ported to the `MutationContext` API, runs to completion over the fixture, and produces state equal to what the existing `JSProcessor` produces on the same input. Equality against the incumbent is what makes the port trustworthy as a benchmark subject.
-- [ ] Every place the entity model forced a contortion is written up in the finding, naming what was awkward and what would have been natural. Report even if nothing was awkward: that is a result too.
-- [ ] The finding states a recommendation with its conditions, as "default to X; choose Y when Z", and names what would overturn it.
-- [ ] The finding answers all open questions in `one-processor-everywhere` explicitly enough that its flags can be cleared.
-- [ ] The fixture, the ported processor and the golden state are retained with provenance (stratagems commit, contracts, block range, date), so a later task can promote them into the conformance workload without recapturing anything.
-- [ ] No production code changes beyond the stream-fixture capture/replay path, which is deliberately allowed to be real. The ported processor stays prototype-quality in the spike folder; promoting it is a later task.
+- [ ] The stratagems processor is ported to `MutationContext`, runs to completion over the fixture, and produces state equal to the existing `JSProcessor` on the same input.
+- [ ] Every contortion the entity model forced is written up, or its absence stated plainly.
+- [ ] `docs/spikes/sqlite-in-the-browser/` holds the re-runnable harness and raw output; `work/notes/findings/sqlite-in-the-browser.md` carries a `source:` naming script, commit, browsers and versions, device profile and date.
+- [ ] The finding states the crossover as a condition ("IndexedDB unless Z"), and names what would overturn it.
+- [ ] All three open questions in `one-processor-everywhere` are answered explicitly enough to clear its flags.
+- [ ] No production code changes beyond the stream capture/replay path. The port stays prototype-quality; promoting it is a later task.
 
 ## Blocked by
 
-- None. It measures candidates and needs neither the seam nor the server to exist.
+- None.
 
 ## Prompt
 
-> Measure what SQLite in the browser costs, against a real workload, so that `work/specs/proposed/one-processor-everywhere.md` can choose a browser storage backend on evidence rather than on taste.
+> Verify, against a real workload, whether wasm SQLite ever beats the IndexedDB backend in the browser, so that `work/specs/proposed/one-processor-everywhere.md` can clear its open questions.
 >
-> FIRST read that spec, especially its open questions, since your output is what clears them. Then read `work/protocol/WORK-CONTRACT.md` on spikes and findings: evidence goes in `docs/spikes/<slug>/`, knowledge goes in `work/notes/findings/<slug>.md` with a `source:` naming the script, its commit, what it ran against and when. A load-bearing measurement MUST become a finding, because a spike folder alone leaves the reason undiscoverable and the next person re-litigates the decision.
+> READ THE PRIOR WORK FIRST; this question is largely already answered and your job is to verify it against our workload, not to re-open it. `~/dev/github/wighawag/research/browser-embedded-indexer/README.md` decided the seam placement on sourced evidence (seam above raw SQL, browser on IndexedDB, do not ship ~1 MB of wasm); its `tasks/in-browser-sqlite-spike.md` is the open head-to-head this task continues; `playwright-browser-harness` on npm is the real-browser harness and already handles COOP/COEP, Worker bundling and the wasm-SQLite-OPFS fixture, so do not rebuild it. The task body lists the payload and multi-tab facts already sourced. Spend the spike on numbers, not on rediscovery.
 >
-> The workload is the real stratagems processor over its real Base logs, replayed from a captured stream fixture. The task body has the addresses, the blocks, and what already exists so you do not rebuild it (the `ExistingStream` seam, `keepStreamOnFile`, the browser IndexedDB stream store). Capture once, replay for every measurement: a node in the measurement loop makes the benchmark slow, rate-limited and unfair between candidates, because each would see different bytes.
+> The missing piece is our workload: the real stratagems processor over its real Base logs, captured once into a stream fixture and replayed offline for every run. A node in the measurement loop makes the benchmark slow, rate-limited and unfair between candidates. The task body has addresses, blocks, and what already exists so you do not rebuild the stream seam.
 >
-> You are answering two questions and the second matters more. The numbers are one. The other is whether the spec's entity model (scalars plus id-reference relations, aggregations parked) can express a processor someone really wrote, whose state is nested maps, an ordered array, a singleton and derived values. Port it, run it, and check the ported version produces state equal to the existing JSProcessor's on identical input. Write down every contortion the entity model forced. If it forced none, say so plainly, because that is the result that unblocks the spec fastest.
+> You are answering two questions and the second matters more. The crossover is one, and the likely honest answer is "IndexedDB stays the default", so the valuable output is the precise condition under which that flips. The other is whether the spec's entity model (scalars plus id-reference relations, aggregations parked) can express a processor someone really wrote, whose state is nested maps, an ordered array, a singleton and derived values. Port it, run it, and verify the port yields state equal to the existing JSProcessor's on identical input. Write down every contortion; if there were none, say so plainly, because that is what unblocks the spec fastest.
 >
-> Three things that would otherwise make this worthless: measure one block as one batch rather than a loop of inserts; measure on a mid-range phone, because the laptop number will make everything look fine; and measure the incumbent whole-state JSON blob on the same fixture, since without it there is no comparison.
+> Measure one block as one batch, on a mid-range device profile as well as a laptop, and measure the incumbent whole-state JSON blob on the same fixture, since without it there is no comparison. Include multi-tab, because `SQLITE_BUSY` is a known failure mode and a browser indexer will meet it.
 >
-> Report a recommendation WITH conditions and with what would overturn it. If the candidates are close enough that it does not matter, say so: that is a legitimate result meaning the seam absorbs the difference.
->
-> The ported processor stays prototype-quality in the spike folder, but do NOT throw the artifacts away: the fixture, the port and the state it produces become the conformance workload later, so record their provenance (stratagems commit, contracts, block range, date). Promoting them is a later task, not yours. The capture/replay path may be real code, because a replayable stream fixture is wanted anyway. Do no git operations.
+> Evidence goes to `docs/spikes/<slug>/`, knowledge to `work/notes/findings/<slug>.md` with a `source:` naming script, commit, browsers, device profile and date; `work/protocol/WORK-CONTRACT.md` requires the finding because a capability is withheld or enabled by this result. Report the recommendation as a condition and name what would overturn it. Keep the artifacts (fixture, port, golden state) with their provenance: they become the conformance workload later. Change no production code beyond the capture/replay path. Do no git operations.
 
 ---
 
