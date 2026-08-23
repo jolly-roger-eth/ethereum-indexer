@@ -1,0 +1,329 @@
+{
+  "shapes": {
+    "tiny": {
+      "spec": {
+        "epochs": 8,
+        "playersPerEpoch": 2,
+        "movesPerPlayer": 4,
+        "gridSize": 12,
+        "seed": 42,
+        "includeRewards": true,
+        "includeForceCells": true
+      },
+      "events": 89,
+      "blocks": 12,
+      "mutations": 447,
+      "mutationsPerBlock": {
+        "min": 1,
+        "median": 47,
+        "max": 69,
+        "mean": 37.3
+      },
+      "perEntity": {
+        "commitment": 29,
+        "placement": 10,
+        "placementWindow": 8,
+        "computedPoints": 21,
+        "cellOwner": 67,
+        "cell": 145,
+        "placementPlayer": 72,
+        "placementCell": 71,
+        "fixedRate": 8,
+        "sharedRate": 8,
+        "globalRate": 8
+      },
+      "liveRows": 245,
+      "versions": 406,
+      "reads": {
+        "reads": 731,
+        "stagedReads": 138,
+        "writes": 548,
+        "deletes": 41
+      },
+      "handlerCalls": {
+        "onCommitmentMade": 24,
+        "onCommitmentRevealed": 16,
+        "onCommitmentVoid": 4,
+        "onMultiPoke": 8,
+        "onSinglePoke": 8,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 8,
+        "onAccountSharedRewardUpdated": 8,
+        "onGlobalRewardUpdated": 8,
+        "onCommitmentCancelled": 4
+      },
+      "portMs": 6
+    },
+    "small": {
+      "spec": {
+        "epochs": 20,
+        "playersPerEpoch": 4,
+        "movesPerPlayer": 6,
+        "gridSize": 40,
+        "seed": 42,
+        "includeRewards": true,
+        "includeForceCells": true
+      },
+      "events": 301,
+      "blocks": 38,
+      "mutations": 3249,
+      "mutationsPerBlock": {
+        "min": 8,
+        "median": 104,
+        "max": 185,
+        "mean": 85.5
+      },
+      "perEntity": {
+        "commitment": 138,
+        "placement": 39,
+        "placementWindow": 20,
+        "computedPoints": 95,
+        "cellOwner": 481,
+        "cell": 836,
+        "placementPlayer": 792,
+        "placementCell": 788,
+        "fixedRate": 20,
+        "sharedRate": 20,
+        "globalRate": 20
+      },
+      "liveRows": 1258,
+      "versions": 2513,
+      "reads": {
+        "reads": 4956,
+        "stagedReads": 933,
+        "writes": 3437,
+        "deletes": 736
+      },
+      "handlerCalls": {
+        "onCommitmentMade": 100,
+        "onCommitmentRevealed": 80,
+        "onCommitmentVoid": 10,
+        "onMultiPoke": 20,
+        "onSinglePoke": 20,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 20,
+        "onAccountSharedRewardUpdated": 20,
+        "onGlobalRewardUpdated": 20,
+        "onCommitmentCancelled": 10
+      },
+      "portMs": 21
+    },
+    "medium": {
+      "spec": {
+        "epochs": 40,
+        "playersPerEpoch": 8,
+        "movesPerPlayer": 10,
+        "gridSize": 160,
+        "seed": 42,
+        "includeRewards": true,
+        "includeForceCells": true
+      },
+      "events": 921,
+      "blocks": 116,
+      "mutations": 20510,
+      "mutationsPerBlock": {
+        "min": 1,
+        "median": 156,
+        "max": 539,
+        "mean": 176.8
+      },
+      "perEntity": {
+        "commitment": 685,
+        "placement": 107,
+        "placementWindow": 40,
+        "computedPoints": 440,
+        "cellOwner": 3202,
+        "cell": 4240,
+        "placementPlayer": 5840,
+        "placementCell": 5836,
+        "fixedRate": 40,
+        "sharedRate": 40,
+        "globalRate": 40
+      },
+      "liveRows": 7406,
+      "versions": 14839,
+      "reads": {
+        "reads": 30913,
+        "stagedReads": 6033,
+        "writes": 20747,
+        "deletes": 5671
+      },
+      "handlerCalls": {
+        "onCommitmentMade": 360,
+        "onCommitmentRevealed": 320,
+        "onCommitmentVoid": 20,
+        "onMultiPoke": 40,
+        "onSinglePoke": 40,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 40,
+        "onAccountSharedRewardUpdated": 40,
+        "onGlobalRewardUpdated": 40,
+        "onCommitmentCancelled": 20
+      },
+      "portMs": 112
+    },
+    "large": {
+      "spec": {
+        "epochs": 80,
+        "playersPerEpoch": 16,
+        "movesPerPlayer": 16,
+        "gridSize": 700,
+        "seed": 42,
+        "includeRewards": true,
+        "includeForceCells": true
+      },
+      "events": 3121,
+      "blocks": 391,
+      "mutations": 126910,
+      "mutationsPerBlock": {
+        "min": 1,
+        "median": 276,
+        "max": 1072,
+        "mean": 324.6
+      },
+      "perEntity": {
+        "commitment": 2650,
+        "placement": 302,
+        "placementWindow": 80,
+        "computedPoints": 1848,
+        "cellOwner": 20483,
+        "cell": 22974,
+        "placementPlayer": 39168,
+        "placementCell": 39165,
+        "fixedRate": 80,
+        "sharedRate": 80,
+        "globalRate": 80
+      },
+      "liveRows": 44459,
+      "versions": 88103,
+      "reads": {
+        "reads": 190971,
+        "stagedReads": 39248,
+        "writes": 127132,
+        "deletes": 38807
+      },
+      "handlerCalls": {
+        "onCommitmentMade": 1360,
+        "onCommitmentRevealed": 1280,
+        "onCommitmentVoid": 40,
+        "onMultiPoke": 80,
+        "onSinglePoke": 80,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 80,
+        "onAccountSharedRewardUpdated": 80,
+        "onGlobalRewardUpdated": 80,
+        "onCommitmentCancelled": 40
+      },
+      "portMs": 833
+    },
+    "huge": {
+      "spec": {
+        "epochs": 160,
+        "playersPerEpoch": 32,
+        "movesPerPlayer": 20,
+        "gridSize": 2000,
+        "seed": 42,
+        "includeRewards": true,
+        "includeForceCells": true
+      },
+      "events": 11361,
+      "blocks": 1421,
+      "mutations": 632192,
+      "mutationsPerBlock": {
+        "min": 1,
+        "median": 344,
+        "max": 1965,
+        "mean": 444.9
+      },
+      "perEntity": {
+        "commitment": 10420,
+        "placement": 932,
+        "placementWindow": 160,
+        "computedPoints": 7825,
+        "cellOwner": 102403,
+        "cell": 109337,
+        "placementPlayer": 200320,
+        "placementCell": 200315,
+        "fixedRate": 160,
+        "sharedRate": 160,
+        "globalRate": 160
+      },
+      "liveRows": 213025,
+      "versions": 430923,
+      "reads": {
+        "reads": 944250,
+        "stagedReads": 196863,
+        "writes": 627356,
+        "deletes": 201269
+      },
+      "handlerCalls": {
+        "onCommitmentMade": 5280,
+        "onCommitmentRevealed": 5120,
+        "onCommitmentVoid": 80,
+        "onMultiPoke": 160,
+        "onSinglePoke": 160,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 160,
+        "onAccountSharedRewardUpdated": 160,
+        "onGlobalRewardUpdated": 160,
+        "onCommitmentCancelled": 80
+      },
+      "portMs": 5024
+    },
+    "sweep": {
+      "spec": {
+        "epochs": 200,
+        "playersPerEpoch": 6,
+        "movesPerPlayer": 8,
+        "gridSize": 900,
+        "seed": 42,
+        "includeRewards": true,
+        "includeForceCells": true
+      },
+      "events": 3801,
+      "blocks": 476,
+      "mutations": 63029,
+      "mutationsPerBlock": {
+        "min": 1,
+        "median": 139,
+        "max": 308,
+        "mean": 132.4
+      },
+      "perEntity": {
+        "commitment": 2324,
+        "placement": 518,
+        "placementWindow": 200,
+        "computedPoints": 1238,
+        "cellOwner": 9604,
+        "cell": 10817,
+        "placementPlayer": 18864,
+        "placementCell": 18864,
+        "fixedRate": 200,
+        "sharedRate": 200,
+        "globalRate": 200
+      },
+      "liveRows": 20775,
+      "versions": 42908,
+      "reads": {
+        "reads": 93422,
+        "stagedReads": 18477,
+        "writes": 61234,
+        "deletes": 20121
+      },
+      "handlerCalls": {
+        "onCommitmentMade": 1400,
+        "onCommitmentRevealed": 1200,
+        "onCommitmentVoid": 100,
+        "onMultiPoke": 200,
+        "onSinglePoke": 200,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 200,
+        "onAccountSharedRewardUpdated": 200,
+        "onGlobalRewardUpdated": 200,
+        "onCommitmentCancelled": 100
+      },
+      "portMs": 360
+    }
+  },
+  "ranAt": "2026-08-22T19:46:19.840Z"
+}

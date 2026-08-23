@@ -1,0 +1,4254 @@
+{
+  "equal": true,
+  "fixture": {
+    "path": "fixtures/stratagems-alpha1.stream.json",
+    "events": 31332,
+    "blocks": 1042,
+    "provenance": {
+      "capturedAt": "2026-08-23T06:11:21.475Z",
+      "chainId": "8453",
+      "fromBlock": 12082307,
+      "toBlock": 23400000,
+      "what": "stratagems on Base (deployments/alpha1): Stratagems + Gems + GemsGenerator, every log in the range",
+      "deployment": "alpha1",
+      "stratagemsRepo": "github.com/wighawag/stratagems",
+      "stratagemsCommit": "3d5a0b3f46bcc0d8370643b8382f11f99f81df00",
+      "contracts": [
+        {
+          "address": "0x5ab6d5bb8012fc60ab3653e025be4a59b4406ff2",
+          "startBlock": 13499257
+        },
+        {
+          "address": "0xb2d822732347e3dc60258dcf6cf0d4c7a432b678",
+          "startBlock": 12082307
+        },
+        {
+          "address": "0xb0855eaf94bf7f122af4f444141e83b7408cc7a7",
+          "startBlock": 12082311
+        }
+      ],
+      "node": "base-mainnet.g.alchemy.com",
+      "chainHeadAtCapture": 50338047,
+      "capturedBy": "docs/spikes/sqlite-in-the-browser/capture/capture-stratagems-base.mjs",
+      "omittedFields": [
+        "data",
+        "topics"
+      ]
+    }
+  },
+  "handlerCalls": {
+    "onCommitmentMade": 450,
+    "onReserveDeposited": 402,
+    "onGlobalRewardUpdated": 5352,
+    "onAccountSharedRewardUpdated": 5347,
+    "onAccounFixedRewardUpdated": 5347,
+    "onCommitmentRevealed": 389,
+    "onCommitmentCancelled": 18,
+    "onMultiPoke": 156,
+    "onCommitmentVoid": 3,
+    "onSinglePoke": 2
+  },
+  "unhandledEvents": {
+    "OwnershipTransferred": 1,
+    "Transfer": 9603,
+    "<unparsed>": 2,
+    "GameEnabled": 5,
+    "MoveProcessed": 4255
+  },
+  "mutations": {
+    "total": 38192,
+    "perBlock": [
+      {
+        "block": 12082307,
+        "mutations": 0
+      },
+      {
+        "block": 12082311,
+        "mutations": 0
+      },
+      {
+        "block": 12082325,
+        "mutations": 0
+      },
+      {
+        "block": 12082327,
+        "mutations": 0
+      },
+      {
+        "block": 12083613,
+        "mutations": 1
+      },
+      {
+        "block": 12083773,
+        "mutations": 1
+      },
+      {
+        "block": 12085561,
+        "mutations": 1
+      },
+      {
+        "block": 12085610,
+        "mutations": 1
+      },
+      {
+        "block": 12093135,
+        "mutations": 95
+      },
+      {
+        "block": 12093137,
+        "mutations": 58
+      },
+      {
+        "block": 12093139,
+        "mutations": 66
+      },
+      {
+        "block": 12093141,
+        "mutations": 82
+      },
+      {
+        "block": 12108336,
+        "mutations": 1
+      },
+      {
+        "block": 12108341,
+        "mutations": 1
+      },
+      {
+        "block": 12112806,
+        "mutations": 1
+      },
+      {
+        "block": 12112832,
+        "mutations": 1
+      },
+      {
+        "block": 12112897,
+        "mutations": 1
+      },
+      {
+        "block": 12118686,
+        "mutations": 1
+      },
+      {
+        "block": 12118968,
+        "mutations": 1
+      },
+      {
+        "block": 12121479,
+        "mutations": 1
+      },
+      {
+        "block": 12124358,
+        "mutations": 1
+      },
+      {
+        "block": 12126006,
+        "mutations": 1
+      },
+      {
+        "block": 12126042,
+        "mutations": 1
+      },
+      {
+        "block": 12126509,
+        "mutations": 1
+      },
+      {
+        "block": 12126670,
+        "mutations": 1
+      },
+      {
+        "block": 12126809,
+        "mutations": 1
+      },
+      {
+        "block": 12126900,
+        "mutations": 1
+      },
+      {
+        "block": 12126929,
+        "mutations": 1
+      },
+      {
+        "block": 12127035,
+        "mutations": 1
+      },
+      {
+        "block": 12127042,
+        "mutations": 1
+      },
+      {
+        "block": 12127067,
+        "mutations": 1
+      },
+      {
+        "block": 12128420,
+        "mutations": 1
+      },
+      {
+        "block": 12128622,
+        "mutations": 1
+      },
+      {
+        "block": 12128646,
+        "mutations": 1
+      },
+      {
+        "block": 12132811,
+        "mutations": 1
+      },
+      {
+        "block": 12132957,
+        "mutations": 1
+      },
+      {
+        "block": 12133306,
+        "mutations": 1
+      },
+      {
+        "block": 12136349,
+        "mutations": 8
+      },
+      {
+        "block": 12136355,
+        "mutations": 38
+      },
+      {
+        "block": 12136359,
+        "mutations": 26
+      },
+      {
+        "block": 12136366,
+        "mutations": 10
+      },
+      {
+        "block": 12136771,
+        "mutations": 35
+      },
+      {
+        "block": 12136854,
+        "mutations": 42
+      },
+      {
+        "block": 12137151,
+        "mutations": 73
+      },
+      {
+        "block": 12137189,
+        "mutations": 38
+      },
+      {
+        "block": 12137219,
+        "mutations": 99
+      },
+      {
+        "block": 12137222,
+        "mutations": 82
+      },
+      {
+        "block": 12143600,
+        "mutations": 1
+      },
+      {
+        "block": 12155341,
+        "mutations": 1
+      },
+      {
+        "block": 12155843,
+        "mutations": 1
+      },
+      {
+        "block": 12155927,
+        "mutations": 1
+      },
+      {
+        "block": 12157479,
+        "mutations": 1
+      },
+      {
+        "block": 12163787,
+        "mutations": 1
+      },
+      {
+        "block": 12167960,
+        "mutations": 1
+      },
+      {
+        "block": 12170490,
+        "mutations": 1
+      },
+      {
+        "block": 12179552,
+        "mutations": 46
+      },
+      {
+        "block": 12179555,
+        "mutations": 26
+      },
+      {
+        "block": 12179557,
+        "mutations": 71
+      },
+      {
+        "block": 12179559,
+        "mutations": 97
+      },
+      {
+        "block": 12209004,
+        "mutations": 1
+      },
+      {
+        "block": 12222751,
+        "mutations": 23
+      },
+      {
+        "block": 12224658,
+        "mutations": 1
+      },
+      {
+        "block": 12234562,
+        "mutations": 26
+      },
+      {
+        "block": 12242869,
+        "mutations": 11
+      },
+      {
+        "block": 12249859,
+        "mutations": 17
+      },
+      {
+        "block": 12249947,
+        "mutations": 1
+      },
+      {
+        "block": 12262566,
+        "mutations": 1
+      },
+      {
+        "block": 12265415,
+        "mutations": 1
+      },
+      {
+        "block": 12265569,
+        "mutations": 1
+      },
+      {
+        "block": 12265948,
+        "mutations": 23
+      },
+      {
+        "block": 12265950,
+        "mutations": 66
+      },
+      {
+        "block": 12265952,
+        "mutations": 70
+      },
+      {
+        "block": 12265981,
+        "mutations": 68
+      },
+      {
+        "block": 12272017,
+        "mutations": 1
+      },
+      {
+        "block": 12273807,
+        "mutations": 1
+      },
+      {
+        "block": 12287120,
+        "mutations": 1
+      },
+      {
+        "block": 12287387,
+        "mutations": 1
+      },
+      {
+        "block": 12289315,
+        "mutations": 1
+      },
+      {
+        "block": 12307053,
+        "mutations": 1
+      },
+      {
+        "block": 12309138,
+        "mutations": 46
+      },
+      {
+        "block": 12309502,
+        "mutations": 12
+      },
+      {
+        "block": 12309552,
+        "mutations": 59
+      },
+      {
+        "block": 12309555,
+        "mutations": 15
+      },
+      {
+        "block": 12309611,
+        "mutations": 11
+      },
+      {
+        "block": 12311122,
+        "mutations": 20
+      },
+      {
+        "block": 12311229,
+        "mutations": 1
+      },
+      {
+        "block": 12324545,
+        "mutations": 1
+      },
+      {
+        "block": 12324840,
+        "mutations": 1
+      },
+      {
+        "block": 12324901,
+        "mutations": 1
+      },
+      {
+        "block": 12327835,
+        "mutations": 21
+      },
+      {
+        "block": 12327906,
+        "mutations": 1
+      },
+      {
+        "block": 12327945,
+        "mutations": 1
+      },
+      {
+        "block": 12340368,
+        "mutations": 1
+      },
+      {
+        "block": 12340591,
+        "mutations": 4
+      },
+      {
+        "block": 12340606,
+        "mutations": 4
+      },
+      {
+        "block": 12340660,
+        "mutations": 1
+      },
+      {
+        "block": 12342975,
+        "mutations": 1
+      },
+      {
+        "block": 12352274,
+        "mutations": 1
+      },
+      {
+        "block": 12352384,
+        "mutations": 23
+      },
+      {
+        "block": 12352413,
+        "mutations": 21
+      },
+      {
+        "block": 12352543,
+        "mutations": 29
+      },
+      {
+        "block": 12352747,
+        "mutations": 37
+      },
+      {
+        "block": 12352774,
+        "mutations": 61
+      },
+      {
+        "block": 12355258,
+        "mutations": 1
+      },
+      {
+        "block": 12377375,
+        "mutations": 1
+      },
+      {
+        "block": 12377426,
+        "mutations": 1
+      },
+      {
+        "block": 12383904,
+        "mutations": 1
+      },
+      {
+        "block": 12385329,
+        "mutations": 1
+      },
+      {
+        "block": 12391619,
+        "mutations": 1
+      },
+      {
+        "block": 12393949,
+        "mutations": 1
+      },
+      {
+        "block": 12393952,
+        "mutations": 1
+      },
+      {
+        "block": 12395399,
+        "mutations": 1
+      },
+      {
+        "block": 12395537,
+        "mutations": 171
+      },
+      {
+        "block": 12395540,
+        "mutations": 22
+      },
+      {
+        "block": 12395542,
+        "mutations": 30
+      },
+      {
+        "block": 12395544,
+        "mutations": 39
+      },
+      {
+        "block": 12395546,
+        "mutations": 55
+      },
+      {
+        "block": 12399926,
+        "mutations": 1
+      },
+      {
+        "block": 12399949,
+        "mutations": 1
+      },
+      {
+        "block": 12407874,
+        "mutations": 1
+      },
+      {
+        "block": 12415737,
+        "mutations": 1
+      },
+      {
+        "block": 12418099,
+        "mutations": 8
+      },
+      {
+        "block": 12420519,
+        "mutations": 1
+      },
+      {
+        "block": 12423860,
+        "mutations": 1
+      },
+      {
+        "block": 12423964,
+        "mutations": 1
+      },
+      {
+        "block": 12424038,
+        "mutations": 1
+      },
+      {
+        "block": 12424383,
+        "mutations": 1
+      },
+      {
+        "block": 12428739,
+        "mutations": 1
+      },
+      {
+        "block": 12428869,
+        "mutations": 1
+      },
+      {
+        "block": 12437692,
+        "mutations": 1
+      },
+      {
+        "block": 12438753,
+        "mutations": 230
+      },
+      {
+        "block": 12438755,
+        "mutations": 62
+      },
+      {
+        "block": 12438757,
+        "mutations": 48
+      },
+      {
+        "block": 12438759,
+        "mutations": 38
+      },
+      {
+        "block": 12438762,
+        "mutations": 55
+      },
+      {
+        "block": 12438764,
+        "mutations": 39
+      },
+      {
+        "block": 12438766,
+        "mutations": 57
+      },
+      {
+        "block": 12438768,
+        "mutations": 67
+      },
+      {
+        "block": 12438770,
+        "mutations": 67
+      },
+      {
+        "block": 12458166,
+        "mutations": 1
+      },
+      {
+        "block": 12459161,
+        "mutations": 1
+      },
+      {
+        "block": 12461450,
+        "mutations": 1
+      },
+      {
+        "block": 12461585,
+        "mutations": 1
+      },
+      {
+        "block": 12463179,
+        "mutations": 1
+      },
+      {
+        "block": 12464062,
+        "mutations": 1
+      },
+      {
+        "block": 12464079,
+        "mutations": 1
+      },
+      {
+        "block": 12465011,
+        "mutations": 1
+      },
+      {
+        "block": 12479198,
+        "mutations": 1
+      },
+      {
+        "block": 12479247,
+        "mutations": 1
+      },
+      {
+        "block": 12480006,
+        "mutations": 1
+      },
+      {
+        "block": 12481125,
+        "mutations": 1
+      },
+      {
+        "block": 12481586,
+        "mutations": 1
+      },
+      {
+        "block": 12481942,
+        "mutations": 117
+      },
+      {
+        "block": 12481945,
+        "mutations": 42
+      },
+      {
+        "block": 12481948,
+        "mutations": 29
+      },
+      {
+        "block": 12481952,
+        "mutations": 22
+      },
+      {
+        "block": 12481955,
+        "mutations": 61
+      },
+      {
+        "block": 12481957,
+        "mutations": 32
+      },
+      {
+        "block": 12481959,
+        "mutations": 49
+      },
+      {
+        "block": 12481961,
+        "mutations": 10
+      },
+      {
+        "block": 12483916,
+        "mutations": 5
+      },
+      {
+        "block": 12493688,
+        "mutations": 1
+      },
+      {
+        "block": 12493735,
+        "mutations": 1
+      },
+      {
+        "block": 12493832,
+        "mutations": 1
+      },
+      {
+        "block": 12493999,
+        "mutations": 1
+      },
+      {
+        "block": 12497820,
+        "mutations": 20
+      },
+      {
+        "block": 12505528,
+        "mutations": 1
+      },
+      {
+        "block": 12511737,
+        "mutations": 23
+      },
+      {
+        "block": 12512694,
+        "mutations": 10
+      },
+      {
+        "block": 12512845,
+        "mutations": 1
+      },
+      {
+        "block": 12520403,
+        "mutations": 1
+      },
+      {
+        "block": 12520701,
+        "mutations": 4
+      },
+      {
+        "block": 12521007,
+        "mutations": 1
+      },
+      {
+        "block": 12521021,
+        "mutations": 3
+      },
+      {
+        "block": 12521139,
+        "mutations": 1
+      },
+      {
+        "block": 12522608,
+        "mutations": 1
+      },
+      {
+        "block": 12522847,
+        "mutations": 1
+      },
+      {
+        "block": 12523710,
+        "mutations": 7
+      },
+      {
+        "block": 12525145,
+        "mutations": 59
+      },
+      {
+        "block": 12525147,
+        "mutations": 67
+      },
+      {
+        "block": 12525149,
+        "mutations": 57
+      },
+      {
+        "block": 12525150,
+        "mutations": 68
+      },
+      {
+        "block": 12525152,
+        "mutations": 24
+      },
+      {
+        "block": 12525153,
+        "mutations": 55
+      },
+      {
+        "block": 12525155,
+        "mutations": 31
+      },
+      {
+        "block": 12527368,
+        "mutations": 1
+      },
+      {
+        "block": 12535294,
+        "mutations": 1
+      },
+      {
+        "block": 12539878,
+        "mutations": 1
+      },
+      {
+        "block": 12555761,
+        "mutations": 1
+      },
+      {
+        "block": 12560503,
+        "mutations": 1
+      },
+      {
+        "block": 12566452,
+        "mutations": 33
+      },
+      {
+        "block": 12566483,
+        "mutations": 1
+      },
+      {
+        "block": 12568362,
+        "mutations": 107
+      },
+      {
+        "block": 12568386,
+        "mutations": 30
+      },
+      {
+        "block": 12568423,
+        "mutations": 218
+      },
+      {
+        "block": 12570406,
+        "mutations": 1
+      },
+      {
+        "block": 12602723,
+        "mutations": 1
+      },
+      {
+        "block": 12605175,
+        "mutations": 21
+      },
+      {
+        "block": 12606134,
+        "mutations": 1
+      },
+      {
+        "block": 12606896,
+        "mutations": 1
+      },
+      {
+        "block": 12611560,
+        "mutations": 98
+      },
+      {
+        "block": 12611563,
+        "mutations": 18
+      },
+      {
+        "block": 12611565,
+        "mutations": 60
+      },
+      {
+        "block": 12611568,
+        "mutations": 64
+      },
+      {
+        "block": 12615705,
+        "mutations": 1
+      },
+      {
+        "block": 12618723,
+        "mutations": 1
+      },
+      {
+        "block": 12622505,
+        "mutations": 6
+      },
+      {
+        "block": 12622617,
+        "mutations": 1
+      },
+      {
+        "block": 12625677,
+        "mutations": 10
+      },
+      {
+        "block": 12629320,
+        "mutations": 1
+      },
+      {
+        "block": 12634816,
+        "mutations": 1
+      },
+      {
+        "block": 12638078,
+        "mutations": 1
+      },
+      {
+        "block": 12638132,
+        "mutations": 1
+      },
+      {
+        "block": 12638189,
+        "mutations": 1
+      },
+      {
+        "block": 12639450,
+        "mutations": 1
+      },
+      {
+        "block": 12640659,
+        "mutations": 1
+      },
+      {
+        "block": 12645453,
+        "mutations": 21
+      },
+      {
+        "block": 12645875,
+        "mutations": 1
+      },
+      {
+        "block": 12646051,
+        "mutations": 1
+      },
+      {
+        "block": 12654123,
+        "mutations": 1
+      },
+      {
+        "block": 12654749,
+        "mutations": 166
+      },
+      {
+        "block": 12654751,
+        "mutations": 15
+      },
+      {
+        "block": 12654753,
+        "mutations": 26
+      },
+      {
+        "block": 12654755,
+        "mutations": 22
+      },
+      {
+        "block": 12654758,
+        "mutations": 22
+      },
+      {
+        "block": 12654760,
+        "mutations": 47
+      },
+      {
+        "block": 12654762,
+        "mutations": 139
+      },
+      {
+        "block": 12654763,
+        "mutations": 10
+      },
+      {
+        "block": 12666424,
+        "mutations": 4
+      },
+      {
+        "block": 12666826,
+        "mutations": 1
+      },
+      {
+        "block": 12668784,
+        "mutations": 1
+      },
+      {
+        "block": 12676325,
+        "mutations": 1
+      },
+      {
+        "block": 12679801,
+        "mutations": 1
+      },
+      {
+        "block": 12679805,
+        "mutations": 1
+      },
+      {
+        "block": 12680477,
+        "mutations": 1
+      },
+      {
+        "block": 12681661,
+        "mutations": 6
+      },
+      {
+        "block": 12684633,
+        "mutations": 1
+      },
+      {
+        "block": 12688341,
+        "mutations": 1
+      },
+      {
+        "block": 12697935,
+        "mutations": 143
+      },
+      {
+        "block": 12697937,
+        "mutations": 20
+      },
+      {
+        "block": 12697939,
+        "mutations": 87
+      },
+      {
+        "block": 12697942,
+        "mutations": 118
+      },
+      {
+        "block": 12697945,
+        "mutations": 65
+      },
+      {
+        "block": 12697947,
+        "mutations": 71
+      },
+      {
+        "block": 12715610,
+        "mutations": 1
+      },
+      {
+        "block": 12723610,
+        "mutations": 6
+      },
+      {
+        "block": 12724749,
+        "mutations": 1
+      },
+      {
+        "block": 12727764,
+        "mutations": 1
+      },
+      {
+        "block": 12735527,
+        "mutations": 1
+      },
+      {
+        "block": 12735770,
+        "mutations": 1
+      },
+      {
+        "block": 12737433,
+        "mutations": 1
+      },
+      {
+        "block": 12739486,
+        "mutations": 1
+      },
+      {
+        "block": 12740401,
+        "mutations": 15
+      },
+      {
+        "block": 12740448,
+        "mutations": 1
+      },
+      {
+        "block": 12741136,
+        "mutations": 288
+      },
+      {
+        "block": 12741139,
+        "mutations": 32
+      },
+      {
+        "block": 12741141,
+        "mutations": 45
+      },
+      {
+        "block": 12741144,
+        "mutations": 31
+      },
+      {
+        "block": 12741146,
+        "mutations": 71
+      },
+      {
+        "block": 12741148,
+        "mutations": 151
+      },
+      {
+        "block": 12741150,
+        "mutations": 58
+      },
+      {
+        "block": 12741151,
+        "mutations": 103
+      },
+      {
+        "block": 12743000,
+        "mutations": 7
+      },
+      {
+        "block": 12743281,
+        "mutations": 1
+      },
+      {
+        "block": 12755067,
+        "mutations": 23
+      },
+      {
+        "block": 12757413,
+        "mutations": 18
+      },
+      {
+        "block": 12757517,
+        "mutations": 1
+      },
+      {
+        "block": 12759152,
+        "mutations": 32
+      },
+      {
+        "block": 12759321,
+        "mutations": 1
+      },
+      {
+        "block": 12759811,
+        "mutations": 22
+      },
+      {
+        "block": 12760193,
+        "mutations": 1
+      },
+      {
+        "block": 12761282,
+        "mutations": 1
+      },
+      {
+        "block": 12770044,
+        "mutations": 1
+      },
+      {
+        "block": 12770460,
+        "mutations": 1
+      },
+      {
+        "block": 12780023,
+        "mutations": 1
+      },
+      {
+        "block": 12781765,
+        "mutations": 1
+      },
+      {
+        "block": 12781979,
+        "mutations": 1
+      },
+      {
+        "block": 12782138,
+        "mutations": 1
+      },
+      {
+        "block": 12784334,
+        "mutations": 117
+      },
+      {
+        "block": 12784337,
+        "mutations": 68
+      },
+      {
+        "block": 12784339,
+        "mutations": 97
+      },
+      {
+        "block": 12784342,
+        "mutations": 59
+      },
+      {
+        "block": 12784345,
+        "mutations": 70
+      },
+      {
+        "block": 12784347,
+        "mutations": 64
+      },
+      {
+        "block": 12784349,
+        "mutations": 95
+      },
+      {
+        "block": 12788359,
+        "mutations": 1
+      },
+      {
+        "block": 12796988,
+        "mutations": 34
+      },
+      {
+        "block": 12797191,
+        "mutations": 1
+      },
+      {
+        "block": 12799520,
+        "mutations": 6
+      },
+      {
+        "block": 12799847,
+        "mutations": 8
+      },
+      {
+        "block": 12805558,
+        "mutations": 1
+      },
+      {
+        "block": 12805751,
+        "mutations": 4
+      },
+      {
+        "block": 12806140,
+        "mutations": 4
+      },
+      {
+        "block": 12806203,
+        "mutations": 1
+      },
+      {
+        "block": 12806268,
+        "mutations": 1
+      },
+      {
+        "block": 12806376,
+        "mutations": 1
+      },
+      {
+        "block": 12806424,
+        "mutations": 1
+      },
+      {
+        "block": 12807059,
+        "mutations": 1
+      },
+      {
+        "block": 12816865,
+        "mutations": 1
+      },
+      {
+        "block": 12826666,
+        "mutations": 1
+      },
+      {
+        "block": 12826874,
+        "mutations": 1
+      },
+      {
+        "block": 12826924,
+        "mutations": 1
+      },
+      {
+        "block": 12827532,
+        "mutations": 156
+      },
+      {
+        "block": 12827535,
+        "mutations": 87
+      },
+      {
+        "block": 12827537,
+        "mutations": 151
+      },
+      {
+        "block": 12827539,
+        "mutations": 42
+      },
+      {
+        "block": 12827540,
+        "mutations": 49
+      },
+      {
+        "block": 12827542,
+        "mutations": 62
+      },
+      {
+        "block": 12827544,
+        "mutations": 45
+      },
+      {
+        "block": 12827546,
+        "mutations": 11
+      },
+      {
+        "block": 12827549,
+        "mutations": 27
+      },
+      {
+        "block": 12833205,
+        "mutations": 8
+      },
+      {
+        "block": 12838870,
+        "mutations": 1
+      },
+      {
+        "block": 12842714,
+        "mutations": 1
+      },
+      {
+        "block": 12858157,
+        "mutations": 3
+      },
+      {
+        "block": 12859866,
+        "mutations": 13
+      },
+      {
+        "block": 12862428,
+        "mutations": 1
+      },
+      {
+        "block": 12864837,
+        "mutations": 1
+      },
+      {
+        "block": 12864943,
+        "mutations": 1
+      },
+      {
+        "block": 12868751,
+        "mutations": 1
+      },
+      {
+        "block": 12870764,
+        "mutations": 146
+      },
+      {
+        "block": 12870766,
+        "mutations": 56
+      },
+      {
+        "block": 12870768,
+        "mutations": 67
+      },
+      {
+        "block": 12870771,
+        "mutations": 38
+      },
+      {
+        "block": 12871252,
+        "mutations": 35
+      },
+      {
+        "block": 12876247,
+        "mutations": 13
+      },
+      {
+        "block": 12878136,
+        "mutations": 12
+      },
+      {
+        "block": 12878176,
+        "mutations": 1
+      },
+      {
+        "block": 12879473,
+        "mutations": 17
+      },
+      {
+        "block": 12879989,
+        "mutations": 1
+      },
+      {
+        "block": 12896926,
+        "mutations": 1
+      },
+      {
+        "block": 12910675,
+        "mutations": 1
+      },
+      {
+        "block": 12913342,
+        "mutations": 1
+      },
+      {
+        "block": 12913949,
+        "mutations": 121
+      },
+      {
+        "block": 12913951,
+        "mutations": 22
+      },
+      {
+        "block": 12913954,
+        "mutations": 10
+      },
+      {
+        "block": 12913957,
+        "mutations": 89
+      },
+      {
+        "block": 12914258,
+        "mutations": 16
+      },
+      {
+        "block": 12916244,
+        "mutations": 1
+      },
+      {
+        "block": 12917828,
+        "mutations": 16
+      },
+      {
+        "block": 12923355,
+        "mutations": 1
+      },
+      {
+        "block": 12932392,
+        "mutations": 1
+      },
+      {
+        "block": 12946079,
+        "mutations": 1
+      },
+      {
+        "block": 12948407,
+        "mutations": 34
+      },
+      {
+        "block": 12948534,
+        "mutations": 1
+      },
+      {
+        "block": 12951386,
+        "mutations": 1
+      },
+      {
+        "block": 12954508,
+        "mutations": 1
+      },
+      {
+        "block": 12955204,
+        "mutations": 1
+      },
+      {
+        "block": 12955208,
+        "mutations": 1
+      },
+      {
+        "block": 12957134,
+        "mutations": 174
+      },
+      {
+        "block": 12957136,
+        "mutations": 49
+      },
+      {
+        "block": 12957138,
+        "mutations": 120
+      },
+      {
+        "block": 12957140,
+        "mutations": 87
+      },
+      {
+        "block": 12957142,
+        "mutations": 50
+      },
+      {
+        "block": 12957144,
+        "mutations": 65
+      },
+      {
+        "block": 12957146,
+        "mutations": 56
+      },
+      {
+        "block": 12957147,
+        "mutations": 26
+      },
+      {
+        "block": 12960807,
+        "mutations": 28
+      },
+      {
+        "block": 12960998,
+        "mutations": 1
+      },
+      {
+        "block": 12984360,
+        "mutations": 19
+      },
+      {
+        "block": 12986103,
+        "mutations": 7
+      },
+      {
+        "block": 12986115,
+        "mutations": 7
+      },
+      {
+        "block": 12986260,
+        "mutations": 1
+      },
+      {
+        "block": 12986578,
+        "mutations": 1
+      },
+      {
+        "block": 12990696,
+        "mutations": 1
+      },
+      {
+        "block": 12995466,
+        "mutations": 1
+      },
+      {
+        "block": 12999825,
+        "mutations": 1
+      },
+      {
+        "block": 13000095,
+        "mutations": 1
+      },
+      {
+        "block": 13000337,
+        "mutations": 223
+      },
+      {
+        "block": 13000340,
+        "mutations": 85
+      },
+      {
+        "block": 13000342,
+        "mutations": 24
+      },
+      {
+        "block": 13000345,
+        "mutations": 112
+      },
+      {
+        "block": 13000347,
+        "mutations": 57
+      },
+      {
+        "block": 13000349,
+        "mutations": 103
+      },
+      {
+        "block": 13000351,
+        "mutations": 45
+      },
+      {
+        "block": 13006031,
+        "mutations": 8
+      },
+      {
+        "block": 13024098,
+        "mutations": 1
+      },
+      {
+        "block": 13025132,
+        "mutations": 1
+      },
+      {
+        "block": 13025977,
+        "mutations": 45
+      },
+      {
+        "block": 13026437,
+        "mutations": 1
+      },
+      {
+        "block": 13027152,
+        "mutations": 1
+      },
+      {
+        "block": 13034409,
+        "mutations": 32
+      },
+      {
+        "block": 13043553,
+        "mutations": 279
+      },
+      {
+        "block": 13043555,
+        "mutations": 154
+      },
+      {
+        "block": 13043558,
+        "mutations": 78
+      },
+      {
+        "block": 13043560,
+        "mutations": 48
+      },
+      {
+        "block": 13067010,
+        "mutations": 30
+      },
+      {
+        "block": 13067077,
+        "mutations": 1
+      },
+      {
+        "block": 13068828,
+        "mutations": 1
+      },
+      {
+        "block": 13068870,
+        "mutations": 0
+      },
+      {
+        "block": 13068872,
+        "mutations": 3
+      },
+      {
+        "block": 13068874,
+        "mutations": 3
+      },
+      {
+        "block": 13068876,
+        "mutations": 3
+      },
+      {
+        "block": 13068877,
+        "mutations": 3
+      },
+      {
+        "block": 13068879,
+        "mutations": 3
+      },
+      {
+        "block": 13068881,
+        "mutations": 3
+      },
+      {
+        "block": 13068883,
+        "mutations": 3
+      },
+      {
+        "block": 13068885,
+        "mutations": 3
+      },
+      {
+        "block": 13068887,
+        "mutations": 3
+      },
+      {
+        "block": 13068889,
+        "mutations": 3
+      },
+      {
+        "block": 13068891,
+        "mutations": 3
+      },
+      {
+        "block": 13068893,
+        "mutations": 3
+      },
+      {
+        "block": 13068895,
+        "mutations": 3
+      },
+      {
+        "block": 13068897,
+        "mutations": 3
+      },
+      {
+        "block": 13068899,
+        "mutations": 3
+      },
+      {
+        "block": 13068901,
+        "mutations": 3
+      },
+      {
+        "block": 13068903,
+        "mutations": 0
+      },
+      {
+        "block": 13069629,
+        "mutations": 1
+      },
+      {
+        "block": 13071586,
+        "mutations": 1
+      },
+      {
+        "block": 13072994,
+        "mutations": 1
+      },
+      {
+        "block": 13077934,
+        "mutations": 1
+      },
+      {
+        "block": 13081986,
+        "mutations": 20
+      },
+      {
+        "block": 13084797,
+        "mutations": 1
+      },
+      {
+        "block": 13085789,
+        "mutations": 1
+      },
+      {
+        "block": 13086738,
+        "mutations": 276
+      },
+      {
+        "block": 13086741,
+        "mutations": 35
+      },
+      {
+        "block": 13086744,
+        "mutations": 45
+      },
+      {
+        "block": 13086746,
+        "mutations": 74
+      },
+      {
+        "block": 13086749,
+        "mutations": 116
+      },
+      {
+        "block": 13086750,
+        "mutations": 10
+      },
+      {
+        "block": 13086752,
+        "mutations": 57
+      },
+      {
+        "block": 13090307,
+        "mutations": 32
+      },
+      {
+        "block": 13091269,
+        "mutations": 1
+      },
+      {
+        "block": 13096013,
+        "mutations": 1
+      },
+      {
+        "block": 13102238,
+        "mutations": 25
+      },
+      {
+        "block": 13113585,
+        "mutations": 1
+      },
+      {
+        "block": 13113937,
+        "mutations": 1
+      },
+      {
+        "block": 13118344,
+        "mutations": 1
+      },
+      {
+        "block": 13125807,
+        "mutations": 1
+      },
+      {
+        "block": 13127539,
+        "mutations": 1
+      },
+      {
+        "block": 13127968,
+        "mutations": 51
+      },
+      {
+        "block": 13129056,
+        "mutations": 1
+      },
+      {
+        "block": 13129956,
+        "mutations": 295
+      },
+      {
+        "block": 13129959,
+        "mutations": 68
+      },
+      {
+        "block": 13129961,
+        "mutations": 141
+      },
+      {
+        "block": 13129964,
+        "mutations": 73
+      },
+      {
+        "block": 13129966,
+        "mutations": 140
+      },
+      {
+        "block": 13129969,
+        "mutations": 85
+      },
+      {
+        "block": 13129971,
+        "mutations": 23
+      },
+      {
+        "block": 13129973,
+        "mutations": 25
+      },
+      {
+        "block": 13140912,
+        "mutations": 1
+      },
+      {
+        "block": 13154075,
+        "mutations": 1
+      },
+      {
+        "block": 13166442,
+        "mutations": 1
+      },
+      {
+        "block": 13166485,
+        "mutations": 1
+      },
+      {
+        "block": 13168058,
+        "mutations": 15
+      },
+      {
+        "block": 13168402,
+        "mutations": 1
+      },
+      {
+        "block": 13171803,
+        "mutations": 1
+      },
+      {
+        "block": 13173156,
+        "mutations": 101
+      },
+      {
+        "block": 13173158,
+        "mutations": 49
+      },
+      {
+        "block": 13173160,
+        "mutations": 155
+      },
+      {
+        "block": 13173163,
+        "mutations": 89
+      },
+      {
+        "block": 13173166,
+        "mutations": 28
+      },
+      {
+        "block": 13173168,
+        "mutations": 45
+      },
+      {
+        "block": 13175710,
+        "mutations": 52
+      },
+      {
+        "block": 13176088,
+        "mutations": 1
+      },
+      {
+        "block": 13176298,
+        "mutations": 1
+      },
+      {
+        "block": 13191558,
+        "mutations": 1
+      },
+      {
+        "block": 13209664,
+        "mutations": 1
+      },
+      {
+        "block": 13212337,
+        "mutations": 1
+      },
+      {
+        "block": 13216338,
+        "mutations": 157
+      },
+      {
+        "block": 13216341,
+        "mutations": 153
+      },
+      {
+        "block": 13216343,
+        "mutations": 115
+      },
+      {
+        "block": 13216345,
+        "mutations": 139
+      },
+      {
+        "block": 13216348,
+        "mutations": 112
+      },
+      {
+        "block": 13218956,
+        "mutations": 22
+      },
+      {
+        "block": 13219176,
+        "mutations": 1
+      },
+      {
+        "block": 13233951,
+        "mutations": 1
+      },
+      {
+        "block": 13236258,
+        "mutations": 1
+      },
+      {
+        "block": 13240834,
+        "mutations": 11
+      },
+      {
+        "block": 13240906,
+        "mutations": 1
+      },
+      {
+        "block": 13253981,
+        "mutations": 1
+      },
+      {
+        "block": 13254031,
+        "mutations": 1
+      },
+      {
+        "block": 13255827,
+        "mutations": 25
+      },
+      {
+        "block": 13257838,
+        "mutations": 1
+      },
+      {
+        "block": 13259541,
+        "mutations": 178
+      },
+      {
+        "block": 13259544,
+        "mutations": 137
+      },
+      {
+        "block": 13259547,
+        "mutations": 156
+      },
+      {
+        "block": 13259550,
+        "mutations": 152
+      },
+      {
+        "block": 13259552,
+        "mutations": 83
+      },
+      {
+        "block": 13259555,
+        "mutations": 23
+      },
+      {
+        "block": 13259557,
+        "mutations": 129
+      },
+      {
+        "block": 13269867,
+        "mutations": 32
+      },
+      {
+        "block": 13270415,
+        "mutations": 1
+      },
+      {
+        "block": 13275784,
+        "mutations": 1
+      },
+      {
+        "block": 13281431,
+        "mutations": 1
+      },
+      {
+        "block": 13289443,
+        "mutations": 1
+      },
+      {
+        "block": 13293664,
+        "mutations": 1
+      },
+      {
+        "block": 13295106,
+        "mutations": 1
+      },
+      {
+        "block": 13296222,
+        "mutations": 1
+      },
+      {
+        "block": 13299270,
+        "mutations": 1
+      },
+      {
+        "block": 13300013,
+        "mutations": 1
+      },
+      {
+        "block": 13300315,
+        "mutations": 1
+      },
+      {
+        "block": 13302738,
+        "mutations": 252
+      },
+      {
+        "block": 13302740,
+        "mutations": 115
+      },
+      {
+        "block": 13302742,
+        "mutations": 115
+      },
+      {
+        "block": 13302744,
+        "mutations": 70
+      },
+      {
+        "block": 13302746,
+        "mutations": 129
+      },
+      {
+        "block": 13302748,
+        "mutations": 47
+      },
+      {
+        "block": 13302750,
+        "mutations": 10
+      },
+      {
+        "block": 13302753,
+        "mutations": 43
+      },
+      {
+        "block": 13304825,
+        "mutations": 21
+      },
+      {
+        "block": 13305311,
+        "mutations": 1
+      },
+      {
+        "block": 13321799,
+        "mutations": 1
+      },
+      {
+        "block": 13329712,
+        "mutations": 8
+      },
+      {
+        "block": 13329793,
+        "mutations": 1
+      },
+      {
+        "block": 13338031,
+        "mutations": 1
+      },
+      {
+        "block": 13338567,
+        "mutations": 1
+      },
+      {
+        "block": 13338792,
+        "mutations": 1
+      },
+      {
+        "block": 13340139,
+        "mutations": 1
+      },
+      {
+        "block": 13345954,
+        "mutations": 173
+      },
+      {
+        "block": 13345957,
+        "mutations": 98
+      },
+      {
+        "block": 13345959,
+        "mutations": 69
+      },
+      {
+        "block": 13345961,
+        "mutations": 22
+      },
+      {
+        "block": 13345964,
+        "mutations": 100
+      },
+      {
+        "block": 13345966,
+        "mutations": 36
+      },
+      {
+        "block": 13345968,
+        "mutations": 30
+      },
+      {
+        "block": 13348521,
+        "mutations": 35
+      },
+      {
+        "block": 13348808,
+        "mutations": 1
+      },
+      {
+        "block": 13359394,
+        "mutations": 1
+      },
+      {
+        "block": 13361185,
+        "mutations": 1
+      },
+      {
+        "block": 13362405,
+        "mutations": 1
+      },
+      {
+        "block": 13364821,
+        "mutations": 21
+      },
+      {
+        "block": 13378656,
+        "mutations": 40
+      },
+      {
+        "block": 13378737,
+        "mutations": 1
+      },
+      {
+        "block": 13383691,
+        "mutations": 1
+      },
+      {
+        "block": 13389152,
+        "mutations": 215
+      },
+      {
+        "block": 13389154,
+        "mutations": 89
+      },
+      {
+        "block": 13389157,
+        "mutations": 27
+      },
+      {
+        "block": 13389159,
+        "mutations": 46
+      },
+      {
+        "block": 13389161,
+        "mutations": 161
+      },
+      {
+        "block": 13389163,
+        "mutations": 94
+      },
+      {
+        "block": 13393887,
+        "mutations": 13
+      },
+      {
+        "block": 13400415,
+        "mutations": 1
+      },
+      {
+        "block": 13415091,
+        "mutations": 7
+      },
+      {
+        "block": 13415217,
+        "mutations": 1
+      },
+      {
+        "block": 13426531,
+        "mutations": 1
+      },
+      {
+        "block": 13427136,
+        "mutations": 1
+      },
+      {
+        "block": 13427769,
+        "mutations": 1
+      },
+      {
+        "block": 13429953,
+        "mutations": 1
+      },
+      {
+        "block": 13431182,
+        "mutations": 1
+      },
+      {
+        "block": 13432335,
+        "mutations": 296
+      },
+      {
+        "block": 13432337,
+        "mutations": 85
+      },
+      {
+        "block": 13432339,
+        "mutations": 140
+      },
+      {
+        "block": 13432341,
+        "mutations": 101
+      },
+      {
+        "block": 13432343,
+        "mutations": 60
+      },
+      {
+        "block": 13432344,
+        "mutations": 70
+      },
+      {
+        "block": 13434625,
+        "mutations": 1
+      },
+      {
+        "block": 13440876,
+        "mutations": 20
+      },
+      {
+        "block": 13442680,
+        "mutations": 1
+      },
+      {
+        "block": 13471713,
+        "mutations": 1
+      },
+      {
+        "block": 13472213,
+        "mutations": 1
+      },
+      {
+        "block": 13473163,
+        "mutations": 1
+      },
+      {
+        "block": 13475536,
+        "mutations": 172
+      },
+      {
+        "block": 13475538,
+        "mutations": 76
+      },
+      {
+        "block": 13475541,
+        "mutations": 136
+      },
+      {
+        "block": 13475543,
+        "mutations": 112
+      },
+      {
+        "block": 13475545,
+        "mutations": 59
+      },
+      {
+        "block": 13478241,
+        "mutations": 42
+      },
+      {
+        "block": 13478246,
+        "mutations": 42
+      },
+      {
+        "block": 13478541,
+        "mutations": 1
+      },
+      {
+        "block": 13489015,
+        "mutations": 1
+      },
+      {
+        "block": 13493737,
+        "mutations": 1
+      },
+      {
+        "block": 13498143,
+        "mutations": 1
+      },
+      {
+        "block": 13499252,
+        "mutations": 1
+      },
+      {
+        "block": 13499740,
+        "mutations": 0
+      },
+      {
+        "block": 13499742,
+        "mutations": 3
+      },
+      {
+        "block": 13499744,
+        "mutations": 3
+      },
+      {
+        "block": 13499746,
+        "mutations": 0
+      },
+      {
+        "block": 13508419,
+        "mutations": 1
+      },
+      {
+        "block": 13508439,
+        "mutations": 1
+      },
+      {
+        "block": 13508452,
+        "mutations": 1
+      },
+      {
+        "block": 13518752,
+        "mutations": 247
+      },
+      {
+        "block": 13518755,
+        "mutations": 60
+      },
+      {
+        "block": 13518757,
+        "mutations": 154
+      },
+      {
+        "block": 13518759,
+        "mutations": 65
+      },
+      {
+        "block": 13518761,
+        "mutations": 12
+      },
+      {
+        "block": 13522006,
+        "mutations": 27
+      },
+      {
+        "block": 13522023,
+        "mutations": 5
+      },
+      {
+        "block": 13522417,
+        "mutations": 1
+      },
+      {
+        "block": 13542031,
+        "mutations": 18
+      },
+      {
+        "block": 13542118,
+        "mutations": 1
+      },
+      {
+        "block": 13544321,
+        "mutations": 1
+      },
+      {
+        "block": 13545473,
+        "mutations": 1
+      },
+      {
+        "block": 13545611,
+        "mutations": 1
+      },
+      {
+        "block": 13553573,
+        "mutations": 1
+      },
+      {
+        "block": 13556305,
+        "mutations": 1
+      },
+      {
+        "block": 13561084,
+        "mutations": 1
+      },
+      {
+        "block": 13561951,
+        "mutations": 317
+      },
+      {
+        "block": 13561953,
+        "mutations": 134
+      },
+      {
+        "block": 13561955,
+        "mutations": 113
+      },
+      {
+        "block": 13561957,
+        "mutations": 82
+      },
+      {
+        "block": 13561960,
+        "mutations": 139
+      },
+      {
+        "block": 13561961,
+        "mutations": 141
+      },
+      {
+        "block": 13561963,
+        "mutations": 158
+      },
+      {
+        "block": 13567775,
+        "mutations": 1
+      },
+      {
+        "block": 13575979,
+        "mutations": 1
+      },
+      {
+        "block": 13576025,
+        "mutations": 1
+      },
+      {
+        "block": 13576752,
+        "mutations": 10
+      },
+      {
+        "block": 13577049,
+        "mutations": 1
+      },
+      {
+        "block": 13577709,
+        "mutations": 1
+      },
+      {
+        "block": 13598176,
+        "mutations": 1
+      },
+      {
+        "block": 13605132,
+        "mutations": 254
+      },
+      {
+        "block": 13605134,
+        "mutations": 136
+      },
+      {
+        "block": 13605136,
+        "mutations": 22
+      },
+      {
+        "block": 13605139,
+        "mutations": 123
+      },
+      {
+        "block": 13605141,
+        "mutations": 118
+      },
+      {
+        "block": 13605142,
+        "mutations": 139
+      },
+      {
+        "block": 13611318,
+        "mutations": 19
+      },
+      {
+        "block": 13611397,
+        "mutations": 20
+      },
+      {
+        "block": 13614282,
+        "mutations": 13
+      },
+      {
+        "block": 13614543,
+        "mutations": 1
+      },
+      {
+        "block": 13641549,
+        "mutations": 1
+      },
+      {
+        "block": 13647729,
+        "mutations": 1
+      },
+      {
+        "block": 13648349,
+        "mutations": 162
+      },
+      {
+        "block": 13648351,
+        "mutations": 150
+      },
+      {
+        "block": 13648353,
+        "mutations": 35
+      },
+      {
+        "block": 13648355,
+        "mutations": 94
+      },
+      {
+        "block": 13651167,
+        "mutations": 13
+      },
+      {
+        "block": 13651278,
+        "mutations": 1
+      },
+      {
+        "block": 13653861,
+        "mutations": 8
+      },
+      {
+        "block": 13653989,
+        "mutations": 1
+      },
+      {
+        "block": 13683463,
+        "mutations": 1
+      },
+      {
+        "block": 13686764,
+        "mutations": 1
+      },
+      {
+        "block": 13689578,
+        "mutations": 1
+      },
+      {
+        "block": 13690978,
+        "mutations": 1
+      },
+      {
+        "block": 13691531,
+        "mutations": 176
+      },
+      {
+        "block": 13691533,
+        "mutations": 81
+      },
+      {
+        "block": 13691535,
+        "mutations": 120
+      },
+      {
+        "block": 13691538,
+        "mutations": 10
+      },
+      {
+        "block": 13691561,
+        "mutations": 132
+      },
+      {
+        "block": 13691562,
+        "mutations": 94
+      },
+      {
+        "block": 13695402,
+        "mutations": 17
+      },
+      {
+        "block": 13695525,
+        "mutations": 1
+      },
+      {
+        "block": 13698052,
+        "mutations": 11
+      },
+      {
+        "block": 13714141,
+        "mutations": 1
+      },
+      {
+        "block": 13724977,
+        "mutations": 1
+      },
+      {
+        "block": 13727045,
+        "mutations": 1
+      },
+      {
+        "block": 13734745,
+        "mutations": 184
+      },
+      {
+        "block": 13734748,
+        "mutations": 81
+      },
+      {
+        "block": 13734750,
+        "mutations": 45
+      },
+      {
+        "block": 13734752,
+        "mutations": 96
+      },
+      {
+        "block": 13737005,
+        "mutations": 11
+      },
+      {
+        "block": 13737064,
+        "mutations": 1
+      },
+      {
+        "block": 13740762,
+        "mutations": 1
+      },
+      {
+        "block": 13767707,
+        "mutations": 1
+      },
+      {
+        "block": 13767835,
+        "mutations": 1
+      },
+      {
+        "block": 13768955,
+        "mutations": 1
+      },
+      {
+        "block": 13769305,
+        "mutations": 1
+      },
+      {
+        "block": 13777942,
+        "mutations": 149
+      },
+      {
+        "block": 13777944,
+        "mutations": 106
+      },
+      {
+        "block": 13777947,
+        "mutations": 24
+      },
+      {
+        "block": 13777948,
+        "mutations": 135
+      },
+      {
+        "block": 13777950,
+        "mutations": 95
+      },
+      {
+        "block": 13777952,
+        "mutations": 10
+      },
+      {
+        "block": 13780880,
+        "mutations": 16
+      },
+      {
+        "block": 13780932,
+        "mutations": 1
+      },
+      {
+        "block": 13785897,
+        "mutations": 25
+      },
+      {
+        "block": 13794919,
+        "mutations": 1
+      },
+      {
+        "block": 13795998,
+        "mutations": 1
+      },
+      {
+        "block": 13796734,
+        "mutations": 44
+      },
+      {
+        "block": 13798006,
+        "mutations": 1
+      },
+      {
+        "block": 13799059,
+        "mutations": 1
+      },
+      {
+        "block": 13800192,
+        "mutations": 1
+      },
+      {
+        "block": 13805013,
+        "mutations": 1
+      },
+      {
+        "block": 13805133,
+        "mutations": 1
+      },
+      {
+        "block": 13810017,
+        "mutations": 1
+      },
+      {
+        "block": 13814231,
+        "mutations": 1
+      },
+      {
+        "block": 13814815,
+        "mutations": 1
+      },
+      {
+        "block": 13820191,
+        "mutations": 7
+      },
+      {
+        "block": 13820257,
+        "mutations": 1
+      },
+      {
+        "block": 13821146,
+        "mutations": 151
+      },
+      {
+        "block": 13821149,
+        "mutations": 135
+      },
+      {
+        "block": 13821150,
+        "mutations": 91
+      },
+      {
+        "block": 13821153,
+        "mutations": 17
+      },
+      {
+        "block": 13821154,
+        "mutations": 55
+      },
+      {
+        "block": 13821157,
+        "mutations": 120
+      },
+      {
+        "block": 13821159,
+        "mutations": 160
+      },
+      {
+        "block": 13821161,
+        "mutations": 112
+      },
+      {
+        "block": 13821163,
+        "mutations": 148
+      },
+      {
+        "block": 13824401,
+        "mutations": 1
+      },
+      {
+        "block": 13825485,
+        "mutations": 7
+      },
+      {
+        "block": 13825549,
+        "mutations": 1
+      },
+      {
+        "block": 13842735,
+        "mutations": 1
+      },
+      {
+        "block": 13848467,
+        "mutations": 1
+      },
+      {
+        "block": 13848486,
+        "mutations": 1
+      },
+      {
+        "block": 13848497,
+        "mutations": 1
+      },
+      {
+        "block": 13853113,
+        "mutations": 1
+      },
+      {
+        "block": 13862663,
+        "mutations": 1
+      },
+      {
+        "block": 13863585,
+        "mutations": 1
+      },
+      {
+        "block": 13864343,
+        "mutations": 404
+      },
+      {
+        "block": 13864346,
+        "mutations": 131
+      },
+      {
+        "block": 13864348,
+        "mutations": 172
+      },
+      {
+        "block": 13864350,
+        "mutations": 137
+      },
+      {
+        "block": 13864353,
+        "mutations": 25
+      },
+      {
+        "block": 13864356,
+        "mutations": 33
+      },
+      {
+        "block": 13875569,
+        "mutations": 7
+      },
+      {
+        "block": 13892846,
+        "mutations": 1
+      },
+      {
+        "block": 13893147,
+        "mutations": 1
+      },
+      {
+        "block": 13893505,
+        "mutations": 1
+      },
+      {
+        "block": 13896518,
+        "mutations": 1
+      },
+      {
+        "block": 13901023,
+        "mutations": 1
+      },
+      {
+        "block": 13907557,
+        "mutations": 252
+      },
+      {
+        "block": 13907560,
+        "mutations": 86
+      },
+      {
+        "block": 13907562,
+        "mutations": 165
+      },
+      {
+        "block": 13907565,
+        "mutations": 145
+      },
+      {
+        "block": 13907567,
+        "mutations": 151
+      },
+      {
+        "block": 13911671,
+        "mutations": 1
+      },
+      {
+        "block": 13913581,
+        "mutations": 15
+      },
+      {
+        "block": 13913648,
+        "mutations": 1
+      },
+      {
+        "block": 13920288,
+        "mutations": 10
+      },
+      {
+        "block": 13931422,
+        "mutations": 22
+      },
+      {
+        "block": 13939835,
+        "mutations": 1
+      },
+      {
+        "block": 13944865,
+        "mutations": 1
+      },
+      {
+        "block": 13946210,
+        "mutations": 1
+      },
+      {
+        "block": 13950750,
+        "mutations": 175
+      },
+      {
+        "block": 13950752,
+        "mutations": 113
+      },
+      {
+        "block": 13950755,
+        "mutations": 87
+      },
+      {
+        "block": 13950757,
+        "mutations": 10
+      },
+      {
+        "block": 13950759,
+        "mutations": 19
+      },
+      {
+        "block": 13954883,
+        "mutations": 28
+      },
+      {
+        "block": 13956348,
+        "mutations": 14
+      },
+      {
+        "block": 13956453,
+        "mutations": 1
+      },
+      {
+        "block": 13971339,
+        "mutations": 1
+      },
+      {
+        "block": 13978637,
+        "mutations": 1
+      },
+      {
+        "block": 13979422,
+        "mutations": 1
+      },
+      {
+        "block": 13993944,
+        "mutations": 204
+      },
+      {
+        "block": 13993946,
+        "mutations": 88
+      },
+      {
+        "block": 13993949,
+        "mutations": 93
+      },
+      {
+        "block": 13993951,
+        "mutations": 29
+      },
+      {
+        "block": 14018055,
+        "mutations": 1
+      },
+      {
+        "block": 14020444,
+        "mutations": 11
+      },
+      {
+        "block": 14021472,
+        "mutations": 1
+      },
+      {
+        "block": 14032270,
+        "mutations": 1
+      },
+      {
+        "block": 14037140,
+        "mutations": 132
+      },
+      {
+        "block": 14037143,
+        "mutations": 32
+      },
+      {
+        "block": 14037145,
+        "mutations": 77
+      },
+      {
+        "block": 14039721,
+        "mutations": 1
+      },
+      {
+        "block": 14040042,
+        "mutations": 1
+      },
+      {
+        "block": 14040144,
+        "mutations": 1
+      },
+      {
+        "block": 14051400,
+        "mutations": 12
+      },
+      {
+        "block": 14051429,
+        "mutations": 1
+      },
+      {
+        "block": 14066038,
+        "mutations": 7
+      },
+      {
+        "block": 14080338,
+        "mutations": 188
+      },
+      {
+        "block": 14080341,
+        "mutations": 17
+      },
+      {
+        "block": 14083011,
+        "mutations": 7
+      },
+      {
+        "block": 14083130,
+        "mutations": 1
+      },
+      {
+        "block": 14085388,
+        "mutations": 1
+      },
+      {
+        "block": 14115981,
+        "mutations": 1
+      },
+      {
+        "block": 14116401,
+        "mutations": 1
+      },
+      {
+        "block": 14123555,
+        "mutations": 457
+      },
+      {
+        "block": 14123558,
+        "mutations": 45
+      },
+      {
+        "block": 14123560,
+        "mutations": 29
+      },
+      {
+        "block": 14123562,
+        "mutations": 10
+      },
+      {
+        "block": 14125795,
+        "mutations": 1
+      },
+      {
+        "block": 14149478,
+        "mutations": 34
+      },
+      {
+        "block": 14149534,
+        "mutations": 1
+      },
+      {
+        "block": 14149557,
+        "mutations": 1
+      },
+      {
+        "block": 14161459,
+        "mutations": 1
+      },
+      {
+        "block": 14163289,
+        "mutations": 1
+      },
+      {
+        "block": 14163896,
+        "mutations": 1
+      },
+      {
+        "block": 14166756,
+        "mutations": 301
+      },
+      {
+        "block": 14166759,
+        "mutations": 140
+      },
+      {
+        "block": 14166761,
+        "mutations": 56
+      },
+      {
+        "block": 14166764,
+        "mutations": 98
+      },
+      {
+        "block": 14166766,
+        "mutations": 62
+      },
+      {
+        "block": 14170475,
+        "mutations": 1
+      },
+      {
+        "block": 14172901,
+        "mutations": 1
+      },
+      {
+        "block": 14188673,
+        "mutations": 1
+      },
+      {
+        "block": 14188821,
+        "mutations": 1
+      },
+      {
+        "block": 14196940,
+        "mutations": 1
+      },
+      {
+        "block": 14205847,
+        "mutations": 1
+      },
+      {
+        "block": 14206106,
+        "mutations": 1
+      },
+      {
+        "block": 14209959,
+        "mutations": 325
+      },
+      {
+        "block": 14209962,
+        "mutations": 95
+      },
+      {
+        "block": 14209964,
+        "mutations": 78
+      },
+      {
+        "block": 14209967,
+        "mutations": 119
+      },
+      {
+        "block": 14209970,
+        "mutations": 164
+      },
+      {
+        "block": 14209972,
+        "mutations": 70
+      },
+      {
+        "block": 14209974,
+        "mutations": 78
+      },
+      {
+        "block": 14212236,
+        "mutations": 10
+      },
+      {
+        "block": 14212566,
+        "mutations": 1
+      },
+      {
+        "block": 14214830,
+        "mutations": 8
+      },
+      {
+        "block": 14214896,
+        "mutations": 1
+      },
+      {
+        "block": 14233651,
+        "mutations": 1
+      },
+      {
+        "block": 14248301,
+        "mutations": 1
+      },
+      {
+        "block": 14252263,
+        "mutations": 1
+      },
+      {
+        "block": 14253160,
+        "mutations": 187
+      },
+      {
+        "block": 14253163,
+        "mutations": 83
+      },
+      {
+        "block": 14253166,
+        "mutations": 116
+      },
+      {
+        "block": 14253168,
+        "mutations": 86
+      },
+      {
+        "block": 14253171,
+        "mutations": 63
+      },
+      {
+        "block": 14255770,
+        "mutations": 17
+      },
+      {
+        "block": 14258526,
+        "mutations": 19
+      },
+      {
+        "block": 14258589,
+        "mutations": 1
+      },
+      {
+        "block": 14271499,
+        "mutations": 1
+      },
+      {
+        "block": 14276879,
+        "mutations": 1
+      },
+      {
+        "block": 14278593,
+        "mutations": 1
+      },
+      {
+        "block": 14294894,
+        "mutations": 1
+      },
+      {
+        "block": 14296292,
+        "mutations": 1
+      },
+      {
+        "block": 14296338,
+        "mutations": 154
+      },
+      {
+        "block": 14296340,
+        "mutations": 68
+      },
+      {
+        "block": 14296342,
+        "mutations": 81
+      },
+      {
+        "block": 14296344,
+        "mutations": 96
+      },
+      {
+        "block": 14296345,
+        "mutations": 164
+      },
+      {
+        "block": 14296347,
+        "mutations": 65
+      },
+      {
+        "block": 14298960,
+        "mutations": 23
+      },
+      {
+        "block": 14299270,
+        "mutations": 1
+      },
+      {
+        "block": 14299482,
+        "mutations": 1
+      },
+      {
+        "block": 14301900,
+        "mutations": 8
+      },
+      {
+        "block": 14301966,
+        "mutations": 1
+      },
+      {
+        "block": 14321683,
+        "mutations": 1
+      },
+      {
+        "block": 14323148,
+        "mutations": 1
+      },
+      {
+        "block": 14337007,
+        "mutations": 1
+      },
+      {
+        "block": 14339554,
+        "mutations": 114
+      },
+      {
+        "block": 14339557,
+        "mutations": 29
+      },
+      {
+        "block": 14339559,
+        "mutations": 66
+      },
+      {
+        "block": 14339562,
+        "mutations": 120
+      },
+      {
+        "block": 14339564,
+        "mutations": 121
+      },
+      {
+        "block": 14339566,
+        "mutations": 58
+      },
+      {
+        "block": 14342002,
+        "mutations": 1
+      },
+      {
+        "block": 14342035,
+        "mutations": 1
+      },
+      {
+        "block": 14342128,
+        "mutations": 1
+      },
+      {
+        "block": 14342266,
+        "mutations": 104
+      },
+      {
+        "block": 14342713,
+        "mutations": 1
+      },
+      {
+        "block": 14342876,
+        "mutations": 28
+      },
+      {
+        "block": 14343338,
+        "mutations": 1
+      },
+      {
+        "block": 14344114,
+        "mutations": 26
+      },
+      {
+        "block": 14344150,
+        "mutations": 1
+      },
+      {
+        "block": 14373276,
+        "mutations": 1
+      },
+      {
+        "block": 14376843,
+        "mutations": 1
+      },
+      {
+        "block": 14377010,
+        "mutations": 1
+      },
+      {
+        "block": 14377014,
+        "mutations": 1
+      },
+      {
+        "block": 14382737,
+        "mutations": 55
+      },
+      {
+        "block": 14382740,
+        "mutations": 68
+      },
+      {
+        "block": 14382742,
+        "mutations": 56
+      },
+      {
+        "block": 14382745,
+        "mutations": 124
+      },
+      {
+        "block": 14382747,
+        "mutations": 114
+      },
+      {
+        "block": 14382749,
+        "mutations": 90
+      },
+      {
+        "block": 14382751,
+        "mutations": 26
+      },
+      {
+        "block": 14384633,
+        "mutations": 1
+      },
+      {
+        "block": 14385251,
+        "mutations": 23
+      },
+      {
+        "block": 14385377,
+        "mutations": 1
+      },
+      {
+        "block": 14395239,
+        "mutations": 109
+      },
+      {
+        "block": 14406046,
+        "mutations": 1
+      },
+      {
+        "block": 14425960,
+        "mutations": 140
+      },
+      {
+        "block": 14425962,
+        "mutations": 93
+      },
+      {
+        "block": 14425964,
+        "mutations": 165
+      },
+      {
+        "block": 14427990,
+        "mutations": 13
+      },
+      {
+        "block": 14428170,
+        "mutations": 1
+      },
+      {
+        "block": 14428342,
+        "mutations": 1
+      },
+      {
+        "block": 14431746,
+        "mutations": 5
+      },
+      {
+        "block": 14431772,
+        "mutations": 1
+      },
+      {
+        "block": 14448097,
+        "mutations": 19
+      },
+      {
+        "block": 14448138,
+        "mutations": 1
+      },
+      {
+        "block": 14468883,
+        "mutations": 1
+      },
+      {
+        "block": 14469159,
+        "mutations": 171
+      },
+      {
+        "block": 14469161,
+        "mutations": 109
+      },
+      {
+        "block": 14469163,
+        "mutations": 139
+      },
+      {
+        "block": 14469165,
+        "mutations": 175
+      },
+      {
+        "block": 14469167,
+        "mutations": 10
+      },
+      {
+        "block": 14471220,
+        "mutations": 19
+      },
+      {
+        "block": 14471235,
+        "mutations": 1
+      },
+      {
+        "block": 14471639,
+        "mutations": 1
+      },
+      {
+        "block": 14504824,
+        "mutations": 1
+      },
+      {
+        "block": 14512331,
+        "mutations": 285
+      },
+      {
+        "block": 14512360,
+        "mutations": 116
+      },
+      {
+        "block": 14512363,
+        "mutations": 110
+      },
+      {
+        "block": 14515645,
+        "mutations": 8
+      },
+      {
+        "block": 14516017,
+        "mutations": 1
+      },
+      {
+        "block": 14519807,
+        "mutations": 27
+      },
+      {
+        "block": 14519861,
+        "mutations": 1
+      },
+      {
+        "block": 14528363,
+        "mutations": 1
+      },
+      {
+        "block": 14542131,
+        "mutations": 1
+      },
+      {
+        "block": 14548331,
+        "mutations": 1
+      },
+      {
+        "block": 14550053,
+        "mutations": 1
+      },
+      {
+        "block": 14555557,
+        "mutations": 207
+      },
+      {
+        "block": 14555558,
+        "mutations": 82
+      },
+      {
+        "block": 14555561,
+        "mutations": 90
+      },
+      {
+        "block": 14555564,
+        "mutations": 99
+      },
+      {
+        "block": 14555566,
+        "mutations": 108
+      },
+      {
+        "block": 14555569,
+        "mutations": 99
+      },
+      {
+        "block": 14558714,
+        "mutations": 1
+      },
+      {
+        "block": 14560232,
+        "mutations": 5
+      },
+      {
+        "block": 14560266,
+        "mutations": 1
+      },
+      {
+        "block": 14571673,
+        "mutations": 1
+      },
+      {
+        "block": 14576700,
+        "mutations": 1
+      },
+      {
+        "block": 14596131,
+        "mutations": 21
+      },
+      {
+        "block": 14596286,
+        "mutations": 1
+      },
+      {
+        "block": 14598748,
+        "mutations": 207
+      },
+      {
+        "block": 14598750,
+        "mutations": 174
+      },
+      {
+        "block": 14598752,
+        "mutations": 99
+      },
+      {
+        "block": 14598755,
+        "mutations": 118
+      },
+      {
+        "block": 14598757,
+        "mutations": 50
+      },
+      {
+        "block": 14603853,
+        "mutations": 1
+      },
+      {
+        "block": 14606895,
+        "mutations": 42
+      },
+      {
+        "block": 14617261,
+        "mutations": 1
+      },
+      {
+        "block": 14622784,
+        "mutations": 1
+      },
+      {
+        "block": 14623956,
+        "mutations": 1
+      },
+      {
+        "block": 14624116,
+        "mutations": 1
+      },
+      {
+        "block": 14624393,
+        "mutations": 1
+      },
+      {
+        "block": 14641954,
+        "mutations": 172
+      },
+      {
+        "block": 14641957,
+        "mutations": 74
+      },
+      {
+        "block": 14641960,
+        "mutations": 113
+      },
+      {
+        "block": 14641962,
+        "mutations": 56
+      },
+      {
+        "block": 14641965,
+        "mutations": 85
+      },
+      {
+        "block": 14641967,
+        "mutations": 57
+      },
+      {
+        "block": 14645694,
+        "mutations": 1
+      },
+      {
+        "block": 14676772,
+        "mutations": 119
+      },
+      {
+        "block": 14676833,
+        "mutations": 1
+      },
+      {
+        "block": 14685133,
+        "mutations": 208
+      },
+      {
+        "block": 14685136,
+        "mutations": 74
+      },
+      {
+        "block": 14687113,
+        "mutations": 1
+      },
+      {
+        "block": 14689023,
+        "mutations": 11
+      },
+      {
+        "block": 14706528,
+        "mutations": 1
+      },
+      {
+        "block": 14706532,
+        "mutations": 1
+      },
+      {
+        "block": 14706555,
+        "mutations": 1
+      },
+      {
+        "block": 14706598,
+        "mutations": 1
+      },
+      {
+        "block": 14728338,
+        "mutations": 113
+      },
+      {
+        "block": 14728341,
+        "mutations": 86
+      },
+      {
+        "block": 14734003,
+        "mutations": 1
+      },
+      {
+        "block": 14771538,
+        "mutations": 145
+      },
+      {
+        "block": 14774424,
+        "mutations": 13
+      },
+      {
+        "block": 14774480,
+        "mutations": 1
+      },
+      {
+        "block": 14777101,
+        "mutations": 5
+      },
+      {
+        "block": 14818519,
+        "mutations": 18
+      },
+      {
+        "block": 14818572,
+        "mutations": 1
+      },
+      {
+        "block": 14839095,
+        "mutations": 1
+      },
+      {
+        "block": 14857956,
+        "mutations": 124
+      },
+      {
+        "block": 14857957,
+        "mutations": 17
+      },
+      {
+        "block": 14861519,
+        "mutations": 1
+      },
+      {
+        "block": 14884015,
+        "mutations": 1
+      },
+      {
+        "block": 14901142,
+        "mutations": 189
+      },
+      {
+        "block": 14949428,
+        "mutations": 1
+      },
+      {
+        "block": 14987554,
+        "mutations": 183
+      },
+      {
+        "block": 15165540,
+        "mutations": 9
+      },
+      {
+        "block": 15165599,
+        "mutations": 1
+      },
+      {
+        "block": 15203555,
+        "mutations": 183
+      },
+      {
+        "block": 15253653,
+        "mutations": 11
+      },
+      {
+        "block": 15253717,
+        "mutations": 1
+      },
+      {
+        "block": 15289944,
+        "mutations": 62
+      },
+      {
+        "block": 15467931,
+        "mutations": 9
+      },
+      {
+        "block": 15467961,
+        "mutations": 1
+      },
+      {
+        "block": 15467980,
+        "mutations": 1
+      },
+      {
+        "block": 15468035,
+        "mutations": 1
+      },
+      {
+        "block": 15505986,
+        "mutations": 66
+      },
+      {
+        "block": 15594811,
+        "mutations": 9
+      },
+      {
+        "block": 15594936,
+        "mutations": 1
+      },
+      {
+        "block": 15635559,
+        "mutations": 28
+      },
+      {
+        "block": 15769621,
+        "mutations": 17
+      },
+      {
+        "block": 15769701,
+        "mutations": 1
+      },
+      {
+        "block": 15808336,
+        "mutations": 52
+      },
+      {
+        "block": 15898262,
+        "mutations": 12
+      },
+      {
+        "block": 15898301,
+        "mutations": 1
+      },
+      {
+        "block": 15937988,
+        "mutations": 27
+      },
+      {
+        "block": 16071355,
+        "mutations": 27
+      },
+      {
+        "block": 16071398,
+        "mutations": 1
+      },
+      {
+        "block": 16110735,
+        "mutations": 50
+      },
+      {
+        "block": 16200528,
+        "mutations": 12
+      },
+      {
+        "block": 16200623,
+        "mutations": 1
+      },
+      {
+        "block": 16240382,
+        "mutations": 28
+      },
+      {
+        "block": 16375243,
+        "mutations": 27
+      },
+      {
+        "block": 16375312,
+        "mutations": 1
+      },
+      {
+        "block": 16375357,
+        "mutations": 1
+      },
+      {
+        "block": 16375413,
+        "mutations": 1
+      },
+      {
+        "block": 16413174,
+        "mutations": 58
+      },
+      {
+        "block": 16504018,
+        "mutations": 14
+      },
+      {
+        "block": 16504061,
+        "mutations": 1
+      },
+      {
+        "block": 16542773,
+        "mutations": 29
+      },
+      {
+        "block": 16744288,
+        "mutations": 24
+      },
+      {
+        "block": 16744330,
+        "mutations": 1
+      },
+      {
+        "block": 16758744,
+        "mutations": 47
+      },
+      {
+        "block": 16806451,
+        "mutations": 18
+      },
+      {
+        "block": 16806498,
+        "mutations": 1
+      },
+      {
+        "block": 16845221,
+        "mutations": 50
+      },
+      {
+        "block": 17023625,
+        "mutations": 22
+      },
+      {
+        "block": 17023664,
+        "mutations": 1
+      },
+      {
+        "block": 17061157,
+        "mutations": 42
+      },
+      {
+        "block": 17109277,
+        "mutations": 21
+      },
+      {
+        "block": 17109334,
+        "mutations": 1
+      },
+      {
+        "block": 17147585,
+        "mutations": 56
+      },
+      {
+        "block": 17324704,
+        "mutations": 14
+      },
+      {
+        "block": 17324741,
+        "mutations": 1
+      },
+      {
+        "block": 17363544,
+        "mutations": 41
+      },
+      {
+        "block": 17411936,
+        "mutations": 29
+      },
+      {
+        "block": 17411979,
+        "mutations": 1
+      },
+      {
+        "block": 17449949,
+        "mutations": 61
+      },
+      {
+        "block": 17627725,
+        "mutations": 13
+      },
+      {
+        "block": 17627752,
+        "mutations": 1
+      },
+      {
+        "block": 17665947,
+        "mutations": 26
+      },
+      {
+        "block": 17712721,
+        "mutations": 15
+      },
+      {
+        "block": 17712787,
+        "mutations": 1
+      },
+      {
+        "block": 17752342,
+        "mutations": 43
+      },
+      {
+        "block": 17982104,
+        "mutations": 6
+      },
+      {
+        "block": 17982134,
+        "mutations": 1
+      },
+      {
+        "block": 18011557,
+        "mutations": 27
+      },
+      {
+        "block": 18016505,
+        "mutations": 9
+      },
+      {
+        "block": 18016536,
+        "mutations": 1
+      },
+      {
+        "block": 18054739,
+        "mutations": 32
+      },
+      {
+        "block": 18276481,
+        "mutations": 6
+      },
+      {
+        "block": 18276506,
+        "mutations": 1
+      },
+      {
+        "block": 18313943,
+        "mutations": 25
+      },
+      {
+        "block": 18328440,
+        "mutations": 5
+      },
+      {
+        "block": 18328481,
+        "mutations": 1
+      },
+      {
+        "block": 18357141,
+        "mutations": 23
+      },
+      {
+        "block": 18619789,
+        "mutations": 13
+      },
+      {
+        "block": 18619818,
+        "mutations": 1
+      },
+      {
+        "block": 18659560,
+        "mutations": 36
+      },
+      {
+        "block": 18921045,
+        "mutations": 12
+      },
+      {
+        "block": 18921087,
+        "mutations": 1
+      },
+      {
+        "block": 18961957,
+        "mutations": 39
+      },
+      {
+        "block": 19226790,
+        "mutations": 15
+      },
+      {
+        "block": 19226871,
+        "mutations": 1
+      },
+      {
+        "block": 19264331,
+        "mutations": 42
+      },
+      {
+        "block": 19526905,
+        "mutations": 15
+      },
+      {
+        "block": 19526929,
+        "mutations": 1
+      },
+      {
+        "block": 19566731,
+        "mutations": 33
+      },
+      {
+        "block": 19832990,
+        "mutations": 20
+      },
+      {
+        "block": 19833077,
+        "mutations": 1
+      },
+      {
+        "block": 19869168,
+        "mutations": 38
+      },
+      {
+        "block": 20134411,
+        "mutations": 22
+      },
+      {
+        "block": 20134442,
+        "mutations": 1
+      },
+      {
+        "block": 20171546,
+        "mutations": 47
+      },
+      {
+        "block": 20299767,
+        "mutations": 1
+      },
+      {
+        "block": 20301145,
+        "mutations": 17
+      },
+      {
+        "block": 20822800,
+        "mutations": 29
+      },
+      {
+        "block": 20822853,
+        "mutations": 1
+      },
+      {
+        "block": 20862775,
+        "mutations": 51
+      },
+      {
+        "block": 20997527,
+        "mutations": 1
+      },
+      {
+        "block": 21035543,
+        "mutations": 18
+      },
+      {
+        "block": 21135000,
+        "mutations": 23
+      },
+      {
+        "block": 21135043,
+        "mutations": 1
+      },
+      {
+        "block": 21165139,
+        "mutations": 53
+      },
+      {
+        "block": 21427715,
+        "mutations": 18
+      },
+      {
+        "block": 21427830,
+        "mutations": 19
+      },
+      {
+        "block": 21467548,
+        "mutations": 48
+      },
+      {
+        "block": 21731141,
+        "mutations": 16
+      },
+      {
+        "block": 21731173,
+        "mutations": 1
+      },
+      {
+        "block": 21769963,
+        "mutations": 42
+      },
+      {
+        "block": 22032221,
+        "mutations": 13
+      },
+      {
+        "block": 22032331,
+        "mutations": 1
+      },
+      {
+        "block": 22076942,
+        "mutations": 1
+      },
+      {
+        "block": 23303136,
+        "mutations": 22
+      }
+    ],
+    "perEntity": {
+      "commitment": 860,
+      "globalRate": 395,
+      "sharedRate": 953,
+      "fixedRate": 953,
+      "placement": 477,
+      "placementWindow": 100,
+      "computedPoints": 915,
+      "cellOwner": 4250,
+      "cell": 12488,
+      "placementPlayer": 8485,
+      "placementCell": 8316
+    }
+  },
+  "reads": {
+    "reads": 49242,
+    "stagedReads": 16871,
+    "writes": 57081,
+    "deletes": 8799
+  },
+  "liveRows": 4072,
+  "versions": 29393,
+  "differences": [],
+  "ranAt": "2026-08-23T06:12:08.047Z"
+}

@@ -1,0 +1,37 @@
+{
+  "equality": {
+    "tiny": {
+      "equal": true,
+      "handlerCalls": {
+        "onCommitmentMade": 24,
+        "onCommitmentRevealed": 16,
+        "onCommitmentVoid": 4,
+        "onMultiPoke": 8,
+        "onSinglePoke": 8,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 8,
+        "onAccountSharedRewardUpdated": 8,
+        "onGlobalRewardUpdated": 8,
+        "onCommitmentCancelled": 4
+      },
+      "liveRows": 245
+    },
+    "small": {
+      "equal": true,
+      "handlerCalls": {
+        "onCommitmentMade": 100,
+        "onCommitmentRevealed": 80,
+        "onCommitmentVoid": 10,
+        "onMultiPoke": 20,
+        "onSinglePoke": 20,
+        "onForceSimpleCells": 1,
+        "onAccounFixedRewardUpdated": 20,
+        "onAccountSharedRewardUpdated": 20,
+        "onGlobalRewardUpdated": 20,
+        "onCommitmentCancelled": 10
+      },
+      "liveRows": 1258
+    }
+  },
+  "ranAt": "2026-08-22T19:46:19.841Z"
+}

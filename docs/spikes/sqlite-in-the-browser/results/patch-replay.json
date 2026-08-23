@@ -1,0 +1,195 @@
+{
+  "finality": 64,
+  "measurements": [
+    {
+      "size": "real",
+      "blocks": 1042,
+      "blockGaps": {
+        "min": 1,
+        "median": 429,
+        "max": 1226194
+      },
+      "blocksWithRetainedPatches": 1,
+      "liveKeys": 3945,
+      "stateBytes": 452693,
+      "patchLogBytes": 4530,
+      "patchesPerBlock": 0,
+      "depths": [
+        {
+          "depth": 1,
+          "ms": 3.341,
+          "correct": true,
+          "patchesApplied": 22,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 2,
+          "ms": 1.244,
+          "correct": false,
+          "patchesApplied": 22,
+          "patchesAvailable": false
+        },
+        {
+          "depth": 4,
+          "ms": 1.208,
+          "correct": false,
+          "patchesApplied": 22,
+          "patchesAvailable": false
+        },
+        {
+          "depth": 8,
+          "ms": 1.071,
+          "correct": false,
+          "patchesApplied": 22,
+          "patchesAvailable": false
+        },
+        {
+          "depth": 16,
+          "ms": 1.151,
+          "correct": false,
+          "patchesApplied": 22,
+          "patchesAvailable": false
+        },
+        {
+          "depth": 32,
+          "ms": 0.98,
+          "correct": false,
+          "patchesApplied": 22,
+          "patchesAvailable": false
+        },
+        {
+          "depth": 64,
+          "ms": 1.056,
+          "correct": false,
+          "patchesApplied": 22,
+          "patchesAvailable": false
+        }
+      ]
+    },
+    {
+      "size": "small",
+      "blocks": 38,
+      "blockGaps": {
+        "min": 1,
+        "median": 1,
+        "max": 1
+      },
+      "blocksWithRetainedPatches": 38,
+      "liveKeys": 907,
+      "stateBytes": 123632,
+      "patchLogBytes": 433708,
+      "patchesPerBlock": 45.1,
+      "depths": [
+        {
+          "depth": 1,
+          "ms": 0.88,
+          "correct": true,
+          "patchesApplied": 10,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 2,
+          "ms": 1.828,
+          "correct": true,
+          "patchesApplied": 92,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 4,
+          "ms": 3.275,
+          "correct": true,
+          "patchesApplied": 179,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 8,
+          "ms": 6.485,
+          "correct": true,
+          "patchesApplied": 358,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 16,
+          "ms": 12.606,
+          "correct": true,
+          "patchesApplied": 765,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 32,
+          "ms": 19.192,
+          "correct": true,
+          "patchesApplied": 1509,
+          "patchesAvailable": true
+        }
+      ]
+    },
+    {
+      "size": "medium",
+      "blocks": 116,
+      "blockGaps": {
+        "min": 1,
+        "median": 1,
+        "max": 1
+      },
+      "blocksWithRetainedPatches": 65,
+      "liveKeys": 6261,
+      "stateBytes": 780927,
+      "patchLogBytes": 1742477,
+      "patchesPerBlock": 51.4,
+      "depths": [
+        {
+          "depth": 1,
+          "ms": 4,
+          "correct": true,
+          "patchesApplied": 1,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 2,
+          "ms": 3.886,
+          "correct": true,
+          "patchesApplied": 90,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 4,
+          "ms": 11.067,
+          "correct": true,
+          "patchesApplied": 262,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 8,
+          "ms": 25.068,
+          "correct": true,
+          "patchesApplied": 690,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 16,
+          "ms": 51.114,
+          "correct": true,
+          "patchesApplied": 1399,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 32,
+          "ms": 85.406,
+          "correct": true,
+          "patchesApplied": 2987,
+          "patchesAvailable": true
+        },
+        {
+          "depth": 64,
+          "ms": 155.75,
+          "correct": true,
+          "patchesApplied": 5950,
+          "patchesAvailable": true
+        }
+      ]
+    }
+  ],
+  "node": "v24.13.1",
+  "ranAt": "2026-08-23T06:12:28.646Z"
+}

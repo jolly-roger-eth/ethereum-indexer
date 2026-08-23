@@ -1,0 +1,3463 @@
+{
+  "format": 1,
+  "provenance": {
+    "capturedAt": "2026-08-22T19:24:45.446Z",
+    "chainId": "8453",
+    "fromBlock": 11681917,
+    "toBlock": 11800000,
+    "what": "stratagems on Base (deployments/base): Stratagems + Gems + GemsGenerator, every log in the range",
+    "deployment": "base",
+    "stratagemsRepo": "github.com/wighawag/stratagems",
+    "stratagemsCommit": "3d5a0b3f46bcc0d8370643b8382f11f99f81df00",
+    "contracts": [
+      {
+        "address": "0xb99d938a722df8984722ab38732533130b4f3ec4",
+        "startBlock": 11681933
+      },
+      {
+        "address": "0xd1b76de5372bc47fc4b7ad918f11937fc17b7b46",
+        "startBlock": 11681917
+      },
+      {
+        "address": "0xbe2f7c303b53f16f447fd82bf549e65185bf3477",
+        "startBlock": 11681921
+      }
+    ],
+    "node": "base-mainnet.g.alchemy.com",
+    "chainHeadAtCapture": 50318668,
+    "capturedBy": "docs/spikes/sqlite-in-the-browser/capture/capture-stratagems-base.mjs",
+    "omittedFields": [
+      "data",
+      "topics"
+    ]
+  },
+  "source": {
+    "chainId": "8453",
+    "contracts": [
+      {
+        "abi": [
+          {
+            "inputs": [],
+            "name": "CanStillReveal",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "CommitmentHashNotMatching",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "GameNotStarted",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "ImpossibleConfiguration",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "InCommitmentPhase",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "InRevealPhase",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "InvalidEpoch",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "InvalidFurtherMoves",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "NothingToReveal",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "PreviousCommitmentNotRevealed",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "inReserve",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "expected",
+                "type": "uint256"
+              }
+            ],
+            "name": "ReserveTooLow",
+            "type": "error"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "uint24",
+                "name": "epoch",
+                "type": "uint24"
+              }
+            ],
+            "name": "CommitmentCancelled",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "uint24",
+                "name": "epoch",
+                "type": "uint24"
+              },
+              {
+                "indexed": false,
+                "internalType": "bytes24",
+                "name": "commitmentHash",
+                "type": "bytes24"
+              }
+            ],
+            "name": "CommitmentMade",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "uint24",
+                "name": "epoch",
+                "type": "uint24"
+              },
+              {
+                "indexed": true,
+                "internalType": "bytes24",
+                "name": "commitmentHash",
+                "type": "bytes24"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint64",
+                    "name": "position",
+                    "type": "uint64"
+                  },
+                  {
+                    "internalType": "enum UsingStratagemsTypes.Color",
+                    "name": "color",
+                    "type": "uint8"
+                  }
+                ],
+                "indexed": false,
+                "internalType": "struct UsingStratagemsTypes.Move[]",
+                "name": "moves",
+                "type": "tuple[]"
+              },
+              {
+                "indexed": false,
+                "internalType": "bytes24",
+                "name": "furtherMoves",
+                "type": "bytes24"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newReserveAmount",
+                "type": "uint256"
+              }
+            ],
+            "name": "CommitmentRevealed",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "uint24",
+                "name": "epoch",
+                "type": "uint24"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amountBurnt",
+                "type": "uint256"
+              },
+              {
+                "indexed": false,
+                "internalType": "bytes24",
+                "name": "furtherMoves",
+                "type": "bytes24"
+              }
+            ],
+            "name": "CommitmentVoid",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "uint64",
+                "name": "position",
+                "type": "uint64"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "enum UsingStratagemsTypes.Color",
+                "name": "oldColor",
+                "type": "uint8"
+              },
+              {
+                "indexed": false,
+                "internalType": "enum UsingStratagemsTypes.Color",
+                "name": "newColor",
+                "type": "uint8"
+              }
+            ],
+            "name": "MoveProcessed",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "uint24",
+                "name": "epoch",
+                "type": "uint24"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint64[]",
+                "name": "positions",
+                "type": "uint64[]"
+              }
+            ],
+            "name": "MultiPoke",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amountDeposited",
+                "type": "uint256"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newAmount",
+                "type": "uint256"
+              }
+            ],
+            "name": "ReserveDeposited",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amountWithdrawn",
+                "type": "uint256"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "newAmount",
+                "type": "uint256"
+              }
+            ],
+            "name": "ReserveWithdrawn",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "uint24",
+                "name": "epoch",
+                "type": "uint24"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint64",
+                "name": "position",
+                "type": "uint64"
+              }
+            ],
+            "name": "SinglePoke",
+            "type": "event"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "id",
+                "type": "uint256"
+              }
+            ],
+            "name": "getCell",
+            "outputs": [
+              {
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "lastEpochUpdate",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "epochWhenTokenIsAdded",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "producingEpochs",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "enum UsingStratagemsTypes.Color",
+                    "name": "color",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "life",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "int8",
+                    "name": "delta",
+                    "type": "int8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "enemyMap",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "distribution",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "stake",
+                    "type": "uint8"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.FullCell",
+                "name": "",
+                "type": "tuple"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256[]",
+                "name": "ids",
+                "type": "uint256[]"
+              }
+            ],
+            "name": "getCells",
+            "outputs": [
+              {
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "lastEpochUpdate",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "epochWhenTokenIsAdded",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "producingEpochs",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "enum UsingStratagemsTypes.Color",
+                    "name": "color",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "life",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "int8",
+                    "name": "delta",
+                    "type": "int8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "enemyMap",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "distribution",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "stake",
+                    "type": "uint8"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.FullCell[]",
+                "name": "cells",
+                "type": "tuple[]"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              }
+            ],
+            "name": "getCommitment",
+            "outputs": [
+              {
+                "components": [
+                  {
+                    "internalType": "bytes24",
+                    "name": "hash",
+                    "type": "bytes24"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "epoch",
+                    "type": "uint24"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.Commitment",
+                "name": "commitment",
+                "type": "tuple"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "getConfig",
+            "outputs": [
+              {
+                "components": [
+                  {
+                    "internalType": "contract IERC20WithIERC2612",
+                    "name": "tokens",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "address payable",
+                    "name": "burnAddress",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "startTime",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "commitPhaseDuration",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "revealPhaseDuration",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "maxLife",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "numTokensPerGems",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "contract ITime",
+                    "name": "time",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "contract IOnStakeChange",
+                    "name": "generator",
+                    "type": "address"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.Config",
+                "name": "config",
+                "type": "tuple"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              }
+            ],
+            "name": "getTokensInReserve",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "approved",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "Approval",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "operator",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "bool",
+                "name": "approved",
+                "type": "bool"
+              }
+            ],
+            "name": "ApprovalForAll",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "Transfer",
+            "type": "event"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "tokensAmountToAdd",
+                "type": "uint256"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "deadline",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "v",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "bytes32",
+                    "name": "r",
+                    "type": "bytes32"
+                  },
+                  {
+                    "internalType": "bytes32",
+                    "name": "s",
+                    "type": "bytes32"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.Permit",
+                "name": "permit",
+                "type": "tuple"
+              }
+            ],
+            "name": "addToReserve",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "cancelCommitment",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "bytes24",
+                "name": "commitmentHash",
+                "type": "bytes24"
+              },
+              {
+                "internalType": "address payable",
+                "name": "payee",
+                "type": "address"
+              }
+            ],
+            "name": "makeCommitment",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "bytes24",
+                "name": "commitmentHash",
+                "type": "bytes24"
+              },
+              {
+                "internalType": "uint256",
+                "name": "tokensAmountToAdd",
+                "type": "uint256"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "deadline",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "v",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "bytes32",
+                    "name": "r",
+                    "type": "bytes32"
+                  },
+                  {
+                    "internalType": "bytes32",
+                    "name": "s",
+                    "type": "bytes32"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.Permit",
+                "name": "permit",
+                "type": "tuple"
+              },
+              {
+                "internalType": "address payable",
+                "name": "payee",
+                "type": "address"
+              }
+            ],
+            "name": "makeCommitmentWithExtraReserve",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "withdrawFromReserve",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes32",
+                "name": "secret",
+                "type": "bytes32"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint64",
+                    "name": "position",
+                    "type": "uint64"
+                  },
+                  {
+                    "internalType": "enum UsingStratagemsTypes.Color",
+                    "name": "color",
+                    "type": "uint8"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.Move[]",
+                "name": "moves",
+                "type": "tuple[]"
+              },
+              {
+                "internalType": "bytes24",
+                "name": "furtherMoves",
+                "type": "bytes24"
+              }
+            ],
+            "name": "acknowledgeMissedReveal",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "acknowledgeMissedRevealByBurningAllReserve",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "player",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes32",
+                "name": "secret",
+                "type": "bytes32"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint64",
+                    "name": "position",
+                    "type": "uint64"
+                  },
+                  {
+                    "internalType": "enum UsingStratagemsTypes.Color",
+                    "name": "color",
+                    "type": "uint8"
+                  }
+                ],
+                "internalType": "struct UsingStratagemsTypes.Move[]",
+                "name": "moves",
+                "type": "tuple[]"
+              },
+              {
+                "internalType": "bytes24",
+                "name": "furtherMoves",
+                "type": "bytes24"
+              },
+              {
+                "internalType": "bool",
+                "name": "useReserve",
+                "type": "bool"
+              },
+              {
+                "internalType": "address payable",
+                "name": "payee",
+                "type": "address"
+              }
+            ],
+            "name": "reveal",
+            "outputs": [],
+            "stateMutability": "payable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint64",
+                "name": "position",
+                "type": "uint64"
+              }
+            ],
+            "name": "poke",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint64[]",
+                "name": "positions",
+                "type": "uint64[]"
+              }
+            ],
+            "name": "pokeMultiple",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "addr",
+                "type": "address"
+              }
+            ],
+            "name": "InvalidAddress",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "NonExistentToken",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "NonceOverflow",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "NotAuthorized",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "NotImplemented",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "provided",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "currentOwner",
+                "type": "address"
+              }
+            ],
+            "name": "NotOwner",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "TransferRejected",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "operator",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "approve",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              }
+            ],
+            "name": "balanceOf",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "getApproved",
+            "outputs": [
+              {
+                "internalType": "address",
+                "name": "operator",
+                "type": "address"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "operator",
+                "type": "address"
+              }
+            ],
+            "name": "isApprovedForAll",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "name",
+            "outputs": [
+              {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256[]",
+                "name": "tokenIDs",
+                "type": "uint256[]"
+              }
+            ],
+            "name": "ownerAndLastTransferBlockNumberList",
+            "outputs": [
+              {
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "lastTransferBlockNumber",
+                    "type": "uint256"
+                  }
+                ],
+                "internalType": "struct IERC721WithBlocknumber.OwnerData[]",
+                "name": "ownersData",
+                "type": "tuple[]"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "ownerAndLastTransferBlockNumberOf",
+            "outputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "blockNumber",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "ownerOf",
+            "outputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "safeTransferFrom",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "operator",
+                "type": "address"
+              },
+              {
+                "internalType": "bool",
+                "name": "approved",
+                "type": "bool"
+              }
+            ],
+            "name": "setApprovalForAll",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "bytes4",
+                "name": "interfaceID",
+                "type": "bytes4"
+              }
+            ],
+            "name": "supportsInterface",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "symbol",
+            "outputs": [
+              {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "tokenURI",
+            "outputs": [
+              {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "tokenID",
+                "type": "uint256"
+              }
+            ],
+            "name": "transferFrom",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "components": [
+                  {
+                    "internalType": "uint64",
+                    "name": "position",
+                    "type": "uint64"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "lastEpochUpdate",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "uint24",
+                    "name": "epochWhenTokenIsAdded",
+                    "type": "uint24"
+                  },
+                  {
+                    "internalType": "enum UsingStratagemsTypes.Color",
+                    "name": "color",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "life",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "int8",
+                    "name": "delta",
+                    "type": "int8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "enemyMap",
+                    "type": "uint8"
+                  }
+                ],
+                "indexed": false,
+                "internalType": "struct UsingStratagemsDebugTypes.DebugCell[]",
+                "name": "cells",
+                "type": "tuple[]"
+              }
+            ],
+            "name": "ForceCells",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": false,
+                "internalType": "uint24",
+                "name": "epoch",
+                "type": "uint24"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint64",
+                    "name": "position",
+                    "type": "uint64"
+                  },
+                  {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "enum UsingStratagemsTypes.Color",
+                    "name": "color",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "life",
+                    "type": "uint8"
+                  },
+                  {
+                    "internalType": "uint8",
+                    "name": "stake",
+                    "type": "uint8"
+                  }
+                ],
+                "indexed": false,
+                "internalType": "struct UsingStratagemsDebugTypes.SimpleCell[]",
+                "name": "cells",
+                "type": "tuple[]"
+              }
+            ],
+            "name": "ForceSimpleCells",
+            "type": "event"
+          }
+        ],
+        "address": "0xb99d938a722df8984722ab38732533130b4f3ec4",
+        "startBlock": 11681933
+      },
+      {
+        "abi": [
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "initialOwner",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "initialBenefieciary",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "constructor"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "currentTime",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "deadline",
+                "type": "uint256"
+              }
+            ],
+            "name": "DeadlineOver",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "addr",
+                "type": "address"
+              }
+            ],
+            "name": "InvalidAddress",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "provided",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "expected",
+                "type": "uint256"
+              }
+            ],
+            "name": "InvalidMsgValue",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "InvalidSignature",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "provided",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "expected",
+                "type": "uint256"
+              }
+            ],
+            "name": "InvalidTotalAmount",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "NotAuthorized",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "currentAllowance",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "expected",
+                "type": "uint256"
+              }
+            ],
+            "name": "NotAuthorizedAllowance",
+            "type": "error"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "uint256",
+                "name": "currentBalance",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "expected",
+                "type": "uint256"
+              }
+            ],
+            "name": "NotEnoughTokens",
+            "type": "error"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "name": "Approval",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": false,
+                "internalType": "address",
+                "name": "generator",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "bool",
+                "name": "enabled",
+                "type": "bool"
+              }
+            ],
+            "name": "GeneratorEnabled",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "previousOwner",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+              }
+            ],
+            "name": "OwnershipTransferred",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "name": "Transfer",
+            "type": "event"
+          },
+          {
+            "inputs": [],
+            "name": "DOMAIN_SEPARATOR",
+            "outputs": [
+              {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+              }
+            ],
+            "name": "allowance",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "approve",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "bytes",
+                "name": "data",
+                "type": "bytes"
+              }
+            ],
+            "name": "approveAndCall",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              }
+            ],
+            "name": "balanceOf",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "decimals",
+            "outputs": [
+              {
+                "internalType": "uint8",
+                "name": "",
+                "type": "uint8"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address payable[]",
+                "name": "tos",
+                "type": "address[]"
+              },
+              {
+                "internalType": "uint256",
+                "name": "totalAmount",
+                "type": "uint256"
+              }
+            ],
+            "name": "distributeAlongWithETH",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "payable",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "eip712Domain",
+            "outputs": [
+              {
+                "internalType": "bytes1",
+                "name": "fields",
+                "type": "bytes1"
+              },
+              {
+                "internalType": "string",
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "internalType": "string",
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "internalType": "uint256",
+                "name": "chainID",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "verifyingContract",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes32",
+                "name": "salt",
+                "type": "bytes32"
+              },
+              {
+                "internalType": "uint256[]",
+                "name": "extensions",
+                "type": "uint256[]"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              }
+            ],
+            "name": "generators",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "name",
+            "outputs": [
+              {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              }
+            ],
+            "name": "nonces",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "owner",
+            "outputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint8",
+                "name": "v",
+                "type": "uint8"
+              },
+              {
+                "internalType": "bytes32",
+                "name": "r",
+                "type": "bytes32"
+              },
+              {
+                "internalType": "bytes32",
+                "name": "s",
+                "type": "bytes32"
+              }
+            ],
+            "name": "permit",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "reward",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "generator",
+                "type": "address"
+              },
+              {
+                "internalType": "bool",
+                "name": "enabled",
+                "type": "bool"
+              }
+            ],
+            "name": "setGenerator",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "symbol",
+            "outputs": [
+              {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "totalSupply",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "transfer",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address payable",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "transferAlongWithETH",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "payable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "bytes",
+                "name": "data",
+                "type": "bytes"
+              }
+            ],
+            "name": "transferAndCall",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "transferFrom",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "bytes",
+                "name": "data",
+                "type": "bytes"
+              }
+            ],
+            "name": "transferFromAndCall",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "forAddress",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "bytes",
+                "name": "data",
+                "type": "bytes"
+              }
+            ],
+            "name": "transferOnBehalfAndCall",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "newOwner",
+                "type": "address"
+              }
+            ],
+            "name": "transferOwnership",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "contract IERC20",
+                "name": "token",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              }
+            ],
+            "name": "withdrawERC20",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          }
+        ],
+        "address": "0xd1b76de5372bc47fc4b7ad918f11937fc17b7b46",
+        "startBlock": 11681917
+      },
+      {
+        "abi": [
+          {
+            "inputs": [
+              {
+                "internalType": "contract IReward",
+                "name": "rewardAddress",
+                "type": "address"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint256",
+                    "name": "rewardRateMillionth",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "fixedRewardRateThousandsMillionth",
+                    "type": "uint256"
+                  }
+                ],
+                "internalType": "struct RewardsGenerator.Config",
+                "name": "config",
+                "type": "tuple"
+              },
+              {
+                "internalType": "address[]",
+                "name": "initialGames",
+                "type": "address[]"
+              }
+            ],
+            "stateMutability": "nonpayable",
+            "type": "constructor"
+          },
+          {
+            "inputs": [],
+            "name": "NonTransferable",
+            "type": "error"
+          },
+          {
+            "inputs": [],
+            "name": "NotAuthorized",
+            "type": "error"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "spender",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "name": "Approval",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "game",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "weight",
+                "type": "uint256"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+              }
+            ],
+            "name": "GameEnabled",
+            "type": "event"
+          },
+          {
+            "anonymous": false,
+            "inputs": [
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "indexed": true,
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "value",
+                "type": "uint256"
+              }
+            ],
+            "name": "Transfer",
+            "type": "event"
+          },
+          {
+            "inputs": [],
+            "name": "REWARD",
+            "outputs": [
+              {
+                "internalType": "contract IReward",
+                "name": "",
+                "type": "address"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "add",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              }
+            ],
+            "name": "allowance",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "name": "approve",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              }
+            ],
+            "name": "balanceOf",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              }
+            ],
+            "name": "claimFixedRewards",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              }
+            ],
+            "name": "claimSharedPoolRewards",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "decimals",
+            "outputs": [
+              {
+                "internalType": "uint8",
+                "name": "",
+                "type": "uint8"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              }
+            ],
+            "name": "earnedFromFixedRate",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address[]",
+                "name": "accounts",
+                "type": "address[]"
+              }
+            ],
+            "name": "earnedFromFixedRateMultipleAccounts",
+            "outputs": [
+              {
+                "internalType": "uint256[]",
+                "name": "result",
+                "type": "uint256[]"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              }
+            ],
+            "name": "earnedFromPoolRate",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address[]",
+                "name": "accounts",
+                "type": "address[]"
+              }
+            ],
+            "name": "earnedFromPoolRateMultipleAccounts",
+            "outputs": [
+              {
+                "internalType": "uint256[]",
+                "name": "result",
+                "type": "uint256[]"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "game",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "weight",
+                "type": "uint256"
+              }
+            ],
+            "name": "enableGame",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              }
+            ],
+            "name": "games",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "getTotalRewardPerPointWithPrecision24",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "from",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "to",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "move",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "name",
+            "outputs": [
+              {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "contract IReward",
+                "name": "rewardAddress",
+                "type": "address"
+              },
+              {
+                "components": [
+                  {
+                    "internalType": "uint256",
+                    "name": "rewardRateMillionth",
+                    "type": "uint256"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "fixedRewardRateThousandsMillionth",
+                    "type": "uint256"
+                  }
+                ],
+                "internalType": "struct RewardsGenerator.Config",
+                "name": "config",
+                "type": "tuple"
+              },
+              {
+                "internalType": "address[]",
+                "name": "initialGames",
+                "type": "address[]"
+              }
+            ],
+            "name": "postUpgrade",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ],
+            "name": "remove",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "symbol",
+            "outputs": [
+              {
+                "internalType": "string",
+                "name": "",
+                "type": "string"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "totalSupply",
+            "outputs": [
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "name": "transfer",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+              }
+            ],
+            "name": "transferFrom",
+            "outputs": [
+              {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+              }
+            ],
+            "stateMutability": "pure",
+            "type": "function"
+          },
+          {
+            "inputs": [],
+            "name": "update",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          }
+        ],
+        "address": "0xbe2f7c303b53f16f447fd82bf549e65185bf3477",
+        "startBlock": 11681921
+      }
+    ]
+  },
+  "lastSync": {
+    "context": {
+      "source": [
+        {
+          "startBlock": 0,
+          "hash": "h1qt190k"
+        }
+      ],
+      "config": "h10lkvwl",
+      "processor": ""
+    },
+    "latestBlock": 11800000,
+    "lastFromBlock": 11681917,
+    "lastToBlock": 11800000,
+    "unconfirmedBlocks": []
+  },
+  "eventStream": [
+    {
+      "blockNumber": 11681917,
+      "blockHash": "0x11c10128ff51b73086fb1b7eb912339fd47e497108d391d542d35a0e7206c862",
+      "transactionIndex": 6,
+      "removed": false,
+      "address": "0xd1b76De5372BC47Fc4B7ad918F11937fc17b7B46",
+      "transactionHash": "0x11492feb810aab7e1893a9509c622d56dc7784ae422fa4d455cf3cfc70a6f4d6",
+      "logIndex": 10,
+      "blockTimestamp": 1710153181,
+      "args": {
+        "previousOwner": "0x0000000000000000000000000000000000000000",
+        "newOwner": "0xbE19B59E8C588d68f475A407C7BA5fE813AEb792"
+      },
+      "eventName": "OwnershipTransferred"
+    },
+    {
+      "blockNumber": 11681917,
+      "blockHash": "0x11c10128ff51b73086fb1b7eb912339fd47e497108d391d542d35a0e7206c862",
+      "transactionIndex": 6,
+      "removed": false,
+      "address": "0xd1b76De5372BC47Fc4B7ad918F11937fc17b7B46",
+      "transactionHash": "0x11492feb810aab7e1893a9509c622d56dc7784ae422fa4d455cf3cfc70a6f4d6",
+      "logIndex": 11,
+      "blockTimestamp": 1710153181,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0xab1346cf31B343dDFbE03EfFeE19baB88C410514",
+        "value": "1000000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11681921,
+      "blockHash": "0x3d44f9db9eab5fb8a83becc7decdd200da0a6c42525f4335c4eed908d77a3288",
+      "transactionIndex": 9,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x68a5b706b0788c5a82b00946c3ae24b7dfae86edfd0d3478e7f39529367c5f02",
+      "logIndex": 35,
+      "blockTimestamp": 1710153189,
+      "decodeError": "parsing did not return any results"
+    },
+    {
+      "blockNumber": 11681935,
+      "blockHash": "0x9fc2f22c359df075e04ef8217d3977270ccac5260ca9ad23dd38976e521126cf",
+      "transactionIndex": 10,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0xe5df0741d61b03ecfc4aa7da099d9ae3759f8253c61fe3698b6ebb8f9fbf1937",
+      "logIndex": 32,
+      "blockTimestamp": 1710153217,
+      "decodeError": "parsing did not return any results"
+    },
+    {
+      "blockNumber": 11681937,
+      "blockHash": "0x4579320bc1559b3350a05013d0bb390e7102483a849af285d5e332baa8626e7f",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0xe2032c052c156d1a17806c720c03c816f387558929db91fa1083e9bc4b6a3d6d",
+      "logIndex": 3,
+      "blockTimestamp": 1710153221,
+      "args": {
+        "game": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+        "weight": "1000000000000000000n",
+        "timestamp": "1710153221n"
+      },
+      "eventName": "GameEnabled"
+    },
+    {
+      "blockNumber": 11682397,
+      "blockHash": "0x756d096b77c83a308a5a587757335ce0bf892b26fa908ed675e37d81f899449e",
+      "transactionIndex": 6,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0xb86271d02843c3b07c404f079da1ef9cd2dcd1668238392db91a1b4c22990ec2",
+      "logIndex": 4,
+      "blockTimestamp": 1710154141,
+      "args": {
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "epoch": 19795,
+        "commitmentHash": "0x3c2c8c8a6eb9b1826ddf31df7d9bd7c2b48f23c5f6b9c9df"
+      },
+      "eventName": "CommitmentMade"
+    },
+    {
+      "blockNumber": 11682397,
+      "blockHash": "0x756d096b77c83a308a5a587757335ce0bf892b26fa908ed675e37d81f899449e",
+      "transactionIndex": 6,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0xb86271d02843c3b07c404f079da1ef9cd2dcd1668238392db91a1b4c22990ec2",
+      "logIndex": 6,
+      "blockTimestamp": 1710154141,
+      "args": {
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "amountDeposited": "6000000000000000000n",
+        "newAmount": "6000000000000000000n"
+      },
+      "eventName": "ReserveDeposited"
+    },
+    {
+      "blockNumber": 11683311,
+      "blockHash": "0xc33690e55ace4ca4cabe6961900e3b6a8f1da3572bff61e6e51d7661b3ef304c",
+      "transactionIndex": 2,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0xa66eafa7e68719c00aec314d42fe2c3d152c4fe5136d948ad248a72c6112c908",
+      "logIndex": 0,
+      "blockTimestamp": 1710155969,
+      "args": {
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "epoch": 19795,
+        "commitmentHash": "0xaaa2b70bb49c9f51ff719915aa775dd7b90c61faa6ba4948"
+      },
+      "eventName": "CommitmentMade"
+    },
+    {
+      "blockNumber": 11683404,
+      "blockHash": "0x3c6de093dd159fa321bfed1f6d9f0d0177c4d4dbfc62ced600b068d7e979fa7e",
+      "transactionIndex": 2,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x444a4d593381253d240ffa1b4ed8c5f86b612160dc59046d2c775f83d8380f38",
+      "logIndex": 1,
+      "blockTimestamp": 1710156155,
+      "args": {
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "epoch": 19795,
+        "commitmentHash": "0x6ddebe134c20b58cdccd7f84aa459eb1c0007aaaa29e0627"
+      },
+      "eventName": "CommitmentMade"
+    },
+    {
+      "blockNumber": 11685648,
+      "blockHash": "0xd0f0e807fca27847dc3ffca3d0e7af3cf26b4e8a8b4fc2dcd7893ba572144d86",
+      "transactionIndex": 4,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0xc1dd5797d73265c47ef7b3ba659d298fbf1b9cb626193ae13be10af17a7cec1d",
+      "logIndex": 17,
+      "blockTimestamp": 1710160643,
+      "args": {
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "epoch": 19795,
+        "commitmentHash": "0xba57e645426d688a96c1fd3e38b437c26ce09e322b5a69c6"
+      },
+      "eventName": "CommitmentMade"
+    },
+    {
+      "blockNumber": 11685648,
+      "blockHash": "0xd0f0e807fca27847dc3ffca3d0e7af3cf26b4e8a8b4fc2dcd7893ba572144d86",
+      "transactionIndex": 4,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0xc1dd5797d73265c47ef7b3ba659d298fbf1b9cb626193ae13be10af17a7cec1d",
+      "logIndex": 19,
+      "blockTimestamp": 1710160643,
+      "args": {
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "amountDeposited": "4000000000000000000n",
+        "newAmount": "10000000000000000000n"
+      },
+      "eventName": "ReserveDeposited"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 20,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "1n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 21,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 22,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "1n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 23,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "4294967297n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 24,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 25,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "4294967297n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 26,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "4294967296n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 27,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 28,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "4294967296n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 29,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "8589934591n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 30,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 31,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "8589934591n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 32,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "4294967295n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 33,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 34,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "4294967295n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 35,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "0n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 36,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 37,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "0n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 38,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "4294967294n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 39,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 40,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "4294967294n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 41,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "8589934590n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 42,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 43,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "8589934590n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 44,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "4294967293n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 45,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 46,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "4294967293n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 47,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "position": "8589934589n",
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "oldColor": 0,
+        "newColor": 1
+      },
+      "eventName": "MoveProcessed"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xbE2f7c303B53F16F447fD82bF549E65185bf3477",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 48,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "value": "1000000000000000000n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 49,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "from": "0x0000000000000000000000000000000000000000",
+        "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "tokenID": "8589934589n"
+      },
+      "eventName": "Transfer"
+    },
+    {
+      "blockNumber": 11704357,
+      "blockHash": "0x640b7f55e80d174e12c6294dbfcba7380e88455e3a99f3a23c8c71a04bbf41e4",
+      "transactionIndex": 5,
+      "removed": false,
+      "address": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
+      "transactionHash": "0x5fafd502aed6e430c3c9cabd209b61da8cd43cf174325c90adc3da8d0f8a5350",
+      "logIndex": 50,
+      "blockTimestamp": 1710198061,
+      "args": {
+        "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
+        "epoch": 19795,
+        "commitmentHash": "0xba57e645426d688a96c1fd3e38b437c26ce09e322b5a69c6",
+        "moves": [
+          {
+            "position": "1n",
+            "color": 1
+          },
+          {
+            "position": "4294967297n",
+            "color": 1
+          },
+          {
+            "position": "4294967296n",
+            "color": 1
+          },
+          {
+            "position": "8589934591n",
+            "color": 1
+          },
+          {
+            "position": "4294967295n",
+            "color": 1
+          },
+          {
+            "position": "0n",
+            "color": 1
+          },
+          {
+            "position": "4294967294n",
+            "color": 1
+          },
+          {
+            "position": "8589934590n",
+            "color": 1
+          },
+          {
+            "position": "4294967293n",
+            "color": 1
+          },
+          {
+            "position": "8589934589n",
+            "color": 1
+          }
+        ],
+        "furtherMoves": "0x000000000000000000000000000000000000000000000000",
+        "newReserveAmount": "0n"
+      },
+      "eventName": "CommitmentRevealed"
+    }
+  ]
+}

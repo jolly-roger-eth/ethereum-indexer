@@ -1,0 +1,29 @@
+{
+	"name": "spike-sqlite-in-the-browser",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"description": "Evidence for work/notes/findings/sqlite-in-the-browser.md: does wasm SQLite ever beat the IndexedDB backend for the stratagems workload?",
+	"scripts": {
+		"capture": "node capture/capture-stratagems-base.mjs",
+		"port:verify": "tsx run/verify-port.ts",
+		"trace": "tsx run/build-traces.ts",
+		"patches": "tsx run/measure-patch-replay.ts",
+		"browser": "playwright test",
+		"all": "npm run port:verify && npm run trace && npm run patches && npm run browser"
+	},
+	"devDependencies": {
+		"@libsql/client": "^0.17.4",
+		"@playwright/test": "^1.60.0",
+		"@sqlite.org/sqlite-wasm": "3.53.0-build1",
+		"@types/node": "^22.0.0",
+		"esbuild": "^0.28.0",
+		"idb-keyval": "^6.2.2",
+		"named-logs": "^0.4.1",
+		"playwright-browser-harness": "^0.3.0",
+		"remote-sql-libsql": "^0.0.7",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.0",
+		"viem": "^2.52.0"
+	}
+}

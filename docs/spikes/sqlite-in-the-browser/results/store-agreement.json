@@ -1,0 +1,10 @@
+{
+  "workload": "real: stratagems alpha1 on Base",
+  "blocks": 1042,
+  "mutations": 38192,
+  "rowsChecked": 4072,
+  "mismatches": [],
+  "asOfDisagreements": [],
+  "applyMsLibsqlInNode": 3173,
+  "ranAt": "2026-08-23T06:12:19.237Z"
+}

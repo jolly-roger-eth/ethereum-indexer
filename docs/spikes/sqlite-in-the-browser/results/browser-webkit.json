@@ -1,0 +1,5227 @@
+{
+  "project": "webkit",
+  "ranAt": "2026-08-22T19:41:19.188Z",
+  "runs": [
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "memory",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 2,
+              "rowsBefore": 0,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 2,
+              "blocks": 2,
+              "rowsBefore": 96,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 2,
+              "rowsBefore": 153,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 6,
+              "blocks": 2,
+              "rowsBefore": 235,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 2,
+              "rowsBefore": 319,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 10,
+              "blocks": 2,
+              "rowsBefore": 377,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            }
+          ],
+          "blocksPerSecond": null,
+          "rowsPerSecond": null,
+          "msPerBlock": 0,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 11,
+          "msPerAsOfRead": 0.005,
+          "revertDepth": 8
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 11
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 0
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          },
+          {
+            "label": "as-of(depth 11)",
+            "ms": 1
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 6
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 2,
+              "rowsBefore": 0,
+              "msPerBlock": 7,
+              "msPerMutation": 0.1458
+            },
+            {
+              "fromBlock": 2,
+              "blocks": 2,
+              "rowsBefore": 96,
+              "msPerBlock": 5,
+              "msPerMutation": 0.1754
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 2,
+              "rowsBefore": 153,
+              "msPerBlock": 7,
+              "msPerMutation": 0.1707
+            },
+            {
+              "fromBlock": 6,
+              "blocks": 2,
+              "rowsBefore": 235,
+              "msPerBlock": 7.5,
+              "msPerMutation": 0.17859999999999998
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 2,
+              "rowsBefore": 319,
+              "msPerBlock": 6,
+              "msPerMutation": 0.2069
+            },
+            {
+              "fromBlock": 10,
+              "blocks": 2,
+              "rowsBefore": 377,
+              "msPerBlock": 6.5,
+              "msPerMutation": 0.18569999999999998
+            }
+          ],
+          "blocksPerSecond": 153.8,
+          "rowsPerSecond": 5730.8,
+          "msPerBlock": 6.5,
+          "pointReads": 200,
+          "msPerPointRead": 0.155,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 11,
+          "msPerAsOfRead": 0.23,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 245,
+            "versions": 428,
+            "blocks": 12
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 13
+          },
+          {
+            "label": "open",
+            "ms": 14
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 78
+          },
+          {
+            "label": "point-reads",
+            "ms": 31
+          },
+          {
+            "label": "as-of(depth 11)",
+            "ms": 46
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 38
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 6
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 2
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned-cached",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 2,
+              "rowsBefore": 0,
+              "msPerBlock": 3,
+              "msPerMutation": 0.0625
+            },
+            {
+              "fromBlock": 2,
+              "blocks": 2,
+              "rowsBefore": 96,
+              "msPerBlock": 2.5,
+              "msPerMutation": 0.0877
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 2,
+              "rowsBefore": 153,
+              "msPerBlock": 3.5,
+              "msPerMutation": 0.0854
+            },
+            {
+              "fromBlock": 6,
+              "blocks": 2,
+              "rowsBefore": 235,
+              "msPerBlock": 4,
+              "msPerMutation": 0.0952
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 2,
+              "rowsBefore": 319,
+              "msPerBlock": 3.5,
+              "msPerMutation": 0.1207
+            },
+            {
+              "fromBlock": 10,
+              "blocks": 2,
+              "rowsBefore": 377,
+              "msPerBlock": 4.5,
+              "msPerMutation": 0.1286
+            }
+          ],
+          "blocksPerSecond": 279.1,
+          "rowsPerSecond": 10395.3,
+          "msPerBlock": 3.583,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 11,
+          "msPerAsOfRead": 0.215,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 245,
+            "versions": 428,
+            "blocks": 12
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 28
+          },
+          {
+            "label": "open",
+            "ms": 3
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 43
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          },
+          {
+            "label": "as-of(depth 11)",
+            "ms": 43
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 39
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 6
+          },
+          {
+            "label": "open",
+            "ms": 4
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-structured-clone",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 2,
+              "rowsBefore": 0,
+              "msPerBlock": 2,
+              "msPerMutation": 0.0417
+            },
+            {
+              "fromBlock": 2,
+              "blocks": 2,
+              "rowsBefore": 96,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.0175
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 2,
+              "rowsBefore": 153,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.012199999999999999
+            },
+            {
+              "fromBlock": 6,
+              "blocks": 2,
+              "rowsBefore": 235,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.0119
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 2,
+              "rowsBefore": 319,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.0172
+            },
+            {
+              "fromBlock": 10,
+              "blocks": 2,
+              "rowsBefore": 377,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.0143
+            }
+          ],
+          "blocksPerSecond": 1333.3,
+          "rowsPerSecond": 49666.7,
+          "msPerBlock": 0.75,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 11,
+          "asOfRefused": "RetentionUnavailableError: blob-structured-clone cannot answer as of block 12000000: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-structured-clone cannot revert: it keeps no history",
+          "blobBytes": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 32
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 9
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "blobRowsLoaded": 245,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 7
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 2
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-json",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 2,
+              "rowsBefore": 0,
+              "msPerBlock": 2.5,
+              "msPerMutation": 0.0521
+            },
+            {
+              "fromBlock": 2,
+              "blocks": 2,
+              "rowsBefore": 96,
+              "msPerBlock": 1,
+              "msPerMutation": 0.0351
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 2,
+              "rowsBefore": 153,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.012199999999999999
+            },
+            {
+              "fromBlock": 6,
+              "blocks": 2,
+              "rowsBefore": 235,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.0119
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 2,
+              "rowsBefore": 319,
+              "msPerBlock": 1,
+              "msPerMutation": 0.0345
+            },
+            {
+              "fromBlock": 10,
+              "blocks": 2,
+              "rowsBefore": 377,
+              "msPerBlock": 0.5,
+              "msPerMutation": 0.0143
+            }
+          ],
+          "blocksPerSecond": 1000,
+          "rowsPerSecond": 37250,
+          "msPerBlock": 1,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 11,
+          "asOfRefused": "RetentionUnavailableError: blob-json cannot answer as of block 12000000: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-json cannot revert: it keeps no history",
+          "blobBytes": 31243
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 27
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 12
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "blobRowsLoaded": 245,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 6
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 11
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": true,
+        "hasSharedArrayBuffer": true,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 59.040000000000006,
+            "openMs": 2.519999999999996,
+            "migrateMs": 37.3
+          },
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 2,
+              "rowsBefore": 0,
+              "msPerBlock": 12.52,
+              "msPerMutation": 0.26080000000000003
+            },
+            {
+              "fromBlock": 2,
+              "blocks": 2,
+              "rowsBefore": 96,
+              "msPerBlock": 3.71,
+              "msPerMutation": 0.13019999999999998
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 2,
+              "rowsBefore": 153,
+              "msPerBlock": 5.7,
+              "msPerMutation": 0.139
+            },
+            {
+              "fromBlock": 6,
+              "blocks": 2,
+              "rowsBefore": 235,
+              "msPerBlock": 9.75,
+              "msPerMutation": 0.2321
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 2,
+              "rowsBefore": 319,
+              "msPerBlock": 3.86,
+              "msPerMutation": 0.1331
+            },
+            {
+              "fromBlock": 10,
+              "blocks": 2,
+              "rowsBefore": 377,
+              "msPerBlock": 7.16,
+              "msPerMutation": 0.2046
+            }
+          ],
+          "blocksPerSecond": 140.4,
+          "rowsPerSecond": 5230.5,
+          "msPerBlock": 7.122,
+          "pointReads": 200,
+          "msPerPointRead": 0.1244,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 11,
+          "msPerAsOfRead": 0.0829,
+          "revertDepth": 8,
+          "sqliteBytes": 491520
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 23.28
+          },
+          {
+            "label": "open",
+            "ms": 125.78
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 85.46
+          },
+          {
+            "label": "point-reads",
+            "ms": 24.879999999999995
+          },
+          {
+            "label": "as-of(depth 11)",
+            "ms": 16.580000000000013
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 4.060000000000002
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 38.84,
+            "openMs": 2.3000000000000043,
+            "migrateMs": 33.78
+          },
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 5.759999999999998
+          },
+          {
+            "label": "open",
+            "ms": 97.26
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 1.3799999999999955
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 10
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:37839/bundle.js:442:42"
+        ]
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 5
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:37839/bundle.js:442:42"
+        ]
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "memory",
+      "size": "small",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 4,
+              "rowsBefore": 0,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 4,
+              "rowsBefore": 240,
+              "msPerBlock": 0.25,
+              "msPerMutation": 0.0040999999999999995
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 4,
+              "rowsBefore": 486,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 4,
+              "rowsBefore": 763,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 16,
+              "blocks": 4,
+              "rowsBefore": 1178,
+              "msPerBlock": 0.25,
+              "msPerMutation": 0.0026
+            },
+            {
+              "fromBlock": 20,
+              "blocks": 4,
+              "rowsBefore": 1562,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 4,
+              "rowsBefore": 1927,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 28,
+              "blocks": 4,
+              "rowsBefore": 2313,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            },
+            {
+              "fromBlock": 32,
+              "blocks": 4,
+              "rowsBefore": 2697,
+              "msPerBlock": 0.25,
+              "msPerMutation": 0.0027
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 2,
+              "rowsBefore": 3062,
+              "msPerBlock": 0,
+              "msPerMutation": 0
+            }
+          ],
+          "blocksPerSecond": 12666.7,
+          "rowsPerSecond": 1083000,
+          "msPerBlock": 0.079,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 37,
+          "msPerAsOfRead": 0,
+          "revertDepth": 8
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 27
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 3
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          },
+          {
+            "label": "as-of(depth 37)",
+            "ms": 0
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 19
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned",
+      "size": "small",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 4,
+              "rowsBefore": 0,
+              "msPerBlock": 9.75,
+              "msPerMutation": 0.1625
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 4,
+              "rowsBefore": 240,
+              "msPerBlock": 10.25,
+              "msPerMutation": 0.1667
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 4,
+              "rowsBefore": 486,
+              "msPerBlock": 11.75,
+              "msPerMutation": 0.1697
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 4,
+              "rowsBefore": 763,
+              "msPerBlock": 20.75,
+              "msPerMutation": 0.2
+            },
+            {
+              "fromBlock": 16,
+              "blocks": 4,
+              "rowsBefore": 1178,
+              "msPerBlock": 19.25,
+              "msPerMutation": 0.2005
+            },
+            {
+              "fromBlock": 20,
+              "blocks": 4,
+              "rowsBefore": 1562,
+              "msPerBlock": 19.5,
+              "msPerMutation": 0.2137
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 4,
+              "rowsBefore": 1927,
+              "msPerBlock": 21.25,
+              "msPerMutation": 0.22019999999999998
+            },
+            {
+              "fromBlock": 28,
+              "blocks": 4,
+              "rowsBefore": 2313,
+              "msPerBlock": 20.25,
+              "msPerMutation": 0.2109
+            },
+            {
+              "fromBlock": 32,
+              "blocks": 4,
+              "rowsBefore": 2697,
+              "msPerBlock": 19.25,
+              "msPerMutation": 0.211
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 2,
+              "rowsBefore": 3062,
+              "msPerBlock": 17.5,
+              "msPerMutation": 0.18719999999999998
+            }
+          ],
+          "blocksPerSecond": 59.1,
+          "rowsPerSecond": 5052.9,
+          "msPerBlock": 16.921,
+          "pointReads": 200,
+          "msPerPointRead": 0.16,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 37,
+          "msPerAsOfRead": 0.205,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 1258,
+            "versions": 3187,
+            "blocks": 38
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 32
+          },
+          {
+            "label": "open",
+            "ms": 4
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 643
+          },
+          {
+            "label": "point-reads",
+            "ms": 32
+          },
+          {
+            "label": "as-of(depth 37)",
+            "ms": 41
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 118
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 29
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned-cached",
+      "size": "small",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 4,
+              "rowsBefore": 0,
+              "msPerBlock": 3.75,
+              "msPerMutation": 0.0625
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 4,
+              "rowsBefore": 240,
+              "msPerBlock": 4.75,
+              "msPerMutation": 0.0772
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 4,
+              "rowsBefore": 486,
+              "msPerBlock": 6.5,
+              "msPerMutation": 0.09390000000000001
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 4,
+              "rowsBefore": 763,
+              "msPerBlock": 10,
+              "msPerMutation": 0.0964
+            },
+            {
+              "fromBlock": 16,
+              "blocks": 4,
+              "rowsBefore": 1178,
+              "msPerBlock": 9.5,
+              "msPerMutation": 0.099
+            },
+            {
+              "fromBlock": 20,
+              "blocks": 4,
+              "rowsBefore": 1562,
+              "msPerBlock": 9.5,
+              "msPerMutation": 0.1041
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 4,
+              "rowsBefore": 1927,
+              "msPerBlock": 9.75,
+              "msPerMutation": 0.101
+            },
+            {
+              "fromBlock": 28,
+              "blocks": 4,
+              "rowsBefore": 2313,
+              "msPerBlock": 10.75,
+              "msPerMutation": 0.112
+            },
+            {
+              "fromBlock": 32,
+              "blocks": 4,
+              "rowsBefore": 2697,
+              "msPerBlock": 10.75,
+              "msPerMutation": 0.1178
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 2,
+              "rowsBefore": 3062,
+              "msPerBlock": 10,
+              "msPerMutation": 0.107
+            }
+          ],
+          "blocksPerSecond": 118.4,
+          "rowsPerSecond": 10121.5,
+          "msPerBlock": 8.447,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 37,
+          "msPerAsOfRead": 0.185,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 1258,
+            "versions": 3187,
+            "blocks": 38
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 48
+          },
+          {
+            "label": "open",
+            "ms": 4
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 321
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          },
+          {
+            "label": "as-of(depth 37)",
+            "ms": 37
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 113
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 28
+          },
+          {
+            "label": "open",
+            "ms": 11
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-structured-clone",
+      "size": "small",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 4,
+              "rowsBefore": 0,
+              "msPerBlock": 1.25,
+              "msPerMutation": 0.0208
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 4,
+              "rowsBefore": 240,
+              "msPerBlock": 0.75,
+              "msPerMutation": 0.012199999999999999
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 4,
+              "rowsBefore": 486,
+              "msPerBlock": 1,
+              "msPerMutation": 0.0144
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 4,
+              "rowsBefore": 763,
+              "msPerBlock": 0.75,
+              "msPerMutation": 0.0072
+            },
+            {
+              "fromBlock": 16,
+              "blocks": 4,
+              "rowsBefore": 1178,
+              "msPerBlock": 1,
+              "msPerMutation": 0.0104
+            },
+            {
+              "fromBlock": 20,
+              "blocks": 4,
+              "rowsBefore": 1562,
+              "msPerBlock": 1,
+              "msPerMutation": 0.011
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 4,
+              "rowsBefore": 1927,
+              "msPerBlock": 1.25,
+              "msPerMutation": 0.013
+            },
+            {
+              "fromBlock": 28,
+              "blocks": 4,
+              "rowsBefore": 2313,
+              "msPerBlock": 1.25,
+              "msPerMutation": 0.013
+            },
+            {
+              "fromBlock": 32,
+              "blocks": 4,
+              "rowsBefore": 2697,
+              "msPerBlock": 1.5,
+              "msPerMutation": 0.016399999999999998
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 2,
+              "rowsBefore": 3062,
+              "msPerBlock": 1.5,
+              "msPerMutation": 0.016
+            }
+          ],
+          "blocksPerSecond": 904.8,
+          "rowsPerSecond": 77357.1,
+          "msPerBlock": 1.105,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 37,
+          "asOfRefused": "RetentionUnavailableError: blob-structured-clone cannot answer as of block 12000000: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-structured-clone cannot revert: it keeps no history",
+          "blobBytes": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 56
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 42
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "blobRowsLoaded": 1258,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 31
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 2
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-json",
+      "size": "small",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 4,
+              "rowsBefore": 0,
+              "msPerBlock": 1.75,
+              "msPerMutation": 0.0292
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 4,
+              "rowsBefore": 240,
+              "msPerBlock": 0.75,
+              "msPerMutation": 0.012199999999999999
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 4,
+              "rowsBefore": 486,
+              "msPerBlock": 0.75,
+              "msPerMutation": 0.0108
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 4,
+              "rowsBefore": 763,
+              "msPerBlock": 1.25,
+              "msPerMutation": 0.012
+            },
+            {
+              "fromBlock": 16,
+              "blocks": 4,
+              "rowsBefore": 1178,
+              "msPerBlock": 1,
+              "msPerMutation": 0.0104
+            },
+            {
+              "fromBlock": 20,
+              "blocks": 4,
+              "rowsBefore": 1562,
+              "msPerBlock": 1.25,
+              "msPerMutation": 0.013699999999999999
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 4,
+              "rowsBefore": 1927,
+              "msPerBlock": 1,
+              "msPerMutation": 0.0104
+            },
+            {
+              "fromBlock": 28,
+              "blocks": 4,
+              "rowsBefore": 2313,
+              "msPerBlock": 1.25,
+              "msPerMutation": 0.013
+            },
+            {
+              "fromBlock": 32,
+              "blocks": 4,
+              "rowsBefore": 2697,
+              "msPerBlock": 1.25,
+              "msPerMutation": 0.013699999999999999
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 2,
+              "rowsBefore": 3062,
+              "msPerBlock": 2,
+              "msPerMutation": 0.0214
+            }
+          ],
+          "blocksPerSecond": 844.4,
+          "rowsPerSecond": 72200,
+          "msPerBlock": 1.184,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 37,
+          "asOfRefused": "RetentionUnavailableError: blob-json cannot answer as of block 12000000: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-json cannot revert: it keeps no history",
+          "blobBytes": 170175
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 44
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 45
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "blobRowsLoaded": 1258,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 24
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 3
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs",
+      "size": "small",
+      "env": {
+        "crossOriginIsolated": true,
+        "hasSharedArrayBuffer": true,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 52.84,
+            "openMs": 2.1200000000000045,
+            "migrateMs": 32
+          },
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 4,
+              "rowsBefore": 0,
+              "msPerBlock": 14.65,
+              "msPerMutation": 0.2442
+            },
+            {
+              "fromBlock": 4,
+              "blocks": 4,
+              "rowsBefore": 240,
+              "msPerBlock": 8.415,
+              "msPerMutation": 0.1368
+            },
+            {
+              "fromBlock": 8,
+              "blocks": 4,
+              "rowsBefore": 486,
+              "msPerBlock": 9.515,
+              "msPerMutation": 0.1374
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 4,
+              "rowsBefore": 763,
+              "msPerBlock": 8.72,
+              "msPerMutation": 0.084
+            },
+            {
+              "fromBlock": 16,
+              "blocks": 4,
+              "rowsBefore": 1178,
+              "msPerBlock": 8.74,
+              "msPerMutation": 0.091
+            },
+            {
+              "fromBlock": 20,
+              "blocks": 4,
+              "rowsBefore": 1562,
+              "msPerBlock": 6.42,
+              "msPerMutation": 0.0704
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 4,
+              "rowsBefore": 1927,
+              "msPerBlock": 6.405,
+              "msPerMutation": 0.0664
+            },
+            {
+              "fromBlock": 28,
+              "blocks": 4,
+              "rowsBefore": 2313,
+              "msPerBlock": 6.195,
+              "msPerMutation": 0.0645
+            },
+            {
+              "fromBlock": 32,
+              "blocks": 4,
+              "rowsBefore": 2697,
+              "msPerBlock": 5.33,
+              "msPerMutation": 0.0584
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 2,
+              "rowsBefore": 3062,
+              "msPerBlock": 6.18,
+              "msPerMutation": 0.06609999999999999
+            }
+          ],
+          "blocksPerSecond": 122.6,
+          "rowsPerSecond": 10480.6,
+          "msPerBlock": 8.158,
+          "pointReads": 200,
+          "msPerPointRead": 0.1054,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 37,
+          "msPerAsOfRead": 0.0705,
+          "revertDepth": 8,
+          "sqliteBytes": 802816
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 37.96
+          },
+          {
+            "label": "open",
+            "ms": 104.5
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 310
+          },
+          {
+            "label": "point-reads",
+            "ms": 21.08000000000004
+          },
+          {
+            "label": "as-of(depth 37)",
+            "ms": 14.100000000000023
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 3.8799999999999955
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 35.86,
+            "openMs": 2.0999999999999943,
+            "migrateMs": 38.17999999999999
+          },
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 23.120000000000005
+          },
+          {
+            "label": "open",
+            "ms": 94.97999999999999
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 4.680000000000007
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "small",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 27
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:39387/bundle.js:442:42"
+        ]
+      },
+      "reopen": {
+        "results": {
+          "blocks": 38,
+          "mutations": 3249,
+          "liveRows": 1258,
+          "versions": 2513
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 23
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:39387/bundle.js:442:42"
+        ]
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "memory",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 12,
+              "rowsBefore": 0,
+              "msPerBlock": 0.167,
+              "msPerMutation": 0.0014
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 12,
+              "rowsBefore": 1441,
+              "msPerBlock": 0.083,
+              "msPerMutation": 0.0006
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 12,
+              "rowsBefore": 3067,
+              "msPerBlock": 0.167,
+              "msPerMutation": 0.0008
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 12,
+              "rowsBefore": 5474,
+              "msPerBlock": 0.25,
+              "msPerMutation": 0.0013
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 12,
+              "rowsBefore": 7787,
+              "msPerBlock": 0.167,
+              "msPerMutation": 0.0009
+            },
+            {
+              "fromBlock": 60,
+              "blocks": 12,
+              "rowsBefore": 10015,
+              "msPerBlock": 0.083,
+              "msPerMutation": 0.0005
+            },
+            {
+              "fromBlock": 72,
+              "blocks": 12,
+              "rowsBefore": 12195,
+              "msPerBlock": 0.167,
+              "msPerMutation": 0.0009
+            },
+            {
+              "fromBlock": 84,
+              "blocks": 12,
+              "rowsBefore": 14387,
+              "msPerBlock": 0.083,
+              "msPerMutation": 0.0004
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 12,
+              "rowsBefore": 16620,
+              "msPerBlock": 0.167,
+              "msPerMutation": 0.0008
+            },
+            {
+              "fromBlock": 108,
+              "blocks": 8,
+              "rowsBefore": 19190,
+              "msPerBlock": 0.125,
+              "msPerMutation": 0.0008
+            }
+          ],
+          "blocksPerSecond": 6823.5,
+          "rowsPerSecond": 1206470.6,
+          "msPerBlock": 0.147,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.005,
+          "revertDepth": 8
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 122
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 17
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 1
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 5
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 107
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 12,
+              "rowsBefore": 0,
+              "msPerBlock": 19.333,
+              "msPerMutation": 0.161
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 12,
+              "rowsBefore": 1441,
+              "msPerBlock": 24.75,
+              "msPerMutation": 0.1827
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 12,
+              "rowsBefore": 3067,
+              "msPerBlock": 40.833,
+              "msPerMutation": 0.2036
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 12,
+              "rowsBefore": 5474,
+              "msPerBlock": 39.417,
+              "msPerMutation": 0.2045
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 12,
+              "rowsBefore": 7787,
+              "msPerBlock": 40.083,
+              "msPerMutation": 0.2159
+            },
+            {
+              "fromBlock": 60,
+              "blocks": 12,
+              "rowsBefore": 10015,
+              "msPerBlock": 39.75,
+              "msPerMutation": 0.21880000000000002
+            },
+            {
+              "fromBlock": 72,
+              "blocks": 12,
+              "rowsBefore": 12195,
+              "msPerBlock": 41.167,
+              "msPerMutation": 0.22540000000000002
+            },
+            {
+              "fromBlock": 84,
+              "blocks": 12,
+              "rowsBefore": 14387,
+              "msPerBlock": 41.333,
+              "msPerMutation": 0.2221
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 12,
+              "rowsBefore": 16620,
+              "msPerBlock": 47.5,
+              "msPerMutation": 0.22180000000000002
+            },
+            {
+              "fromBlock": 108,
+              "blocks": 8,
+              "rowsBefore": 19190,
+              "msPerBlock": 36.5,
+              "msPerMutation": 0.22119999999999998
+            }
+          ],
+          "blocksPerSecond": 27,
+          "rowsPerSecond": 4766.4,
+          "msPerBlock": 37.095,
+          "pointReads": 200,
+          "msPerPointRead": 0.175,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.19,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 7406,
+            "versions": 20475,
+            "blocks": 116
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 135
+          },
+          {
+            "label": "open",
+            "ms": 9
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 4303
+          },
+          {
+            "label": "point-reads",
+            "ms": 35
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 38
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 219
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 121
+          },
+          {
+            "label": "open",
+            "ms": 7
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned-cached",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 12,
+              "rowsBefore": 0,
+              "msPerBlock": 8.5,
+              "msPerMutation": 0.0708
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 12,
+              "rowsBefore": 1441,
+              "msPerBlock": 11.667,
+              "msPerMutation": 0.0861
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 12,
+              "rowsBefore": 3067,
+              "msPerBlock": 20.5,
+              "msPerMutation": 0.1022
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 12,
+              "rowsBefore": 5474,
+              "msPerBlock": 20.5,
+              "msPerMutation": 0.10640000000000001
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 12,
+              "rowsBefore": 7787,
+              "msPerBlock": 20.333,
+              "msPerMutation": 0.1095
+            },
+            {
+              "fromBlock": 60,
+              "blocks": 12,
+              "rowsBefore": 10015,
+              "msPerBlock": 20.25,
+              "msPerMutation": 0.1115
+            },
+            {
+              "fromBlock": 72,
+              "blocks": 12,
+              "rowsBefore": 12195,
+              "msPerBlock": 20.75,
+              "msPerMutation": 0.11359999999999999
+            },
+            {
+              "fromBlock": 84,
+              "blocks": 12,
+              "rowsBefore": 14387,
+              "msPerBlock": 21.833,
+              "msPerMutation": 0.1173
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 12,
+              "rowsBefore": 16620,
+              "msPerBlock": 25.917,
+              "msPerMutation": 0.121
+            },
+            {
+              "fromBlock": 108,
+              "blocks": 8,
+              "rowsBefore": 19190,
+              "msPerBlock": 19,
+              "msPerMutation": 0.1152
+            }
+          ],
+          "blocksPerSecond": 52.8,
+          "rowsPerSecond": 9344,
+          "msPerBlock": 18.922,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.195,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 7406,
+            "versions": 20475,
+            "blocks": 116
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 144
+          },
+          {
+            "label": "open",
+            "ms": 8
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 2195
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 39
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 215
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 109
+          },
+          {
+            "label": "open",
+            "ms": 58
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-structured-clone",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 12,
+              "rowsBefore": 0,
+              "msPerBlock": 1.583,
+              "msPerMutation": 0.0132
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 12,
+              "rowsBefore": 1441,
+              "msPerBlock": 2,
+              "msPerMutation": 0.0148
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 12,
+              "rowsBefore": 3067,
+              "msPerBlock": 3.083,
+              "msPerMutation": 0.0154
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 12,
+              "rowsBefore": 5474,
+              "msPerBlock": 3.417,
+              "msPerMutation": 0.0177
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 12,
+              "rowsBefore": 7787,
+              "msPerBlock": 4.583,
+              "msPerMutation": 0.0247
+            },
+            {
+              "fromBlock": 60,
+              "blocks": 12,
+              "rowsBefore": 10015,
+              "msPerBlock": 5.333,
+              "msPerMutation": 0.0294
+            },
+            {
+              "fromBlock": 72,
+              "blocks": 12,
+              "rowsBefore": 12195,
+              "msPerBlock": 5.667,
+              "msPerMutation": 0.031
+            },
+            {
+              "fromBlock": 84,
+              "blocks": 12,
+              "rowsBefore": 14387,
+              "msPerBlock": 7.583,
+              "msPerMutation": 0.040799999999999996
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 12,
+              "rowsBefore": 16620,
+              "msPerBlock": 8.667,
+              "msPerMutation": 0.0405
+            },
+            {
+              "fromBlock": 108,
+              "blocks": 8,
+              "rowsBefore": 19190,
+              "msPerBlock": 8.5,
+              "msPerMutation": 0.0515
+            }
+          ],
+          "blocksPerSecond": 202.4,
+          "rowsPerSecond": 35794.1,
+          "msPerBlock": 4.94,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "asOfRefused": "RetentionUnavailableError: blob-structured-clone cannot answer as of block 12000051: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-structured-clone cannot revert: it keeps no history",
+          "blobBytes": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 137
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 573
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "blobRowsLoaded": 7406,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 113
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 7
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-json",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 12,
+              "rowsBefore": 0,
+              "msPerBlock": 1.667,
+              "msPerMutation": 0.013900000000000001
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 12,
+              "rowsBefore": 1441,
+              "msPerBlock": 2.167,
+              "msPerMutation": 0.016
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 12,
+              "rowsBefore": 3067,
+              "msPerBlock": 3.167,
+              "msPerMutation": 0.0158
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 12,
+              "rowsBefore": 5474,
+              "msPerBlock": 3.917,
+              "msPerMutation": 0.020300000000000002
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 12,
+              "rowsBefore": 7787,
+              "msPerBlock": 4.667,
+              "msPerMutation": 0.0251
+            },
+            {
+              "fromBlock": 60,
+              "blocks": 12,
+              "rowsBefore": 10015,
+              "msPerBlock": 5.333,
+              "msPerMutation": 0.0294
+            },
+            {
+              "fromBlock": 72,
+              "blocks": 12,
+              "rowsBefore": 12195,
+              "msPerBlock": 6.5,
+              "msPerMutation": 0.0356
+            },
+            {
+              "fromBlock": 84,
+              "blocks": 12,
+              "rowsBefore": 14387,
+              "msPerBlock": 7.917,
+              "msPerMutation": 0.0425
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 12,
+              "rowsBefore": 16620,
+              "msPerBlock": 8.583,
+              "msPerMutation": 0.040100000000000004
+            },
+            {
+              "fromBlock": 108,
+              "blocks": 8,
+              "rowsBefore": 19190,
+              "msPerBlock": 9.25,
+              "msPerMutation": 0.056100000000000004
+            }
+          ],
+          "blocksPerSecond": 193,
+          "rowsPerSecond": 34126.5,
+          "msPerBlock": 5.181,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "asOfRefused": "RetentionUnavailableError: blob-json cannot answer as of block 12000051: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-json cannot revert: it keeps no history",
+          "blobBytes": 1022035
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 136
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 601
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "blobRowsLoaded": 7406,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 113
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 10
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": true,
+        "hasSharedArrayBuffer": true,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 47.22,
+            "openMs": 2.219999999999999,
+            "migrateMs": 32.84
+          },
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 12,
+              "rowsBefore": 0,
+              "msPerBlock": 14.243,
+              "msPerMutation": 0.1186
+            },
+            {
+              "fromBlock": 12,
+              "blocks": 12,
+              "rowsBefore": 1441,
+              "msPerBlock": 9.13,
+              "msPerMutation": 0.0674
+            },
+            {
+              "fromBlock": 24,
+              "blocks": 12,
+              "rowsBefore": 3067,
+              "msPerBlock": 12.345,
+              "msPerMutation": 0.0615
+            },
+            {
+              "fromBlock": 36,
+              "blocks": 12,
+              "rowsBefore": 5474,
+              "msPerBlock": 8.748,
+              "msPerMutation": 0.045399999999999996
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 12,
+              "rowsBefore": 7787,
+              "msPerBlock": 7.732,
+              "msPerMutation": 0.0416
+            },
+            {
+              "fromBlock": 60,
+              "blocks": 12,
+              "rowsBefore": 10015,
+              "msPerBlock": 7.38,
+              "msPerMutation": 0.040600000000000004
+            },
+            {
+              "fromBlock": 72,
+              "blocks": 12,
+              "rowsBefore": 12195,
+              "msPerBlock": 7.615,
+              "msPerMutation": 0.0417
+            },
+            {
+              "fromBlock": 84,
+              "blocks": 12,
+              "rowsBefore": 14387,
+              "msPerBlock": 6.925,
+              "msPerMutation": 0.037200000000000004
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 12,
+              "rowsBefore": 16620,
+              "msPerBlock": 7.675,
+              "msPerMutation": 0.0358
+            },
+            {
+              "fromBlock": 108,
+              "blocks": 8,
+              "rowsBefore": 19190,
+              "msPerBlock": 6.525,
+              "msPerMutation": 0.0395
+            }
+          ],
+          "blocksPerSecond": 112.2,
+          "rowsPerSecond": 19833.7,
+          "msPerBlock": 8.915,
+          "pointReads": 200,
+          "msPerPointRead": 0.0869,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.056,
+          "revertDepth": 8,
+          "sqliteBytes": 2752512
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 152.1
+          },
+          {
+            "label": "open",
+            "ms": 99.32000000000002
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 1034.1000000000001
+          },
+          {
+            "label": "point-reads",
+            "ms": 17.37999999999988
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 11.200000000000045
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 5.820000000000164
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 41.74,
+            "openMs": 2,
+            "migrateMs": 32.22
+          },
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 113.42
+          },
+          {
+            "label": "open",
+            "ms": 94.12
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 2.0400000000000205
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 116
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:33801/bundle.js:442:42"
+        ]
+      },
+      "reopen": {
+        "results": {
+          "blocks": 116,
+          "mutations": 20510,
+          "liveRows": 7406,
+          "versions": 14839
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 110
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:33801/bundle.js:442:42"
+        ]
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "multi-tab",
+      "backend": "idb-versioned",
+      "size": "small",
+      "tabs": [
+        {
+          "tab": 0,
+          "errors": [],
+          "blocksPerSecond": 13.2,
+          "mismatches": 0
+        },
+        {
+          "tab": 1,
+          "errors": [],
+          "blocksPerSecond": 13.2,
+          "mismatches": 0
+        },
+        {
+          "tab": 2,
+          "errors": [],
+          "blocksPerSecond": 13.2,
+          "mismatches": 0
+        },
+        {
+          "tab": 3,
+          "errors": [],
+          "blocksPerSecond": 13.2,
+          "mismatches": 0
+        }
+      ],
+      "tabsThatFailed": 0
+    },
+    {
+      "project": "webkit",
+      "profile": "multi-tab",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "small",
+      "tabs": [
+        {
+          "tab": 0,
+          "errors": [
+            "@http://127.0.0.1:37329/bundle.js:442:42"
+          ]
+        },
+        {
+          "tab": 1,
+          "errors": [
+            "@http://127.0.0.1:37329/bundle.js:442:42"
+          ]
+        },
+        {
+          "tab": 2,
+          "errors": [
+            "@http://127.0.0.1:37329/bundle.js:442:42"
+          ]
+        },
+        {
+          "tab": 3,
+          "errors": [
+            "@http://127.0.0.1:37329/bundle.js:442:42"
+          ]
+        }
+      ],
+      "tabsThatFailed": 4
+    },
+    {
+      "project": "webkit",
+      "profile": "multi-tab",
+      "backend": "sqlite-opfs",
+      "size": "small",
+      "tabs": [
+        {
+          "tab": 0,
+          "errors": [],
+          "blocksPerSecond": 51.7,
+          "mismatches": 0
+        },
+        {
+          "tab": 1,
+          "errors": [],
+          "blocksPerSecond": 51.5,
+          "mismatches": 0
+        },
+        {
+          "tab": 2,
+          "errors": [],
+          "blocksPerSecond": 48,
+          "mismatches": 0
+        },
+        {
+          "tab": 3,
+          "errors": [],
+          "blocksPerSecond": 49.2,
+          "mismatches": 0
+        }
+      ],
+      "tabsThatFailed": 0
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 11
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:40283/bundle.js:442:42"
+        ]
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 6
+          }
+        ],
+        "errors": [
+          "@http://127.0.0.1:40283/bundle.js:442:42"
+        ]
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "tiny",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 11
+          }
+        ],
+        "errors": [
+          "Error: Error: Missing required OPFS APIs. | @http://127.0.0.1:37645/worker.js:10967:297 | @http://127.0.0.1:37645/bundle.js:442:42"
+        ]
+      },
+      "reopen": {
+        "results": {
+          "blocks": 12,
+          "mutations": 447,
+          "liveRows": 245,
+          "versions": 406
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 7
+          }
+        ],
+        "errors": [
+          "Error: Error: Missing required OPFS APIs. | @http://127.0.0.1:37645/worker.js:10967:297 | @http://127.0.0.1:37645/bundle.js:442:42"
+        ]
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "memory",
+      "size": "sweep",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 48,
+              "rowsBefore": 0,
+              "msPerBlock": 0.188,
+              "msPerMutation": 0.0016
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 48,
+              "rowsBefore": 5680,
+              "msPerBlock": 0.25,
+              "msPerMutation": 0.0018
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 48,
+              "rowsBefore": 12171,
+              "msPerBlock": 0.271,
+              "msPerMutation": 0.002
+            },
+            {
+              "fromBlock": 144,
+              "blocks": 48,
+              "rowsBefore": 18662,
+              "msPerBlock": 0.229,
+              "msPerMutation": 0.0017
+            },
+            {
+              "fromBlock": 192,
+              "blocks": 48,
+              "rowsBefore": 25065,
+              "msPerBlock": 0.375,
+              "msPerMutation": 0.0028
+            },
+            {
+              "fromBlock": 240,
+              "blocks": 48,
+              "rowsBefore": 31428,
+              "msPerBlock": 0.229,
+              "msPerMutation": 0.0017
+            },
+            {
+              "fromBlock": 288,
+              "blocks": 48,
+              "rowsBefore": 37799,
+              "msPerBlock": 0.229,
+              "msPerMutation": 0.0017
+            },
+            {
+              "fromBlock": 336,
+              "blocks": 48,
+              "rowsBefore": 44353,
+              "msPerBlock": 0.292,
+              "msPerMutation": 0.0021000000000000003
+            },
+            {
+              "fromBlock": 384,
+              "blocks": 48,
+              "rowsBefore": 50870,
+              "msPerBlock": 0.25,
+              "msPerMutation": 0.0019
+            },
+            {
+              "fromBlock": 432,
+              "blocks": 44,
+              "rowsBefore": 57270,
+              "msPerBlock": 0.227,
+              "msPerMutation": 0.0017
+            }
+          ],
+          "blocksPerSecond": 3933.9,
+          "rowsPerSecond": 520900.8,
+          "msPerBlock": 0.254,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0,
+          "revertDepth": 8
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 445
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 121
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 0
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 33
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 291
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned",
+      "size": "sweep",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 48,
+              "rowsBefore": 0,
+              "msPerBlock": 24.417,
+              "msPerMutation": 0.2063
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 48,
+              "rowsBefore": 5680,
+              "msPerBlock": 28.25,
+              "msPerMutation": 0.2089
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 48,
+              "rowsBefore": 12171,
+              "msPerBlock": 29.479,
+              "msPerMutation": 0.218
+            },
+            {
+              "fromBlock": 144,
+              "blocks": 48,
+              "rowsBefore": 18662,
+              "msPerBlock": 29.563,
+              "msPerMutation": 0.2216
+            },
+            {
+              "fromBlock": 192,
+              "blocks": 48,
+              "rowsBefore": 25065,
+              "msPerBlock": 29.729,
+              "msPerMutation": 0.2243
+            },
+            {
+              "fromBlock": 240,
+              "blocks": 48,
+              "rowsBefore": 31428,
+              "msPerBlock": 28.521,
+              "msPerMutation": 0.2149
+            },
+            {
+              "fromBlock": 288,
+              "blocks": 48,
+              "rowsBefore": 37799,
+              "msPerBlock": 30,
+              "msPerMutation": 0.21969999999999998
+            },
+            {
+              "fromBlock": 336,
+              "blocks": 48,
+              "rowsBefore": 44353,
+              "msPerBlock": 30.417,
+              "msPerMutation": 0.224
+            },
+            {
+              "fromBlock": 384,
+              "blocks": 48,
+              "rowsBefore": 50870,
+              "msPerBlock": 28.688,
+              "msPerMutation": 0.2152
+            },
+            {
+              "fromBlock": 432,
+              "blocks": 44,
+              "rowsBefore": 57270,
+              "msPerBlock": 28.091,
+              "msPerMutation": 0.21459999999999999
+            }
+          ],
+          "blocksPerSecond": 34.8,
+          "rowsPerSecond": 4610.1,
+          "msPerBlock": 28.723,
+          "pointReads": 200,
+          "msPerPointRead": 0.16,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.215,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 20775,
+            "versions": 62553,
+            "blocks": 476
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 288
+          },
+          {
+            "label": "open",
+            "ms": 11
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 13672
+          },
+          {
+            "label": "point-reads",
+            "ms": 32
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 43
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 151
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 563
+          },
+          {
+            "label": "open",
+            "ms": 8
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned-cached",
+      "size": "sweep",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 48,
+              "rowsBefore": 0,
+              "msPerBlock": 10.5,
+              "msPerMutation": 0.0887
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 48,
+              "rowsBefore": 5680,
+              "msPerBlock": 14.146,
+              "msPerMutation": 0.1046
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 48,
+              "rowsBefore": 12171,
+              "msPerBlock": 14.729,
+              "msPerMutation": 0.10890000000000001
+            },
+            {
+              "fromBlock": 144,
+              "blocks": 48,
+              "rowsBefore": 18662,
+              "msPerBlock": 14.458,
+              "msPerMutation": 0.10840000000000001
+            },
+            {
+              "fromBlock": 192,
+              "blocks": 48,
+              "rowsBefore": 25065,
+              "msPerBlock": 14.854,
+              "msPerMutation": 0.11209999999999999
+            },
+            {
+              "fromBlock": 240,
+              "blocks": 48,
+              "rowsBefore": 31428,
+              "msPerBlock": 15.063,
+              "msPerMutation": 0.1135
+            },
+            {
+              "fromBlock": 288,
+              "blocks": 48,
+              "rowsBefore": 37799,
+              "msPerBlock": 15.521,
+              "msPerMutation": 0.11370000000000001
+            },
+            {
+              "fromBlock": 336,
+              "blocks": 48,
+              "rowsBefore": 44353,
+              "msPerBlock": 16.958,
+              "msPerMutation": 0.12490000000000001
+            },
+            {
+              "fromBlock": 384,
+              "blocks": 48,
+              "rowsBefore": 50870,
+              "msPerBlock": 15.792,
+              "msPerMutation": 0.1184
+            },
+            {
+              "fromBlock": 432,
+              "blocks": 44,
+              "rowsBefore": 57270,
+              "msPerBlock": 15.523,
+              "msPerMutation": 0.1186
+            }
+          ],
+          "blocksPerSecond": 67.8,
+          "rowsPerSecond": 8974.7,
+          "msPerBlock": 14.754,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.205,
+          "revertDepth": 8,
+          "idbCounts": {
+            "current": 20775,
+            "versions": 62553,
+            "blocks": 476
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 301
+          },
+          {
+            "label": "open",
+            "ms": 17
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 7023
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 41
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 145
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 458
+          },
+          {
+            "label": "open",
+            "ms": 192
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-structured-clone",
+      "size": "sweep",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 48,
+              "rowsBefore": 0,
+              "msPerBlock": 2.104,
+              "msPerMutation": 0.0178
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 48,
+              "rowsBefore": 5680,
+              "msPerBlock": 4.563,
+              "msPerMutation": 0.0337
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 48,
+              "rowsBefore": 12171,
+              "msPerBlock": 6.542,
+              "msPerMutation": 0.0484
+            },
+            {
+              "fromBlock": 144,
+              "blocks": 48,
+              "rowsBefore": 18662,
+              "msPerBlock": 9.896,
+              "msPerMutation": 0.0742
+            },
+            {
+              "fromBlock": 192,
+              "blocks": 48,
+              "rowsBefore": 25065,
+              "msPerBlock": 12.667,
+              "msPerMutation": 0.09559999999999999
+            },
+            {
+              "fromBlock": 240,
+              "blocks": 48,
+              "rowsBefore": 31428,
+              "msPerBlock": 14.438,
+              "msPerMutation": 0.1088
+            },
+            {
+              "fromBlock": 288,
+              "blocks": 48,
+              "rowsBefore": 37799,
+              "msPerBlock": 17.875,
+              "msPerMutation": 0.13090000000000002
+            },
+            {
+              "fromBlock": 336,
+              "blocks": 48,
+              "rowsBefore": 44353,
+              "msPerBlock": 20.75,
+              "msPerMutation": 0.15280000000000002
+            },
+            {
+              "fromBlock": 384,
+              "blocks": 48,
+              "rowsBefore": 50870,
+              "msPerBlock": 25.229,
+              "msPerMutation": 0.18919999999999998
+            },
+            {
+              "fromBlock": 432,
+              "blocks": 44,
+              "rowsBefore": 57270,
+              "msPerBlock": 28.341,
+              "msPerMutation": 0.2165
+            }
+          ],
+          "blocksPerSecond": 70.8,
+          "rowsPerSecond": 9375.1,
+          "msPerBlock": 14.124,
+          "pointReads": 200,
+          "msPerPointRead": 0,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "asOfRefused": "RetentionUnavailableError: blob-structured-clone cannot answer as of block 12000411: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-structured-clone cannot revert: it keeps no history",
+          "blobBytes": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 297
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 6723
+          },
+          {
+            "label": "point-reads",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "blobRowsLoaded": 20775,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 393
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 28
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-json",
+      "size": "sweep",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 48,
+              "rowsBefore": 0,
+              "msPerBlock": 2.125,
+              "msPerMutation": 0.018
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 48,
+              "rowsBefore": 5680,
+              "msPerBlock": 4.729,
+              "msPerMutation": 0.035
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 48,
+              "rowsBefore": 12171,
+              "msPerBlock": 7.354,
+              "msPerMutation": 0.0544
+            },
+            {
+              "fromBlock": 144,
+              "blocks": 48,
+              "rowsBefore": 18662,
+              "msPerBlock": 10.458,
+              "msPerMutation": 0.07840000000000001
+            },
+            {
+              "fromBlock": 192,
+              "blocks": 48,
+              "rowsBefore": 25065,
+              "msPerBlock": 12.521,
+              "msPerMutation": 0.0945
+            },
+            {
+              "fromBlock": 240,
+              "blocks": 48,
+              "rowsBefore": 31428,
+              "msPerBlock": 15,
+              "msPerMutation": 0.113
+            },
+            {
+              "fromBlock": 288,
+              "blocks": 48,
+              "rowsBefore": 37799,
+              "msPerBlock": 17.521,
+              "msPerMutation": 0.12830000000000003
+            },
+            {
+              "fromBlock": 336,
+              "blocks": 48,
+              "rowsBefore": 44353,
+              "msPerBlock": 20.042,
+              "msPerMutation": 0.14759999999999998
+            },
+            {
+              "fromBlock": 384,
+              "blocks": 48,
+              "rowsBefore": 50870,
+              "msPerBlock": 23.083,
+              "msPerMutation": 0.1731
+            },
+            {
+              "fromBlock": 432,
+              "blocks": 44,
+              "rowsBefore": 57270,
+              "msPerBlock": 26.386,
+              "msPerMutation": 0.2016
+            }
+          ],
+          "blocksPerSecond": 72.4,
+          "rowsPerSecond": 9580.3,
+          "msPerBlock": 13.821,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "asOfRefused": "RetentionUnavailableError: blob-json cannot answer as of block 12000411: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-json cannot revert: it keeps no history",
+          "blobBytes": 2945175
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 306
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 6579
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "blobRowsLoaded": 20775,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 1
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 394
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 45
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs",
+      "size": "sweep",
+      "env": {
+        "crossOriginIsolated": true,
+        "hasSharedArrayBuffer": true,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 48.120000000000005,
+            "openMs": 3.039999999999992,
+            "migrateMs": 34.96000000000001
+          },
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 48,
+              "rowsBefore": 0,
+              "msPerBlock": 8.764,
+              "msPerMutation": 0.0741
+            },
+            {
+              "fromBlock": 48,
+              "blocks": 48,
+              "rowsBefore": 5680,
+              "msPerBlock": 5.101,
+              "msPerMutation": 0.037700000000000004
+            },
+            {
+              "fromBlock": 96,
+              "blocks": 48,
+              "rowsBefore": 12171,
+              "msPerBlock": 5.312,
+              "msPerMutation": 0.039299999999999995
+            },
+            {
+              "fromBlock": 144,
+              "blocks": 48,
+              "rowsBefore": 18662,
+              "msPerBlock": 5.312,
+              "msPerMutation": 0.039799999999999995
+            },
+            {
+              "fromBlock": 192,
+              "blocks": 48,
+              "rowsBefore": 25065,
+              "msPerBlock": 5.234,
+              "msPerMutation": 0.0395
+            },
+            {
+              "fromBlock": 240,
+              "blocks": 48,
+              "rowsBefore": 31428,
+              "msPerBlock": 5.115,
+              "msPerMutation": 0.0385
+            },
+            {
+              "fromBlock": 288,
+              "blocks": 48,
+              "rowsBefore": 37799,
+              "msPerBlock": 4.955,
+              "msPerMutation": 0.0363
+            },
+            {
+              "fromBlock": 336,
+              "blocks": 48,
+              "rowsBefore": 44353,
+              "msPerBlock": 5.539,
+              "msPerMutation": 0.040799999999999996
+            },
+            {
+              "fromBlock": 384,
+              "blocks": 48,
+              "rowsBefore": 50870,
+              "msPerBlock": 5.082,
+              "msPerMutation": 0.0381
+            },
+            {
+              "fromBlock": 432,
+              "blocks": 44,
+              "rowsBefore": 57270,
+              "msPerBlock": 5.051,
+              "msPerMutation": 0.0386
+            }
+          ],
+          "blocksPerSecond": 180.1,
+          "rowsPerSecond": 23848.8,
+          "msPerBlock": 5.552,
+          "pointReads": 200,
+          "msPerPointRead": 0.0872,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.075,
+          "revertDepth": 8,
+          "sqliteBytes": 7053312
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 294.73999999999995
+          },
+          {
+            "label": "open",
+            "ms": 116.98000000000002
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 2642.8599999999997
+          },
+          {
+            "label": "point-reads",
+            "ms": 17.440000000000055
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 15
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 5.460000000000036
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 59.31999999999999,
+            "openMs": 2.9200000000000017,
+            "migrateMs": 36.81999999999999
+          },
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 391.96
+          },
+          {
+            "label": "open",
+            "ms": 147.52000000000004
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 2.5
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "sweep",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 286
+          }
+        ],
+        "errors": [
+          "Error: Error: Missing required OPFS APIs. | @http://127.0.0.1:42383/worker.js:10967:297 | @http://127.0.0.1:42383/bundle.js:442:42"
+        ]
+      },
+      "reopen": {
+        "results": {
+          "blocks": 476,
+          "mutations": 63029,
+          "liveRows": 20775,
+          "versions": 42908
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 313
+          }
+        ],
+        "errors": [
+          "Error: Error: Missing required OPFS APIs. | @http://127.0.0.1:42383/worker.js:10967:297 | @http://127.0.0.1:42383/bundle.js:442:42"
+        ]
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "immer-patch-replay",
+      "size": "medium",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "stateBytes": 780927,
+          "patchLogBytes": 1742477,
+          "blocks": 116,
+          "depths": [
+            {
+              "depth": 1,
+              "ms": 10,
+              "patches": 1,
+              "correct": true
+            },
+            {
+              "depth": 2,
+              "ms": 4,
+              "patches": 90,
+              "correct": true
+            },
+            {
+              "depth": 4,
+              "ms": 15,
+              "patches": 262,
+              "correct": true
+            },
+            {
+              "depth": 8,
+              "ms": 36,
+              "patches": 690,
+              "correct": true
+            },
+            {
+              "depth": 16,
+              "ms": 70,
+              "patches": 1399,
+              "correct": true
+            },
+            {
+              "depth": 32,
+              "ms": 101,
+              "patches": 2987,
+              "correct": true
+            },
+            {
+              "depth": 64,
+              "ms": 214,
+              "patches": 5950,
+              "correct": true
+            }
+          ],
+          "allCorrect": true
+        },
+        "timings": [
+          {
+            "label": "index-with-patches",
+            "ms": 965
+          },
+          {
+            "label": "backwards-replay(depth 1)",
+            "ms": 10
+          },
+          {
+            "label": "backwards-replay(depth 2)",
+            "ms": 4
+          },
+          {
+            "label": "backwards-replay(depth 4)",
+            "ms": 15
+          },
+          {
+            "label": "backwards-replay(depth 8)",
+            "ms": 36
+          },
+          {
+            "label": "backwards-replay(depth 16)",
+            "ms": 70
+          },
+          {
+            "label": "backwards-replay(depth 32)",
+            "ms": 101
+          },
+          {
+            "label": "backwards-replay(depth 64)",
+            "ms": 214
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "captured-fixture-replay",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "events": 42,
+          "blocks": 9,
+          "provenance": {
+            "capturedAt": "2026-08-22T17:23:20.618Z",
+            "chainId": "8453",
+            "fromBlock": 11681917,
+            "toBlock": 11800000,
+            "what": "stratagems on Base: Stratagems + Gems + GemsGenerator, every log in the range",
+            "stratagemsRepo": "github.com/wighawag/stratagems",
+            "stratagemsCommit": "3d5a0b3f46bcc0d8370643b8382f11f99f81df00",
+            "contracts": [
+              {
+                "address": "0xb99d938a722df8984722ab38732533130b4f3ec4",
+                "startBlock": 11681933
+              },
+              {
+                "address": "0xd1b76de5372bc47fc4b7ad918f11937fc17b7b46",
+                "startBlock": 11681917
+              },
+              {
+                "address": "0xbe2f7c303b53f16f447fd82bf549e65185bf3477",
+                "startBlock": 11681921
+              }
+            ],
+            "node": "base-mainnet.g.alchemy.com",
+            "chainHeadAtCapture": 50315026,
+            "capturedBy": "docs/spikes/sqlite-in-the-browser/capture/capture-stratagems-base.mjs"
+          },
+          "mutations": 48,
+          "handlerCalls": {
+            "onCommitmentMade": 4,
+            "onReserveDeposited": 2,
+            "onCommitmentRevealed": 1
+          },
+          "matchesGoldenState": true,
+          "liveRows": 43,
+          "idbMismatches": 0
+        },
+        "timings": [
+          {
+            "label": "fetch+parse-fixture",
+            "ms": 6
+          },
+          {
+            "label": "replay-through-port",
+            "ms": 4
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "memory",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 105,
+              "rowsBefore": 0,
+              "msPerBlock": 0.038,
+              "msPerMutation": 0.0023
+            },
+            {
+              "fromBlock": 105,
+              "blocks": 105,
+              "rowsBefore": 1720,
+              "msPerBlock": 0.057,
+              "msPerMutation": 0.0024
+            },
+            {
+              "fromBlock": 210,
+              "blocks": 105,
+              "rowsBefore": 4225,
+              "msPerBlock": 0.038,
+              "msPerMutation": 0.0012
+            },
+            {
+              "fromBlock": 315,
+              "blocks": 105,
+              "rowsBefore": 7426,
+              "msPerBlock": 0.057,
+              "msPerMutation": 0.0018
+            },
+            {
+              "fromBlock": 420,
+              "blocks": 105,
+              "rowsBefore": 10803,
+              "msPerBlock": 0.105,
+              "msPerMutation": 0.0024
+            },
+            {
+              "fromBlock": 525,
+              "blocks": 105,
+              "rowsBefore": 15459,
+              "msPerBlock": 0.067,
+              "msPerMutation": 0.0012
+            },
+            {
+              "fromBlock": 630,
+              "blocks": 105,
+              "rowsBefore": 21078,
+              "msPerBlock": 0.048,
+              "msPerMutation": 0.001
+            },
+            {
+              "fromBlock": 735,
+              "blocks": 105,
+              "rowsBefore": 26062,
+              "msPerBlock": 0.114,
+              "msPerMutation": 0.0024
+            },
+            {
+              "fromBlock": 840,
+              "blocks": 105,
+              "rowsBefore": 31027,
+              "msPerBlock": 0.067,
+              "msPerMutation": 0.0013
+            },
+            {
+              "fromBlock": 945,
+              "blocks": 97,
+              "rowsBefore": 36412,
+              "msPerBlock": 0.062,
+              "msPerMutation": 0.0034
+            }
+          ],
+          "blocksPerSecond": 15323.5,
+          "rowsPerSecond": 561647.1,
+          "msPerBlock": 0.065,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.005,
+          "revertDepth": 8,
+          "retention": {}
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1157
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 68
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 1
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 9
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1508
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 105,
+              "rowsBefore": 0,
+              "msPerBlock": 4.61,
+              "msPerMutation": 0.2814
+            },
+            {
+              "fromBlock": 105,
+              "blocks": 105,
+              "rowsBefore": 1720,
+              "msPerBlock": 6.952,
+              "msPerMutation": 0.2914
+            },
+            {
+              "fromBlock": 210,
+              "blocks": 105,
+              "rowsBefore": 4225,
+              "msPerBlock": 8.505,
+              "msPerMutation": 0.279
+            },
+            {
+              "fromBlock": 315,
+              "blocks": 105,
+              "rowsBefore": 7426,
+              "msPerBlock": 9.438,
+              "msPerMutation": 0.2935
+            },
+            {
+              "fromBlock": 420,
+              "blocks": 105,
+              "rowsBefore": 10803,
+              "msPerBlock": 15.41,
+              "msPerMutation": 0.3475
+            },
+            {
+              "fromBlock": 525,
+              "blocks": 105,
+              "rowsBefore": 15459,
+              "msPerBlock": 18.752,
+              "msPerMutation": 0.3504
+            },
+            {
+              "fromBlock": 630,
+              "blocks": 105,
+              "rowsBefore": 21078,
+              "msPerBlock": 14.648,
+              "msPerMutation": 0.30860000000000004
+            },
+            {
+              "fromBlock": 735,
+              "blocks": 105,
+              "rowsBefore": 26062,
+              "msPerBlock": 14.857,
+              "msPerMutation": 0.3142
+            },
+            {
+              "fromBlock": 840,
+              "blocks": 105,
+              "rowsBefore": 31027,
+              "msPerBlock": 16.495,
+              "msPerMutation": 0.3216
+            },
+            {
+              "fromBlock": 945,
+              "blocks": 97,
+              "rowsBefore": 36412,
+              "msPerBlock": 6.825,
+              "msPerMutation": 0.37189999999999995
+            }
+          ],
+          "blocksPerSecond": 85.6,
+          "rowsPerSecond": 3135.9,
+          "msPerBlock": 11.688,
+          "pointReads": 200,
+          "msPerPointRead": 0.205,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.315,
+          "revertDepth": 8,
+          "retention": {
+            "unboundedCounts": {
+              "current": 4072,
+              "versions": 38192,
+              "blocks": 1042
+            },
+            "window-1000": {
+              "dropped": 25299,
+              "pruneMs": 7597,
+              "counts": {
+                "current": 4072,
+                "versions": 12893,
+                "blocks": 1042
+              }
+            },
+            "window-64": {
+              "dropped": 0,
+              "pruneMs": 679,
+              "counts": {
+                "current": 4072,
+                "versions": 12893,
+                "blocks": 1042
+              }
+            }
+          },
+          "idbCounts": {
+            "current": 4072,
+            "versions": 12893,
+            "blocks": 1042
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1035
+          },
+          {
+            "label": "open",
+            "ms": 49
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 12179
+          },
+          {
+            "label": "point-reads",
+            "ms": 41
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 63
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 72
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 3
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 5050
+          },
+          {
+            "label": "open",
+            "ms": 47
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 18
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "idb-versioned-cached",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 105,
+              "rowsBefore": 0,
+              "msPerBlock": 2.686,
+              "msPerMutation": 0.164
+            },
+            {
+              "fromBlock": 105,
+              "blocks": 105,
+              "rowsBefore": 1720,
+              "msPerBlock": 5.2,
+              "msPerMutation": 0.218
+            },
+            {
+              "fromBlock": 210,
+              "blocks": 105,
+              "rowsBefore": 4225,
+              "msPerBlock": 8.495,
+              "msPerMutation": 0.2787
+            },
+            {
+              "fromBlock": 315,
+              "blocks": 105,
+              "rowsBefore": 7426,
+              "msPerBlock": 8.248,
+              "msPerMutation": 0.25639999999999996
+            },
+            {
+              "fromBlock": 420,
+              "blocks": 105,
+              "rowsBefore": 10803,
+              "msPerBlock": 12.886,
+              "msPerMutation": 0.2906
+            },
+            {
+              "fromBlock": 525,
+              "blocks": 105,
+              "rowsBefore": 15459,
+              "msPerBlock": 24.248,
+              "msPerMutation": 0.4531
+            },
+            {
+              "fromBlock": 630,
+              "blocks": 105,
+              "rowsBefore": 21078,
+              "msPerBlock": 14.39,
+              "msPerMutation": 0.30319999999999997
+            },
+            {
+              "fromBlock": 735,
+              "blocks": 105,
+              "rowsBefore": 26062,
+              "msPerBlock": 21.257,
+              "msPerMutation": 0.4495
+            },
+            {
+              "fromBlock": 840,
+              "blocks": 105,
+              "rowsBefore": 31027,
+              "msPerBlock": 23.752,
+              "msPerMutation": 0.4631
+            },
+            {
+              "fromBlock": 945,
+              "blocks": 97,
+              "rowsBefore": 36412,
+              "msPerBlock": 8.309,
+              "msPerMutation": 0.45280000000000004
+            }
+          ],
+          "blocksPerSecond": 77,
+          "rowsPerSecond": 2821.5,
+          "msPerBlock": 12.99,
+          "pointReads": 200,
+          "msPerPointRead": 0.555,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 4.695,
+          "revertDepth": 8,
+          "retention": {
+            "unboundedCounts": {
+              "current": 4072,
+              "versions": 38192,
+              "blocks": 1042
+            },
+            "window-1000": {
+              "dropped": 25299,
+              "pruneMs": 7806,
+              "counts": {
+                "current": 4072,
+                "versions": 12893,
+                "blocks": 1042
+              }
+            },
+            "window-64": {
+              "dropped": 0,
+              "pruneMs": 464,
+              "counts": {
+                "current": 4072,
+                "versions": 12893,
+                "blocks": 1042
+              }
+            }
+          },
+          "idbCounts": {
+            "current": 4072,
+            "versions": 12893,
+            "blocks": 1042
+          }
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1658
+          },
+          {
+            "label": "open",
+            "ms": 42
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 13536
+          },
+          {
+            "label": "point-reads",
+            "ms": 111
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 939
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 976
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 3
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 3152
+          },
+          {
+            "label": "open",
+            "ms": 302
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-structured-clone",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 105,
+              "rowsBefore": 0,
+              "msPerBlock": 1.571,
+              "msPerMutation": 0.0959
+            },
+            {
+              "fromBlock": 105,
+              "blocks": 105,
+              "rowsBefore": 1720,
+              "msPerBlock": 1.99,
+              "msPerMutation": 0.0834
+            },
+            {
+              "fromBlock": 210,
+              "blocks": 105,
+              "rowsBefore": 4225,
+              "msPerBlock": 3.362,
+              "msPerMutation": 0.1103
+            },
+            {
+              "fromBlock": 315,
+              "blocks": 105,
+              "rowsBefore": 7426,
+              "msPerBlock": 3.781,
+              "msPerMutation": 0.1176
+            },
+            {
+              "fromBlock": 420,
+              "blocks": 105,
+              "rowsBefore": 10803,
+              "msPerBlock": 4.086,
+              "msPerMutation": 0.09209999999999999
+            },
+            {
+              "fromBlock": 525,
+              "blocks": 105,
+              "rowsBefore": 15459,
+              "msPerBlock": 5.476,
+              "msPerMutation": 0.1023
+            },
+            {
+              "fromBlock": 630,
+              "blocks": 105,
+              "rowsBefore": 21078,
+              "msPerBlock": 6.238,
+              "msPerMutation": 0.13140000000000002
+            },
+            {
+              "fromBlock": 735,
+              "blocks": 105,
+              "rowsBefore": 26062,
+              "msPerBlock": 5.276,
+              "msPerMutation": 0.11159999999999999
+            },
+            {
+              "fromBlock": 840,
+              "blocks": 105,
+              "rowsBefore": 31027,
+              "msPerBlock": 6.667,
+              "msPerMutation": 0.13
+            },
+            {
+              "fromBlock": 945,
+              "blocks": 97,
+              "rowsBefore": 36412,
+              "msPerBlock": 7.216,
+              "msPerMutation": 0.39330000000000004
+            }
+          ],
+          "blocksPerSecond": 219.9,
+          "rowsPerSecond": 8059.1,
+          "msPerBlock": 4.548,
+          "pointReads": 200,
+          "msPerPointRead": 0.005,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "asOfRefused": "RetentionUnavailableError: blob-structured-clone cannot answer as of block 17109277: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-structured-clone cannot revert: it keeps no history",
+          "retention": {},
+          "blobBytes": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1488
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 4739
+          },
+          {
+            "label": "point-reads",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "blobRowsLoaded": 4072,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 3
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1402
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 27
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 0
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "blob-json",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 105,
+              "rowsBefore": 0,
+              "msPerBlock": 1.61,
+              "msPerMutation": 0.0983
+            },
+            {
+              "fromBlock": 105,
+              "blocks": 105,
+              "rowsBefore": 1720,
+              "msPerBlock": 3.133,
+              "msPerMutation": 0.1313
+            },
+            {
+              "fromBlock": 210,
+              "blocks": 105,
+              "rowsBefore": 4225,
+              "msPerBlock": 4.029,
+              "msPerMutation": 0.1321
+            },
+            {
+              "fromBlock": 315,
+              "blocks": 105,
+              "rowsBefore": 7426,
+              "msPerBlock": 4.676,
+              "msPerMutation": 0.1454
+            },
+            {
+              "fromBlock": 420,
+              "blocks": 105,
+              "rowsBefore": 10803,
+              "msPerBlock": 5.143,
+              "msPerMutation": 0.116
+            },
+            {
+              "fromBlock": 525,
+              "blocks": 105,
+              "rowsBefore": 15459,
+              "msPerBlock": 5.962,
+              "msPerMutation": 0.1114
+            },
+            {
+              "fromBlock": 630,
+              "blocks": 105,
+              "rowsBefore": 21078,
+              "msPerBlock": 6.114,
+              "msPerMutation": 0.1288
+            },
+            {
+              "fromBlock": 735,
+              "blocks": 105,
+              "rowsBefore": 26062,
+              "msPerBlock": 7.276,
+              "msPerMutation": 0.1539
+            },
+            {
+              "fromBlock": 840,
+              "blocks": 105,
+              "rowsBefore": 31027,
+              "msPerBlock": 8.467,
+              "msPerMutation": 0.1651
+            },
+            {
+              "fromBlock": 945,
+              "blocks": 97,
+              "rowsBefore": 36412,
+              "msPerBlock": 7.495,
+              "msPerMutation": 0.4084
+            }
+          ],
+          "blocksPerSecond": 185.9,
+          "rowsPerSecond": 6813.9,
+          "msPerBlock": 5.379,
+          "pointReads": 200,
+          "msPerPointRead": 0.025,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "asOfRefused": "RetentionUnavailableError: blob-json cannot answer as of block 17109277: retention is {\"kind\":\"revert-only\"}",
+          "revertRefused": "blob-json cannot revert: it keeps no history",
+          "retention": {},
+          "blobBytes": 562374
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1114
+          },
+          {
+            "label": "open",
+            "ms": 1
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 5605
+          },
+          {
+            "label": "point-reads",
+            "ms": 5
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "blobRowsLoaded": 4072,
+          "survived": true,
+          "survivedRows": 10,
+          "sampled": 10,
+          "firstRow": 3
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 2460
+          },
+          {
+            "label": "open",
+            "ms": 0
+          },
+          {
+            "label": "load-whole-blob",
+            "ms": 120
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 1
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": true,
+        "hasSharedArrayBuffer": true,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 93.38,
+            "openMs": 3.819999999999993,
+            "migrateMs": 43.640000000000015
+          },
+          "writeCurve": [
+            {
+              "fromBlock": 0,
+              "blocks": 105,
+              "rowsBefore": 0,
+              "msPerBlock": 2.684,
+              "msPerMutation": 0.16390000000000002
+            },
+            {
+              "fromBlock": 105,
+              "blocks": 105,
+              "rowsBefore": 1720,
+              "msPerBlock": 1.674,
+              "msPerMutation": 0.0702
+            },
+            {
+              "fromBlock": 210,
+              "blocks": 105,
+              "rowsBefore": 4225,
+              "msPerBlock": 1.835,
+              "msPerMutation": 0.060200000000000004
+            },
+            {
+              "fromBlock": 315,
+              "blocks": 105,
+              "rowsBefore": 7426,
+              "msPerBlock": 1.803,
+              "msPerMutation": 0.056100000000000004
+            },
+            {
+              "fromBlock": 420,
+              "blocks": 105,
+              "rowsBefore": 10803,
+              "msPerBlock": 2.479,
+              "msPerMutation": 0.0559
+            },
+            {
+              "fromBlock": 525,
+              "blocks": 105,
+              "rowsBefore": 15459,
+              "msPerBlock": 2.6,
+              "msPerMutation": 0.048600000000000004
+            },
+            {
+              "fromBlock": 630,
+              "blocks": 105,
+              "rowsBefore": 21078,
+              "msPerBlock": 2.531,
+              "msPerMutation": 0.0533
+            },
+            {
+              "fromBlock": 735,
+              "blocks": 105,
+              "rowsBefore": 26062,
+              "msPerBlock": 2.732,
+              "msPerMutation": 0.0578
+            },
+            {
+              "fromBlock": 840,
+              "blocks": 105,
+              "rowsBefore": 31027,
+              "msPerBlock": 2.55,
+              "msPerMutation": 0.0497
+            },
+            {
+              "fromBlock": 945,
+              "blocks": 97,
+              "rowsBefore": 36412,
+              "msPerBlock": 1.135,
+              "msPerMutation": 0.061799999999999994
+            }
+          ],
+          "blocksPerSecond": 451.9,
+          "rowsPerSecond": 16565,
+          "msPerBlock": 2.213,
+          "pointReads": 200,
+          "msPerPointRead": 0.1436,
+          "spotCheckMismatches": 0,
+          "asOfDepth": 64,
+          "msPerAsOfRead": 0.1432,
+          "revertDepth": 8,
+          "retention": {
+            "unbounded": 4947968,
+            "window-1000": 1212416,
+            "window-1000-pruneMs": 55.9,
+            "window-64": 1212416,
+            "window-64-pruneMs": 8.1
+          },
+          "sqliteBytes": 1212416
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1320.16
+          },
+          {
+            "label": "open",
+            "ms": 269.31999999999994
+          },
+          {
+            "label": "write-all-blocks",
+            "ms": 2305.58
+          },
+          {
+            "label": "point-reads",
+            "ms": 28.7199999999998
+          },
+          {
+            "label": "as-of(depth 64)",
+            "ms": 28.640000000000327
+          },
+          {
+            "label": "revert(8 blocks)",
+            "ms": 5
+          }
+        ],
+        "errors": []
+      },
+      "reopen": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393,
+          "vfsUsed": "memory",
+          "openBreakdown": {
+            "initMs": 65.9,
+            "openMs": 5.840000000000003,
+            "migrateMs": 49.359999999999985
+          },
+          "survived": false,
+          "survivedRows": 0,
+          "sampled": 10,
+          "firstRow": 0
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1641.06
+          },
+          {
+            "label": "open",
+            "ms": 210.58000000000015
+          },
+          {
+            "label": "first-read-after-reload",
+            "ms": 2.7599999999997635
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "project": "webkit",
+      "profile": "laptop",
+      "backend": "sqlite-opfs-sahpool",
+      "size": "real",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "write": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1094
+          }
+        ],
+        "errors": [
+          "Error: Error: Missing required OPFS APIs. | @http://127.0.0.1:44057/worker.js:10967:297 | @http://127.0.0.1:44057/bundle.js:484:42"
+        ]
+      },
+      "reopen": {
+        "results": {
+          "blocks": 1042,
+          "mutations": 38192,
+          "liveRows": 4072,
+          "versions": 29393
+        },
+        "timings": [
+          {
+            "label": "build-trace(untimed for candidates)",
+            "ms": 1506
+          }
+        ],
+        "errors": [
+          "Error: Error: Missing required OPFS APIs. | @http://127.0.0.1:44057/worker.js:10967:297 | @http://127.0.0.1:44057/bundle.js:484:42"
+        ]
+      }
+    }
+  ]
+}

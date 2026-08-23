@@ -1,0 +1,112 @@
+{
+  "equal": true,
+  "fixture": {
+    "path": "fixtures/stratagems-base.stream.json",
+    "events": 42,
+    "blocks": 9,
+    "provenance": {
+      "capturedAt": "2026-08-22T19:24:45.446Z",
+      "chainId": "8453",
+      "fromBlock": 11681917,
+      "toBlock": 11800000,
+      "what": "stratagems on Base (deployments/base): Stratagems + Gems + GemsGenerator, every log in the range",
+      "deployment": "base",
+      "stratagemsRepo": "github.com/wighawag/stratagems",
+      "stratagemsCommit": "3d5a0b3f46bcc0d8370643b8382f11f99f81df00",
+      "contracts": [
+        {
+          "address": "0xb99d938a722df8984722ab38732533130b4f3ec4",
+          "startBlock": 11681933
+        },
+        {
+          "address": "0xd1b76de5372bc47fc4b7ad918f11937fc17b7b46",
+          "startBlock": 11681917
+        },
+        {
+          "address": "0xbe2f7c303b53f16f447fd82bf549e65185bf3477",
+          "startBlock": 11681921
+        }
+      ],
+      "node": "base-mainnet.g.alchemy.com",
+      "chainHeadAtCapture": 50318668,
+      "capturedBy": "docs/spikes/sqlite-in-the-browser/capture/capture-stratagems-base.mjs",
+      "omittedFields": [
+        "data",
+        "topics"
+      ]
+    }
+  },
+  "handlerCalls": {
+    "onCommitmentMade": 4,
+    "onReserveDeposited": 2,
+    "onCommitmentRevealed": 1
+  },
+  "unhandledEvents": {
+    "OwnershipTransferred": 1,
+    "Transfer": 21,
+    "<unparsed>": 2,
+    "GameEnabled": 1,
+    "MoveProcessed": 10
+  },
+  "mutations": {
+    "total": 48,
+    "perBlock": [
+      {
+        "block": 11681917,
+        "mutations": 0
+      },
+      {
+        "block": 11681921,
+        "mutations": 0
+      },
+      {
+        "block": 11681935,
+        "mutations": 0
+      },
+      {
+        "block": 11681937,
+        "mutations": 0
+      },
+      {
+        "block": 11682397,
+        "mutations": 1
+      },
+      {
+        "block": 11683311,
+        "mutations": 1
+      },
+      {
+        "block": 11683404,
+        "mutations": 1
+      },
+      {
+        "block": 11685648,
+        "mutations": 1
+      },
+      {
+        "block": 11704357,
+        "mutations": 44
+      }
+    ],
+    "perEntity": {
+      "commitment": 5,
+      "placement": 1,
+      "placementWindow": 1,
+      "computedPoints": 1,
+      "cellOwner": 10,
+      "cell": 10,
+      "placementPlayer": 10,
+      "placementCell": 10
+    }
+  },
+  "reads": {
+    "reads": 69,
+    "stagedReads": 45,
+    "writes": 79,
+    "deletes": 1
+  },
+  "liveRows": 43,
+  "versions": 47,
+  "differences": [],
+  "ranAt": "2026-08-23T06:12:09.014Z"
+}
