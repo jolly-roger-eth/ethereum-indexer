@@ -17,13 +17,30 @@ An author declares only `{name, id, fields}`; the store owns the DDL, the versio
 
 ## One implementation of the seam
 
-This is a `StateStore` ([`@etherfold/state-store`](../state-store)), which is the backend-neutral contract a processor is written against: `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` / `revertTo`, plus the capabilities it declares. The declaration, mutation and block-pointer types are the seam's and are re-exported here, so a processor hands this store exactly what it would hand any other backend.
+This is a `StateStore` ([`@etherfold/state-store`](../state-store)), which is the backend-neutral contract a processor is written against: `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` / `revertTo` / `prune`, plus the capabilities it declares. The declaration, mutation and block-pointer types are the seam's and are re-exported here, so a processor hands this store exactly what it would hand any other backend.
 
 Everything below those verbs is this backend's own and deliberately NOT at the seam: block addressing by hash and by time, and the `queryCurrent` / `queryAsOf` surface that takes caller-supplied SQL. A server has a query planner; a handler, running once per event on every backend, does not.
 
 The seam's `listCurrent` / `listAsOf` are the other side of that line, and they are cheap here for a reason a test pins rather than asserts by hand: an equality on the LEADING id columns plus `ORDER BY` the declared id is a key-prefix range, so SQLite seeks into the entity's id index and walks it in order, with no sort and no table scan whatever the table holds. `test/listing.test.ts` reads the access path back out of `EXPLAIN QUERY PLAN`, because no behavioural assertion can tell a range scan from a table scan that returns the same rows.
 
-`store.capabilities` reports `{retention: {kind: 'unbounded'}, asOf: true}`, and `unbounded` is the honest report rather than an aspiration: this package has no pruning, so every version ever written is still here. It takes no retention option on purpose, because a store that accepted a window it cannot enforce would be making exactly the claim the report exists to prevent.
+## Retention
+
+`store.capabilities` reports what the deployment configured, because this store enforces all of it. The default is `{retention: {kind: 'unbounded'}, asOf: true}`: keep everything, answer at any depth.
+
+```ts
+new VersionedStateStore(db, declarations, {retention: {blocks: 128}, finalityDepth: 64});
+```
+
+A window is measured in BLOCK NUMBERS and in no other unit, and it may not go below the finality depth it protects (refused at construction, naming both numbers) because reorg revert reopens versions closed after the fork point. Note the trap before sizing one: a window of N blocks is **not** N updates of history. On the real measured stream event-bearing blocks are median 429 apart, so 64 blocks holds exactly one of them.
+
+Enforcement has two halves and they are separate on purpose:
+
+- **Answers** are bounded immediately. An as-of read outside the window throws `BlockNotRetainedError` (naming the block asked for and the range kept) on every read surface, including this backend's own `queryAsOf` and the hash and timestamp address axes. It is never served from the tip.
+- **Storage** is bounded when `store.prune()` runs, which the host schedules. It deletes the versions closed at or below `tip - blocks` and reports what went (`{tip, floor, versionsDeleted, complete}`). The LIVE version of an entity survives however old it is; the block table is kept, so an old hash still resolves and is REFUSED rather than reported unknown; and it does not `VACUUM` (SQLite reuses the freed pages, so the file stops growing without shrinking).
+
+Pruning is not in the write path because it costs time proportional to what it drops (1.1 s at 62,553 versions, measured) while a block carries a median of 7 mutations. `prune({maxVersions: n})` is how an amortised policy is expressed, and one statement never names more rows than `bounds.maxRowsPerStatement`, so one request never carries unbounded work. See ADR-0019 and ADR-0022.
+
+`retention: 'revert-only'` refuses every historical read while `revertTo` keeps working, and prunes to the declared `finalityDepth` (its whole retention) when one is given.
 
 ## Usage
 

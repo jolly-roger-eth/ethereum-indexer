@@ -18,6 +18,8 @@ export type {
 	FieldType,
 	Mutation,
 	NormalizedEntity,
+	PruneOptions,
+	PruneReport,
 	RetainedRange,
 	Retention,
 	RetentionSetting,

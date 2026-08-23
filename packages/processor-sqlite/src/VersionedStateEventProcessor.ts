@@ -1,4 +1,9 @@
-import {VersionedStateStore, type VersionedStateStoreOptions} from '@etherfold/state-store-sqlite';
+import {
+	VersionedStateStore,
+	type PruneOptions,
+	type PruneReport,
+	type VersionedStateStoreOptions,
+} from '@etherfold/state-store-sqlite';
 import {applyEventStream, type EntityProcessor} from '@etherfold/processor-entities';
 import {
 	assertProcessorVersion,
@@ -34,6 +39,9 @@ const logger = logs('@etherfold/processor-sqlite');
  * time at `load`, against the finality the stream actually runs with; see the
  * note there for why one number configured in two places has to be reconciled
  * rather than trusted.
+ *
+ * Setting a window bounds what this state ANSWERS immediately; bounding what it
+ * HOLDS is `prune`, which the deployment schedules.
  */
 export type VersionedStateProcessorOptions = Pick<VersionedStateStoreOptions, 'retention' | 'finalityDepth'>;
 
@@ -89,6 +97,32 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 	/** The read handle, also what `load` and `process` hand back. */
 	get state(): VersionedStateView {
 		return this.view;
+	}
+
+	/**
+	 * Enforce the configured retention against the storage: drop the versions it
+	 * no longer covers.
+	 *
+	 * It lives HERE and not on `state` because it is a WRITE, and the view is
+	 * read-only for the reason recorded on it: a UI callback holding a handle that
+	 * can delete versions is a corruption waiting to happen. The processor is the
+	 * writer, so scheduling a prune is scheduling one more thing the writer does.
+	 *
+	 * It is a call a deployment makes rather than something `process` does on its
+	 * own, and that placement is deliberate: pruning costs time proportional to
+	 * what it drops (1.1 s at 62,553 versions, measured in
+	 * `work/notes/findings/sqlite-in-the-browser.md`), so a prune inside `process`
+	 * would stall whichever block crossed a threshold. See `StateStore.prune` for
+	 * the whole reasoning and for `maxVersions`, which is how an amortised policy
+	 * is expressed. Call it BETWEEN `process` calls: it is a write, and this
+	 * processor has one writer.
+	 *
+	 * On the default (`unbounded`) retention it is a no-op, so a host may schedule
+	 * it unconditionally.
+	 */
+	async prune(options?: PruneOptions): Promise<PruneReport> {
+		await this.ensureMigrated();
+		return this.store.prune(options);
 	}
 
 	/**

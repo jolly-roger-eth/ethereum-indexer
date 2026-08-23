@@ -3,6 +3,7 @@ import {boundedListingCases} from './cases/bounded-listing.js';
 import {declaredCapabilityCases} from './cases/declared-capabilities.js';
 import {readYourWritesCases} from './cases/read-your-writes.js';
 import {reorgRevertCases} from './cases/reorg-revert.js';
+import {retentionPruningCases} from './cases/retention-pruning.js';
 import {versionedReadCases} from './cases/versioned-reads.js';
 import {CONFORMANCE_ENTITIES} from './fixtures.js';
 import type {ConformanceCase, ConformanceFailure, ConformanceResult, StateStoreFactory} from './types.js';
@@ -21,8 +22,9 @@ import type {ConformanceCase, ConformanceFailure, ConformanceResult, StateStoreF
  *
  * Everything else is asked of everyone: versioned reads, the reorg revert with
  * its counter that must go back DOWN, read-your-writes inside a block, the
- * bounded id-prefix listing a one-to-many is derived through, and a block
- * applying as one unit.
+ * bounded id-prefix listing a one-to-many is derived through, a block applying
+ * as one unit, and what a prune must never delete (the same claim-driven
+ * selection: what a store may drop is what it stopped promising to answer).
  */
 export async function stateStoreConformanceCases(factory: StateStoreFactory): Promise<ConformanceCase[]> {
 	const probe = await factory(CONFORMANCE_ENTITIES);
@@ -31,6 +33,7 @@ export async function stateStoreConformanceCases(factory: StateStoreFactory): Pr
 	return [
 		...versionedReadCases(factory, capabilities),
 		...declaredCapabilityCases(factory, capabilities),
+		...retentionPruningCases(factory, capabilities),
 		...reorgRevertCases(factory, capabilities),
 		...readYourWritesCases(factory, capabilities),
 		...boundedListingCases(factory, capabilities),

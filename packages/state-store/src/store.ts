@@ -1,11 +1,12 @@
 import type {StateStoreCapabilities} from './capabilities.js';
 import type {EntityIdPrefix, Listing} from './listing.js';
+import type {PruneOptions, PruneReport} from './retention.js';
 import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.js';
 
 /**
  * The seam: what a store must do for a processor to run on it.
  *
- * Seven verbs and one report, chosen because they are the whole of what
+ * Eight verbs and one report, chosen because they are the whole of what
  * processing a chain needs and because each of them is cheaply implementable on
  * every substrate we have measured (versioned SQL rows, an object store, an
  * in-memory map, a patch log). Anything a particular backend can do BETTER stays
@@ -55,6 +56,37 @@ export interface StateStore {
 	 * block a consumer can legitimately pin.
 	 */
 	applyBlock(block: BlockPointer, mutations?: readonly Mutation[]): Promise<void>;
+
+	/**
+	 * Delete the versions the declared retention no longer covers, and report what
+	 * went.
+	 *
+	 * **It is an EXPLICIT call, and that placement is the decision.** The window
+	 * bounds what a read may ask about at all times, whether or not this ever runs;
+	 * what this adds is the other half, bounding the BYTES. It is deliberately not
+	 * a side effect of `applyBlock`, because a prune costs real time (1.1 s at
+	 * 62,553 versions, measured in
+	 * `work/notes/findings/sqlite-in-the-browser.md`) and a block carries a median
+	 * of 7 mutations, so folding it in would stall whichever block happened to
+	 * cross a threshold by a second for work that block did not ask for. Which
+	 * block pays, and how often, is the host's scheduling decision, and a store is
+	 * the wrong place to invent one. An amortised policy is `maxVersions` on a
+	 * schedule; a background policy is this call on a timer. Both are built ON this
+	 * verb rather than instead of it.
+	 *
+	 * The caller is the writer: a store has one, and pruning between blocks is safe
+	 * exactly where applying a block is.
+	 *
+	 * Pruning a store that has no floor to prune at (`unbounded`, or `revert-only`
+	 * with no declared finality depth) is a NO-OP and never an error: "keep
+	 * everything" is a legitimate answer to "drop what is unreachable", and a host
+	 * that prunes on a timer must not have to ask what it is holding first.
+	 *
+	 * The LIVE version of an entity is never dropped, however old it is. A row
+	 * written once at block 12,082,307 and never touched again is still the current
+	 * state, and deleting by age alone destroys it (see `retentionFloor`).
+	 */
+	prune(options?: PruneOptions): Promise<PruneReport>;
 
 	/** One entity as it stands at the tip. */
 	getCurrent<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined>;

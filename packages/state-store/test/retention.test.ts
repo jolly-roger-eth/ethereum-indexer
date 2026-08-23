@@ -4,9 +4,10 @@ import {
 	BlockUnavailableError,
 	MemoryStateStore,
 	assertRetained,
+	pruneBudget,
 	resolveRetention,
 	retainedRange,
-	retentionWithoutPruning,
+	retentionFloor,
 	type Retention,
 	type StateStoreCapabilities,
 } from '../src/index.js';
@@ -37,9 +38,9 @@ const capabilities = (retention: Retention, asOf = retention.kind !== 'revert-on
 
 describe('a deployment sets retention, in block numbers', () => {
 	it('keeps everything when nothing is set', () => {
-		// The default is the only one that claims nothing: no shipped store prunes,
-		// so `unbounded` is what is TRUE of them, and a default window would be a
-		// claim nothing enforces (and, at 64 blocks, nearly empty on a real stream).
+		// The default is the only one that changes nothing about a store nobody
+		// configured, and a default window would be a bound nobody chose (and, at 64
+		// blocks, nearly empty in updates on a real stream).
 		expect(resolveRetention(undefined, {})).toEqual({kind: 'unbounded'});
 	});
 
@@ -108,14 +109,46 @@ describe('the retained range', () => {
 	});
 });
 
-describe('a store that cannot prune reports what it actually keeps', () => {
-	it('turns a window it cannot enforce into `unbounded`, which is what is true of it', () => {
-		expect(retentionWithoutPruning({kind: 'window', blocks: 128})).toEqual({kind: 'unbounded'});
+describe('the prune floor: the one boundary a version is deleted at', () => {
+	it('is the OLDEST block a read may still ask about, so the two cannot drift apart', () => {
+		// deliberately the same number `retainedRange` refuses below: a store that
+		// deleted at one boundary and refused at another would either lose answers it
+		// promised or keep rows forever.
+		expect(retentionFloor({kind: 'window', blocks: 60}, 1_000)).toBe(940);
+		expect(retentionFloor({kind: 'window', blocks: 60}, 1_000)).toBe(
+			retainedRange({kind: 'window', blocks: 60}, 1_000)?.from,
+		);
 	});
 
-	it('leaves the two it can honour alone', () => {
-		expect(retentionWithoutPruning({kind: 'unbounded'})).toEqual({kind: 'unbounded'});
-		expect(retentionWithoutPruning({kind: 'revert-only'})).toEqual({kind: 'revert-only'});
+	it('never runs below genesis, for a store younger than its own window', () => {
+		expect(retentionFloor({kind: 'window', blocks: 60}, 10)).toBe(0);
+	});
+
+	it('is nothing at all for an unbounded store, so pruning one is a no-op', () => {
+		expect(retentionFloor({kind: 'unbounded'}, 1_000, 64)).toBeUndefined();
+	});
+
+	it('is the FINALITY DEPTH for a revert-only store, which is how long revert needs', () => {
+		expect(retentionFloor({kind: 'revert-only'}, 1_000, 64)).toBe(936);
+	});
+
+	it('is nothing for a revert-only store that declared no depth, rather than a guessed one', () => {
+		// a store deleting rows against a number nobody wrote down is worse than one
+		// that keeps them.
+		expect(retentionFloor({kind: 'revert-only'}, 1_000)).toBeUndefined();
+	});
+});
+
+describe('the prune budget', () => {
+	it('is unlimited when unset', () => {
+		expect(pruneBudget({})).toBe(Number.POSITIVE_INFINITY);
+	});
+
+	it('is a whole number of versions', () => {
+		expect(pruneBudget({maxVersions: 100})).toBe(100);
+		for (const budget of [0, -1, 1.5, '10']) {
+			expect(() => pruneBudget({maxVersions: budget as never}), JSON.stringify(budget)).toThrow(/versions/i);
+		}
 	});
 });
 
@@ -178,15 +211,15 @@ describe('the refusal', () => {
 	});
 });
 
-describe('a store keeps whatever it was set to, but claims only what it enforces', () => {
+describe('a store claims what it enforces', () => {
 	it('reports `revert-only`, and reports that it answers no as-of read', () => {
 		const store = new MemoryStateStore([TOKEN], {retention: 'revert-only'});
 		expect(store.capabilities).toEqual({retention: {kind: 'revert-only'}, asOf: false});
 	});
 
-	it('accepts a window and still reports `unbounded` while nothing prunes', () => {
+	it('reports the window it was set to, because it enforces both halves of it', () => {
 		const store = new MemoryStateStore([TOKEN], {retention: {blocks: 128}, finalityDepth: 64});
-		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});
+		expect(store.capabilities).toEqual({retention: {kind: 'window', blocks: 128}, asOf: true});
 	});
 
 	it('rejects a window below the finality depth at construction, before any read', () => {

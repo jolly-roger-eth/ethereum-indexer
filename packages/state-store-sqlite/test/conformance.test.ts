@@ -1,7 +1,6 @@
 import {describeStateStoreConformance} from '@etherfold/state-store-conformance';
 import {VersionedStateStore} from '../src/index.js';
 import {createTestDB} from './utils/db.js';
-import {WindowedStore} from './utils/windowed-store.js';
 
 /**
  * This backend, put through the suite every backend must pass.
@@ -21,7 +20,9 @@ import {WindowedStore} from './utils/windowed-store.js';
  *
  * Three runs, one per retention CLAIM, because the suite tests a store against
  * what it says about itself: keeping everything, keeping a window, and keeping
- * history for revert alone.
+ * history for revert alone. All three are ordinary configuration: the windowed
+ * run was a test double while this package had no pruning and could not honestly
+ * claim a window, and it is a real store now that it can.
  */
 
 await describeStateStoreConformance(
@@ -31,7 +32,7 @@ await describeStateStoreConformance(
 
 await describeStateStoreConformance(
 	'VersionedStateStore, claiming a 60-block window',
-	(declarations) => new WindowedStore(createTestDB(), declarations, 60),
+	(declarations) => new VersionedStateStore(createTestDB(), declarations, {retention: {blocks: 60}, finalityDepth: 60}),
 );
 
 await describeStateStoreConformance(

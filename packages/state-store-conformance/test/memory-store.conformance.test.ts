@@ -1,6 +1,5 @@
 import {MemoryStateStore} from '@etherfold/state-store';
 import {describeStateStoreConformance} from '../src/index.js';
-import {WindowedMemoryStore} from './utils/windowed-memory-store.js';
 
 /**
  * The reference backend, put through the suite it defines.
@@ -15,6 +14,12 @@ import {WindowedMemoryStore} from './utils/windowed-memory-store.js';
  * contract: keeping everything, keeping a window, and keeping history for revert
  * alone. The suite reads each claim and asks that store what it said it could
  * do.
+ *
+ * All three are ordinary CONFIGURATION rather than test doubles. They were
+ * doubles while nothing pruned, because a store claiming a window it could not
+ * enforce was the fiction the report exists to prevent; now that the window is
+ * enforced on both halves (refused on read, pruned in storage) the honest
+ * subject is the store a deployment would actually build.
  */
 
 await describeStateStoreConformance(
@@ -24,7 +29,7 @@ await describeStateStoreConformance(
 
 await describeStateStoreConformance(
 	'MemoryStateStore, claiming a 60-block window',
-	(declarations) => new WindowedMemoryStore(declarations, 60),
+	(declarations) => new MemoryStateStore(declarations, {retention: {blocks: 60}, finalityDepth: 60}),
 );
 
 await describeStateStoreConformance(

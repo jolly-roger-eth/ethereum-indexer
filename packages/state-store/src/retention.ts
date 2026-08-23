@@ -9,10 +9,13 @@ import {BlockNotRetainedError} from './errors.js';
  * falls outside it gets back.
  *
  * The two are deliberately not the same type. A setting is a request, and a
- * store reports what it can actually provide: a store with no pruning that is
- * asked for a window keeps MORE than it was asked to (see
- * `retentionWithoutPruning`), and it says `unbounded` rather than claiming an
- * enforcement it does not have.
+ * store reports what it can actually provide, so a store that cannot enforce
+ * what it was asked for reports what it does instead of what it was told.
+ *
+ * The third piece is `retentionFloor` and `prune`: the window bounds what a READ
+ * may ask about at all times (`assertRetained`), and pruning is what makes it
+ * bound the BYTES as well. The two halves share one comparison, deliberately, so
+ * that no backend can refuse a read at one boundary and delete rows at another.
  */
 
 /**
@@ -41,15 +44,53 @@ export type RetentionOptions = {
 	/**
 	 * The reorg depth this deployment protects against, in block numbers.
 	 *
-	 * Required whenever a window is set and unused otherwise: reorg revert
-	 * reopens versions closed after the fork point, so a window shorter than the
-	 * finality depth would prune the versions revert itself needs.
+	 * Required whenever a window is set: reorg revert reopens versions closed
+	 * after the fork point, so a window shorter than the finality depth would
+	 * prune the versions revert itself needs.
+	 *
+	 * Optional but load-bearing alongside `revert-only`, where it is the store's
+	 * whole retention and therefore its prune floor (`retentionFloor`). A
+	 * `revert-only` store that states no depth has stated no floor and prunes
+	 * nothing.
 	 */
 	readonly finalityDepth?: number;
 };
 
 /** The block numbers a store can still answer about: `from` and `to` inclusive. */
 export type RetainedRange = {readonly from: number; readonly to: number};
+
+/** How much work ONE `prune` call may do. */
+export type PruneOptions = {
+	/**
+	 * Stop after deleting this many versions and leave the rest for the next call.
+	 *
+	 * This is what makes an AMORTISED policy expressible above the seam without
+	 * the store guessing one: a host that wants to spread the cost calls
+	 * `prune({maxVersions: n})` on its own schedule and watches `complete`, while a
+	 * host that wants the whole pass calls `prune()` and pays for it once. Pruning
+	 * is not free (a prune plus `VACUUM` measured 1.1 s at 62,553 versions in
+	 * `work/notes/findings/sqlite-in-the-browser.md`), which is exactly why the
+	 * budget is the caller's to set.
+	 *
+	 * Unset means no budget: prune until there is nothing left to prune.
+	 */
+	readonly maxVersions?: number;
+};
+
+/** What one `prune` call actually did, as data rather than as a log line. */
+export type PruneReport = {
+	/** The tip the floor was measured back from, or `undefined` before the first block. */
+	readonly tip: number | undefined;
+	/**
+	 * The block at or below which a CLOSED version was dropped, or `undefined`
+	 * when this store has no floor to prune at (see `retentionFloor`).
+	 */
+	readonly floor: number | undefined;
+	/** How many versions were physically deleted. The honest measure of a prune. */
+	readonly versionsDeleted: number;
+	/** Whether nothing prunable remains. `false` only when a budget stopped the pass. */
+	readonly complete: boolean;
+};
 
 /** The retention of a store nothing was asked of: keep everything, claim nothing. */
 export const DEFAULT_RETENTION: Retention = {kind: 'unbounded'};
@@ -72,10 +113,10 @@ export const DEFAULT_RETENTION: Retention = {kind: 'unbounded'};
  *   "the last N updates" resolves to a floor BLOCK NUMBER above the seam and the
  *   one enforcement path does the rest.
  *
- * The default, when nothing is set, is `unbounded`: no shipped store prunes, so
- * it is the only report that is TRUE of them, and any default window would be
- * both a claim nothing enforces and (at the sizes that look generous) nearly
- * empty in updates on a real stream.
+ * The default, when nothing is set, is `unbounded`: it is the only setting that
+ * changes nothing about a store that was never configured, and any default
+ * window would be both a bound nobody chose and (at the sizes that look
+ * generous) nearly empty in updates on a real stream.
  */
 export function resolveRetention(setting: RetentionSetting | undefined, options: RetentionOptions): Retention {
 	if (setting === undefined) return DEFAULT_RETENTION;
@@ -122,24 +163,61 @@ export function resolveRetention(setting: RetentionSetting | undefined, options:
 }
 
 /**
- * What a store that does not prune may honestly report, given what it was asked
- * for.
+ * The block at or below which a CLOSED version can no longer be reached by any
+ * legal read, and may therefore be deleted. `undefined` means "delete nothing".
  *
- * A window becomes `unbounded`, because that is what such a store actually does:
- * it keeps everything. This understates its retention, which is the safe
- * direction (a caller relying on the report asks for LESS history than is
- * there); claiming the window would be the dangerous one, since the report would
- * promise a bound nothing enforces and a long-running store would grow anyway.
+ * This is the ONE comparison the spec asks every backend to prune on, written
+ * once so that the boundary a read is refused at and the boundary a row is
+ * deleted at cannot drift apart: it is `retainedRange(...).from`, the oldest
+ * block a caller may still ask about. A version whose `_upper` equals the floor
+ * was already closed when that block was reached, so nothing inside the window
+ * can see it; a version whose `_upper` is ABOVE the floor is still the answer
+ * somewhere inside the window, and a LIVE version (no upper bound at all) is the
+ * current state and is never in scope however old it is.
  *
- * `revert-only` passes through, because refusing every historical read is
- * enforceable with no pruning at all, and `unbounded` is already the truth.
+ * The three kinds:
  *
- * This exists here rather than in each store so that the rule and its reasoning
- * are singular. It disappears from a store the day that store prunes
- * (`prune-versions-outside-retention-window`).
+ * - **`unbounded`** has no floor. Nothing is ever dropped, which is the whole
+ *   claim, so pruning such a store is a no-op rather than an error.
+ * - **`window`** floors at `tip - blocks`.
+ * - **`revert-only`** keeps superseded versions "only as long as reorg revert
+ *   needs them", and the depth a revert reaches is the FINALITY DEPTH, so that
+ *   is its floor. A deployment that declared no depth has stated no floor, and
+ *   gets no pruning rather than a guessed one: the alternative would be a store
+ *   silently deleting against a number nobody wrote down.
+ *
+ * Never negative: a tip closer to genesis than the window means the store is
+ * younger than its own retention, and there is nothing behind block 0.
  */
-export function retentionWithoutPruning(requested: Retention): Retention {
-	return requested.kind === 'window' ? {kind: 'unbounded'} : requested;
+export function retentionFloor(retention: Retention, tip: number, finalityDepth?: number): number | undefined {
+	switch (retention.kind) {
+		case 'unbounded':
+			return undefined;
+		case 'window':
+			return Math.max(0, tip - retention.blocks);
+		case 'revert-only':
+			return finalityDepth === undefined ? undefined : Math.max(0, tip - finalityDepth);
+	}
+}
+
+/**
+ * Validate a prune budget and return it as a number to count down from.
+ *
+ * Shared so that every backend refuses the same nonsense in the same words. Zero
+ * is refused rather than treated as "do nothing", because a caller writing
+ * `maxVersions: 0` has computed a budget wrongly, and a silent no-op would let a
+ * store grow forever while its owner watched a prune run on schedule.
+ */
+export function pruneBudget(options: PruneOptions): number {
+	const {maxVersions} = options;
+	if (maxVersions === undefined) return Number.POSITIVE_INFINITY;
+	if (!Number.isInteger(maxVersions) || maxVersions < 1) {
+		throw new Error(
+			`invalid prune budget: ${JSON.stringify(maxVersions)}. maxVersions is a whole number of versions to ` +
+				`delete, at least 1; leave it unset to prune everything the retention floor allows.`,
+		);
+	}
+	return maxVersions;
 }
 
 /**
