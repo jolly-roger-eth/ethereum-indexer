@@ -1,0 +1,5 @@
+# `EthereumIndexer.load()` needs a chain, so the split server half cannot call it
+
+2026-08-23, noticed while building `work/tasks/.../one-processor-cli-and-split-server`.
+
+`EthereumIndexer.load()` opens with `eth_chainId` (and `eth_getBlockByNumber` when a `genesisHash` is set) before it reaches `processor.load()`, so the half of a SPLIT deployment that hosts the stream-builder and the processor cannot use it: that half has no provider (ADR-0003 keeps every chain call in the log-fetcher). `packages/processor-sqlite/test/deployment-shapes.test.ts` works around it by calling `processor.load(source, streamConfig)` directly and never `indexer.load()`, which also skips the kept-stream resume and the `indexerMatches` discard path. Worth resolving in `ingest-wire-receiving-side`, which owns the real ingestion endpoint: either a chain-free load for the receiving side, or an explicit statement that the server boots its processor itself and validates `{source, config}` off the wire instead of off the chain.

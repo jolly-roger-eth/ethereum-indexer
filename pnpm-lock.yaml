@@ -730,6 +730,9 @@ importers:
       '@etherfold/js-processor':
         specifier: workspace:*
         version: link:../js-processor
+      '@etherfold/state-store':
+        specifier: workspace:*
+        version: link:../state-store
       '@libsql/client':
         specifier: ^0.17.3
         version: 0.17.4
