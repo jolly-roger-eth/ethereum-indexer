@@ -1,5 +1,5 @@
 ---
-'ethereum-indexer': minor
+'@etherfold/core': minor
 ---
 
 Read `blockTimestamp` off the log, and only fetch the blocks that are missing one.

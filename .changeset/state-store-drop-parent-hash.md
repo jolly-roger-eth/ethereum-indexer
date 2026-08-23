@@ -1,5 +1,5 @@
 ---
-'@ethereum-indexer/state-store-sqlite': minor
+'@etherfold/state-store-sqlite': minor
 ---
 
 Remove `parentHash` from `_blocks`, `BlockPointer` and `RecordedBlock`.

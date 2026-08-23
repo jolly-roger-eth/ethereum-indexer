@@ -1,5 +1,7 @@
 # Findings: EventCache review
 
+> The reviewed code has since moved: `packages/ethereum-indexer-db-utils/` is now `archive/ethereum-indexer-db-utils/`, retired under ADR-0010. The paths below are as they were at review time. This review stays live because that code is being **re-homed** into the stream-builder rather than discarded, so its findings must not be carried across with it.
+
 **Reviewed:**
 - `packages/ethereum-indexer-db-utils/src/processor/EventCache.ts` (~210 LOC)
 - `packages/ethereum-indexer-db-utils/src/cache/StreamDBCache.ts` (~71 LOC)

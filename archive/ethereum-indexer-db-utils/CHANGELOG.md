@@ -1,5 +1,13 @@
 # ethereum-indexer-db-utils
 
+## Unreleased, and never will be
+
+This package retired under ADR-0010 before these changes were released, and it moved to `archive/` outside the workspace. It had no changeset of its own; it was named by four that also covered packages which were renamed and will ship under their new names. Those changesets stopped naming this one when the release path was cleared, since a changeset naming a package that is not in the workspace makes `changeset status` and any release fail outright. See `archive/README.md`.
+
+### Patch Changes
+
+- The ESM-only `tsc` build (`dist/*.cjs` and `main` removed, `NodeNext` resolution), the viem v2 dependency update, and the shared `isBigIntLiteral` / `simple_hash` guard that replaced this package's own copy of the `"123n"` BigInt reviver. Released under `@etherfold/*`; never released here.
+
 ## 0.6.21
 
 ### Patch Changes

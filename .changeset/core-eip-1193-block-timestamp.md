@@ -1,5 +1,5 @@
 ---
-'ethereum-indexer': patch
+'@etherfold/core': patch
 ---
 
 Take `blockTimestamp` from `eip-1193`'s own type, dropping the local widening.

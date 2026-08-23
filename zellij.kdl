@@ -11,9 +11,6 @@ layout {
 			pane name="cli" command="pnpm" cwd="packages/cli" {
 				args "dev"
 			}
-			pane name="db-utils" command="pnpm" cwd="packages/ethereum-indexer-db-utils" {
-				args "dev"
-			}
 		}
 		pane split_direction="horizontal" {
 			pane name="fs" command="pnpm" cwd="packages/fs" {
@@ -23,9 +20,6 @@ layout {
 				args "dev"
 			}
 			pane name="js-processor" command="pnpm" cwd="packages/js-processor" {
-				args "dev"
-			}
-			pane name="old-server" command="pnpm" cwd="packages/ethereum-indexer-server" {
 				args "dev"
 			}
 			pane name="server" command="pnpm" cwd="packages/server" {

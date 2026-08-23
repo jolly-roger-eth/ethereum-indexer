@@ -15,12 +15,9 @@
 	},
 	"devDependencies": {
 		"as-soon": "^0.1.5",
-		"ethereum-indexer-server": "workspace:*",
 		"typescript": "^6.0.3"
 	},
 	"scripts": {
-		"eis": "eis",
-		"test": "eis run -p ./dist/index.js --disableCache",
 		"build": "tsc",
 		"dev": "as-soon -w src pnpm build"
 	}

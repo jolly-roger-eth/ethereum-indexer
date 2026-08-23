@@ -1,5 +1,30 @@
 # ethereum-indexer-server
 
+## Unreleased, and never will be
+
+This package retired under ADR-0010 before these changes were released, and it moved to `archive/` outside the workspace. The entries below were pending changesets in `.changeset/`; they are transcribed here rather than deleted, because a changeset naming a package that is not in the workspace makes `changeset status`, `changeset version` and any release fail outright. There is no version to publish them under. See `archive/README.md`.
+
+### Patch Changes
+
+- Rewrite `setupIndexing()` to use the new shared `resolveProcessorAndSource` helper from `@etherfold/utils` instead of its own copy of the processor-module loading / contract-data / source-resolution logic (LOW-4 in the server/CLI batch audit). Behaviour is preserved: the server still owns its provider construction (including the `createProvider` seam) and its caching (`useCache` / `useFSCache`) and `EthereumIndexer` wiring, and still passes its `folder` as the processor factory argument (now expressed explicitly via the helper's `processorConfig` parameter).
+
+- Harden the server HTTP surface (low-severity fixes):
+
+  - Routes that hit a not-ready server (`no indexer` / `no processor` / cache disabled) now return a shaped `503` `{error:{code,message}}` body instead of throwing, which Koa turned into a `500` (potentially leaking a stack trace). The mutating routes keep their existing `{error:{code}}` shape.
+  - The API-key check now uses a constant-time comparison (`crypto.timingSafeEqual`) instead of `Array.includes`, so response timing does not leak the key. Behaviour is otherwise unchanged (valid keys authorize, invalid keys are rejected).
+
+- Make the server's indexing more robust and observable:
+
+  - **Exponential backoff on auto-index errors.** The auto-index loop previously retried every 1s forever on failure and logged at `info`. It now backs off exponentially (1s → 2s → 4s … capped at 60s), resets on success, and logs at `error`.
+  - **Surface the last error in the `/` status.** A failing/stuck server reported `indexing: true` with no indication of trouble. The `/` response now includes a `lastError` (`{message, at}`) so operators can see the loop is failing.
+  - **Serialize all indexing entrypoints.** The auto-index loop, manual `/indexMore`, `/feed` and `/replay` now go through a single in-flight guard, so two indexing operations never run concurrently on the same indexer instance (previously two concurrent `/indexMore` calls could race, and `/feed`/`/replay` were not guarded against an in-flight manual `/indexMore`).
+
+- Fix the `/feed` route reading the request body from the wrong place. It read `ctx.body.events` (the response body, always `undefined` here) instead of `ctx.request.body.events`, so every real `/feed` call threw `Cannot read properties of undefined (reading 'events')` and the route was effectively dead. It now reads the `events` array from the request body, validates it is an array (returning a shaped `{error:{code:4000}}` Bad Request instead of throwing a 500 when it is missing/not an array), and forwards it to `indexer.feed`.
+
+  Also adds an optional `createProvider?: (nodeURL) => provider` factory to the server config (defaults to the existing `new JSONRPCHTTPProvider(nodeURL)`, so behaviour is unchanged when omitted; useful for injecting a custom provider or a fake in tests), and makes the admin page template load lazily instead of at module import time.
+
+- Shared with the packages that were renamed, and released only under their new names: the ESM-only `tsc` build, the viem v2 dependency update, the published-type-dependency fix and the `isBigIntLiteral` / `simple_hash` guard. Those changesets kept their other packages and simply stopped naming this one.
+
 ## 0.6.32
 
 ### Patch Changes

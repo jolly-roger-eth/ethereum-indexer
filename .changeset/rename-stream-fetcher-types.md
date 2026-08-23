@@ -1,6 +1,6 @@
 ---
-'ethereum-indexer': minor
-'ethereum-indexer-browser': minor
+'@etherfold/core': minor
+'@etherfold/browser': minor
 ---
 
 Rename misspelled public types `StreamFecther` → `StreamFetcher` and `ExistingStateFecther` → `ExistingStateFetcher`.

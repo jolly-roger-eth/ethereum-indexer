@@ -1,5 +1,5 @@
 ---
-'ethereum-indexer': patch
+'@etherfold/core': patch
 ---
 
 Several bug fixes in the core indexer:
