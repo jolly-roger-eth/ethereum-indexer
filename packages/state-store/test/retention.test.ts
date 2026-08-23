@@ -10,8 +10,7 @@ import {
 	type Retention,
 	type StateStoreCapabilities,
 } from '../src/index.js';
-import {TOKEN, block, owns} from './utils/fixtures.js';
-import {WindowedStore} from './utils/windowed-store.js';
+import {TOKEN} from './utils/fixtures.js';
 
 /**
  * Retention is a number a deployment SETS and a store REPORTS, and the refusal
@@ -22,6 +21,13 @@ import {WindowedStore} from './utils/windowed-store.js';
  * event-bearing blocks are median 429 apart, so a window of 64 BLOCKS holds
  * exactly one event-bearing block. A window is not a number of updates, and it
  * is not a duration.
+ *
+ * These are the rules themselves: the setting a deployment writes, the range it
+ * resolves to, and the refusal a store raises. That a STORE honours its own
+ * claim -- answers inside its window, refuses outside it, refuses everything
+ * when it keeps history for revert alone -- is asserted against every backend by
+ * the shared suite (`@etherfold/state-store-conformance`), which runs this
+ * package's `MemoryStateStore` under each of the three claims.
  */
 
 const capabilities = (retention: Retention, asOf = retention.kind !== 'revert-only'): StateStoreCapabilities => ({
@@ -172,73 +178,12 @@ describe('the refusal', () => {
 	});
 });
 
-describe('a revert-only store', () => {
+describe('a store keeps whatever it was set to, but claims only what it enforces', () => {
 	it('reports `revert-only`, and reports that it answers no as-of read', () => {
 		const store = new MemoryStateStore([TOKEN], {retention: 'revert-only'});
 		expect(store.capabilities).toEqual({retention: {kind: 'revert-only'}, asOf: false});
 	});
 
-	it('refuses EVERY historical read, including one at its own tip', async () => {
-		const store = new MemoryStateStore([TOKEN], {retention: 'revert-only'});
-		await store.migrate();
-		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
-
-		await expect(store.getAsOf('token', {id: '1'}, 10)).rejects.toBeInstanceOf(BlockNotRetainedError);
-		await expect(store.getAsOf('token', {id: '1'}, 9)).rejects.toBeInstanceOf(BlockNotRetainedError);
-	});
-
-	it('never answers a historical read from the tip, which is the whole point', async () => {
-		const store = new MemoryStateStore([TOKEN], {retention: 'revert-only'});
-		await store.migrate();
-		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
-		await store.applyBlock(block(20), [owns('1', '0xbob', 2)]);
-
-		// the tip value is `0xbob`; a store that "helpfully" answered the as-of read
-		// from the tip would return a plausible wrong number nothing downstream can
-		// tell apart from a true one.
-		const error = await store.getAsOf('token', {id: '1'}, 10).catch((e) => e);
-		expect(error).toBeInstanceOf(BlockNotRetainedError);
-		expect(await store.getCurrent<{owner: string}>('token', {id: '1'})).toMatchObject({owner: '0xbob'});
-	});
-
-	it('still reverts, because revert is the capability it keeps', async () => {
-		const store = new MemoryStateStore([TOKEN], {retention: 'revert-only'});
-		await store.migrate();
-		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
-		await store.applyBlock(block(20), [owns('1', '0xbob', 2)]);
-
-		await store.revertTo(10);
-		expect(await store.getCurrent<{owner: string}>('token', {id: '1'})).toMatchObject({owner: '0xalice'});
-	});
-});
-
-describe('a store with a window', () => {
-	it('answers inside it and refuses outside it', async () => {
-		const store = new WindowedStore([TOKEN], 60);
-		await store.migrate();
-		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
-		await store.applyBlock(block(1_000), [owns('1', '0xbob', 2)]);
-
-		expect(await store.getAsOf<{owner: string}>('token', {id: '1'}, 999)).toMatchObject({owner: '0xalice'});
-
-		const error = await store.getAsOf('token', {id: '1'}, 10).catch((e) => e);
-		expect(error).toBeInstanceOf(BlockNotRetainedError);
-		expect(error.requested).toBe(10);
-		expect(error.retained).toEqual({from: 940, to: 1_000});
-	});
-
-	it('moves its window with the tip', async () => {
-		const store = new WindowedStore([TOKEN], 60);
-		await store.migrate();
-		await store.applyBlock(block(100), [owns('1', '0xalice', 1)]);
-
-		expect(await store.getAsOf('token', {id: '1'}, 40)).toBeUndefined();
-		await store.applyBlock(block(200), [owns('1', '0xbob', 2)]);
-		await expect(store.getAsOf('token', {id: '1'}, 40)).rejects.toBeInstanceOf(BlockNotRetainedError);
-	});
-});
-
-describe('a store keeps whatever it was set to, but claims only what it enforces', () => {
 	it('accepts a window and still reports `unbounded` while nothing prunes', () => {
 		const store = new MemoryStateStore([TOKEN], {retention: {blocks: 128}, finalityDepth: 64});
 		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});

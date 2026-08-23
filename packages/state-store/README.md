@@ -44,3 +44,5 @@ A processor could have been written against raw SQL, forcing wasm SQLite into ev
 ## Tests
 
 `pnpm --filter @etherfold/state-store test`, vitest.
+
+What the CONTRACT is, rather than what this package's reference store happens to do, is asserted by [`@etherfold/state-store-conformance`](../state-store-conformance): one suite, parameterised by a backend factory, asserting external behaviour only. `MemoryStateStore` is run through it under three retention claims, and that run lives in THAT package because it depends on this one and cannot be depended on back. A new backend earns its place behind this seam by passing the same suite.

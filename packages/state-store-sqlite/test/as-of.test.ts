@@ -1,7 +1,23 @@
-import {beforeEach, describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vitest';
 import {VersionedStateStore} from '../src/index.js';
 import {createTestDB, rows} from './utils/db.js';
-import {TOKEN, block, burn, owns} from './utils/fixtures.js';
+import {TOKEN, block, owns} from './utils/fixtures.js';
+
+/**
+ * What is left here is what only THIS backend can be asked.
+ *
+ * The behaviour of an as-of read -- which version answers at which block, the
+ * half-open range, an entity absent before it existed, a delete readable as of
+ * any earlier block -- is the seam's and is asserted for every backend by
+ * `@etherfold/state-store-conformance` (see `conformance.test.ts`). Keeping a
+ * second copy of those cases here would be keeping a second answer to the same
+ * question, which is the drift the shared suite exists to prevent.
+ *
+ * These remain because they are about the versioned-row REPRESENTATION: the
+ * whole-table query surface that takes caller-supplied SQL and is deliberately
+ * not at the seam, and the invariants a reader can only check by looking at the
+ * rows.
+ */
 
 // One token, three owners, so the key has several versions to travel through:
 //   [100, 101) Alice   [101, 102) Bob   [102, ...) Carol
@@ -15,38 +31,32 @@ async function threeVersions() {
 	return {db, store};
 }
 
-describe('reading as of a block', () => {
-	let store: VersionedStateStore;
-	let db: ReturnType<typeof createTestDB>;
-
-	beforeEach(async () => {
-		({db, store} = await threeVersions());
+describe('the whole-table query surface, which belongs to this backend alone', () => {
+	it('queries a whole entity as of a block', async () => {
+		const {store} = await threeVersions();
+		await store.applyBlock(block(103), [owns('2', '0xDave', 1)]);
+		const at102 = await store.queryAsOf<{id: string}>('token', 102);
+		const at103 = await store.queryAsOf<{id: string}>('token', 103);
+		expect(at102.map((t) => t.id).sort()).toEqual(['1']);
+		expect(at103.map((t) => t.id).sort()).toEqual(['1', '2']);
 	});
 
-	it('returns the value that was live at that block', async () => {
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 100))?.owner).toBe('0xAlice');
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 101))?.owner).toBe('0xBob');
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 102))?.owner).toBe('0xCarol');
+	it('supports a filter, an order and a limit on an as-of query', async () => {
+		const {store} = await threeVersions();
+		await store.applyBlock(block(103), [owns('2', '0xDave', 1), owns('3', '0xDave', 1)]);
+		const dave = await store.queryAsOf<{id: string}>('token', 103, {
+			where: 'owner = ?',
+			args: ['0xDave'],
+			orderBy: 'id DESC',
+			limit: 1,
+		});
+		expect(dave.map((t) => t.id)).toEqual(['3']);
 	});
+});
 
-	it('is inclusive at the block a version opened and exclusive at the block it closed', async () => {
-		// version [101, 102): live AT 101 (the block that opened it),
-		// and NOT live at 102 (the block that closed it) — half-open range.
-		const at101 = await store.getAsOf<{owner: string}>('token', {id: '1'}, 101);
-		const at102 = await store.getAsOf<{owner: string}>('token', {id: '1'}, 102);
-		expect(at101?.owner).toBe('0xBob');
-		expect(at102?.owner).not.toBe('0xBob');
-	});
-
-	it('returns nothing before the entity existed', async () => {
-		expect(await store.getAsOf('token', {id: '1'}, 99)).toBeUndefined();
-	});
-
-	it('returns the tip value for any block at or after the last change', async () => {
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 5_000))?.owner).toBe('0xCarol');
-	});
-
+describe('one live version per business key', () => {
 	it('never returns more than one version for a key at a given block', async () => {
+		const {db} = await threeVersions();
 		for (const n of [100, 101, 102, 103]) {
 			const all = await rows(
 				db,
@@ -59,44 +69,6 @@ describe('reading as of a block', () => {
 		}
 	});
 
-	it('reads current state as the open-row special case', async () => {
-		const current = await store.getCurrent<{owner: string; transferCount: number}>('token', {id: '1'});
-		expect(current?.owner).toBe('0xCarol');
-		expect(current?.transferCount).toBe(3);
-	});
-
-	it('queries a whole entity as of a block', async () => {
-		await store.applyBlock(block(103), [owns('2', '0xDave', 1)]);
-		const at102 = await store.queryAsOf<{id: string}>('token', 102);
-		const at103 = await store.queryAsOf<{id: string}>('token', 103);
-		expect(at102.map((t) => t.id).sort()).toEqual(['1']);
-		expect(at103.map((t) => t.id).sort()).toEqual(['1', '2']);
-	});
-
-	it('supports a filter, an order and a limit on an as-of query', async () => {
-		await store.applyBlock(block(103), [owns('2', '0xDave', 1), owns('3', '0xDave', 1)]);
-		const dave = await store.queryAsOf<{id: string}>('token', 103, {
-			where: 'owner = ?',
-			args: ['0xDave'],
-			orderBy: 'id DESC',
-			limit: 1,
-		});
-		expect(dave.map((t) => t.id)).toEqual(['3']);
-	});
-});
-
-describe('deleting an entity', () => {
-	it('is just the close: absent afterwards, still present as of before', async () => {
-		const {store} = await threeVersions();
-		await store.applyBlock(block(103), [burn('1')]);
-
-		expect(await store.getCurrent('token', {id: '1'})).toBeUndefined();
-		expect(await store.getAsOf('token', {id: '1'}, 103)).toBeUndefined();
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 102))?.owner).toBe('0xCarol');
-	});
-});
-
-describe('one live version per business key', () => {
 	it('is enforced by the partial unique index, not by convention', async () => {
 		const db = createTestDB();
 		const store = new VersionedStateStore(db, [TOKEN]);

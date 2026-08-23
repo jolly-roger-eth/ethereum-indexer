@@ -3,6 +3,19 @@ import {VersionedStateStore} from '../src/index.js';
 import {createTestDB, rows} from './utils/db.js';
 import {ACCOUNT, TOKEN, block, burn, owns} from './utils/fixtures.js';
 
+/**
+ * What revert MEANS -- a closed version live again, a counter back DOWN, an
+ * entity created above the fork gone, the same height replayable afterwards --
+ * is the seam's, and `@etherfold/state-store-conformance` asserts it against
+ * every backend (see `conformance.test.ts`). It is not restated here.
+ *
+ * What is left is what revert does to the ROWS, which only this backend has:
+ * that no version survives above the fork in either bound, that the dead blocks
+ * leave the canonical block table, and that exactly one version per key is open
+ * afterwards. Those are the invariants a wrong revert would break silently while
+ * still answering every external question correctly for a while.
+ */
+
 async function indexedChain() {
 	const db = createTestDB();
 	const store = new VersionedStateStore(db, [TOKEN, ACCOUNT]);
@@ -14,27 +27,17 @@ async function indexedChain() {
 	return {db, store};
 }
 
-describe('revertTo', () => {
-	it('restores exactly the state as of the fork block', async () => {
+describe('revertTo, in the rows', () => {
+	it('restores exactly the state the as-of query gave for the fork block', async () => {
 		const {store} = await indexedChain();
 		const before = await store.queryAsOf<{id: string; owner: string}>('token', 101);
 
 		await store.revertTo(101);
 
-		expect((await store.getCurrent<{owner: string}>('token', {id: '1'}))?.owner).toBe('0xBob');
-		// entity 2 was deleted on the dead branch: the delete must be undone too
-		expect((await store.getCurrent<{owner: string}>('token', {id: '2'}))?.owner).toBe('0xZoe');
+		// the whole-table read is this backend's own surface, so the equality
+		// between "as of 101" and "current, after reverting to 101" is asserted here
 		const after = await store.queryCurrent<{id: string; owner: string}>('token');
 		expect(after.map((t) => `${t.id}:${t.owner}`).sort()).toEqual(before.map((t) => `${t.id}:${t.owner}`).sort());
-	});
-
-	it('leaves history strictly below the fork untouched and still queryable', async () => {
-		const {store} = await indexedChain();
-		await store.revertTo(101);
-
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 100))?.owner).toBe('0xAlice');
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 101))?.owner).toBe('0xBob');
-		expect(await store.getAsOf('token', {id: '1'}, 99)).toBeUndefined();
 	});
 
 	it('drops every version born above the fork', async () => {
@@ -58,44 +61,13 @@ describe('revertTo', () => {
 		expect(open.map((t) => t.id)).toEqual(['1', '2']);
 	});
 
-	it('lets the canonical branch replay normally after the fork', async () => {
-		const {store} = await indexedChain();
-		await store.revertTo(101);
-		await store.applyBlock(block(102, '0xc2'), [owns('1', '0xErin', 3)]);
-
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 102))?.owner).toBe('0xErin');
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 101))?.owner).toBe('0xBob');
-		expect((await store.getAsOf<{owner: string}>('token', {id: '1'}, 100))?.owner).toBe('0xAlice');
-	});
-
-	it('reverting to a block below everything empties the state without touching the schema', async () => {
+	it('empties the tables without touching the schema when it reverts below everything', async () => {
 		const {db, store} = await indexedChain();
 		await store.revertTo(0);
 		expect(await rows(db, `SELECT * FROM token`)).toEqual([]);
 		expect(await rows(db, `SELECT * FROM _blocks`)).toEqual([]);
-		// still usable
+		// still usable: the tables are still there
 		await store.applyBlock(block(100), [owns('1', '0xAlice', 1)]);
 		expect((await store.getCurrent<{owner: string}>('token', {id: '1'}))?.owner).toBe('0xAlice');
-	});
-
-	it('is a no-op above the tip', async () => {
-		const {store} = await indexedChain();
-		await store.revertTo(9_999);
-		expect((await store.getCurrent<{owner: string}>('token', {id: '1'}))?.owner).toBe('0xDan');
-	});
-
-	it('reverts every declared entity, not just the ones that changed', async () => {
-		const db = createTestDB();
-		const store = new VersionedStateStore(db, [TOKEN, ACCOUNT]);
-		await store.migrate();
-		await store.applyBlock(block(100), [
-			{type: 'upsert', entity: 'account', id: {address: '0xa'}, values: {balance: 1}},
-		]);
-		await store.applyBlock(block(101), [
-			{type: 'upsert', entity: 'account', id: {address: '0xa'}, values: {balance: 2}},
-		]);
-
-		await store.revertTo(100);
-		expect((await store.getCurrent<{balance: number}>('account', {address: '0xa'}))?.balance).toBe(1);
 	});
 });
