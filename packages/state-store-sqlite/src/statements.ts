@@ -1,7 +1,13 @@
-import {normalizeBlockHash} from './blocks.js';
+import {idValues, mustGet, normalizeBlockHash, normalizeEntities} from '@etherfold/state-store';
 import {BLOCKS_TABLE, LOWER, UPPER} from './ddl.js';
-import {mustGet, normalizeEntities} from './internal/identifiers.js';
-import type {BlockPointer, EntityDeclaration, EntityId, Mutation, NormalizedEntity, Statement} from './types.js';
+import type {BlockPointer, EntityDeclaration, Mutation, NormalizedEntity, Statement} from './types.js';
+
+/**
+ * The business key as bound values, in declared column order. Defined at the
+ * seam (every backend stringifies a key the same way) and re-exported because
+ * this package's public surface has always carried it.
+ */
+export {idValues};
 
 /**
  * The SQL of the store, built as plain data.
@@ -55,16 +61,6 @@ export function blockAtOrBeforeStatement(timestamp: number): Statement {
 
 export function idPredicate(entity: NormalizedEntity): string {
 	return entity.id.map((column) => `${column} = ?`).join(' AND ');
-}
-
-export function idValues(entity: NormalizedEntity, id: EntityId): string[] {
-	return entity.id.map((column) => {
-		const value = id?.[column];
-		if (value === undefined || value === null) {
-			throw new Error(`entity ${entity.name} requires an id column ${column}, got ${JSON.stringify(value)}`);
-		}
-		return String(value);
-	});
 }
 
 /**

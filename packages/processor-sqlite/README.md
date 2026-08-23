@@ -2,6 +2,8 @@
 
 An `EventProcessor` whose derived state is versioned rows in [`@etherfold/state-store-sqlite`](../state-store-sqlite) rather than an object in memory. Indexing a chain normally leaves the state readable **as of any earlier block**, on the hash, height or time axis, without the processor author doing anything beyond declaring entities and writing handlers.
 
+The processor object below is **not** a SQLite thing. The authoring API (`EntityProcessor`, the `on<EventName>` handler map, `MutationContext`) is defined in [`@etherfold/processor-entities`](../processor-entities) and re-exported here, so the same object runs unchanged against any other `StateStore` backend; `SQLProcessor` remains as a deprecated alias. This package is what wires SQLite in and owns the `LastSync` cursor. See ADR-0018.
+
 ```ts
 import {VersionedStateEventProcessor} from '@etherfold/processor-sqlite';
 
@@ -28,7 +30,7 @@ The observable behaviour is meant to be identical, and that is checked rather th
 
 **Timestamps usually cost nothing, but check your node.** `blockTimestamp` is on the log itself under `execution-apis#639`, served by geth (>= 1.16.0), reth, besu, erigon and anvil, so the time axis is populated with no extra request. **Hardhat's EDR does not emit it** (verified on hardhat 3.14.0 / edr 0.3.8), and there set `stream: {alwaysFetchTimestamps: true}` so the core fetches the blocks whose logs lack one. That flag is now a fallback rather than a requirement: it only fetches what is actually missing, so leaving it on costs nothing on a compliant node. A block is never recorded without a real timestamp: `process` throws instead of guessing, because `getAsOf({timestamp})` has no way to tell a caller it was lied to.
 
-**A handler's `set` writes the whole row.** A version is a complete row rather than a delta, mirroring the store's close-then-insert, so unlisted declared fields become `NULL`. To change one field, `get` the record and spread it; `get` is read-your-writes within the block being processed.
+**A handler's `set` writes the whole row.** A version is a complete row rather than a delta, mirroring the store's close-then-insert, so unlisted declared fields become `NULL`. To change one field, use `update(entity, id, partial)`, which is sugar over get-then-spread-then-set; `get` is read-your-writes within the block being processed.
 
 ## What `process` returns
 
@@ -36,7 +38,7 @@ A `VersionedStateView`: a read-only query handle, not the state. Materialising a
 
 ## Design notes
 
-- ADR-0016 for the package name, ADR-0014 for the scope.
+- ADR-0016 for the package name, ADR-0014 for the scope, ADR-0018 for why the authoring API is not defined here.
 - ADR-0001 for why the in-memory path uses reverse-patches and what justified revisiting it here.
 - ADR-0015 for why an unresolvable block address throws instead of answering `undefined`.
 - `docs/design/historical-state-database.md` §2 and §5 for the versioned-row model and the revert.

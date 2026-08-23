@@ -1,3 +1,14 @@
+import {normalizeBlockHash, normalizeBlockTimestamp} from '@etherfold/state-store';
+
+/**
+ * The normalisation of a block's own fields is the SEAM's, not this store's:
+ * `BlockPointer` means the same thing to every backend, so `hash` is folded to
+ * lower case and `timestamp` is read out of its wire encoding in one place.
+ * Re-exported here because this package's public surface has always carried
+ * them.
+ */
+export {normalizeBlockHash, normalizeBlockTimestamp};
+
 /**
  * ## Addressing state by block: hash, height, or time
  *
@@ -126,66 +137,4 @@ function assertHeight(value: unknown, address: BlockAddress): number {
 		throw new Error(`invalid block address: ${JSON.stringify(address)}. A height must be a non-negative integer.`);
 	}
 	return value;
-}
-
-/**
- * Fold a block hash to one canonical spelling: lower case.
- *
- * Hex case carries no meaning in a block hash (unlike an EIP-55 address), but
- * SQL string comparison is case-sensitive, so a hash that has travelled through
- * a consumer's storage and come back upper-cased would fail to resolve. That
- * failure would read as "reorged out", which is the one answer this store must
- * never give wrongly. Folding on write and on lookup removes the possibility.
- */
-export function normalizeBlockHash(hash: unknown): string {
-	if (typeof hash !== 'string' || hash.length === 0) {
-		throw new Error(`invalid block hash: ${JSON.stringify(hash)}. Expected a non-empty string.`);
-	}
-	return hash.toLowerCase();
-}
-
-/**
- * Read `blockTimestamp` off a log into seconds since the epoch.
- *
- * The timestamp comes from the log itself (`blockTimestamp`, standardised in
- * `execution-apis#639`, served by current clients), so addressing by time needs
- * no extra block-by-number round-trip. It arrives inconsistently encoded: the
- * spec says a QUANTITY is 0x-prefixed hex, and at least one client returned it
- * in decimal.
- *
- * The prefix is the ONLY signal, and the ambiguity is not recoverable without
- * it: `'1705366720'` is a valid hex string as well as a valid decimal one, and
- * the two readings are ~2,300 years apart. So `0x` means hex, bare digits mean
- * decimal, and anything else throws rather than defaulting to 0 (a timestamp of
- * 0 would sort before every block and quietly poison time addressing).
- *
- * This lives at the store's seam because the store's `BlockPointer.timestamp` is
- * where the numeric contract is defined. The ingestion side (the stream-builder,
- * not yet built) calls it once, when it turns a log into a `BlockPointer`,
- * rather than re-deriving the same rule.
- */
-export function normalizeBlockTimestamp(value: string | number | bigint): number {
-	const seconds = toSeconds(value);
-	if (!Number.isInteger(seconds) || seconds < 0 || !Number.isSafeInteger(seconds)) {
-		throw new Error(
-			`invalid block timestamp: ${JSON.stringify(String(value))}. Expected seconds since the epoch as a ` +
-				`non-negative integer, a 0x-prefixed hex quantity, or a decimal string.`,
-		);
-	}
-	return seconds;
-}
-
-const HEX_QUANTITY = /^0[xX][0-9a-fA-F]+$/;
-const DECIMAL_QUANTITY = /^[0-9]+$/;
-
-function toSeconds(value: string | number | bigint): number {
-	if (typeof value === 'number') return value;
-	if (typeof value === 'bigint') return Number(value);
-	if (typeof value === 'string') {
-		const text = value.trim();
-		if (HEX_QUANTITY.test(text)) return parseInt(text, 16);
-		if (DECIMAL_QUANTITY.test(text)) return Number(text);
-		return Number.NaN;
-	}
-	return Number.NaN;
 }

@@ -1,5 +1,5 @@
-import {normalizeEntity} from './internal/identifiers.js';
-import type {ColumnType, EntityDeclaration, Statement} from './types.js';
+import {normalizeEntity, type FieldType} from '@etherfold/state-store';
+import type {EntityDeclaration, Statement} from './types.js';
 
 /**
  * ## Fixed schema vs dynamic schema (the seam)
@@ -14,7 +14,9 @@ import type {ColumnType, EntityDeclaration, Statement} from './types.js';
  * declares, which is only known at run time, so their DDL is generated from the
  * declaration. That is the exception, it applies here and nowhere else, and the
  * containment is deliberate: only this module emits DDL, and every identifier it
- * interpolates has been validated (see `internal/identifiers.ts`).
+ * interpolates has been validated by the seam's `normalizeEntity`, which applies
+ * this store's identifier rule to EVERY backend so that a declaration is valid
+ * or invalid as a fact about the declaration.
  */
 
 /** Block number at which a version became valid (inclusive). */
@@ -51,7 +53,7 @@ export const FIXED_SCHEMA_DDL: string[] = [
 	`CREATE INDEX IF NOT EXISTS ${BLOCKS_TABLE}_timestamp ON ${BLOCKS_TABLE} (timestamp)`,
 ];
 
-function sqlType(type: ColumnType): string {
+function sqlType(type: FieldType): string {
 	switch (type) {
 		case 'text':
 			return 'TEXT';

@@ -8,8 +8,8 @@ import {
 	type ParsedBlockAddress,
 	type RecordedBlock,
 } from './blocks.js';
+import {mustGet, normalizeEntities, type StateStore, type StateStoreCapabilities} from '@etherfold/state-store';
 import {migrationStatements} from './ddl.js';
-import {mustGet, normalizeEntities} from './internal/identifiers.js';
 import {
 	AS_OF_PREDICATE,
 	CURRENT_PREDICATE,
@@ -66,8 +66,15 @@ export type QueryOptions = {
  *
  * It speaks only the `remote-sql` interface, so the same code runs on a local
  * SQLite file, on libSQL/Turso, and on hosted SQLite reached over HTTP.
+ *
+ * It is one implementation of `StateStore` (`@etherfold/state-store`), which is
+ * the seam a processor is written against. Everything below the `StateStore`
+ * methods -- block addressing by hash and by time, and the `queryCurrent` /
+ * `queryAsOf` surface that takes caller-supplied SQL -- is this backend's own
+ * and deliberately NOT at the seam: a server has a query planner and a handler,
+ * running once per event on every backend, does not.
  */
-export class VersionedStateStore {
+export class VersionedStateStore implements StateStore {
 	private readonly entities: ReadonlyMap<string, NormalizedEntity>;
 	private readonly bounds: BatchBounds;
 
@@ -83,6 +90,23 @@ export class VersionedStateStore {
 	/** The declared entities, after validation. */
 	get declarations(): ReadonlyMap<string, NormalizedEntity> {
 		return this.entities;
+	}
+
+	/**
+	 * What this store keeps, and what it can answer, as data a caller reads at
+	 * startup rather than inferring from a wrong answer later.
+	 *
+	 * `unbounded` is the HONEST report, not an aspiration: this package has no
+	 * pruning at all, so every version ever written is still here whatever a
+	 * deployment might wish. It deliberately takes no retention option, because a
+	 * store that accepted a window it cannot enforce would be making exactly the
+	 * claim this report exists to prevent. `prune-versions-outside-retention-window`
+	 * is what earns the right to report a window, and
+	 * `retention-capability-and-refusal` is what makes the report load-bearing by
+	 * refusing an out-of-window read.
+	 */
+	get capabilities(): StateStoreCapabilities {
+		return {retention: {kind: 'unbounded'}, asOf: true};
 	}
 
 	/**

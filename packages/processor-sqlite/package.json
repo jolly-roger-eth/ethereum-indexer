@@ -20,6 +20,7 @@
 	},
 	"license": "MIT",
 	"dependencies": {
+		"@etherfold/processor-entities": "workspace:*",
 		"@etherfold/state-store-sqlite": "workspace:*",
 		"@etherfold/core": "workspace:*",
 		"named-logs": "^0.4.1",

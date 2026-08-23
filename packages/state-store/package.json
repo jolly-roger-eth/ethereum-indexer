@@ -1,7 +1,7 @@
 {
-	"name": "@etherfold/state-store-sqlite",
+	"name": "@etherfold/state-store",
 	"version": "0.0.0",
-	"description": "Versioned-row state store for @etherfold/core: entity state kept with half-open block-validity ranges on the remote-sql interface, with as-of reads and reorg revert.",
+	"description": "The backend-agnostic state-store contract: entity declarations, the mutation context a handler writes through, the interface a versioned store implements, and the capabilities it declares.",
 	"publishConfig": {
 		"access": "public"
 	},
@@ -19,23 +19,16 @@
 		"entryPoint": "src/index.ts"
 	},
 	"license": "MIT",
-	"dependencies": {
-		"@etherfold/state-store": "workspace:*",
-		"named-logs": "^0.4.1",
-		"remote-sql": "^0.0.7"
-	},
+	"dependencies": {},
 	"devDependencies": {
-		"@libsql/client": "^0.17.3",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
-		"remote-sql-libsql": "^0.0.7",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"
 	},
 	"scripts": {
 		"build": "rm -rf dist && tsc",
-		"typecheck": "tsc -p tsconfig.typecheck.json",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",
 		"test:watch": "vitest"
