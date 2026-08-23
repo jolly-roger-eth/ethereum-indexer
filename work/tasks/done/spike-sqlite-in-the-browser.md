@@ -85,3 +85,23 @@ dorfl claim spike-sqlite-in-the-browser --arbiter <remote>
 git fetch <remote> && git switch -c work/spike-sqlite-in-the-browser <remote>/main
 git mv work/tasks/ready/spike-sqlite-in-the-browser.md work/tasks/done/spike-sqlite-in-the-browser.md
 ```
+
+---
+
+## Decisions
+
+Transcribed verbatim from the builder's final report, per `WORK-CONTRACT.md`: a builder's rationale for non-obvious in-scope choices has exactly one channel, and this is it.
+
+- **The task's premise was wrong, and the work was redirected rather than bounced.** The addresses in the body (`deployments/base`, Stratagems `0xb99d938a722df8984722ab38732533130b4f3ec4` from 11,681,933) are an early, abandoned deployment that saw 45 logs across 10 blocks. The LAUNCHED game is `contracts/deployments/alpha1`, which is also Base (its `.chain` file says `chainId: 8453`, same genesis hash), at Stratagems `0x5ab6d5bb8012fc60ab3653e025be4a59b4406ff2` from 13,499,257, with 26,308 logs. Everything is measured on `alpha1`; `base` is kept as a small smoke fixture. The task body is deliberately NOT edited, because it is a launch snapshot and rewriting it would falsify the record of what was asked.
+- **The crossover sweep is generated, and says so everywhere.** The real capture drives the port equality, the shape facts, the sparsity result and the head-to-head at the real size, but the game never reached the dataset sizes where a crossover occurs. The generated workloads use real event shapes, real handlers and real mutations out of the real processor, with invented play. Orders of magnitude are sound; the exact write mix inherits an assumption about how people play.
+- **The SQLite worker hosts the store, not a SQL socket.** Page-per-statement messaging would have cost a round-trip per statement and made SQLite look absurd for reasons unrelated to SQLite. The block-level boundary is what a real deployment would do. The price of the choice (a `postMessage` round-trip on every point read, which no tuning removes because the OPFS sync VFS is Worker-only) is reported rather than hidden.
+- **The committed fixture is gzipped, and the derived trace is not committed.** 0.6 MB against 20.5 MB of JSON, with git storing both at about 0.6 MB, so the compressed form costs nothing in the repository and saves 20 MB in every working tree. `data` and `topics` are omitted as the encoded form of the already-decoded `args` (recorded in the fixture's own `provenance.omittedFields`). The 12 MB `*.trace.json` is gitignored because `run/verify-port.ts` regenerates it identically in about three seconds; the 618 KB golden `*.state.json` IS committed, because it is the oracle and a diff on it means the processor changed meaning. A re-capture was verified byte-identical apart from `capturedAt` and `chainHeadAtCapture`.
+- **A production defect was found and deliberately NOT fixed.** An entity column named `index` passes `@etherfold/state-store-sqlite`'s identifier validation and then fails at `migrate()` with `near "index": syntax error`, while the in-memory and IndexedDB backends accept it. Fixing it was outside "no production code beyond the capture/replay path", so it is captured with its mechanism and two fix shapes in `work/notes/observations/entity-identifier-sql-keyword.md`; the port renamed its column to `playerIndex`.
+- **`vendor/stratagems/` is GPL-3.0 inside an MIT repository.** Same author, deliberate, and fine for an example and a test fixture. Noted in that folder's README so a reader who meets the files without this context can see the difference rather than wonder whether it was an accident.
+- **`@etherfold/fs` gained a test script**, which it did not have, because the new file helpers needed one.
+
+## Outcome
+
+`work/notes/findings/sqlite-in-the-browser.md` carries the result and answers all three open questions in `work/specs/proposed/one-processor-everywhere.md`. Headline: IndexedDB stays the browser default; on the real workload it beats wasm SQLite by 1.6x to 6.9x on writes and 4x to 14x on reads, and the crossover (Chromium only, roughly 5,000 to 13,000 live rows) sits above the 4,072 live rows the real deployment reached. The port produces state equal to the original `JSProcessor` on the real stream, with every contortion the entity model forced written up.
+
+Spawned: `work/notes/observations/entity-identifier-sql-keyword.md`, `work/notes/ideas/opfs-backed-browser-store.md`.
