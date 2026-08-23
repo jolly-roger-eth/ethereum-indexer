@@ -52,3 +52,7 @@ indexed/
 /docs/media
 
 prompts
+
+# Playwright (browser tests in packages/state-store-indexeddb)
+test-results/
+playwright-report/

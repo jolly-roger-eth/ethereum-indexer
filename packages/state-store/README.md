@@ -44,6 +44,7 @@ A processor could have been written against raw SQL, forcing wasm SQLite into ev
 
 - `MemoryStateStore`, here: versioned rows in a Map. The reference implementation, so the contract has an executable definition, and the second backend a portability test needs. It matches the SQL store down to the sharp edges (a re-applied block raises, an unlisted field goes to `NULL`) because a lenient reference implementation would let caller bugs through.
 - [`@etherfold/state-store-sqlite`](../state-store-sqlite): versioned rows over `remote-sql`.
+- [`@etherfold/state-store-indexeddb`](../state-store-indexeddb): versioned rows in IndexedDB, and the browser default (ADR-0024).
 
 ## Tests
 
