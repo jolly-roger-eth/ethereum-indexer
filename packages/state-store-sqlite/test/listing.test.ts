@@ -41,7 +41,8 @@ describe('the statement a listing compiles to', () => {
 	it('is an equality on the leading id columns, ordered by the id, with a bound', () => {
 		expect(listCurrentStatement(ENTITY, {epoch: 7}, 3)).toEqual({
 			sql:
-				`SELECT * FROM placement WHERE epoch = ? AND _upper IS NULL ` + `ORDER BY epoch, position, playerIndex LIMIT ?`,
+				`SELECT * FROM "placement" WHERE "epoch" = ? AND _upper IS NULL ` +
+				`ORDER BY "epoch", "position", "playerIndex" LIMIT ?`,
 			// the bound is limit + 1: the extra row is what makes `truncated` a fact
 			args: ['7', 4],
 		});
@@ -50,8 +51,9 @@ describe('the statement a listing compiles to', () => {
 	it('adds the as-of predicate and nothing else when it is asked about a block', () => {
 		expect(listAsOfStatement(ENTITY, {epoch: 7, position: 1}, 102, 3)).toEqual({
 			sql:
-				`SELECT * FROM placement WHERE epoch = ? AND position = ? AND _lower <= ? AND (_upper IS NULL OR ? < _upper) ` +
-				`ORDER BY epoch, position, playerIndex LIMIT ?`,
+				`SELECT * FROM "placement" WHERE "epoch" = ? AND "position" = ? AND ` +
+				`_lower <= ? AND (_upper IS NULL OR ? < _upper) ` +
+				`ORDER BY "epoch", "position", "playerIndex" LIMIT ?`,
 			args: ['7', '1', 102, 102, 4],
 		});
 	});
@@ -61,7 +63,7 @@ describe('the statement a listing compiles to', () => {
 		expect(sql).not.toMatch(/OFFSET/i);
 		// the only ORDER BY is the declared id, and it is not caller-supplied
 		expect(sql.match(/ORDER BY/gi)).toHaveLength(1);
-		expect(sql).toMatch(/ORDER BY epoch, position, playerIndex LIMIT \?$/);
+		expect(sql).toMatch(/ORDER BY "epoch", "position", "playerIndex" LIMIT \?$/);
 	});
 });
 

@@ -34,8 +34,8 @@ async function forkedChain() {
 describe('revertTo statement ordering', () => {
 	it('emits the DELETE of opened versions before the re-open of closed ones', () => {
 		const statements = revertToStatements([TOKEN], 101);
-		const deleteIndex = statements.findIndex((s) => /^DELETE FROM token/i.test(s.sql));
-		const reopenIndex = statements.findIndex((s) => /^UPDATE token SET _upper = NULL/i.test(s.sql));
+		const deleteIndex = statements.findIndex((s) => /^DELETE FROM "token"/i.test(s.sql));
+		const reopenIndex = statements.findIndex((s) => /^UPDATE "token" SET _upper = NULL/i.test(s.sql));
 
 		expect(deleteIndex, 'a DELETE of versions opened above the fork').toBeGreaterThanOrEqual(0);
 		expect(reopenIndex, 'a re-open of versions closed above the fork').toBeGreaterThanOrEqual(0);

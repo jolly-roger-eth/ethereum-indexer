@@ -17,14 +17,15 @@ import type {ConformanceCase, StateStoreFactory} from './types.js';
  * subject for this same suite, not a replacement for these: a case that fails on
  * 31,332 real events is a bug report nobody can read.
  *
- * Four entities, each earning its place: `token` is the ordinary
+ * Five entities, each earning its place: `token` is the ordinary
  * overwrite-and-delete subject, `player` carries the ACCUMULATED counter the
  * reorg case exists for (the field is named after the real one that went from 12
  * back to 6 in `work/notes/findings/sqlite-in-the-browser.md`), `cell` has a
  * composite business key, which is the part of the id contract a single-column
- * fixture would never exercise, and `placement` is the ordered child collection
+ * fixture would never exercise, `placement` is the ordered child collection
  * a bounded listing exists for -- three id columns, so a PREFIX has more than
- * one length to be tested at.
+ * one length to be tested at -- and `order` is spelled entirely in SQL KEYWORDS
+ * (see `RESERVED_WORDS`).
  */
 export const TOKEN: EntityDeclaration = {
 	name: 'token',
@@ -54,8 +55,45 @@ export const PLACEMENT: EntityDeclaration = {
 	fields: {player: 'text'},
 };
 
+/**
+ * A declaration spelled ENTIRELY in SQL keywords: the entity name, both id
+ * columns, and every field.
+ *
+ * It is in the shared set rather than in its own case because that is the
+ * property under test. A declaration is the surface ONE processor writes and
+ * SEVERAL backends store, so "is this declaration legal" has to be a fact about
+ * the declaration and not about the deployment. A name only a SQL backend chokes
+ * on is the failure `work/notes/findings/sqlite-in-the-browser.md` recorded: an
+ * id column named `index` passed validation, was stored happily by the
+ * light and IndexedDB backends, and killed `migrate()` on SQLite with
+ * `SQLITE_ERROR: near "index": syntax error` -- at deploy time, on one platform,
+ * far from where it was written.
+ *
+ * Being in `CONFORMANCE_ENTITIES` means every case migrates it, every revert
+ * sweeps it and every prune considers it, so the keyword identifiers reach every
+ * statement a backend emits rather than only its DDL.
+ */
+export const RESERVED: EntityDeclaration = {
+	name: 'order',
+	id: ['group', 'index'],
+	fields: {select: 'text', table: 'text', where: 'integer', default: 'text', references: 'text', primary: 'text'},
+};
+
+/** The keywords `RESERVED` is built from, so a case can name what it covers. */
+export const RESERVED_WORDS: readonly string[] = [
+	'order',
+	'group',
+	'index',
+	'select',
+	'table',
+	'where',
+	'default',
+	'references',
+	'primary',
+];
+
 /** What every factory is handed. A backend may not pick and choose among them. */
-export const CONFORMANCE_ENTITIES: readonly EntityDeclaration[] = [TOKEN, PLAYER, CELL, PLACEMENT];
+export const CONFORMANCE_ENTITIES: readonly EntityDeclaration[] = [TOKEN, PLAYER, CELL, PLACEMENT, RESERVED];
 
 /**
  * The block the ladder cases start from, and the span they cover.
@@ -87,6 +125,16 @@ export function burn(id: string): Mutation {
 /** One child of one parent: `{epoch}` is the prefix a listing asks about. */
 export function placed(epoch: number, position: number, playerIndex: number, player: string): Mutation {
 	return {type: 'upsert', entity: 'placement', id: {epoch, position, playerIndex}, values: {player}};
+}
+
+/** One row of `RESERVED`, written through columns that are all SQL keywords. */
+export function ordered(group: string, index: number, select: string): Mutation {
+	return {
+		type: 'upsert',
+		entity: 'order',
+		id: {group, index},
+		values: {select, table: 'ledger', where: index, default: 'none', references: group, primary: `${group}/${index}`},
+	};
 }
 
 /** The `player` of each listed child, which is enough to name it and see its order. */

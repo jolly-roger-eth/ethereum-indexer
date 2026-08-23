@@ -1,4 +1,5 @@
 import {normalizeEntity, type FieldType} from '@etherfold/state-store';
+import {quoted, quotedList} from './identifiers.js';
 import type {EntityDeclaration, Statement} from './types.js';
 
 /**
@@ -16,7 +17,10 @@ import type {EntityDeclaration, Statement} from './types.js';
  * containment is deliberate: only this module emits DDL, and every identifier it
  * interpolates has been validated by the seam's `normalizeEntity`, which applies
  * this store's identifier rule to EVERY backend so that a declaration is valid
- * or invalid as a fact about the declaration.
+ * or invalid as a fact about the declaration. Every one of them is also QUOTED
+ * on the way out (`quoted`, `identifiers.ts`), because a validated SHAPE can
+ * still be a SQL keyword and this backend must accept exactly what the seam
+ * accepts.
  */
 
 /** Block number at which a version became valid (inclusive). */
@@ -73,13 +77,13 @@ function sqlType(type: FieldType): string {
  */
 export function ddlForEntity(declaration: EntityDeclaration): string[] {
 	const entity = normalizeEntity(declaration);
-	const table = entity.name;
-	const idList = entity.id.join(', ');
+	const table = quoted(entity.name);
+	const idList = quotedList(entity.id);
 
 	const columns = [
 		`${ROWID} INTEGER PRIMARY KEY AUTOINCREMENT`,
-		...entity.id.map((column) => `${column} TEXT NOT NULL`),
-		...Object.entries(entity.fields).map(([field, type]) => `${field} ${sqlType(type)}`),
+		...entity.id.map((column) => `${quoted(column)} TEXT NOT NULL`),
+		...Object.entries(entity.fields).map(([field, type]) => `${quoted(field)} ${sqlType(type)}`),
 		`${LOWER} INTEGER NOT NULL`,
 		// nullable on purpose: NULL is how "still valid at the tip" is expressed.
 		// A sentinel such as INT64_MAX would leak into every query and every
@@ -91,14 +95,14 @@ export function ddlForEntity(declaration: EntityDeclaration): string[] {
 		`CREATE TABLE IF NOT EXISTS ${table} (\n\t${columns.join(',\n\t')}\n)`,
 		// The live set, and the invariant SQLite cannot express as a constraint:
 		// at most one open version per business key.
-		`CREATE UNIQUE INDEX IF NOT EXISTS ${table}_open ON ${table} (${idList}) WHERE ${UPPER} IS NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS ${quoted(`${entity.name}_open`)} ON ${table} (${idList}) WHERE ${UPPER} IS NULL`,
 		// Time travel: the point as-of probe rides this B-tree, which is why it
 		// stays effectively flat as history accumulates.
-		`CREATE INDEX IF NOT EXISTS ${table}_history ON ${table} (${idList}, ${LOWER})`,
+		`CREATE INDEX IF NOT EXISTS ${quoted(`${entity.name}_history`)} ON ${table} (${idList}, ${LOWER})`,
 		// Revert leg A: versions opened above the fork.
-		`CREATE INDEX IF NOT EXISTS ${table}_lower ON ${table} (${LOWER})`,
+		`CREATE INDEX IF NOT EXISTS ${quoted(`${entity.name}_lower`)} ON ${table} (${LOWER})`,
 		// Revert leg B: versions closed above the fork.
-		`CREATE INDEX IF NOT EXISTS ${table}_upper ON ${table} (${UPPER})`,
+		`CREATE INDEX IF NOT EXISTS ${quoted(`${entity.name}_upper`)} ON ${table} (${UPPER})`,
 	];
 }
 
