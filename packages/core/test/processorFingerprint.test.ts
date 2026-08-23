@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {processorCodeFingerprint} from '../src/utils/fingerprint';
+import {processorCodeFingerprint} from '../src/utils/fingerprint.js';
 import {fixtureFingerprint} from './utils/fingerprintFixture.js';
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
-import {generateStreamToAppend, getFromBlock, groupLogsPerBlock} from '../src/internal/engine/utils';
-import type {EventBlock, LastSync, LogEvent} from '../src/types';
+import {generateStreamToAppend, getFromBlock, groupLogsPerBlock} from '../src/internal/engine/utils.js';
+import type {EventBlock, LastSync, LogEvent} from '../src/types.js';
 
 type TestABI = Abi;
 

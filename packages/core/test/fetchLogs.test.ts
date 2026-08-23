@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
-import {EthereumIndexer} from '../src/indexer';
-import type {IndexingSource, LastSync, LogEvent} from '../src/types';
+import {EthereumIndexer} from '../src/indexer.js';
+import type {IndexingSource, LastSync, LogEvent} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers

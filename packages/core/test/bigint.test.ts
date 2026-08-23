@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {bnReplacer, bnReviver, isBigIntLiteral} from '../src/utils/bigint';
-import {simple_hash} from '../src/utils/hash';
+import {bnReplacer, bnReviver, isBigIntLiteral} from '../src/utils/bigint.js';
+import {simple_hash} from '../src/utils/hash.js';
 
 // ---------------------------------------------------------------------------
 // The "123n" convention: what it may claim, and what it must not touch

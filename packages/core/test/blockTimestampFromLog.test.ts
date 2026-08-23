@@ -1,8 +1,8 @@
 import type {Abi} from 'abitype';
 import {describe, expect, it} from 'vitest';
-import {LogEventFetcher, parseLogBlockTimestamp} from '../src/internal/decoding/LogEventFetcher';
-import {EthereumIndexer} from '../src/indexer';
-import type {IndexingSource, LastSync} from '../src/types';
+import {LogEventFetcher, parseLogBlockTimestamp} from '../src/internal/decoding/LogEventFetcher.js';
+import {EthereumIndexer} from '../src/indexer.js';
+import type {IndexingSource, LastSync} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
 // `blockTimestamp` comes off the log when the node provides it

@@ -35,6 +35,7 @@
 	"scripts": {
 		"sql2ts": "node sql2ts.cjs ./src/schema/sql",
 		"build": "rm -rf dist && pnpm sql2ts && tsc",
+		"typecheck": "tsc -p tsconfig.typecheck.json",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",
 		"test:watch": "vitest"

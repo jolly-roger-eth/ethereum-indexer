@@ -30,6 +30,8 @@
     "dev": "ldenv pnpm --filter './packages/*' --filter './platforms/*' dev",
     "---------------------- TEST ----------------------": "",
     "test": "ldenv pnpm --filter './packages/*' --filter './platforms/*' test",
+    "------- TYPECHECK (src + test; RUN AFTER build: cross-package types resolve through dist/) -------": "",
+    "typecheck": "ldenv pnpm --filter './packages/*' --filter './platforms/*' typecheck",
     "---------------------- BUILD ----------------------": "",
     "build": "ldenv pnpm --filter './packages/*' --filter './platforms/*' build",
     "build:examples": "ldenv pnpm --filter './examples/*' build",

@@ -36,6 +36,14 @@ const abi = [
 
 type State = {owners: {[id: string]: string}; transferCount: number};
 
+// Every processor VARIANT below is annotated `JSProcessor<typeof abi, State>`,
+// spelled out rather than aliased. `EventFunctions` MAPS over the ABI's event
+// names, so `ABI` is not inferrable from an object LITERAL: a bare spread of
+// `processor` widens to the `Abi` constraint and the handlers it just copied
+// stop matching the resulting index signature. The annotation also has to be
+// this exact type REFERENCE, because that is what `fromJSProcessor` recovers
+// `ABI` from; a local alias for it erases the type arguments again.
+
 const processor: JSProcessor<typeof abi, State> = {
 	version: '1.0.0',
 	construct() {
@@ -54,8 +62,10 @@ describe('a version is mandatory', () => {
 	});
 
 	it('refuses an empty or whitespace-only version', () => {
-		expect(() => fromJSProcessor({...processor, version: ''})()).toThrow(/has no `version`/);
-		expect(() => fromJSProcessor({...processor, version: '   '})()).toThrow(/has no `version`/);
+		const empty: JSProcessor<typeof abi, State> = {...processor, version: ''};
+		const whitespace: JSProcessor<typeof abi, State> = {...processor, version: '   '};
+		expect(() => fromJSProcessor(empty)()).toThrow(/has no `version`/);
+		expect(() => fromJSProcessor(whitespace)()).toThrow(/has no `version`/);
 	});
 
 	it('names the processor and says why the version is required', () => {
@@ -142,14 +152,15 @@ describe('getVersionHash', () => {
 describe('the code fingerprint', () => {
 	it('is derived from the author handlers, and changes when one of them changes', () => {
 		const original = fromJSProcessor(processor)();
-		const edited = fromJSProcessor({
+		const editedProcessor: JSProcessor<typeof abi, State> = {
 			...processor,
 			onTransfer(state, event) {
 				// same version, different logic: the case this whole task exists for
 				state.owners[event.args.id.toString()] = event.args.from;
 				state.transferCount++;
 			},
-		})();
+		};
+		const edited = fromJSProcessor(editedProcessor)();
 
 		expect(original.getVersionHash()).toBe(edited.getVersionHash());
 		expect(original.getCodeFingerprint()).toBeDefined();
@@ -163,8 +174,9 @@ describe('the code fingerprint', () => {
 	it('does not move when only the version or the config changes', () => {
 		// Otherwise a deliberate bump would also read as a code change, and the
 		// version hash already covers both.
+		const bumped: JSProcessor<typeof abi, State> = {...processor, version: '9.9.9'};
 		const a = fromJSProcessor(processor)();
-		const b = fromJSProcessor({...processor, version: '9.9.9'})();
+		const b = fromJSProcessor(bumped)();
 		expect(a.getCodeFingerprint()).toBe(b.getCodeFingerprint());
 	});
 });
@@ -321,7 +333,8 @@ describe('drift, end to end through a keeper', () => {
 		const keeper = memoryKeeper();
 		await indexOneBlock(fromJSProcessor(processor)(), keeper);
 
-		const {reports, load} = await reloadWith(fromJSProcessor({...editedSameVersion, version: '2.0.0'})(), keeper);
+		const bumped: JSProcessor<typeof abi, State> = {...editedSameVersion, version: '2.0.0'};
+		const {reports, load} = await reloadWith(fromJSProcessor(bumped)(), keeper);
 		await load();
 
 		expect(reports).toEqual([]);

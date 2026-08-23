@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {VersionedStateEventProcessor} from '../src/index.js';
+import {VersionedStateEventProcessor, type SQLProcessor} from '../src/index.js';
 import {createTestDB, rows} from './utils/db.js';
 import {
 	finality,
@@ -10,7 +10,13 @@ import {
 	SOURCE,
 	timestampOf,
 	transfer,
+	type TestABI,
 } from './utils/fixtures.js';
+
+// Every processor VARIANT below is annotated `SQLProcessor<TestABI>`. The handler
+// map MAPS over the ABI's event names, so `ABI` is not inferrable from an object
+// LITERAL: a bare spread of `processor` widens to the `Abi` constraint and the
+// handlers it just copied stop matching the resulting index signature.
 
 describe('the sync cursor', () => {
 	it('is absent before the first sync, so the core starts fresh', async () => {
@@ -47,7 +53,8 @@ describe('the sync cursor', () => {
 			lastSync({latestBlock: 100, lastToBlock: 100}),
 		);
 
-		const upgraded = new VersionedStateEventProcessor(db, {...processor, version: '2.0.0'});
+		const v2: SQLProcessor<TestABI> = {...processor, version: '2.0.0'};
+		const upgraded = new VersionedStateEventProcessor(db, v2);
 		const loaded = await upgraded.load(SOURCE, {finality, alwaysFetchTimestamps: true});
 		expect(loaded).toBeDefined();
 		expect(loaded!.lastSync.context.processor).not.toBe(upgraded.getVersionHash());
@@ -97,8 +104,9 @@ describe('the sync cursor', () => {
 
 describe('getVersionHash', () => {
 	it('changes when the processor version changes', () => {
+		const v2: SQLProcessor<TestABI> = {...processor, version: '2.0.0'};
 		const a = new VersionedStateEventProcessor(createTestDB(), processor);
-		const b = new VersionedStateEventProcessor(createTestDB(), {...processor, version: '2.0.0'});
+		const b = new VersionedStateEventProcessor(createTestDB(), v2);
 		expect(a.getVersionHash()).not.toBe(b.getVersionHash());
 	});
 
@@ -106,11 +114,12 @@ describe('getVersionHash', () => {
 		// The schema is part of what the stored rows MEAN. A renamed field at an
 		// unchanged version would otherwise let the core adopt rows whose columns
 		// no longer say what the handlers now assume.
-		const a = new VersionedStateEventProcessor(createTestDB(), processor);
-		const b = new VersionedStateEventProcessor(createTestDB(), {
+		const renamedField: SQLProcessor<TestABI> = {
 			...processor,
 			entities: [{name: 'token', id: ['id'], fields: {holder: 'text'}}, processor.entities[1]],
-		});
+		};
+		const a = new VersionedStateEventProcessor(createTestDB(), processor);
+		const b = new VersionedStateEventProcessor(createTestDB(), renamedField);
 		expect(a.getVersionHash()).not.toBe(b.getVersionHash());
 	});
 

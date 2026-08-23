@@ -10,7 +10,7 @@ import {
 	STREAM_FIXTURE_FORMAT,
 	type StreamFixture,
 } from '../src/stream/fixture.js';
-import type {EventProcessor, IndexingSource, LastSync, LogEvent, UsedStreamConfig} from '../src/types';
+import type {EventProcessor, IndexingSource, LastSync, LogEvent, UsedStreamConfig} from '../src/types.js';
 
 const ERC20_ABI = [
 	{
