@@ -70,3 +70,15 @@ Where the artifacts LIVE after promotion is a real decision: `docs/spikes/` is a
 Re-dispatched by the drive-tasks conductor after a harness misfire, not a defect in the task.
 
 The previous claim resolved its harness adapter to `null` (no agent attached), so dorfl created the branch and printed the manual 'Start work:' instructions and exited without ever running a build. No code was written, no gate ran, and no branch was pushed. `pi` is present and the harness config is unchanged, so this was transient. Start fresh.
+
+## Requeue 2026-08-23
+
+PARKED by the drive-tasks conductor after TWO consecutive runs died mid-flight without surfacing.
+
+Both runs claimed, built substantial work in the isolated worktree, then stopped with no commit, no branch pushed, and the lock left 'implement/active' (state file still said 'running' with no live process). Run 1 died ~14:08; run 2 wrote until 15:22 and was dead by 16:07. No OOM (9GiB free) and no stray process either time.
+
+The work was nearly complete both times and is NOT lost: a 32,170-line patch of run 2 is saved at /tmp/promote-stratagems-wip.patch and the worktree is retained. It had already produced packages/conformance-workload-stratagems/ (entities, processor, oracle, replay, workload, plus alpha1/oracle/workload tests), ADR-0026, a changeset, the vendored GPL oracle move, and an observation note.
+
+VERIFIED GOOD on the critical axis: all four golden fixtures are byte-identical to origin/main after the move into the package (alpha1.state.json sha256:63559834..., alpha1.stream.json.gz sha256:8edce428..., base.state.json sha256:633985b3..., base.stream.json sha256:f2e7d89d...). They were MOVED, not regenerated, which is exactly what this task's acceptance requires.
+
+Hypothesis for a human to confirm: agentDeadlineMinutes is 90 and both runs exceeded it, and the deadline path is not surfacing cleanly (it should route to needs-attention, not leave an active lock and a 'running' state file). Consider raising the deadline for this task, or splitting it (the port rewrite and the fixture promotion are separable), before spending a third ~2h run.
