@@ -180,6 +180,31 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
 	// PUBLIC INTERFACE
 	// ------------------------------------------------------------------------------------------------------------------
+
+	/**
+	 * The block the next batch of logs must start at.
+	 *
+	 * This is the value ADR-0004 makes the RECEIVER authoritative about. A
+	 * log-fetcher holds no cursor, so before it fetches it asks the side that does,
+	 * and a batch starting anywhere else is refused (`feed` throws, naming this
+	 * number, because `generateStreamToAppend` already enforces exactly that check
+	 * internally). Exposing it is what lets the two halves be pulled apart: without
+	 * it the sender would have to compute the cursor itself, which is precisely the
+	 * state a stateless component must not hold.
+	 *
+	 * It is NOT `lastToBlock + 1`. It deliberately reaches back to
+	 * `latestBlock - finality` so the unconfirmed window is re-fetched every round,
+	 * which is how a reorg is detected at all.
+	 *
+	 * Before anything has been indexed it is the source's earliest `startBlock`.
+	 */
+	get expectedFromBlock(): number {
+		if (!this.lastSync) {
+			return this.defaultFromBlock;
+		}
+		return getFromBlock(this.lastSync, this.defaultFromBlock, this.finality);
+	}
+
 	load(): Promise<LastSync<ABI>> {
 		if (this._index.executing) {
 			throw new Error(`indexing... should not load`);

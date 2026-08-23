@@ -225,3 +225,46 @@ describe('feed() delivers retractions to the processor', () => {
 		expect(seen[seen.length - 1]).toBe(101);
 	});
 });
+
+// -- the receiver's own cursor ------------------------------------------------
+
+describe('expectedFromBlock', () => {
+	// ADR-0004: the receiver is authoritative about where the next batch starts.
+	// A log-fetcher holds no cursor, so it has to be able to ASK; without this the
+	// stateless half would have to compute the cursor itself, which is precisely
+	// the state it must not hold.
+
+	it('is the source start block before anything has been fed', () => {
+		const {processor} = recordingProcessor();
+		expect(makeIndexer(processor).expectedFromBlock).toBe(0);
+	});
+
+	it('reaches back over the unconfirmed window rather than to lastToBlock + 1', async () => {
+		const {processor} = recordingProcessor();
+		const indexer = makeIndexer(processor); // finality 12
+		await indexer.load();
+
+		await indexer.feed([makeEvent(100, '0xAAA')], lastSyncFor({latestBlock: 100, lastToBlock: 100}));
+
+		// not 101: the window a reorg can still reach has to be re-fetched, which is
+		// how a reorg is detected at all.
+		expect(indexer.expectedFromBlock).toBe(88);
+	});
+
+	it('is the value feed() refuses a batch against', async () => {
+		const {processor} = recordingProcessor();
+		const indexer = makeIndexer(processor);
+		await indexer.load();
+
+		await indexer.feed([makeEvent(100, '0xAAA')], lastSyncFor({latestBlock: 100, lastToBlock: 100}));
+		const expected = indexer.expectedFromBlock;
+
+		await expect(
+			indexer.feed([], lastSyncFor({latestBlock: 101, lastToBlock: 101, lastFromBlock: expected + 1})),
+		).rejects.toThrow(new RegExp(`not as expected \\(${expected}\\)`));
+
+		// and a batch that does start there is applied
+		await indexer.feed([], lastSyncFor({latestBlock: 101, lastToBlock: 101, lastFromBlock: expected}));
+		expect(indexer.expectedFromBlock).toBe(Math.max(Math.min(102, 101 - 12), 0));
+	});
+});
