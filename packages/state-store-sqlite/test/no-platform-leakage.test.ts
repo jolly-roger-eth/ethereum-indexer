@@ -7,6 +7,15 @@ import {describe, expect, it} from 'vitest';
  * one backend among several, never the target. This is a review criterion that
  * is easy to state and easy to erode, so it is asserted instead.
  *
+ * The allowed set gained `@etherfold/state-store`, the seam this package
+ * implements, and the meaning is unchanged: that package is the backend-neutral
+ * contract, it declares NO dependencies of its own (asserted below), and it
+ * knows nothing about any platform or any hosted backend. What the list still
+ * refuses is the thing it was written to refuse -- this store growing a
+ * dependency on a runtime, a provider, or on `@etherfold/core`, which would
+ * invert ADR-0016's direction and drag the whole indexer (viem included) into a
+ * storage primitive.
+ *
  * (This test reads the filesystem; the *published* source it inspects does not.)
  */
 
@@ -27,8 +36,8 @@ describe('the package stays platform agnostic', () => {
 		expect(files.length).toBeGreaterThan(0);
 	});
 
-	it('imports nothing but remote-sql and named-logs', () => {
-		const allowed = new Set(['remote-sql', 'named-logs']);
+	it('imports nothing but remote-sql, named-logs and the seam it implements', () => {
+		const allowed = new Set(['remote-sql', 'named-logs', '@etherfold/state-store']);
 		for (const file of files) {
 			const source = readFileSync(file, 'utf-8');
 			for (const match of source.matchAll(/^\s*import\s+(?:type\s+)?.*?from\s+'([^']+)'/gm)) {
@@ -49,8 +58,15 @@ describe('the package stays platform agnostic', () => {
 		}
 	});
 
-	it('declares only remote-sql and named-logs as runtime dependencies', () => {
+	it('declares only remote-sql, named-logs and the seam as runtime dependencies', () => {
 		const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url).pathname, 'utf-8'));
-		expect(Object.keys(pkg.dependencies).sort()).toEqual(['named-logs', 'remote-sql']);
+		expect(Object.keys(pkg.dependencies).sort()).toEqual(['@etherfold/state-store', 'named-logs', 'remote-sql']);
+	});
+
+	it('and the seam brings nothing with it, so the primitive stays a primitive', () => {
+		// The one dependency added above is only harmless as long as it stays empty:
+		// the moment the seam takes a dependency, this store inherits it.
+		const seam = JSON.parse(readFileSync(new URL('../../state-store/package.json', import.meta.url).pathname, 'utf-8'));
+		expect(Object.keys(seam.dependencies ?? {})).toEqual([]);
 	});
 });

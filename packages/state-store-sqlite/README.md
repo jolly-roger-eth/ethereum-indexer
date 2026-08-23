@@ -15,6 +15,14 @@ Every version of every entity is a row carrying `_lower` (valid from, inclusive)
 
 An author declares only `{name, id, fields}`; the store owns the DDL, the version columns, the as-of rewrite and the revert. History falls out of a declaration instead of being re-implemented by every processor.
 
+## One implementation of the seam
+
+This is a `StateStore` ([`@etherfold/state-store`](../state-store)), which is the backend-neutral contract a processor is written against: `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `revertTo`, plus the capabilities it declares. The declaration, mutation and block-pointer types are the seam's and are re-exported here, so a processor hands this store exactly what it would hand any other backend.
+
+Everything below those five verbs is this backend's own and deliberately NOT at the seam: block addressing by hash and by time, and the `queryCurrent` / `queryAsOf` surface that takes caller-supplied SQL. A server has a query planner; a handler, running once per event on every backend, does not.
+
+`store.capabilities` reports `{retention: {kind: 'unbounded'}, asOf: true}`, and `unbounded` is the honest report rather than an aspiration: this package has no pruning, so every version ever written is still here. It takes no retention option on purpose, because a store that accepted a window it cannot enforce would be making exactly the claim the report exists to prevent.
+
 ## Usage
 
 ```ts
@@ -60,14 +68,14 @@ All three axes resolve to a block number through the canonical `_blocks` table, 
 
 **Backend limits are configuration, not constants.** Backends reached over the network cap statements and payload size per request, differently per backend and per plan. `DEFAULT_BATCH_BOUNDS` is deliberately conservative (100 statements, ~90 KB) so the default is safe everywhere; raise it via `{bounds}` on a local database. A single block that alone exceeds the bound is still sent as one batch, with a warning: splitting it would trade a correctness property for a tuning parameter.
 
-**Fixed schema vs dynamic schema.** The repo's convention is static `.sql` schema files. That holds for fixed tables, and `_blocks` is one. It cannot hold for entity tables, whose columns are whatever a processor declares at run time, so their DDL is generated. The exception is contained in `src/ddl.ts`, which is the only module that emits DDL, and every interpolated identifier is validated first (`src/internal/identifiers.ts`), since SQL cannot bind an identifier as a parameter.
+**Fixed schema vs dynamic schema.** The repo's convention is static `.sql` schema files. That holds for fixed tables, and `_blocks` is one. It cannot hold for entity tables, whose columns are whatever a processor declares at run time, so their DDL is generated. The exception is contained in `src/ddl.ts`, which is the only module that emits DDL, and every interpolated identifier is validated first, since SQL cannot bind an identifier as a parameter. That validation now lives at the seam (`normalizeEntity` in `@etherfold/state-store`) and applies to every backend, so "this declaration is valid" is a fact about the declaration rather than about the deployment.
 
 ## Deviations from the reference prototype
 
 This package ports a verified prototype (`~/dev/github/wighawag/research/ethereum-indexer-historical-state-db`, `example/src/historical-store.ts`) rather than inventing a model. The model is unchanged; these are the deliberate differences.
 
 - **Named `VersionedStateStore`, not `HistoricalStore`.** "Versioned state" is the vocabulary the ADRs and `CONTEXT.md` use for the thing this stores; "historical state" names the whole feature, spec and design.
-- **Declarations are validated.** The prototype interpolated table and field names straight into SQL, which was safe for its own hand-written declaration. Here they arrive from whatever a processor declares, so identifiers are checked once, at declaration time, and the `_` namespace is reserved for the store.
+- **Declarations are validated.** The prototype interpolated table and field names straight into SQL, which was safe for its own hand-written declaration. Here they arrive from whatever a processor declares, so identifiers are checked once, at declaration time (at the seam, for every backend), and the `_` namespace is reserved for the store.
 - **Statements are built as data, then prepared.** The prototype prepared statements as it went. Building `{sql, args}` first is what lets the batch bound count and size a batch before sending it, and lets a test assert the ordering inside `revertTo` instead of trusting a comment.
 - **The batch bound and `applyBlocks` are new.** The prototype was one block per batch with no limits; the design calls for packing many blocks per batch under a configurable bound.
 - **An unresolvable address throws, and hashes are case-folded.** The prototype's `resolveBlock` returned a number or nothing, and the caller decided what that meant. Here "no such block" is a `NoSuchBlockError` on the read path so it cannot be mistaken for an absent entity (`docs/adr/0015`), and block hashes are stored and looked up lower-cased so an echoed-back upper-case hash cannot masquerade as a reorg.

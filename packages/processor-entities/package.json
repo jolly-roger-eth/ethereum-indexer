@@ -1,7 +1,7 @@
 {
-	"name": "@etherfold/state-store-sqlite",
+	"name": "@etherfold/processor-entities",
 	"version": "0.0.0",
-	"description": "Versioned-row state store for @etherfold/core: entity state kept with half-open block-validity ranges on the remote-sql interface, with as-of reads and reorg revert.",
+	"description": "The backend-agnostic processor authoring API: declare entities, write on<EventName> handlers against a MutationContext, and run them against any @etherfold/state-store backend.",
 	"publishConfig": {
 		"access": "public"
 	},
@@ -20,14 +20,16 @@
 	},
 	"license": "MIT",
 	"dependencies": {
+		"@etherfold/core": "workspace:*",
 		"@etherfold/state-store": "workspace:*",
-		"named-logs": "^0.4.1",
-		"remote-sql": "^0.0.7"
+		"named-logs": "^0.4.1"
 	},
 	"devDependencies": {
+		"@etherfold/state-store-sqlite": "workspace:*",
 		"@libsql/client": "^0.17.3",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
+		"remote-sql": "^0.0.7",
 		"remote-sql-libsql": "^0.0.7",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",

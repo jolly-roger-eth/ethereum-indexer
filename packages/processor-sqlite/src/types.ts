@@ -1,78 +1,43 @@
-import type {
-	Abi,
-	AbiParameterToPrimitiveType,
-	ExtractAbiEvent,
-	ExtractAbiEventNames,
-	AbiEvent,
-	LogEvent,
-	LogEventWithParsingFailure,
-} from '@etherfold/core';
-import type {EntityDeclaration, EntityId} from '@etherfold/state-store-sqlite';
-
-export type InputNames<T extends AbiEvent> = Extract<T['inputs'][number], {name: string}>['name'];
-export type InputValues<T extends AbiEvent> = {
-	[Property in InputNames<T>]: AbiParameterToPrimitiveType<Extract<T['inputs'][number], {name: Property}>>;
-};
+/**
+ * The authoring API is NOT this package's.
+ *
+ * `MutationContext`, the `on<EventName>` handler map and the processor's
+ * `version` describe how a processor is WRITTEN, not where its state ends up, so
+ * they live in `@etherfold/processor-entities` and this package consumes them.
+ * That is what makes one processor portable: the same object runs here, on a
+ * server, and against any other `StateStore` in a browser, with no edit and no
+ * second authoring surface to keep in step.
+ *
+ * They are re-exported so that an author who has picked SQLite can still import
+ * everything from one place.
+ */
+export type {
+	EntityProcessor,
+	EventHandlers,
+	InputNames,
+	InputValues,
+	MutationContext,
+} from '@etherfold/processor-entities';
 
 /**
- * The write surface a handler gets for ONE block.
+ * The old name for `EntityProcessor`, kept so existing processors compile
+ * unchanged. The type never had anything SQL in it: the name predates the seam
+ * being lifted out of this package.
  *
- * `get` is read-your-writes WITHIN the block being processed: it answers from the
- * mutations already staged for this block, and falls through to the store's
- * current state otherwise. That matters because a handler that increments a
- * counter must see the value an earlier event in the same block wrote, which is
- * the behaviour the in-memory path gets for free by mutating one object.
+ * ## Do NOT rewrite this as `export type SQLProcessor<ABI, C> = EntityProcessor<ABI, C>`
  *
- * Blocks below the one being processed are always already flushed, because a
- * block is applied before the next block's handlers run (see `applyBlock`: one
- * block is exactly one batch). So `get` never has to reason about more than the
- * current block.
+ * That looks equivalent and is not. `EntityProcessor` is an intersection whose
+ * handler half is a mapped type with REMAPPED keys (`on${EventName}`), which
+ * offers no site to infer `ABI` from. TypeScript still infers it, but only via
+ * its shortcut for a source and target that share an alias SYMBOL. A re-export
+ * specifier resolves to the very same symbol, so the shortcut fires; a
+ * `type ... = ...` declaration creates a NEW symbol, the shortcut misses, and
+ * `ABI` silently falls back to its `Abi` constraint. The visible damage is a
+ * user writing `const p: SQLProcessor<typeof abi> = {...}` and then finding
+ * `new VersionedStateEventProcessor(db, p)` rejected, with an error about the
+ * handler map that names no cause. Pinned by `test/lifecycle.test.ts` and
+ * `test/version.test.ts`, which annotate every processor with this alias.
+ *
+ * @deprecated Use `EntityProcessor` from `@etherfold/processor-entities`.
  */
-export type MutationContext = {
-	/** The entity as it stands, including mutations staged earlier in this block. */
-	get<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined>;
-	/**
-	 * Write the WHOLE row. Unlisted declared fields become NULL, mirroring the
-	 * store's close-then-insert: a version is a complete row, not a delta. To
-	 * change one field, `get` the record and spread it.
-	 */
-	set(entity: string, id: EntityId, values: Record<string, unknown>): void;
-	/** Close the live version without opening a new one: absent from this block on, readable before it. */
-	delete(entity: string, id: EntityId): void;
-};
-
-/** `on<EventName>` handlers, typed off the ABI exactly as the JS-object path types them. */
-export type EventHandlers<ABI extends Abi, ProcessorConfig = undefined> = {
-	[Property in ExtractAbiEventNames<ABI> as `on${Property}`]?: (
-		state: MutationContext,
-		event: LogEvent<ABI> & {args: InputValues<ExtractAbiEvent<ABI, Property>>},
-		config: ProcessorConfig,
-	) => Promise<void> | void;
-};
-
-/**
- * What an author writes: the entity schema, and a handler per event.
- *
- * The shape deliberately mirrors `JSProcessor` from the js-processor package, so
- * that moving a processor from an in-memory object to versioned rows is a change
- * of write calls and nothing else. `construct()` has no counterpart here: the
- * initial state of a versioned store is an empty set of tables, which `migrate`
- * creates from `entities`.
- */
-export type SQLProcessor<ABI extends Abi, ProcessorConfig = undefined> = EventHandlers<ABI, ProcessorConfig> & {
-	/**
-	 * REQUIRED. The identity of this processor's logic.
-	 *
-	 * The indexer discards state computed by a previous version by comparing
-	 * `getVersionHash()`, of which this is the author-declared part. The entity
-	 * declarations are hashed in alongside it, so a SCHEMA change invalidates
-	 * without a bump; handlers are functions, not data, so a HANDLER change does
-	 * not. Ideally generate this (from a content hash, a build id, a git sha) so
-	 * it cannot be forgotten; when you do forget, the advisory code fingerprint
-	 * is what says so.
-	 */
-	version: string;
-	/** `{name, id, fields}` per entity: the store owns the version columns, the DDL and the revert. */
-	entities: readonly EntityDeclaration[];
-	handleUnparsedEvent?(state: MutationContext, event: LogEventWithParsingFailure): void | Promise<void>;
-};
+export type {EntityProcessor as SQLProcessor} from '@etherfold/processor-entities';

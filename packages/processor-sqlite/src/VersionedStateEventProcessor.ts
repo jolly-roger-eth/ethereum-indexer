@@ -1,10 +1,5 @@
-import {
-	VersionedStateStore,
-	normalizeBlockTimestamp,
-	type BlockPointer,
-	type EntityId,
-	type Mutation,
-} from '@etherfold/state-store-sqlite';
+import {VersionedStateStore} from '@etherfold/state-store-sqlite';
+import {applyEventStream, type EntityProcessor} from '@etherfold/processor-entities';
 import {
 	assertProcessorVersion,
 	processorCodeFingerprint,
@@ -19,8 +14,13 @@ import {
 import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
 import {deleteLastSyncStatement, readLastSync, SYNC_SCHEMA_DDL, writeLastSyncStatement} from './sync.js';
-import type {MutationContext, SQLProcessor} from './types.js';
 import {VersionedStateView} from './view.js';
+
+/**
+ * Re-exported: the stream shaping is backend-agnostic and now lives at the seam,
+ * but this package's public surface has always carried these two.
+ */
+export {forkPoint, groupByBlock} from '@etherfold/processor-entities';
 
 const logger = logs('@etherfold/processor-sqlite');
 
@@ -61,7 +61,7 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 
 	constructor(
 		private readonly db: RemoteSQL,
-		private readonly processor: SQLProcessor<ABI, ProcessorConfig>,
+		private readonly processor: EntityProcessor<ABI, ProcessorConfig>,
 	) {
 		// Refused at construction, not at load: a version-less processor's hash is a
 		// constant, and a constant invalidates nothing, ever.
@@ -125,7 +125,8 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 		// `blockTimestamp` on the log itself, so requiring `alwaysFetchTimestamps`
 		// would force a pointless second round-trip per block on geth, reth, besu,
 		// erigon and anvil, which is precisely what this package wants to avoid in a
-		// browser (ADR-0002). The check that matters is per-block, in `blockPointer`:
+		// browser (ADR-0002). The check that matters is per-block, in `blockPointer`
+		// (`@etherfold/processor-entities`):
 		// it cannot be known in advance whether a node supplies timestamps, but a
 		// block still cannot be recorded without one, and the failure lands on the
 		// FIRST block, before anything is written.
@@ -140,33 +141,18 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 	}
 
 	/**
-	 * Apply a stream, reverting first if any of it is a retraction.
+	 * Apply a stream, reverting first if any of it is a retraction, then move the
+	 * cursor.
 	 *
-	 * The stream is a flat list in which reorged-out events carry `removed: true`
-	 * and are followed by the canonical replacements, if there are any. Three
-	 * things about how that becomes SQL are load-bearing:
+	 * The stream handling itself is `applyEventStream`, at the seam: reverting
+	 * ONCE at the fork point, grouping by block hash, running the handlers with
+	 * read-your-writes and applying each block as one atomic unit. None of that is
+	 * SQL, and none of it is duplicated per backend; the reasoning lives on
+	 * `applyEventStream`.
 	 *
-	 * 1. **Revert ONCE, at the fork point**, not per removed event. The fork point
-	 *    is one below the LOWEST removed block in the stream, and it has to be
-	 *    computed over the whole stream before anything is applied. Reverting per
-	 *    event would issue N reverts where the second is a no-op at best and, if
-	 *    the events were ordered high-to-low, would revert to the wrong height.
-	 *
-	 * 2. **A removed event is a removed event, whatever caused it.** The engine
-	 *    emits retractions both when a height is replaced by a different hash
-	 *    (a contradiction) and when a block's logs simply vanish with no
-	 *    replacement (an absence: the transaction went back to the mempool). This
-	 *    reads `removed` and never looks at what replaced anything, so the second
-	 *    case cannot be missed. Wiring the revert to "a new hash appeared at this
-	 *    height" would reproduce `d24872f` one layer down, where the symptom is a
-	 *    row nobody notices instead of a state object somebody prints.
-	 *
-	 * 3. **Revert precedes apply**, which is also what makes replay safe. The
-	 *    store inserts a block row plainly and a re-applied block raises a
-	 *    primary-key violation on purpose. `revertTo(fork)` deletes every block
-	 *    row above the fork, and the canonical events in the same stream are all
-	 *    at or above `fork + 1`, so the replacements cannot collide with the
-	 *    branch they replace.
+	 * What is left here is the half that IS this package's: the `LastSync` cursor,
+	 * which lives in this package's own `_sync` table because where a processor
+	 * keeps its cursor is a property of where its state lives (ADR-0016).
 	 */
 	async process(eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>): Promise<VersionedStateView> {
 		if (this.finality === undefined) {
@@ -174,16 +160,7 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 		}
 		await this.ensureMigrated();
 
-		const fork = forkPoint(eventStream);
-		if (fork !== undefined) {
-			logger.info(`retraction in stream: reverting state above block ${fork}`);
-			await this.store.revertTo(fork);
-		}
-
-		for (const block of groupByBlock(eventStream)) {
-			const mutations = await this.runHandlers(block.events);
-			await this.store.applyBlock(blockPointer(block), mutations);
-		}
+		await applyEventStream(this.store, this.processor, eventStream, this.config as ProcessorConfig);
 
 		const cursor = writeLastSyncStatement(lastSync);
 		await this.db.batch([this.db.prepare(cursor.sql).bind(...cursor.args)]);
@@ -230,139 +207,11 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 		await this.db.batch(SYNC_SCHEMA_DDL.map((sql) => this.db.prepare(sql)));
 		this.migrated = true;
 	}
-
-	/**
-	 * Run the author's handlers over one block's events, collecting mutations.
-	 *
-	 * Mutations are COALESCED per business key, in first-touch order: the last
-	 * write for a key in this block is the one applied. Emitting them all would be
-	 * correct but would leave zero-width versions (`_lower = _upper = N`) that no
-	 * as-of predicate can ever match, so it would grow the table with rows that
-	 * are invisible by construction.
-	 */
-	private async runHandlers(events: LogEvent<ABI>[]): Promise<Mutation[]> {
-		const pending = new Map<string, Mutation>();
-		const context: MutationContext = {
-			get: async <T>(entity: string, id: EntityId): Promise<T | undefined> => {
-				const staged = pending.get(mutationKey(entity, id));
-				if (staged) {
-					return staged.type === 'delete' ? undefined : ({...staged.values} as T);
-				}
-				return this.store.getCurrent<T>(entity, id);
-			},
-			set: (entity: string, id: EntityId, values: Record<string, unknown>): void => {
-				pending.set(mutationKey(entity, id), {type: 'upsert', entity, id, values});
-			},
-			delete: (entity: string, id: EntityId): void => {
-				pending.set(mutationKey(entity, id), {type: 'delete', entity, id});
-			},
-		};
-
-		for (const event of events) {
-			if ('decodeError' in event) {
-				if (this.processor.handleUnparsedEvent) {
-					await this.processor.handleUnparsedEvent(context, event);
-				}
-				continue;
-			}
-			const handler = (this.processor as Record<string, unknown>)[`on${event.eventName}`];
-			if (typeof handler === 'function') {
-				await (handler as (...args: unknown[]) => unknown | Promise<unknown>).call(
-					this.processor,
-					context,
-					event,
-					this.config,
-				);
-			}
-		}
-
-		return [...pending.values()];
-	}
-}
-
-type BlockOfEvents<ABI extends Abi> = {number: number; hash: string; events: LogEvent<ABI>[]};
-
-function mutationKey(entity: string, id: EntityId): string {
-	return `${entity}\u0000${Object.keys(id)
-		.sort()
-		.map((column) => `${column}=${String(id[column])}`)
-		.join('\u0000')}`;
-}
-
-/**
- * One below the lowest retracted block in the stream, or `undefined` if nothing
- * was retracted.
- *
- * `min` over the whole stream rather than "the first removed event" because the
- * ordering of retractions is the engine's business, not this processor's, and a
- * revert to the wrong height is silent in both directions: too high leaves dead
- * rows live, too low drops canonical history that nothing will re-apply.
- */
-export function forkPoint<ABI extends Abi>(eventStream: readonly LogEvent<ABI>[]): number | undefined {
-	let lowest: number | undefined;
-	for (const event of eventStream) {
-		if (!event.removed) continue;
-		lowest = lowest === undefined ? event.blockNumber : Math.min(lowest, event.blockNumber);
-	}
-	return lowest === undefined ? undefined : lowest - 1;
-}
-
-/**
- * Group the APPLIED events by block, preserving stream order.
- *
- * Keyed by block hash, matching the core's `groupLogsPerBlock`, so that two
- * distinct blocks at the same height (which is exactly what a reorg produces
- * inside one stream) stay two blocks. Removed events are dropped here: they were
- * already answered by the revert, and re-running them as mutations would apply
- * the dead branch a second time.
- */
-export function groupByBlock<ABI extends Abi>(eventStream: readonly LogEvent<ABI>[]): BlockOfEvents<ABI>[] {
-	const byHash = new Map<string, BlockOfEvents<ABI>>();
-	const ordered: BlockOfEvents<ABI>[] = [];
-	for (const event of eventStream) {
-		if (event.removed) continue;
-		let group = byHash.get(event.blockHash);
-		if (!group) {
-			group = {number: event.blockNumber, hash: event.blockHash, events: []};
-			byHash.set(event.blockHash, group);
-			ordered.push(group);
-		}
-		group.events.push(event);
-	}
-	return ordered;
-}
-
-/**
- * The block row to record, built from the events themselves.
- *
- * The timestamp comes off the log, which is the whole point: a node implementing
- * `execution-apis#639` puts it there, so recording the time axis costs no extra
- * request. When it is missing the block is NOT recorded on a guess. A zero or an
- * interpolated value would not fail, it would answer confidently about the wrong
- * block for as long as the database lives, and `getAsOf({timestamp})` has no way
- * to tell a caller it was lied to.
- */
-function blockPointer<ABI extends Abi>(block: BlockOfEvents<ABI>): BlockPointer {
-	const withTimestamp = block.events.find((event) => event.blockTimestamp !== undefined);
-	if (!withTimestamp || withTimestamp.blockTimestamp === undefined) {
-		throw new Error(
-			`no blockTimestamp on any event of block ${block.number} (${block.hash}). Nodes implementing ` +
-				`execution-apis#639 (geth >= 1.16.0, reth, besu, erigon, anvil) put it on the log itself, but some do ` +
-				`not: Hardhat's EDR does not as of hardhat 3.14.0. Set \`stream: {alwaysFetchTimestamps: true}\` on the ` +
-				`indexer to fall back to fetching the block, or populate blockTimestamp before feeding. This refuses to ` +
-				`guess, because a wrong timestamp breaks the time axis silently.`,
-		);
-	}
-	return {
-		number: block.number,
-		hash: block.hash,
-		timestamp: normalizeBlockTimestamp(withTimestamp.blockTimestamp),
-	};
 }
 
 /** Mirrors `fromJSProcessor`: a factory, so each indexer gets its own instance. */
 export function fromSQLProcessor<ABI extends Abi, ProcessorConfig = undefined>(
-	processor: SQLProcessor<ABI, ProcessorConfig> | (() => SQLProcessor<ABI, ProcessorConfig>),
+	processor: EntityProcessor<ABI, ProcessorConfig> | (() => EntityProcessor<ABI, ProcessorConfig>),
 ): (db: RemoteSQL) => VersionedStateEventProcessor<ABI, ProcessorConfig> {
 	return (db) =>
 		new VersionedStateEventProcessor<ABI, ProcessorConfig>(

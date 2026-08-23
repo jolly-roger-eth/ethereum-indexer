@@ -654,11 +654,54 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/processor-entities:
+    dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      '@etherfold/state-store':
+        specifier: workspace:*
+        version: link:../state-store
+      named-logs:
+        specifier: ^0.4.1
+        version: 0.4.1
+    devDependencies:
+      '@etherfold/state-store-sqlite':
+        specifier: workspace:*
+        version: link:../state-store-sqlite
+      '@libsql/client':
+        specifier: ^0.17.3
+        version: 0.17.4
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      remote-sql:
+        specifier: ^0.0.7
+        version: 0.0.7
+      remote-sql-libsql:
+        specifier: ^0.0.7
+        version: 0.0.7(@libsql/core@0.17.4)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/processor-sqlite:
     dependencies:
       '@etherfold/core':
         specifier: workspace:*
         version: link:../core
+      '@etherfold/processor-entities':
+        specifier: workspace:*
+        version: link:../processor-entities
       '@etherfold/state-store-sqlite':
         specifier: workspace:*
         version: link:../state-store-sqlite
@@ -725,8 +768,29 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/state-store:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/state-store-sqlite:
     dependencies:
+      '@etherfold/state-store':
+        specifier: workspace:*
+        version: link:../state-store
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
