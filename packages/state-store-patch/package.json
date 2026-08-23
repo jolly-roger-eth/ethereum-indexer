@@ -1,7 +1,7 @@
 {
-	"name": "@etherfold/processor-entities",
+	"name": "@etherfold/state-store-patch",
 	"version": "0.0.0",
-	"description": "The backend-agnostic processor authoring API: declare entities, write on<EventName> handlers against a MutationContext, and run them against any @etherfold/state-store backend.",
+	"description": "The light state store: current state as a plain object, history as immer reverse patches, reorg revert by replaying them backwards. Memory-only, and it advertises revert-only.",
 	"publishConfig": {
 		"access": "public"
 	},
@@ -20,18 +20,13 @@
 	},
 	"license": "MIT",
 	"dependencies": {
-		"@etherfold/core": "workspace:*",
 		"@etherfold/state-store": "workspace:*",
-		"named-logs": "^0.4.1"
+		"immer": "^11.1.8"
 	},
 	"devDependencies": {
-		"@etherfold/state-store-patch": "workspace:*",
-		"@etherfold/state-store-sqlite": "workspace:*",
-		"@libsql/client": "^0.17.3",
+		"@etherfold/state-store-conformance": "workspace:*",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
-		"remote-sql": "^0.0.7",
-		"remote-sql-libsql": "^0.0.7",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"
