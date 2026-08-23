@@ -64,3 +64,9 @@ Where the artifacts LIVE after promotion is a real decision: `docs/spikes/` is a
 > Done means: the suite runs a real, launched processor's real event stream through every backend and compares against a state computed independently, including the revert-makes-a-counter-decrease case at block 13,364,821.
 >
 > RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your final report, in particular where the promoted artifacts now live and what the fast versus full test split is.
+
+## Requeue 2026-08-23
+
+Re-dispatched by the drive-tasks conductor after a harness misfire, not a defect in the task.
+
+The previous claim resolved its harness adapter to `null` (no agent attached), so dorfl created the branch and printed the manual 'Start work:' instructions and exited without ever running a build. No code was written, no gate ran, and no branch was pushed. `pi` is present and the harness config is unchanged, so this was transient. Start fresh.
