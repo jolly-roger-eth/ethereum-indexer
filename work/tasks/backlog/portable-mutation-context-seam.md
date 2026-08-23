@@ -4,7 +4,6 @@ slug: portable-mutation-context-seam
 spec: one-processor-everywhere
 blockedBy: []
 covers: [1, 2, 3, 4, 5]
-needsAnswers: true
 ---
 
 ## What to build
@@ -18,6 +17,20 @@ The capability report is part of this task even though its enforcement is not. A
 Keep the semantics that already work and are load-bearing. `set` writes a WHOLE row, because a version is a complete row and the primitive should mirror the store's close-then-insert rather than hide it; `update(entity, id, partial)` stays sugar over get-then-spread-then-set. Handlers stay uniformly async: the alternative, typing reads as `T | Promise<T>`, is infectious at every call site to save a microtask on a path dominated by log fetching. Read-your-writes within the block being processed stays exactly as `processor-sqlite` documents it, and it is genuinely load-bearing rather than theoretical: on the real stratagems stream, 16,871 of 66,113 reads were served from the block's own staging area.
 
 Naming and package layout are yours to decide, but decide them deliberately: the published names are `@etherfold/processor-sqlite` and `@etherfold/state-store-sqlite`, and ADR-0016 already says a processor package names where its state lives, so a new backend-agnostic package needs a name that does not contradict it. Migrating existing consumers is explicitly not a constraint (see the spec's Out of Scope).
+
+## Handoff (2026-08-23, drive-tasks conductor)
+
+This task was routed to needs-attention on its first run by a FALSE RED, and `needsAnswers` has been cleared because the question it stood for is answered.
+
+The first build produced a complete, working branch (`work/task-portable-mutation-context-seam`, preserved on the arbiter) that passed every real gate step: `format:check`, `changeset status`, `build` and `test` all green, with 16 new `processor-entities` tests and 62 `processor-sqlite` tests passing. It was bounced only because the gate's `verify` named `pnpm typecheck`, a script that did not exist, so `&&` short-circuited and `pnpm test` was never reached. Nothing was wrong with the seam work.
+
+That gate defect is fixed on `main` (`typecheck-tests-in-the-acceptance-gate`, PR #1). **Continue from the existing branch tip; do not restart.**
+
+What changed underneath, and what it means here: `main` now has a real `pnpm typecheck` that covers `test/**/*.ts`, which nothing did before. Each package carries a `tsconfig.typecheck.json` and a `typecheck` script. This branch predates that, so after the rebase expect type errors in TEST files that were previously invisible, concentrated in `packages/processor-sqlite/test/` around `SQLProcessor<abi>` not being assignable to `EntityProcessor<Abi, undefined>`. Part of that variance looseness pre-exists on `main` and part may be amplified by this refactor; judge each on its merits.
+
+Fix them properly, under the same constraint the typecheck task was held to: no `as any`, no `@ts-ignore`, no relaxing `strict`, no widening a public type purely to silence a call site. If a correct fix would change published API surface, route to needs-attention and say so rather than papering over it. That would be a real finding about this seam's generic variance, and it is worth more surfaced than hidden.
+
+Finally: each NEW package this task adds (`state-store`, `processor-entities`) needs its own `tsconfig.typecheck.json` and `typecheck` script, or the root fan-out silently skips it. Copy the pattern from a sibling package.
 
 ## Acceptance criteria
 
