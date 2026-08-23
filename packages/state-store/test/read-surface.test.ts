@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import {
 	BlockNotRetainedError,
+	InvalidBlockNumberError,
 	MemoryStateStore,
 	createReadSurface,
 	declareEntities,
@@ -190,10 +191,11 @@ describe('the types are derived from the declaration', () => {
 
 		// A `MemoryStateStore` reads as of a block NUMBER. Addressing by hash or by
 		// time is the read layer a BACKEND adds above the seam, so a surface over a
-		// store that has none refuses a hash at COMPILE time -- which is the only
-		// place it can be refused, since a hash compared against block numbers
-		// matches no version and comes back as an ordinary `undefined`.
+		// store that has none refuses a hash at COMPILE time -- and, because a cast
+		// or a JavaScript caller walks straight past that, at RUN time too: a hash
+		// compared against block numbers matches no version, and answering
+		// `undefined` would report the token as absent at a block nobody named.
 		// @ts-expect-error this store's as-of reads take a block number
-		expect(await surface.token.getAsOf({id: '1'}, {hash: '0x64'})).toBeUndefined();
+		await expect(surface.token.getAsOf({id: '1'}, {hash: '0x64'})).rejects.toBeInstanceOf(InvalidBlockNumberError);
 	});
 });

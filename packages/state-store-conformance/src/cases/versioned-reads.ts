@@ -1,4 +1,4 @@
-import type {StateStoreCapabilities} from '@etherfold/state-store';
+import {InvalidBlockNumberError, type StateStoreCapabilities} from '@etherfold/state-store';
 import {expect} from 'vitest';
 import {LADDER_BASE, answersHistoryOverLadder, block, burn, cases, opened, owns} from '../fixtures.js';
 import type {ConformanceCase, StateStoreFactory} from '../types.js';
@@ -39,6 +39,32 @@ export function versionedReadCases(
 			'an entity that was never written reads as undefined, not as an error': async () => {
 				const store = await opened(factory);
 				expect(await store.getCurrent('token', {id: 'never'})).toBeUndefined();
+			},
+
+			'an `at` that is not a block number is REFUSED, not answered as absent': async () => {
+				// The other half of the sentence above. `undefined` means the block was
+				// fine and the entity was absent from it, so it is the one answer a read
+				// nobody could serve must never give: `{number: '100'}` names no block,
+				// and a store that compares it against its version ranges matches
+				// nothing and reports an absence that was never asked about.
+				//
+				// Asked of EVERY backend, whatever addressing sits above it, because it
+				// is the same caller bug on both sides of one: a backend taking a block
+				// number refuses an object, and a backend that resolves a richer address
+				// (a height, a `{hash}`, a `{timestamp}`) refuses this one on its height
+				// axis. Neither is a `BlockUnavailableError`: no retention setting makes
+				// a non-block answerable, so it is a programmer error.
+				const store = await opened(factory);
+				await store.applyBlock(block(LADDER_BASE), [owns('1', '0xalice', 1)]);
+
+				// the OUTCOME rather than a rejection, so a backend that answered says
+				// so in the failure: what it handed back is what a caller would act on.
+				const read = await store.getAsOf('token', {id: '1'}, {number: '100'} as never).catch((e: unknown) => e);
+				expect(read).toBeInstanceOf(InvalidBlockNumberError);
+
+				// the SET read too: it is refused at the same seam, for the same reason
+				const listed = await store.listAsOf('token', {id: '1'}, {number: '100'} as never, 10).catch((e: unknown) => e);
+				expect(listed).toBeInstanceOf(InvalidBlockNumberError);
 			},
 
 			'a delete makes the entity absent at the tip': async () => {

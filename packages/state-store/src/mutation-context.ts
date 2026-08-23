@@ -95,10 +95,23 @@ export function createMutationContext(store: StateStore): StagedBlock {
 	const keyOf = (entity: string, id: EntityId): string => entityKey(mustGet(store.declarations, entity), id);
 
 	const context: MutationContext = {
+		/**
+		 * The block's staging area first, the store underneath it.
+		 *
+		 * A staged row is built by `stagedRow`, the same construction `list` uses,
+		 * so a row's SHAPE does not depend on when in the block it was written: the
+		 * id columns are there and a declared field the write did not list is NULL,
+		 * exactly as the store will hold it one block later. Handing back
+		 * `staged.values` (only what `set` was passed) instead would make a field
+		 * present or `undefined` according to timing, and `undefined` is a legal
+		 * value meaning "not set" rather than an error a handler would notice.
+		 */
 		get: async <T>(entity: string, id: EntityId): Promise<T | undefined> => {
-			const staged = pending.get(keyOf(entity, id));
+			const declaration = mustGet(store.declarations, entity);
+			const staged = pending.get(entityKey(declaration, id));
 			if (staged) {
-				return staged.type === 'delete' ? undefined : ({...staged.values} as T);
+				if (staged.type === 'delete') return undefined;
+				return stagedRow(declaration, idValues(declaration, staged.id), staged.values) as T;
 			}
 			return store.getCurrent<T>(entity, id);
 		},
@@ -179,10 +192,15 @@ export function createMutationContext(store: StateStore): StagedBlock {
  * A row staged in this block, in the shape the store would have given it back.
  *
  * The id columns are included and every declared field is present, unlisted ones
- * as NULL, because a version is a COMPLETE row and because a listing's rows come
+ * as NULL, because a version is a COMPLETE row and because an answer can come
  * from two places at once: a caller must not be able to tell which of them a row
  * came from. The one difference it cannot hide is the version columns, which a
  * staged row has none of: it has no version yet.
+ *
+ * `get` and `list` share it, which is the point of it being a function. They
+ * disagreed once -- a listing filled the row and `get` handed back the values
+ * `set` was passed -- and the shape of a row then depended on which read asked
+ * for it and on how late in the block the write had happened.
  */
 function stagedRow(
 	entity: NormalizedEntity,

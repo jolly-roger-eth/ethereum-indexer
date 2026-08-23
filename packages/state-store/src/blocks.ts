@@ -1,12 +1,50 @@
+import {InvalidBlockNumberError} from './errors.js';
+
 /**
  * The numeric and textual contract of `BlockPointer`, normalised once.
  *
- * Both of these live here rather than in any one backend because they define
- * what the SHARED type means. A hash that resolves in one store and not in
- * another, or a timestamp read as hex by one and as decimal by another, would be
- * a difference between backends in the one place the seam promises there is
- * none.
+ * These live here rather than in any one backend because they define what the
+ * SHARED type means. A hash that resolves in one store and not in another, a
+ * timestamp read as hex by one and as decimal by another, or a block number one
+ * backend accepts and another matches nothing against, would each be a
+ * difference between backends in the one place the seam promises there is none.
  */
+
+/**
+ * What a block NUMBER is, in the one place that decides it: a whole,
+ * non-negative number.
+ *
+ * The rule is deliberately narrow, because everything a block number is used for
+ * here is an integer comparison against a version's `_lower` / `_upper`. `1.5`
+ * is not a block, `-1` is not a block, and `'100'` is a string that compares
+ * unequal to every one of them rather than a block written differently. A store
+ * that let any of them through would answer the read with an empty match, which
+ * reads as "the entity was absent then".
+ *
+ * It is exported because the addressing layer above the seam asks the same
+ * question of its HEIGHT axis (`@etherfold/state-store-sqlite`), and one rule
+ * spelled twice is a rule that drifts.
+ */
+export function isBlockNumber(value: unknown): value is number {
+	return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+/**
+ * Refuse an `at` that is not a block number, before any read is attempted.
+ *
+ * Called by `assertRetained`, which is the one function every backend whose
+ * `getAsOf` / `listAsOf` takes a NUMBER already routes its historical reads
+ * through, so the check is written once and inherited rather than copied into
+ * each backend and left to drift. A backend with an addressing layer above it
+ * resolves first and hands a number down, so this constrains it not at all.
+ *
+ * The failure is a caller BUG rather than a state of the store, which is why it
+ * is a `TypeError` outside the `BlockUnavailableError` family: see
+ * `InvalidBlockNumberError`.
+ */
+export function assertBlockNumber(at: unknown): asserts at is number {
+	if (!isBlockNumber(at)) throw new InvalidBlockNumberError(at);
+}
 
 /**
  * Fold a block hash to one canonical spelling: lower case.
