@@ -169,18 +169,18 @@ describe.each(backends)('the seam behaves the same on $name', (backend) => {
 		expect(await store.getCurrent('token', {id: '1'})).toMatchObject({owner: '0xbob', transferCount: 1});
 
 		// and the primitive still writes a WHOLE row: `set` without transferCount nulls it
-		await applyEventStream(store, processor, [transfer(102, '0xC', {from: '0x0', to: '0xcarol', id: 2n})], undefined);
-		await applyEventStream(
-			store,
-			{
-				...processor,
-				async onTransfer(state, event) {
-					state.set('token', {id: event.args.id.toString()}, {owner: event.args.to});
-				},
+		// (annotated, not inlined: the handler map MAPS over the ABI's event names, so
+		// `TestABI` is not inferrable from an object LITERAL and the handler arguments
+		// would be implicitly `any`.)
+		const wholeRow: EntityProcessor<TestABI> = {
+			...processor,
+			async onTransfer(state, event) {
+				state.set('token', {id: event.args.id.toString()}, {owner: event.args.to});
 			},
-			[transfer(103, '0xD', {from: '0xcarol', to: '0xdan', id: 2n})],
-			undefined,
-		);
+		};
+
+		await applyEventStream(store, processor, [transfer(102, '0xC', {from: '0x0', to: '0xcarol', id: 2n})], undefined);
+		await applyEventStream(store, wholeRow, [transfer(103, '0xD', {from: '0xcarol', to: '0xdan', id: 2n})], undefined);
 		expect(await store.getCurrent('token', {id: '2'})).toMatchObject({owner: '0xdan', transferCount: null});
 	});
 

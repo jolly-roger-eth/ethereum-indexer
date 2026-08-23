@@ -1,6 +1,3 @@
-import type {Abi} from '@etherfold/core';
-import type {EntityProcessor} from '@etherfold/processor-entities';
-
 /**
  * The authoring API is NOT this package's.
  *
@@ -23,11 +20,24 @@ export type {
 } from '@etherfold/processor-entities';
 
 /**
- * What an author writes, when the state lives in versioned SQL rows.
+ * The old name for `EntityProcessor`, kept so existing processors compile
+ * unchanged. The type never had anything SQL in it: the name predates the seam
+ * being lifted out of this package.
  *
- * @deprecated Use `EntityProcessor` from `@etherfold/processor-entities`. The
- * type never had anything SQL in it: the name predates the seam being lifted out
- * of this package, and the alias is kept so existing processors compile
- * unchanged.
+ * ## Do NOT rewrite this as `export type SQLProcessor<ABI, C> = EntityProcessor<ABI, C>`
+ *
+ * That looks equivalent and is not. `EntityProcessor` is an intersection whose
+ * handler half is a mapped type with REMAPPED keys (`on${EventName}`), which
+ * offers no site to infer `ABI` from. TypeScript still infers it, but only via
+ * its shortcut for a source and target that share an alias SYMBOL. A re-export
+ * specifier resolves to the very same symbol, so the shortcut fires; a
+ * `type ... = ...` declaration creates a NEW symbol, the shortcut misses, and
+ * `ABI` silently falls back to its `Abi` constraint. The visible damage is a
+ * user writing `const p: SQLProcessor<typeof abi> = {...}` and then finding
+ * `new VersionedStateEventProcessor(db, p)` rejected, with an error about the
+ * handler map that names no cause. Pinned by `test/lifecycle.test.ts` and
+ * `test/version.test.ts`, which annotate every processor with this alias.
+ *
+ * @deprecated Use `EntityProcessor` from `@etherfold/processor-entities`.
  */
-export type SQLProcessor<ABI extends Abi, ProcessorConfig = undefined> = EntityProcessor<ABI, ProcessorConfig>;
+export type {EntityProcessor as SQLProcessor} from '@etherfold/processor-entities';

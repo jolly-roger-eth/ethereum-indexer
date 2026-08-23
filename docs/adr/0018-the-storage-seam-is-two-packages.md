@@ -24,6 +24,8 @@ ADR-0014's rule is role first, backend last; ADR-0016 applies it to processors, 
 @etherfold/processor-js           state in a JS object, reverted by immer patches
 ```
 
+The last row is the name ADR-0016 gives that package, not the one it ships under: it is published as `@etherfold/js-processor` today, because ADR-0017's rename carried the old word order over. That rename is unfinished business of ADR-0016 and is untouched here; the axis is what the two new names are read off, and it holds either way.
+
 `entity-processor` and `processor-api` were rejected for breaking that ordering: a scope listing must keep the variants of one role adjacent.
 
 ## Consequences
