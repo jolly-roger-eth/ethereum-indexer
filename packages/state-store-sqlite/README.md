@@ -65,6 +65,24 @@ await store.getCurrent('token', {id: '1'}); // who owns it at the tip
 await store.revertTo(99); // a reorg forked at 99
 ```
 
+## The generated read surface, both tiers
+
+The entity declarations type the reads as well as the writes, so a consumer names an entity and its declared columns rather than a table and a column string:
+
+```ts
+import {declareEntities} from '@etherfold/state-store';
+import {createQuerySurface, VersionedStateStore} from '@etherfold/state-store-sqlite';
+
+const entities = declareEntities([{name: 'token', id: 'id', fields: {owner: 'text', transferCount: 'integer'}}]);
+const surface = createQuerySurface(new VersionedStateStore(db, entities), entities);
+
+await surface.token.getCurrent({id: '1'}); // the bounded tier, identical on every backend
+await surface.token.getAsOf({id: '1'}, {hash: '0xaa'}); // ...on any of the three address axes, here
+await surface.token.queryCurrent({where: 'transferCount > ?', args: [1]}); // this tier, here only
+```
+
+`createQuerySurface` is `createReadSurface` (`@etherfold/state-store`, the four seam reads, typed off the declaration) plus the two reads that need a query planner. **The asymmetry is placement, not caution**: the bounded tier is what a HANDLER is held to and a handler runs once per event on every backend, so it gets the one shape that is an indexed range scan everywhere (ADR-0021); a server-side reader runs per request with SQLite underneath it, so it may take predicates. Both tiers project rows to the declared columns and type them off the same declarations, so renaming a field breaks a `queryCurrent` consumer exactly as it breaks a `getCurrent` one. The predicate text is the one part no type can check, because it is SQL: pass values through `args`, never by interpolation.
+
 ## Addressing state: hash, height, or time
 
 All three axes resolve to a block number through the canonical `_blocks` table, and then run the one as-of predicate, so they answer identically when they identify the same block. There is one addressing mechanism, not three.

@@ -1,5 +1,7 @@
 export * from './types.js';
 export * from './entities.js';
+export * from './declarations.js';
+export * from './read-surface.js';
 export * from './listing.js';
 export * from './blocks.js';
 export * from './capabilities.js';

@@ -4,3 +4,4 @@ export * from './ddl.js';
 export * from './statements.js';
 export * from './batching.js';
 export * from './store.js';
+export * from './query-surface.js';

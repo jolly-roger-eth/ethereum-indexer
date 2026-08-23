@@ -1,0 +1,18 @@
+# The generated read surface decodes nothing the declaration does not describe
+
+The read surface generated from the entity declarations (`createReadSurface`, and `createQuerySurface` on the SQLite backend) hands a consumer back exactly the declared storage classes: a `text` field is a `string`, an `integer` is a `number`, a `blob` is a `Uint8Array`, and every field is nullable because `set` writes a whole row. It performs NO decoding on top of that, which in practice means a `uint256` comes back as the decimal `string` it was stored as, and the consumer calls `BigInt()` on it. The declaration is the only thing this surface is allowed to know, and the declaration cannot currently say that a text column holds a u256.
+
+## Why not decode a u256
+
+It is the obvious thing to want. There is no u256 column type (`FieldType` is `text | integer | real | blob`, the INTERSECTION of what the backends can hold, and SQLite's INTEGER is 64-bit), so every u256 is decimal TEXT; on the real measured stream 16,046 reward events write nothing but u256 fields (`work/notes/findings/sqlite-in-the-browser.md`, contortion 5). A surface that returned `bigint` for those fields would be materially nicer to use.
+
+It cannot be done honestly from what the declaration carries. The only available rule would be "text that parses as digits is a BigInt", and that is precisely the irreducible ambiguity `tagged-bigint-codec-across-storage-adapters` exists to remove elsewhere in this repo: `"123"` is both what a `123n` serializes to and a perfectly legal string for a contract to emit, so the decoder would be guessing, and guessing wrong is silent in both directions (a real BigInt read back as a string breaks arithmetic; a string read back as a BigInt breaks comparisons and JSON round-trips). Decoding on a guess in the READ layer would also make the two halves of one declaration disagree: the store wrote a string and the reader returned something else, from the same `{name, id, fields}`.
+
+So the answer to "should the generated surface decode a u256" is **no, and the reason is that the declaration would first have to SAY so**. That is a change to the declaration, not to the read surface: a field would have to carry a semantic type (or a codec) alongside its storage class, every backend would have to agree on the encoding, and equality/ordering would have to be defined for it. That is a storage-side decision with a conformance obligation, and it belongs with `tagged-bigint-codec-across-storage-adapters` rather than being invented in a read layer that no backend can see.
+
+## Consequences
+
+- **A u256 consumer writes `BigInt(row.amount)`**, and the surface's type says `string | null` so it cannot forget the null. Equality on such a field still depends on the encoding being canonical, which nothing in the model states; that limitation is unchanged by this ADR and is what the follow-on work has to answer.
+- **The rows are PROJECTED, not cast.** The surface returns the declared id columns and declared fields, with an unlisted field as `null`, and deliberately drops the version columns (`_lower` / `_upper`) a versioned backend's `SELECT *` carries. A cast would have made the type a claim; the projection makes it true, and stops a row being spread straight back into a write.
+- **`integer` and `real` are both `number`.** That is the honest reading of a 64-bit SQLite INTEGER in JavaScript, and it is the second reason a u256 is not an integer field: it does not fit.
+- **The day the declaration can say "u256", this surface follows for free**, because its types are derived from the declaration rather than written beside it. Nothing here has to be un-decided; a field type has to be added.

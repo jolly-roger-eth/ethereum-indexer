@@ -36,6 +36,22 @@ Nothing in that object names a backend, which is the whole point: where the stat
   The prefix is a LEADING run of the declared id columns, the limit is REQUIRED, the order is the id's own ascending order, and there is no `where`, no `orderBy` and no offset: that is what keeps it one indexed range scan on every backend a handler might run on (ADR-0021). Nothing is maintained at write time, so appending a child costs one row.
 - **Key ordered children by something naturally unique** (an event ordinal, or `(blockNumber, logIndex)`) rather than by a dense array position, and make a key that must sort numerically FIXED-WIDTH, because a listing is ordered lexicographically over the stringified id. The measured port that validated this model paid for ignoring the first rule with three entities and a hand-maintained CSV index; see `work/notes/findings/sqlite-in-the-browser.md` and `test/ordered-children.test.ts`, which models the same window of seven with no index, no count and no stored array.
 
+## Reading the state back
+
+The declarations are the ONE description of the data, so the read surface is generated from them rather than hand-written beside them:
+
+```ts
+import {createReadSurface, declareEntities} from '@etherfold/processor-entities';
+
+const entities = declareEntities([{name: 'token', id: 'id', fields: {owner: 'text', transferCount: 'integer'}}]);
+const processor: EntityProcessor<typeof abi> = {version: '1.0.0', entities /* handlers... */};
+
+const surface = createReadSurface(store, entities);
+await surface.token.getCurrent({id: '1'}); // {id: string; owner: string | null; transferCount: number | null}
+```
+
+The same four reads the seam has (`getCurrent` / `getAsOf` / `listCurrent` / `listAsOf`), typed off the declaration, so renaming a field breaks the consumer at COMPILE time; `declareEntities` is an identity function that exists only to keep the literal types an annotation would widen away. `test/read-surface.test.ts` runs one reader, unchanged, against all three backends. See [`@etherfold/state-store`](../state-store) for the details, and `createQuerySurface` in [`@etherfold/state-store-sqlite`](../state-store-sqlite) for the server-side tier that also takes predicates.
+
 ## Where the pieces live
 
 | | |
