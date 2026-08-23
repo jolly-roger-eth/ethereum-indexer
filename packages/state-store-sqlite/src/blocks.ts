@@ -1,4 +1,10 @@
-import {BlockUnavailableError, normalizeBlockHash, normalizeBlockTimestamp} from '@etherfold/state-store';
+import {
+	BlockUnavailableError,
+	InvalidBlockNumberError,
+	isBlockNumber,
+	normalizeBlockHash,
+	normalizeBlockTimestamp,
+} from '@etherfold/state-store';
 
 /**
  * The normalisation of a block's own fields is the SEAM's, not this store's:
@@ -139,9 +145,26 @@ export function parseBlockAddress(address: BlockAddress): ParsedBlockAddress {
 	);
 }
 
+/**
+ * The height axis, held to the SEAM's rule for what a block number is.
+ *
+ * `isBlockNumber` rather than a copy of it, and `InvalidBlockNumberError` rather
+ * than a bare `Error`, because this is the same caller bug the seam refuses for
+ * a backend with no addressing layer: a height that is not a whole non-negative
+ * number is not a block, whichever side of the addressing layer it arrived on.
+ * The message still names the ADDRESS, since that is what the caller wrote.
+ *
+ * Note which error this is NOT: an address that is well formed and resolves to
+ * no recorded block is `NoSuchBlockError`, a member of the `BlockUnavailableError`
+ * family. This one is outside that family on purpose (see the class), because no
+ * store configuration makes a non-number answerable.
+ */
 function assertHeight(value: unknown, address: BlockAddress): number {
-	if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-		throw new Error(`invalid block address: ${JSON.stringify(address)}. A height must be a non-negative integer.`);
+	if (!isBlockNumber(value)) {
+		throw new InvalidBlockNumberError(
+			value,
+			`invalid block address: ${JSON.stringify(address)}. A height must be a non-negative integer.`,
+		);
 	}
 	return value;
 }

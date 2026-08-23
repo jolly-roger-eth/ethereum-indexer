@@ -5,6 +5,7 @@ import {
 	answersHistoryOverLadder,
 	block,
 	cases,
+	declaredColumns,
 	opened,
 	owns,
 	placed,
@@ -48,6 +49,39 @@ export function readYourWritesCases(
 				// 12: the second handler read the first handler's write, inside the
 				// block, before anything was applied.
 				expect(await pointsOf(store, '0xevil')).toBe(12);
+			},
+
+			'a row written earlier in this block reads back WHOLE, exactly as one written earlier': async () => {
+				// The shape of a row must not depend on WHEN it was written. `id` is an
+				// id column and `transferCount` is a declared field this write does not
+				// list, so both belong to the row the store will hold, and a handler
+				// that reads its own block's write must not get a partial one: a field
+				// that is only sometimes there comes back as `undefined`, which is a
+				// legal value meaning "not set" rather than an error anyone notices.
+				const store = await opened(factory);
+				const {state, mutations} = createMutationContext(store);
+				state.set('token', {id: '1'}, {owner: '0xalice'});
+
+				const sameBlock = await state.get<Record<string, unknown>>('token', {id: '1'});
+				expect(sameBlock).toMatchObject({id: '1', owner: '0xalice', transferCount: null});
+
+				await store.applyBlock(block(LADDER_BASE), mutations());
+				const laterBlock = await createMutationContext(store).state.get<Record<string, unknown>>('token', {id: '1'});
+
+				// the same declared columns on both sides of the block boundary (the
+				// version columns are the one difference a staged row cannot hide: it
+				// has no version yet)
+				expect(declaredColumns(sameBlock)).toEqual(declaredColumns(laterBlock));
+				expect(declaredColumns(laterBlock)).toEqual(['id', 'owner', 'transferCount']);
+			},
+
+			'`get` and `list` agree about a row this block staged': async () => {
+				const store = await opened(factory);
+				const {state} = createMutationContext(store);
+				state.set('placement', {epoch: 7, position: 1, playerIndex: 0}, {player: '0xalice'});
+
+				const listed = (await state.list<Record<string, unknown>>('placement', {epoch: 7}, 10)).rows[0];
+				expect(await state.get('placement', {epoch: 7, position: 1, playerIndex: 0})).toEqual(listed);
 			},
 
 			'a read for a key this block has not touched falls through to the store': async () => {

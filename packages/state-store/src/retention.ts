@@ -1,3 +1,4 @@
+import {assertBlockNumber} from './blocks.js';
 import type {Retention, StateStoreCapabilities} from './capabilities.js';
 import {BlockNotRetainedError} from './errors.js';
 
@@ -255,12 +256,22 @@ export function retainedRange(retention: Retention, tip: number): RetainedRange 
  * is the tip state, which is what the version ranges already answer, and it is
  * `NoSuchBlockError`'s business (not retention's) when an address identifies no
  * block at all.
+ *
+ * The first thing it does is not about retention at all: it refuses an `at` that
+ * is not a block NUMBER (`assertBlockNumber`). The guard rides here because this
+ * is the one call every backend taking a resolved block number already makes on
+ * every historical read, so one check covers all of them instead of three copies
+ * drifting; and it comes FIRST, before the store's own claim is consulted,
+ * because which refusal a caller gets is the point. A store answering no
+ * historical read would otherwise report `{hash: '0x64'}` as "not retained",
+ * sending its caller off to widen a retention window that was never the problem.
  */
 export async function assertRetained(
 	capabilities: StateStoreCapabilities,
 	requested: number,
 	tip: () => number | undefined | Promise<number | undefined>,
 ): Promise<void> {
+	assertBlockNumber(requested);
 	const retention = capabilities.retention;
 	if (!capabilities.asOf || retention.kind === 'revert-only') {
 		throw new BlockNotRetainedError(requested, undefined, 'no-historical-reads', retention);

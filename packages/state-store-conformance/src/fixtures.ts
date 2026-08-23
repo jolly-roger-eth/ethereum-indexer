@@ -223,6 +223,21 @@ export function ordered(group: string, index: number, select: string): Mutation 
 	};
 }
 
+/**
+ * A row's own columns, sorted, without the version columns a store adds.
+ *
+ * The `_` namespace belongs to the store (see the identifier rules at the seam),
+ * and what a backend keeps in it is its own business: a versioned-rows backend
+ * hands back `_lower` / `_upper` and a patch-log backend has neither. Dropping
+ * them is what lets a case compare the SHAPE of two rows across backends, and
+ * across the block boundary that used to change it.
+ */
+export function declaredColumns(row: Record<string, unknown> | undefined): string[] {
+	return Object.keys(row ?? {})
+		.filter((column) => !column.startsWith('_'))
+		.sort();
+}
+
 /** The `player` of each listed child, which is enough to name it and see its order. */
 export function playersOf(rows: readonly Record<string, unknown>[]): unknown[] {
 	return rows.map((row) => row.player);

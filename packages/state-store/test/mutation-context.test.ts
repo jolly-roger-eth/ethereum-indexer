@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {MemoryStateStore, createMutationContext} from '../src/index.js';
-import {TOKEN, block} from './utils/fixtures.js';
+import {PLACEMENT, TOKEN, block} from './utils/fixtures.js';
 
 /**
  * The write surface, tested AT THE SEAM rather than through any one backend.
@@ -14,6 +14,13 @@ import {TOKEN, block} from './utils/fixtures.js';
 async function staged(store: MemoryStateStore) {
 	const {state, mutations} = createMutationContext(store);
 	return {state, mutations};
+}
+
+/** A row's own columns, without the version columns a store adds in its `_` namespace. */
+function declaredColumns(row: Record<string, unknown> | undefined): string[] {
+	return Object.keys(row ?? {})
+		.filter((column) => !column.startsWith('_'))
+		.sort();
 }
 
 describe('read-your-writes within the block being processed', () => {
@@ -57,6 +64,36 @@ describe('read-your-writes within the block being processed', () => {
 		state.delete('token', {id: '1'});
 		expect(await state.get('token', {id: '1'})).toBeUndefined();
 		expect(mutations()).toEqual([{type: 'delete', entity: 'token', id: {id: '1'}}]);
+	});
+
+	it('answers a key staged in this block with a WHOLE row, as the store would have', async () => {
+		// The shape of a row must not depend on WHEN it was written. `id` is an id
+		// column and `transferCount` is a declared field the write did not list, so
+		// both are part of the row the store will hold, and a handler reading its
+		// own block's write must see them rather than only what `set` was passed.
+		const store = new MemoryStateStore([TOKEN]);
+		await store.migrate();
+		const {state, mutations} = await staged(store);
+
+		state.set('token', {id: '1'}, {owner: '0xalice'});
+		expect(await state.get('token', {id: '1'})).toEqual({id: '1', owner: '0xalice', transferCount: null});
+
+		// and the SAME row, read in a later block, has the same declared columns
+		await store.applyBlock(block(10), mutations());
+		const {state: later} = await staged(store);
+		const stored = await later.get<Record<string, unknown>>('token', {id: '1'});
+		expect(declaredColumns(stored)).toEqual(['id', 'owner', 'transferCount']);
+	});
+
+	it('agrees with `list` about a staged row, because both build it the same way', async () => {
+		const store = new MemoryStateStore([PLACEMENT]);
+		await store.migrate();
+		const {state} = await staged(store);
+
+		state.set('placement', {epoch: 7, position: 1, playerIndex: 0}, {});
+
+		const listed = (await state.list<Record<string, unknown>>('placement', {epoch: 7}, 10)).rows[0];
+		expect(await state.get('placement', {epoch: 7, position: 1, playerIndex: 0})).toEqual(listed);
 	});
 
 	it('hands back a copy of the staged values, so a handler cannot mutate the staging area', async () => {

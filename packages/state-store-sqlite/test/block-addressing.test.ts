@@ -1,3 +1,4 @@
+import {BlockUnavailableError, InvalidBlockNumberError} from '@etherfold/state-store';
 import {beforeEach, describe, expect, it} from 'vitest';
 import {NoSuchBlockError, VersionedStateStore} from '../src/index.js';
 import {createTestDB, rows} from './utils/db.js';
@@ -201,5 +202,43 @@ describe('a malformed address', () => {
 		await expect(store.resolveBlockNumber({} as never)).rejects.toThrow(/block address/i);
 		await expect(store.resolveBlockNumber({height: 101} as never)).rejects.toThrow(/block address/i);
 		await expect(store.resolveBlockNumber(1.5)).rejects.toThrow(/block address/i);
+	});
+
+	it('is a caller BUG, so it is not a member of the `BlockUnavailableError` family', async () => {
+		// A height that is not a whole non-negative number is not a block at all,
+		// which no retention setting and no reorg can make answerable. The family is
+		// for the store's own limits: the address resolved to nothing
+		// (`NoSuchBlockError`) or the versions are gone (`BlockNotRetainedError`).
+		const {store} = await threeVersions();
+		const error = await store.getAsOf('token', {id: '1'}, {number: '101'} as never).catch((e: unknown) => e);
+
+		expect(error).toBeInstanceOf(InvalidBlockNumberError);
+		expect(error).not.toBeInstanceOf(BlockUnavailableError);
+	});
+});
+
+describe("the seam's block-number guard", () => {
+	// The guard added beside `assertRetained` constrains a backend whose `getAsOf`
+	// takes a NUMBER. This store takes a richer address and resolves it FIRST, so
+	// the guard sees the resolved number and this layer keeps every axis it had.
+	// These assertions exist to fail if that ever stops being true.
+	it('leaves all three axes answering, because this store resolves before the seam sees a number', async () => {
+		const {store} = await threeVersions();
+		const {number, hash, timestamp} = block(101);
+
+		expect(owner(await store.getAsOf<{owner: string}>('token', {id: '1'}, number))).toBe('0xBob');
+		expect(owner(await store.getAsOf<{owner: string}>('token', {id: '1'}, {number}))).toBe('0xBob');
+		expect(owner(await store.getAsOf<{owner: string}>('token', {id: '1'}, {hash}))).toBe('0xBob');
+		expect(owner(await store.getAsOf<{owner: string}>('token', {id: '1'}, {timestamp}))).toBe('0xBob');
+		expect(await store.getAsOf('token', {id: 'never-minted'}, {hash})).toBeUndefined();
+	});
+
+	it('leaves `NoSuchBlockError` as the answer for an address that resolves to no block', async () => {
+		const {store} = await threeVersions();
+
+		await expect(store.getAsOf('token', {id: '1'}, {hash: '0xdeadbeef'})).rejects.toBeInstanceOf(NoSuchBlockError);
+		await expect(store.getAsOf('token', {id: '1'}, {timestamp: 1})).rejects.toBeInstanceOf(NoSuchBlockError);
+		// and the soft form still answers rather than throwing
+		expect(await store.resolveBlockNumber({hash: '0xdeadbeef'})).toBeUndefined();
 	});
 });

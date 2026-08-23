@@ -21,8 +21,56 @@ import type {Retention} from './capabilities.js';
  * from a retention boundary still can. It lives at the seam because the second
  * member is thrown by every backend, and two classes of one name in two packages
  * would break `instanceof` across the boundary.
+ *
+ * What is NOT a member, deliberately: `InvalidBlockNumberError` below. Every
+ * member of this family is a fact about the store; that one is a fact about the
+ * call, and no retention setting makes a non-block answerable.
  */
 export abstract class BlockUnavailableError extends Error {}
+
+/**
+ * Thrown by a read whose `at` is not a block number at all.
+ *
+ * **Deliberately not a member of `BlockUnavailableError`, and that is the whole
+ * decision.** Every member of that family is a fact about the STORE: the block
+ * is real, and this store cannot answer about it. A caller acts on one by
+ * widening retention, re-pinning, or telling a user their pinned block is gone.
+ * This one is a fact about the CALL: `{hash: '0x64'}`, `'100'` or `undefined`
+ * names no block, so there is no store configuration under which it becomes
+ * answerable and nothing to catch it for. It is a programmer error, so it is a
+ * `TypeError`, and a caller that catches `BlockUnavailableError` to handle "my
+ * historical read did not happen" does not swallow it.
+ *
+ * It is also not `undefined`, which is the answer this guard exists to prevent:
+ * a non-number `at` compares unequal to every version range, so without the
+ * guard the read matches nothing and returns the ordinary "the entity was absent
+ * then" -- a plausible answer to a question nobody asked.
+ *
+ * A backend with an addressing layer above the seam resolves its address to a
+ * block number first (`@etherfold/state-store-sqlite` takes a height, a `{hash}`
+ * or a `{timestamp}`), and throws this for the HEIGHT axis for the same reason:
+ * a height that is not a whole non-negative number is not a block either. An
+ * address that resolves to no recorded block is the other thing entirely, and
+ * stays `NoSuchBlockError`.
+ */
+export class InvalidBlockNumberError extends TypeError {
+	readonly name = 'InvalidBlockNumberError';
+
+	constructor(
+		/** What was passed instead of a block number. */
+		readonly received: unknown,
+		/** An override for a caller that can say more, e.g. which address axis it came from. */
+		message?: string,
+	) {
+		super(
+			message ??
+				`invalid block number: ${describeValue(received)}. A read as of a block takes a whole, ` +
+					`non-negative block NUMBER; this store has no addressing layer that resolves a hash or a timestamp to ` +
+					`one. Answering would mean matching nothing and reporting the entity as absent, which is an ordinary ` +
+					`answer to a question that was never asked.`,
+		);
+	}
+}
 
 /** Which way a historical read fell outside what the store keeps. */
 export type NotRetainedReason =
@@ -66,5 +114,15 @@ export class BlockNotRetainedError extends BlockUnavailableError {
 						`retention is \`${retention.kind}\`, which keeps superseded versions for reorg revert and nothing else. ` +
 						`Read its capabilities at startup rather than discovering this at the call.`,
 		);
+	}
+}
+
+/** A value in a message, without `JSON.stringify` throwing on a BigInt or a cycle. */
+function describeValue(value: unknown): string {
+	if (typeof value === 'bigint') return `${value}n`;
+	try {
+		return JSON.stringify(value) ?? String(value);
+	} catch {
+		return String(value);
 	}
 }
