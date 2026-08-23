@@ -1,11 +1,5 @@
 import {createClient} from '@libsql/client';
-import {
-	BlockNotRetainedError,
-	MemoryStateStore,
-	type RetentionOptions,
-	type RetentionSetting,
-	type StateStore,
-} from '@etherfold/state-store';
+import {MemoryStateStore, type RetentionOptions, type RetentionSetting, type StateStore} from '@etherfold/state-store';
 import {VersionedStateStore} from '@etherfold/state-store-sqlite';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import {beforeEach, describe, expect, it} from 'vitest';
@@ -202,15 +196,17 @@ describe.each(backends)('the seam behaves the same on $name', (backend) => {
 });
 
 /**
- * The capability cases: what a store CLAIMS, tested against what it DOES.
+ * What a DEPLOYMENT writes, and what each backend then claims about itself.
  *
- * They live here, next to the two-backend run, because that is what makes them
- * worth writing: a claim that means one thing on SQLite and another on a Map is
- * not a capability report, it is a per-backend README. `state-store-conformance-suite`
- * absorbs these into the shared suite it exports; until then this is where they
- * run against both.
+ * That a claim is HONOURED is no longer asserted here: the shared suite
+ * (`@etherfold/state-store-conformance`) reads a store's report and tests its
+ * behaviour against it, on every backend and under each of the three claims. So
+ * what is left is the half the suite cannot see, because the suite is handed a
+ * store rather than the options it was built from: that one spelling of the
+ * retention setting means the same thing to both backends, and produces the same
+ * report from both.
  */
-describe.each(backends)('the capability report means the same thing on $name', (backend) => {
+describe.each(backends)('a retention setting is written the same way on $name', (backend) => {
 	it('rejects a window below the finality depth where it is CONFIGURED', () => {
 		// not at the first read it would have answered wrongly: both numbers are
 		// known at construction, so that is where the two are compared.
@@ -233,17 +229,14 @@ describe.each(backends)('the capability report means the same thing on $name', (
 		expect(await store.getAsOf<{value: number}>('counter', {name: 'transfers'}, 100)).toMatchObject({value: 3});
 	});
 
-	it('refuses every historical read when it declares `revert-only`', async () => {
+	it('turns `revert-only` into the same claim on both, and the processor still runs on it', async () => {
 		const store = backend.make({retention: 'revert-only'});
 		await store.migrate();
 		await applyEventStream(store, processor, STREAM, undefined);
 
 		expect(store.capabilities).toEqual({retention: {kind: 'revert-only'}, asOf: false});
-		await expect(store.getAsOf('counter', {name: 'transfers'}, 100)).rejects.toBeInstanceOf(BlockNotRetainedError);
-		await expect(store.getAsOf('counter', {name: 'transfers'}, 102)).rejects.toBeInstanceOf(BlockNotRetainedError);
-		// the tip is not a historical read, and revert is the capability it kept
+		// the tip is not a historical read: a processor does not need history to run,
+		// which is what makes `revert-only` a usable deployment rather than a crippled one
 		expect(await store.getCurrent<{value: number}>('counter', {name: 'transfers'})).toMatchObject({value: 5});
-		await store.revertTo(101);
-		expect(await store.getCurrent<{value: number}>('counter', {name: 'transfers'})).toMatchObject({value: 4});
 	});
 });

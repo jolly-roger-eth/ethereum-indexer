@@ -84,3 +84,5 @@ This package ports a verified prototype (`~/dev/github/wighawag/research/ethereu
 ## Tests
 
 `pnpm --filter @etherfold/state-store-sqlite test`, vitest, against a real in-memory libSQL database. Never a mock: the ordering rule above is a property of how SQLite enforces a partial index, and a fake would accept the broken order happily.
+
+The cases that are the SEAM's rather than this backend's (versioned reads, as-of reads against the declared capabilities, reorg revert with a counter that must go back down, read-your-writes, block atomicity) are not written here: `test/conformance.test.ts` runs the shared suite, [`@etherfold/state-store-conformance`](../state-store-conformance), against this store under three retention claims. What stays in this package's own tests is what only a versioned-row backend can be asked: the partial unique index, the batch, the `revertTo` ordering, the DDL, the block addressing, and the SQL query surface.

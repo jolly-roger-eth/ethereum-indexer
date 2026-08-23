@@ -30,7 +30,3 @@ export function block(
 export function owns(id: string, owner: string, transferCount: number): Mutation {
 	return {type: 'upsert', entity: 'token', id: {id}, values: {owner, transferCount}};
 }
-
-export function burn(id: string): Mutation {
-	return {type: 'delete', entity: 'token', id: {id}};
-}

@@ -1,17 +1,24 @@
-import {BlockNotRetainedError, BlockUnavailableError, type StateStoreCapabilities} from '@etherfold/state-store';
+import {BlockNotRetainedError, BlockUnavailableError} from '@etherfold/state-store';
 import type {RemoteSQL} from 'remote-sql';
 import {describe, expect, it} from 'vitest';
 import {NoSuchBlockError, VersionedStateStore, type EntityDeclaration} from '../src/index.js';
 import {createTestDB} from './utils/db.js';
 import {TOKEN, block, owns} from './utils/fixtures.js';
+import {WindowedStore} from './utils/windowed-store.js';
 
 /**
  * A backend states what it can do BEFORE anyone asks it a question, which is the
- * difference between discovering a missing capability at startup and
- * discovering it from a wrong number in production.
+ * difference between discovering a missing capability at startup and discovering
+ * it from a wrong number in production.
  *
- * The report is only worth reading because of the refusal underneath it: a read
- * this store does not cover throws, and never answers from the tip.
+ * That a claim is HONOURED -- answering inside a window, refusing outside it,
+ * refusing everything when the store keeps history for revert alone -- is
+ * asserted against every backend by `@etherfold/state-store-conformance` (see
+ * `conformance.test.ts`), which reads the report and tests behaviour against it.
+ * What is asserted here is what only this package can say: WHICH claim it makes
+ * and why, what it does with a retention setting a deployment writes, and how
+ * the refusal behaves on the surfaces that are this backend's own (the
+ * whole-table query and the hash and timestamp address axes).
  */
 describe('declared capabilities', () => {
 	it('are readable before migrate and before any read', () => {
@@ -28,16 +35,6 @@ describe('declared capabilities', () => {
 		// a million blocks later, the first version is still readable. A store that
 		// reported a window here would be claiming an enforcement it does not have.
 		expect(store.capabilities.retention).toEqual({kind: 'unbounded'});
-		expect(await store.getAsOf<{owner: string}>('token', {id: '1'}, 10)).toMatchObject({owner: '0xalice'});
-	});
-
-	it('claim `asOf`, and answer as-of reads', async () => {
-		const store = new VersionedStateStore(createTestDB(), [TOKEN]);
-		await store.migrate();
-		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
-
-		expect(store.capabilities.asOf).toBe(true);
-		expect(await store.getAsOf('token', {id: '1'}, 9)).toBeUndefined();
 		expect(await store.getAsOf<{owner: string}>('token', {id: '1'}, 10)).toMatchObject({owner: '0xalice'});
 	});
 });
@@ -78,13 +75,12 @@ describe('a store set to `revert-only`', () => {
 		expect(revertOnly().capabilities).toEqual({retention: {kind: 'revert-only'}, asOf: false});
 	});
 
-	it('refuses every historical read rather than answering from the tip', async () => {
+	it("refuses on the read surfaces that are this backend's own, not only at the seam", async () => {
 		const store = revertOnly();
 		await store.migrate();
 		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
 		await store.applyBlock(block(20), [owns('1', '0xbob', 2)]);
 
-		await expect(store.getAsOf('token', {id: '1'}, 10)).rejects.toBeInstanceOf(BlockNotRetainedError);
 		await expect(store.queryAsOf('token', 10)).rejects.toBeInstanceOf(BlockNotRetainedError);
 		// including through the hash axis, which resolves perfectly well
 		await expect(store.getAsOf('token', {id: '1'}, {hash: block(10).hash})).rejects.toBeInstanceOf(
@@ -93,50 +89,9 @@ describe('a store set to `revert-only`', () => {
 		// and the tip is still readable, through the read that is honestly about the tip
 		expect(await store.getCurrent<{owner: string}>('token', {id: '1'})).toMatchObject({owner: '0xbob'});
 	});
-
-	it('still reverts: that is the capability it kept the versions for', async () => {
-		const store = revertOnly();
-		await store.migrate();
-		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
-		await store.applyBlock(block(20), [owns('1', '0xbob', 2)]);
-
-		await store.revertTo(10);
-		expect(await store.getCurrent<{owner: string}>('token', {id: '1'})).toMatchObject({owner: '0xalice'});
-	});
 });
 
-/**
- * What a windowed SQLite store will do once it can honestly claim a window.
- *
- * The claim is overridden rather than configured, because a shipped store that
- * claimed a window today would be claiming an enforcement it does not have (no
- * pruning: `prune-versions-outside-retention-window`). What is real here is
- * everything below the claim: the tip comes out of the block table, and the
- * refusal is the seam's.
- */
-class WindowedStore extends VersionedStateStore {
-	override get capabilities(): StateStoreCapabilities {
-		return {retention: {kind: 'window', blocks: 60}, asOf: true};
-	}
-}
-
 describe('a store that claims a window', () => {
-	it('answers inside it and refuses outside it, measuring from the recorded tip', async () => {
-		const store = new WindowedStore(createTestDB(), [TOKEN]);
-		await store.migrate();
-		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
-		await store.applyBlock(block(1_000), [owns('1', '0xbob', 2)]);
-
-		// inside: the live-at-940 version is the one opened at block 10, and a version
-		// that is still valid is readable however old it is
-		expect(await store.getAsOf<{owner: string}>('token', {id: '1'}, 999)).toMatchObject({owner: '0xalice'});
-
-		const error = await store.getAsOf('token', {id: '1'}, 10).catch((e) => e);
-		expect(error).toBeInstanceOf(BlockNotRetainedError);
-		expect(error.requested).toBe(10);
-		expect(error.retained).toEqual({from: 940, to: 1_000});
-	});
-
 	it('refuses a whole-table query outside the window too', async () => {
 		const store = new WindowedStore(createTestDB(), [TOKEN]);
 		await store.migrate();
