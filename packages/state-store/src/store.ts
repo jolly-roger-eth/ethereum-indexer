@@ -1,10 +1,11 @@
 import type {StateStoreCapabilities} from './capabilities.js';
+import type {EntityIdPrefix, Listing} from './listing.js';
 import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.js';
 
 /**
  * The seam: what a store must do for a processor to run on it.
  *
- * Five verbs and one report, chosen because they are the whole of what
+ * Seven verbs and one report, chosen because they are the whole of what
  * processing a chain needs and because each of them is cheaply implementable on
  * every substrate we have measured (versioned SQL rows, an object store, an
  * in-memory map, a patch log). Anything a particular backend can do BETTER stays
@@ -18,12 +19,12 @@ import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.j
  * implement it, while backing arbitrary nested object mutation with versioned
  * rows cannot be done without materialising the store.
  *
+ * The listing is the one SET read, and its BOUND is what keeps it cheap
+ * everywhere: a prefix of the declared id plus a required limit, never a
+ * predicate and never a caller-supplied ordering (see `listing.ts`).
+ *
  * Deliberately absent, and each absence is a decision:
  *
- * - **A listing.** `bounded-id-prefix-listing` adds the one read the model is
- *   missing (rows whose declared id starts with a prefix, with a required
- *   limit). It is not here because the bound is a design decision that task
- *   owns, not because a listing does not belong at the seam.
  * - **Block addressing by hash or time.** `getAsOf` takes a resolved block
  *   NUMBER, so the seam owes nothing to a block table. Resolving a hash or a
  *   timestamp to a number, and refusing an address that resolves to nothing
@@ -57,6 +58,31 @@ export interface StateStore {
 
 	/** One entity as it stands at the tip. */
 	getCurrent<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined>;
+
+	/**
+	 * The rows whose declared id starts with `prefix`, at the tip, in ascending
+	 * id order, at most `limit` of them.
+	 *
+	 * This is the derived collection a one-to-many is read through, and the
+	 * REQUIRED limit is the whole reason it can be asked of any backend: the
+	 * operation is a key-prefix range with a bound, which is an indexed range scan
+	 * on every substrate. `truncated` says whether more matched, because a set that
+	 * exactly fills the limit is otherwise indistinguishable from a cut-off one.
+	 */
+	listCurrent<T = Record<string, unknown>>(entity: string, prefix: EntityIdPrefix, limit: number): Promise<Listing<T>>;
+
+	/**
+	 * The same listing as of a block NUMBER: the children that were live then.
+	 *
+	 * Refused, not answered from the tip, by a store whose retention does not
+	 * cover that block -- the same contract as `getAsOf`, for the same reason.
+	 */
+	listAsOf<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		at: number,
+		limit: number,
+	): Promise<Listing<T>>;
 
 	/**
 	 * One entity as of a block NUMBER.

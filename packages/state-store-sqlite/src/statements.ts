@@ -1,4 +1,12 @@
-import {idValues, mustGet, normalizeBlockHash, normalizeEntities} from '@etherfold/state-store';
+import {
+	assertListingLimit,
+	idValues,
+	mustGet,
+	normalizeBlockHash,
+	normalizeEntities,
+	prefixValues,
+	type EntityIdPrefix,
+} from '@etherfold/state-store';
 import {BLOCKS_TABLE, LOWER, UPPER} from './ddl.js';
 import type {BlockPointer, EntityDeclaration, Mutation, NormalizedEntity, Statement} from './types.js';
 
@@ -73,6 +81,51 @@ export function latestBlockStatement(): Statement {
 
 export function idPredicate(entity: NormalizedEntity): string {
 	return entity.id.map((column) => `${column} = ?`).join(' AND ');
+}
+
+/**
+ * The two statements a bounded id-prefix listing compiles to, and the reason the
+ * surface has the shape it has.
+ *
+ * Equality on the LEADING id columns plus `ORDER BY` the declared id is a
+ * key-prefix range: SQLite seeks into the entity's id index and walks it in
+ * order, so there is no sort and no scan, whatever the table holds. That is why
+ * the seam offers a prefix and a limit and refuses a `where`, an `orderBy` or an
+ * offset -- any of the three would let a handler, which runs once per event,
+ * express something no index can serve. The access path is pinned by
+ * `test/listing.test.ts` through `EXPLAIN QUERY PLAN`, because no behavioural
+ * assertion can tell a range scan from a table scan that returns the same rows.
+ *
+ * Both bind `limit + 1`. The extra row never reaches the caller: it is what
+ * turns "there may be more" into the `truncated` flag the seam answers with.
+ */
+function listStatement(entity: NormalizedEntity, prefix: EntityIdPrefix, limit: number, asOf?: number): Statement {
+	const values = prefixValues(entity, prefix);
+	assertListingLimit(entity, limit);
+	const predicate = asOf === undefined ? CURRENT_PREDICATE : AS_OF_PREDICATE;
+	const bounds = asOf === undefined ? [] : [asOf, asOf];
+	return {
+		sql:
+			`SELECT * FROM ${entity.name} ` +
+			`WHERE ${values.map((_, index) => `${entity.id[index]} = ?`).join(' AND ')} AND ${predicate} ` +
+			`ORDER BY ${entity.id.join(', ')} LIMIT ?`,
+		args: [...values, ...bounds, limit + 1],
+	};
+}
+
+/** The children of a prefix at the tip, riding the id index. */
+export function listCurrentStatement(entity: NormalizedEntity, prefix: EntityIdPrefix, limit: number): Statement {
+	return listStatement(entity, prefix, limit);
+}
+
+/** The same range, as of a resolved block NUMBER, under the validity predicate. */
+export function listAsOfStatement(
+	entity: NormalizedEntity,
+	prefix: EntityIdPrefix,
+	at: number,
+	limit: number,
+): Statement {
+	return listStatement(entity, prefix, limit, at);
 }
 
 /**

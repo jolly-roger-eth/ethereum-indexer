@@ -1,6 +1,14 @@
-import {entityKey, mustGet} from './entities.js';
+import {entityKey, idValues, mustGet} from './entities.js';
+import {
+	assertListingLimit,
+	compareIds,
+	hasIdPrefix,
+	prefixValues,
+	type EntityIdPrefix,
+	type Listing,
+} from './listing.js';
 import type {StateStore} from './store.js';
-import type {EntityId, Mutation} from './types.js';
+import type {EntityId, Mutation, NormalizedEntity} from './types.js';
 
 /**
  * The write surface a handler gets for ONE block.
@@ -39,6 +47,23 @@ export type MutationContext = {
 	 * there is no such thing as writing one column of a version.
 	 */
 	update(entity: string, id: EntityId, values: Record<string, unknown>): Promise<void>;
+	/**
+	 * The children of a key: the rows whose declared id STARTS WITH `prefix`, in
+	 * ascending id order, at most `limit` of them, including this block's writes.
+	 *
+	 * This is how a one-to-many is read: children are their own entity keyed by
+	 * their parent, and the collection is DERIVED HERE rather than stored, so
+	 * appending a child costs one row and no maintenance of an array, a count or
+	 * an index. `{epoch: 7}` under `id: ['epoch', 'position', 'playerIndex']` is
+	 * every placement of epoch 7.
+	 *
+	 * The limit is REQUIRED and there is no predicate, no ordering and no offset:
+	 * see `listing.ts` for why the bound is the design rather than a detail. If the
+	 * answer is cut off, `truncated` says so, because a handler that mistakes a
+	 * truncated collection for the whole of it (a cascade delete that stops early)
+	 * leaves orphans behind silently.
+	 */
+	list<T = Record<string, unknown>>(entity: string, prefix: EntityIdPrefix, limit: number): Promise<Listing<T>>;
 	/** Close the live version without opening a new one: absent from this block on, readable before it. */
 	delete(entity: string, id: EntityId): void;
 };
@@ -92,10 +117,82 @@ export function createMutationContext(store: StateStore): StagedBlock {
 			}
 			context.set(entity, id, {...merged, ...values});
 		},
+		/**
+		 * The store's range scan with this block's staging area merged into it.
+		 *
+		 * Read-your-writes is the part most likely to be got wrong here, because a
+		 * listing cannot simply fall through to the store the way `get` does: a row
+		 * written earlier in the block is not in the store yet, a row deleted earlier
+		 * in the block still is, and the answer has to be BOTH bounded and correct.
+		 *
+		 * Hence the fetch budget. A row this block deleted occupies a slot in the
+		 * store's answer and none in ours, so asking the store for exactly `limit`
+		 * rows could come back short; asking for `limit + (staged keys under this
+		 * prefix)` cannot, because that is the most the staging area can subtract.
+		 * Scanning the staging area itself is a walk over ONE block's mutations
+		 * (median 7, max 457 on the real measured stream), never over the store.
+		 */
+		list: async <T>(entity: string, prefix: EntityIdPrefix, limit: number): Promise<Listing<T>> => {
+			const declaration = mustGet(store.declarations, entity);
+			const values = prefixValues(declaration, prefix);
+			assertListingLimit(declaration, limit);
+
+			const staged = new Map<string, {id: readonly string[]; row?: Record<string, unknown>}>();
+			for (const [key, mutation] of pending) {
+				if (mutation.entity !== declaration.name) continue;
+				const id = idValues(declaration, mutation.id);
+				if (!hasIdPrefix(id, values)) continue;
+				staged.set(key, {
+					id,
+					row: mutation.type === 'upsert' ? stagedRow(declaration, id, mutation.values) : undefined,
+				});
+			}
+
+			const stored = await store.listCurrent<Record<string, unknown>>(entity, prefix, limit + staged.size);
+			const merged: {id: readonly string[]; row: Record<string, unknown>}[] = [];
+			for (const row of stored.rows) {
+				// a key this block has touched is answered from the block, never twice
+				if (staged.has(entityKey(declaration, row as EntityId))) continue;
+				merged.push({id: idValues(declaration, row as EntityId), row});
+			}
+			for (const {id, row} of staged.values()) {
+				if (row) merged.push({id, row});
+			}
+			merged.sort((a, b) => compareIds(a.id, b.id));
+
+			return {
+				rows: merged.slice(0, limit).map(({row}) => row as T),
+				// the store's own flag still counts: with the budget above, a store that
+				// reported more can only have rows we have not seen.
+				truncated: merged.length > limit || stored.truncated,
+			};
+		},
 		delete: (entity: string, id: EntityId): void => {
 			pending.set(keyOf(entity, id), {type: 'delete', entity, id});
 		},
 	};
 
 	return {state: context, mutations: () => [...pending.values()]};
+}
+
+/**
+ * A row staged in this block, in the shape the store would have given it back.
+ *
+ * The id columns are included and every declared field is present, unlisted ones
+ * as NULL, because a version is a COMPLETE row and because a listing's rows come
+ * from two places at once: a caller must not be able to tell which of them a row
+ * came from. The one difference it cannot hide is the version columns, which a
+ * staged row has none of: it has no version yet.
+ */
+function stagedRow(
+	entity: NormalizedEntity,
+	id: readonly string[],
+	values: Record<string, unknown>,
+): Record<string, unknown> {
+	const row: Record<string, unknown> = {};
+	entity.id.forEach((column, index) => (row[column] = id[index]));
+	for (const field of Object.keys(entity.fields)) {
+		row[field] = values?.[field] ?? null;
+	}
+	return row;
 }

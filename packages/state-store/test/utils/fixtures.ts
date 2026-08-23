@@ -19,6 +19,23 @@ export const ACCOUNT: EntityDeclaration = {
 	fields: {balance: 'integer'},
 };
 
+/**
+ * The ordered child collection, keyed by its parent: the shape a listing exists
+ * for.
+ *
+ * Taken from the real one in `work/notes/findings/sqlite-in-the-browser.md`
+ * (contortion 1), where an array of placements per epoch cost three entities
+ * plus a hand-maintained CSV index purely because a handler could not ask which
+ * rows belong to an epoch. Declared here as the subgraph's `@derivedFrom` shape:
+ * the children are their own entity keyed by the parent, and the collection is
+ * derived WHEN READ.
+ */
+export const PLACEMENT: EntityDeclaration = {
+	name: 'placement',
+	id: ['epoch', 'position', 'playerIndex'],
+	fields: {player: 'text'},
+};
+
 export function block(
 	number: number,
 	hash = `0x${number.toString(16)}`,

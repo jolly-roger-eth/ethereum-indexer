@@ -2,6 +2,8 @@ import {
 	MemoryStateStore,
 	type BlockPointer,
 	type EntityId,
+	type EntityIdPrefix,
+	type Listing,
 	type Mutation,
 	type NormalizedEntity,
 	type StateStore,
@@ -77,6 +79,19 @@ class Decorated implements StateStore {
 		return this.inner.getAsOf<T>(entity, id, at);
 	}
 
+	listCurrent<T = Record<string, unknown>>(entity: string, prefix: EntityIdPrefix, limit: number): Promise<Listing<T>> {
+		return this.inner.listCurrent<T>(entity, prefix, limit);
+	}
+
+	listAsOf<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		at: number,
+		limit: number,
+	): Promise<Listing<T>> {
+		return this.inner.listAsOf<T>(entity, prefix, at, limit);
+	}
+
 	revertTo(keepUpTo: number): Promise<void> {
 		return this.inner.revertTo(keepUpTo);
 	}
@@ -93,6 +108,17 @@ class LyingWindowStore extends Decorated {
 class AmnesiacStore extends Decorated {
 	override getAsOf<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined> {
 		return this.inner.getCurrent<T>(entity, id);
+	}
+
+	// including the SET read: a collection derived from the tip and presented as
+	// a historical one is the same lie, one row at a time.
+	override listAsOf<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		_at: number,
+		limit: number,
+	): Promise<Listing<T>> {
+		return this.inner.listCurrent<T>(entity, prefix, limit);
 	}
 }
 

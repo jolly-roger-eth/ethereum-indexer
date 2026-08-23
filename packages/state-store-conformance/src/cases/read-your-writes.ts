@@ -1,6 +1,16 @@
 import {createMutationContext, type StateStoreCapabilities} from '@etherfold/state-store';
 import {expect} from 'vitest';
-import {LADDER_BASE, answersHistoryOverLadder, block, cases, opened, owns, pointsOf} from '../fixtures.js';
+import {
+	LADDER_BASE,
+	answersHistoryOverLadder,
+	block,
+	cases,
+	opened,
+	owns,
+	placed,
+	playersOf,
+	pointsOf,
+} from '../fixtures.js';
 import type {ConformanceCase, StateStoreFactory} from '../types.js';
 
 const GROUP = 'read-your-writes within a block';
@@ -79,6 +89,49 @@ export function readYourWritesCases(
 				replaced.state.set('token', {id: '1'}, {owner: '0xcarol'});
 				await store.applyBlock(block(LADDER_BASE + 2), replaced.mutations());
 				expect(await store.getCurrent('token', {id: '1'})).toMatchObject({owner: '0xcarol', transferCount: null});
+			},
+
+			'a LISTING made later in the block sees exactly what the block has done to it': async () => {
+				// The part of read-your-writes a listing cannot get for free: a child
+				// written earlier in the block is not in the store yet, and one deleted
+				// earlier in the block still is, so the staging area has to be merged
+				// into the range scan rather than fallen back on.
+				const store = await opened(factory);
+				await store.applyBlock(block(LADDER_BASE), [placed(7, 1, 0, '0xalice'), placed(7, 2, 0, '0xcarol')]);
+
+				const {state, mutations} = createMutationContext(store);
+				// one event of the block writes two children and deletes a third
+				state.set('placement', {epoch: 7, position: 3, playerIndex: 0}, {player: '0xdan'});
+				state.set('placement', {epoch: 7, position: 0, playerIndex: 0}, {player: '0xerin'});
+				state.delete('placement', {epoch: 7, position: 1, playerIndex: 0});
+
+				// a later event of the SAME block lists the prefix
+				const listing = await state.list<Record<string, unknown>>('placement', {epoch: 7}, 10);
+				expect(playersOf(listing.rows)).toEqual(['0xerin', '0xcarol', '0xdan']);
+
+				// and the store agrees once the block lands
+				await store.applyBlock(block(LADDER_BASE + 1), mutations());
+				const applied = await store.listCurrent<Record<string, unknown>>('placement', {epoch: 7}, 10);
+				expect(playersOf(applied.rows)).toEqual(['0xerin', '0xcarol', '0xdan']);
+			},
+
+			"fills a listing's limit from beyond the children this block deleted": async () => {
+				// Asking the store for exactly `limit` rows would come back short here,
+				// because a row this block deleted takes a slot in the store's answer
+				// and none in the caller's.
+				const store = await opened(factory);
+				await store.applyBlock(block(LADDER_BASE), [
+					placed(7, 1, 0, '0xalice'),
+					placed(7, 2, 0, '0xbob'),
+					placed(7, 3, 0, '0xcarol'),
+				]);
+
+				const {state} = createMutationContext(store);
+				state.delete('placement', {epoch: 7, position: 1, playerIndex: 0});
+
+				const listing = await state.list<Record<string, unknown>>('placement', {epoch: 7}, 2);
+				expect(playersOf(listing.rows)).toEqual(['0xbob', '0xcarol']);
+				expect(listing.truncated).toBe(false);
 			},
 
 			'`update` on an entity that does not exist yet writes the fields it was given': async () => {

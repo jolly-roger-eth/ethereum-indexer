@@ -26,7 +26,15 @@ Nothing in that object names a backend, which is the whole point: where the stat
 - **`set` writes a WHOLE row.** A version is a complete row, not a delta, so a declared field `set` does not list becomes `NULL`. `update(entity, id, partial)` is sugar over get-then-spread-then-set for the counter case; it is spelled as sugar so the storage model stays visible.
 - **Read-your-writes within the block.** `get` answers from the mutations already staged for the block being processed. It is load-bearing, not theoretical: on the real measured stream, 16,871 of 66,113 reads were served from the block's own staging area.
 - **Handlers are uniformly async.** Typing reads as `T | Promise<T>` instead would be infectious at every call site, to save a microtask on a path dominated by fetching logs.
-- **Model a one-to-many as children keyed by their parent**, the way a subgraph's `@derivedFrom` does, and key ordered children by something naturally unique (an event ordinal, or `(blockNumber, logIndex)`) rather than by a dense array position. The measured port that validated this model paid for ignoring that rule with three entities and a hand-maintained CSV index; see `work/notes/findings/sqlite-in-the-browser.md`.
+- **Model a one-to-many as children keyed by their parent**, the way a subgraph's `@derivedFrom` does, and read the collection back with a bounded listing:
+
+  ```ts
+  // entity: {name: 'placement', id: ['window', 'ordinal'], fields: {epoch: 'integer'}}
+  const {rows, truncated} = await state.list('placement', {window: 'global'}, 8);
+  ```
+
+  The prefix is a LEADING run of the declared id columns, the limit is REQUIRED, the order is the id's own ascending order, and there is no `where`, no `orderBy` and no offset: that is what keeps it one indexed range scan on every backend a handler might run on (ADR-0021). Nothing is maintained at write time, so appending a child costs one row.
+- **Key ordered children by something naturally unique** (an event ordinal, or `(blockNumber, logIndex)`) rather than by a dense array position, and make a key that must sort numerically FIXED-WIDTH, because a listing is ordered lexicographically over the stringified id. The measured port that validated this model paid for ignoring the first rule with three entities and a hand-maintained CSV index; see `work/notes/findings/sqlite-in-the-browser.md` and `test/ordered-children.test.ts`, which models the same window of seven with no index, no count and no stored array.
 
 ## Where the pieces live
 

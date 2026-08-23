@@ -17,9 +17,11 @@ An author declares only `{name, id, fields}`; the store owns the DDL, the versio
 
 ## One implementation of the seam
 
-This is a `StateStore` ([`@etherfold/state-store`](../state-store)), which is the backend-neutral contract a processor is written against: `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `revertTo`, plus the capabilities it declares. The declaration, mutation and block-pointer types are the seam's and are re-exported here, so a processor hands this store exactly what it would hand any other backend.
+This is a `StateStore` ([`@etherfold/state-store`](../state-store)), which is the backend-neutral contract a processor is written against: `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` / `revertTo`, plus the capabilities it declares. The declaration, mutation and block-pointer types are the seam's and are re-exported here, so a processor hands this store exactly what it would hand any other backend.
 
-Everything below those five verbs is this backend's own and deliberately NOT at the seam: block addressing by hash and by time, and the `queryCurrent` / `queryAsOf` surface that takes caller-supplied SQL. A server has a query planner; a handler, running once per event on every backend, does not.
+Everything below those verbs is this backend's own and deliberately NOT at the seam: block addressing by hash and by time, and the `queryCurrent` / `queryAsOf` surface that takes caller-supplied SQL. A server has a query planner; a handler, running once per event on every backend, does not.
+
+The seam's `listCurrent` / `listAsOf` are the other side of that line, and they are cheap here for a reason a test pins rather than asserts by hand: an equality on the LEADING id columns plus `ORDER BY` the declared id is a key-prefix range, so SQLite seeks into the entity's id index and walks it in order, with no sort and no table scan whatever the table holds. `test/listing.test.ts` reads the access path back out of `EXPLAIN QUERY PLAN`, because no behavioural assertion can tell a range scan from a table scan that returns the same rows.
 
 `store.capabilities` reports `{retention: {kind: 'unbounded'}, asOf: true}`, and `unbounded` is the honest report rather than an aspiration: this package has no pruning, so every version ever written is still here. It takes no retention option on purpose, because a store that accepted a window it cannot enforce would be making exactly the claim the report exists to prevent.
 

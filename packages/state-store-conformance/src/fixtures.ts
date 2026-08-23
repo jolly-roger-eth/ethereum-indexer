@@ -17,12 +17,14 @@ import type {ConformanceCase, StateStoreFactory} from './types.js';
  * subject for this same suite, not a replacement for these: a case that fails on
  * 31,332 real events is a bug report nobody can read.
  *
- * Three entities, each earning its place: `token` is the ordinary
+ * Four entities, each earning its place: `token` is the ordinary
  * overwrite-and-delete subject, `player` carries the ACCUMULATED counter the
  * reorg case exists for (the field is named after the real one that went from 12
- * back to 6 in `work/notes/findings/sqlite-in-the-browser.md`), and `cell` has a
+ * back to 6 in `work/notes/findings/sqlite-in-the-browser.md`), `cell` has a
  * composite business key, which is the part of the id contract a single-column
- * fixture would never exercise.
+ * fixture would never exercise, and `placement` is the ordered child collection
+ * a bounded listing exists for -- three id columns, so a PREFIX has more than
+ * one length to be tested at.
  */
 export const TOKEN: EntityDeclaration = {
 	name: 'token',
@@ -42,8 +44,18 @@ export const CELL: EntityDeclaration = {
 	fields: {owner: 'text'},
 };
 
+/**
+ * The children of a parent, keyed by it: the shape a one-to-many is modelled in
+ * once a listing exists, taken from the real `placements` in the finding.
+ */
+export const PLACEMENT: EntityDeclaration = {
+	name: 'placement',
+	id: ['epoch', 'position', 'playerIndex'],
+	fields: {player: 'text'},
+};
+
 /** What every factory is handed. A backend may not pick and choose among them. */
-export const CONFORMANCE_ENTITIES: readonly EntityDeclaration[] = [TOKEN, PLAYER, CELL];
+export const CONFORMANCE_ENTITIES: readonly EntityDeclaration[] = [TOKEN, PLAYER, CELL, PLACEMENT];
 
 /**
  * The block the ladder cases start from, and the span they cover.
@@ -70,6 +82,16 @@ export function owns(id: string, owner: string, transferCount: number): Mutation
 
 export function burn(id: string): Mutation {
 	return {type: 'delete', entity: 'token', id: {id}};
+}
+
+/** One child of one parent: `{epoch}` is the prefix a listing asks about. */
+export function placed(epoch: number, position: number, playerIndex: number, player: string): Mutation {
+	return {type: 'upsert', entity: 'placement', id: {epoch, position, playerIndex}, values: {player}};
+}
+
+/** The `player` of each listed child, which is enough to name it and see its order. */
+export function playersOf(rows: readonly Record<string, unknown>[]): unknown[] {
+	return rows.map((row) => row.player);
 }
 
 /** A store from the factory, migrated, exactly as a caller would get one. */

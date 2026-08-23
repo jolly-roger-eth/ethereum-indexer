@@ -2,6 +2,15 @@ import {normalizeBlockHash} from './blocks.js';
 import type {Retention, StateStoreCapabilities} from './capabilities.js';
 import {entityKey, idValues, mustGet, normalizeEntities} from './entities.js';
 import {
+	assertListingLimit,
+	boundedListing,
+	compareIds,
+	hasIdPrefix,
+	prefixValues,
+	type EntityIdPrefix,
+	type Listing,
+} from './listing.js';
+import {
 	assertRetained,
 	resolveRetention,
 	retentionWithoutPruning,
@@ -29,6 +38,15 @@ export type MemoryStateStoreOptions = RetentionOptions & {
 type Version = {values: Record<string, unknown>; lower: number; upper: number | null};
 
 /**
+ * One business key and every version of it, oldest first.
+ *
+ * The id is kept beside the versions rather than parsed back out of the map key
+ * because a listing needs it: the rows of a prefix scan are found by comparing
+ * ids, and ordered by them.
+ */
+type Row = {entity: string; id: readonly string[]; versions: Version[]};
+
+/**
  * The reference `StateStore`: versioned rows in a Map.
  *
  * It is here for two reasons and neither of them is production use. A contract
@@ -49,8 +67,8 @@ type Version = {values: Record<string, unknown>; lower: number; upper: number | 
  */
 export class MemoryStateStore implements StateStore {
 	private readonly entities: ReadonlyMap<string, NormalizedEntity>;
-	/** entity key -> versions, oldest first. */
-	private readonly versions = new Map<string, Version[]>();
+	/** entity key -> that key's versions, oldest first. */
+	private readonly rows = new Map<string, Row>();
 	private readonly blocks = new Map<number, BlockPointer>();
 	private readonly hashes = new Map<string, number>();
 	private readonly provided: Retention;
@@ -114,8 +132,12 @@ export class MemoryStateStore implements StateStore {
 		if (this.tip === undefined || block.number > this.tip) this.tip = block.number;
 
 		for (const {mutation, entity, key, id} of planned) {
-			const versions = this.versions.get(key) ?? [];
-			if (versions.length === 0) this.versions.set(key, versions);
+			let row = this.rows.get(key);
+			if (!row) {
+				row = {entity: entity.name, id, versions: []};
+				this.rows.set(key, row);
+			}
+			const versions = row.versions;
 
 			const live = versions.find((version) => version.upper === null);
 			if (live) live.upper = block.number;
@@ -151,6 +173,31 @@ export class MemoryStateStore implements StateStore {
 		return this.read<T>(entity, id, (version) => version.lower <= at && (version.upper === null || at < version.upper));
 	}
 
+	/** The children of a prefix at the tip: a sorted walk, bounded by the limit. */
+	async listCurrent<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		limit: number,
+	): Promise<Listing<T>> {
+		return this.scan<T>(entity, prefix, limit, (version) => version.upper === null);
+	}
+
+	/** The same, as of a block number, refused where the retention does not reach. */
+	async listAsOf<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		at: number,
+		limit: number,
+	): Promise<Listing<T>> {
+		await assertRetained(this.capabilities, at, () => this.tip);
+		return this.scan<T>(
+			entity,
+			prefix,
+			limit,
+			(version) => version.lower <= at && (version.upper === null || at < version.upper),
+		);
+	}
+
 	/**
 	 * Drop versions opened above the fork, then re-open the ones it closed.
 	 *
@@ -160,13 +207,13 @@ export class MemoryStateStore implements StateStore {
 	 * one business key would be open at once.
 	 */
 	async revertTo(keepUpTo: number): Promise<void> {
-		for (const [key, versions] of this.versions) {
-			const kept = versions.filter((version) => version.lower <= keepUpTo);
+		for (const [key, row] of this.rows) {
+			const kept = row.versions.filter((version) => version.lower <= keepUpTo);
 			for (const version of kept) {
 				if (version.upper !== null && version.upper > keepUpTo) version.upper = null;
 			}
-			if (kept.length === 0) this.versions.delete(key);
-			else this.versions.set(key, kept);
+			if (kept.length === 0) this.rows.delete(key);
+			else row.versions = kept;
 		}
 		for (const [number, block] of this.blocks) {
 			if (number > keepUpTo) {
@@ -196,8 +243,42 @@ export class MemoryStateStore implements StateStore {
 
 	private read<T>(entity: string, id: EntityId, matches: (version: Version) => boolean): T | undefined {
 		const declaration = mustGet(this.entities, entity);
-		const versions = this.versions.get(entityKey(declaration, id)) ?? [];
-		const found = versions.find(matches);
+		const found = this.rows.get(entityKey(declaration, id))?.versions.find(matches);
 		return found && ({...found.values, _lower: found.lower, _upper: found.upper} as T);
+	}
+
+	/**
+	 * The prefix scan: every business key of the entity, filtered and then sorted.
+	 *
+	 * A real backend rides an index and touches only the range (that is the whole
+	 * point of the bound), and this one walks the map instead. It is the reference
+	 * implementation, so the property it has to hold is the ANSWER -- ascending id
+	 * order, the limit, and an honest `truncated` -- not the access path.
+	 */
+	private scan<T>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		limit: number,
+		matches: (version: Version) => boolean,
+	): Listing<T> {
+		const declaration = mustGet(this.entities, entity);
+		const values = prefixValues(declaration, prefix);
+		assertListingLimit(declaration, limit);
+
+		const found: {id: readonly string[]; version: Version}[] = [];
+		for (const row of this.rows.values()) {
+			if (row.entity !== declaration.name || !hasIdPrefix(row.id, values)) continue;
+			const version = row.versions.find(matches);
+			if (version) found.push({id: row.id, version});
+		}
+		found.sort((a, b) => compareIds(a.id, b.id));
+
+		// one MORE than the limit, which is how `truncated` is a fact here as well
+		return boundedListing(
+			found
+				.slice(0, limit + 1)
+				.map(({version}) => ({...version.values, _lower: version.lower, _upper: version.upper}) as T),
+			limit,
+		);
 	}
 }

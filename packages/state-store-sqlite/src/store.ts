@@ -10,10 +10,13 @@ import {
 } from './blocks.js';
 import {
 	assertRetained,
+	boundedListing,
 	mustGet,
 	normalizeEntities,
 	resolveRetention,
 	retentionWithoutPruning,
+	type EntityIdPrefix,
+	type Listing,
 	type Retention,
 	type RetentionOptions,
 	type RetentionSetting,
@@ -31,6 +34,8 @@ import {
 	idPredicate,
 	idValues,
 	latestBlockStatement,
+	listAsOfStatement,
+	listCurrentStatement,
 	revertToStatements,
 } from './statements.js';
 import type {
@@ -352,6 +357,46 @@ export class VersionedStateStore implements StateStore {
 	}
 
 	/**
+	 * The children of an id PREFIX at the tip: one indexed range scan, bounded.
+	 *
+	 * This is the seam's only set read, and it is deliberately the poor relation of
+	 * `queryCurrent` below: no predicate, no caller-supplied ordering, no offset.
+	 * The reason is not taste but WHERE IT RUNS. A handler runs once per event on
+	 * every backend, including the ones with no query planner, so the seam gets the
+	 * one shape that is an indexed range scan everywhere; a server-side caller with
+	 * a planner underneath it uses `queryCurrent`. See `listStatement` for the
+	 * access path, which `test/listing.test.ts` pins with `EXPLAIN QUERY PLAN`.
+	 */
+	async listCurrent<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		limit: number,
+	): Promise<Listing<T>> {
+		const statement = listCurrentStatement(mustGet(this.entities, entity), prefix, limit);
+		return boundedListing(await this.select<T>(statement), limit);
+	}
+
+	/**
+	 * The same range as of a block hash, a height or a timestamp.
+	 *
+	 * Same resolution and the same two refusals as `getAsOf`: an address that
+	 * identifies no block throws `NoSuchBlockError`, and a block outside what this
+	 * store retains throws `BlockNotRetainedError`. An EMPTY listing means the
+	 * block is known and the prefix had no children then.
+	 */
+	async listAsOf<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		at: BlockAddress,
+		limit: number,
+	): Promise<Listing<T>> {
+		const declaration = mustGet(this.entities, entity);
+		const blockNumber = await this.resolveForRead(at);
+		await assertRetained(this.capabilities, blockNumber, () => this.tipBlockNumber());
+		return boundedListing(await this.select<T>(listAsOfStatement(declaration, prefix, blockNumber, limit)), limit);
+	}
+
+	/**
 	 * A whole entity table as of a block hash, a height, or a timestamp.
 	 *
 	 * Same resolution, the same "no such block" contract and the same retention
@@ -382,6 +427,14 @@ export class VersionedStateStore implements StateStore {
 		const result = await this.db
 			.prepare(`SELECT * FROM ${declaration.name} WHERE ${CURRENT_PREDICATE}${filter(options)}${order(options)}${tail}`)
 			.bind(...(options.args ?? []), ...tailArgs)
+			.all<T>();
+		return result.results;
+	}
+
+	private async select<T>(statement: Statement): Promise<T[]> {
+		const result = await this.db
+			.prepare(statement.sql)
+			.bind(...statement.args)
 			.all<T>();
 		return result.results;
 	}
