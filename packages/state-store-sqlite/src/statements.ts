@@ -8,6 +8,7 @@ import {
 	type EntityIdPrefix,
 } from '@etherfold/state-store';
 import {BLOCKS_TABLE, LOWER, ROWID, UPPER} from './ddl.js';
+import {quoted, quotedList} from './identifiers.js';
 import type {BlockPointer, EntityDeclaration, Mutation, NormalizedEntity, Statement} from './types.js';
 
 /**
@@ -23,6 +24,11 @@ export {idValues};
  * These are pure functions on purpose. The ordering inside a batch is
  * load-bearing (see `revertToStatements`), and a test can only pin an ordering
  * it can see.
+ *
+ * Every identifier that came from a DECLARATION is quoted on the way out
+ * (`identifiers.ts`), for the reason set out there: a validated identifier shape
+ * can still be a SQL keyword. The store's own names (`_lower`, `_upper`,
+ * `_rowid`, `_blocks`) are fixed and stay bare.
  */
 
 /** `_lower <= N AND (_upper IS NULL OR N < _upper)` — the whole of time travel. */
@@ -80,7 +86,7 @@ export function latestBlockStatement(): Statement {
 }
 
 export function idPredicate(entity: NormalizedEntity): string {
-	return entity.id.map((column) => `${column} = ?`).join(' AND ');
+	return entity.id.map((column) => `${quoted(column)} = ?`).join(' AND ');
 }
 
 /**
@@ -106,9 +112,9 @@ function listStatement(entity: NormalizedEntity, prefix: EntityIdPrefix, limit: 
 	const bounds = asOf === undefined ? [] : [asOf, asOf];
 	return {
 		sql:
-			`SELECT * FROM ${entity.name} ` +
-			`WHERE ${values.map((_, index) => `${entity.id[index]} = ?`).join(' AND ')} AND ${predicate} ` +
-			`ORDER BY ${entity.id.join(', ')} LIMIT ?`,
+			`SELECT * FROM ${quoted(entity.name)} ` +
+			`WHERE ${values.map((_, index) => `${quoted(entity.id[index])} = ?`).join(' AND ')} AND ${predicate} ` +
+			`ORDER BY ${quotedList(entity.id)} LIMIT ?`,
 		args: [...values, ...bounds, limit + 1],
 	};
 }
@@ -159,7 +165,7 @@ export function applyBlockStatements(
 
 	for (const mutation of mutations) {
 		const entity = mustGet(entities, mutation.entity);
-		const table = entity.name;
+		const table = quoted(entity.name);
 		const values = idValues(entity, mutation.id);
 
 		// (1) close the live version at this height
@@ -171,7 +177,7 @@ export function applyBlockStatements(
 		if (mutation.type === 'upsert') {
 			// (2) open the new one
 			const fields = Object.keys(entity.fields);
-			const columns = [...entity.id, ...fields, LOWER];
+			const columns = [...entity.id.map(quoted), ...fields.map(quoted), LOWER];
 			statements.push({
 				sql: `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
 				args: [...values, ...fields.map((field) => mutation.values?.[field] ?? null), block.number],
@@ -207,7 +213,8 @@ export function applyBlockStatements(
 export function prunableVersionsStatement(entity: NormalizedEntity, floor: number, limit: number): Statement {
 	return {
 		sql:
-			`SELECT ${ROWID} FROM ${entity.name} ` + `WHERE ${UPPER} IS NOT NULL AND ${UPPER} <= ? ORDER BY ${UPPER} LIMIT ?`,
+			`SELECT ${ROWID} FROM ${quoted(entity.name)} ` +
+			`WHERE ${UPPER} IS NOT NULL AND ${UPPER} <= ? ORDER BY ${UPPER} LIMIT ?`,
 		args: [floor, limit],
 	};
 }
@@ -226,7 +233,7 @@ export function prunableVersionsStatement(entity: NormalizedEntity, floor: numbe
  */
 export function dropVersionsStatement(entity: NormalizedEntity, rowids: readonly number[]): Statement {
 	return {
-		sql: `DELETE FROM ${entity.name} WHERE ${ROWID} IN (${rowids.map(() => '?').join(', ')})`,
+		sql: `DELETE FROM ${quoted(entity.name)} WHERE ${ROWID} IN (${rowids.map(() => '?').join(', ')})`,
 		args: [...rowids],
 	};
 }
@@ -263,9 +270,9 @@ export function revertToStatements(
 
 	for (const entity of entities.values()) {
 		// A) drop versions opened above the fork (this clears their open rows)
-		statements.push({sql: `DELETE FROM ${entity.name} WHERE ${LOWER} > ?`, args: [keepUpTo]});
+		statements.push({sql: `DELETE FROM ${quoted(entity.name)} WHERE ${LOWER} > ?`, args: [keepUpTo]});
 		// B) re-open versions closed above the fork
-		statements.push({sql: `UPDATE ${entity.name} SET ${UPPER} = NULL WHERE ${UPPER} > ?`, args: [keepUpTo]});
+		statements.push({sql: `UPDATE ${quoted(entity.name)} SET ${UPPER} = NULL WHERE ${UPPER} > ?`, args: [keepUpTo]});
 	}
 
 	statements.push({sql: `DELETE FROM ${BLOCKS_TABLE} WHERE number > ?`, args: [keepUpTo]});

@@ -40,7 +40,7 @@ describe('applying a block', () => {
 		await store.applyBlock(block(101), [{type: 'delete', entity: 'token', id: {id: '1'}}]);
 
 		expect(db.batches[0].length).toBe(2); // block row + the close
-		expect(sqlOf(db.batches[0][1])).toMatch(/^UPDATE token SET _upper/i);
+		expect(sqlOf(db.batches[0][1])).toMatch(/^UPDATE "token" SET _upper/i);
 	});
 
 	it('leaves nothing applied when a statement inside the batch fails', async () => {

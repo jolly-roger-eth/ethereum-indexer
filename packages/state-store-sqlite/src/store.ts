@@ -27,6 +27,7 @@ import {
 	type StateStoreCapabilities,
 } from '@etherfold/state-store';
 import {ROWID, migrationStatements} from './ddl.js';
+import {quoted} from './identifiers.js';
 import {
 	AS_OF_PREDICATE,
 	CURRENT_PREDICATE,
@@ -426,7 +427,9 @@ export class VersionedStateStore implements StateStore {
 		const blockNumber = await this.resolveForRead(at);
 		await assertRetained(this.capabilities, blockNumber, () => this.tipBlockNumber());
 		const result = await this.db
-			.prepare(`SELECT * FROM ${declaration.name} WHERE ${idPredicate(declaration)} AND ${AS_OF_PREDICATE} LIMIT 1`)
+			.prepare(
+				`SELECT * FROM ${quoted(declaration.name)} WHERE ${idPredicate(declaration)} AND ${AS_OF_PREDICATE} LIMIT 1`,
+			)
 			.bind(...idValues(declaration, id), blockNumber, blockNumber)
 			.all<T>();
 		return result.results[0];
@@ -436,7 +439,9 @@ export class VersionedStateStore implements StateStore {
 	async getCurrent<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined> {
 		const declaration = mustGet(this.entities, entity);
 		const result = await this.db
-			.prepare(`SELECT * FROM ${declaration.name} WHERE ${idPredicate(declaration)} AND ${CURRENT_PREDICATE} LIMIT 1`)
+			.prepare(
+				`SELECT * FROM ${quoted(declaration.name)} WHERE ${idPredicate(declaration)} AND ${CURRENT_PREDICATE} LIMIT 1`,
+			)
 			.bind(...idValues(declaration, id))
 			.all<T>();
 		return result.results[0];
@@ -500,7 +505,9 @@ export class VersionedStateStore implements StateStore {
 		await assertRetained(this.capabilities, blockNumber, () => this.tipBlockNumber());
 		const {tail, tailArgs} = paginate(options);
 		const result = await this.db
-			.prepare(`SELECT * FROM ${declaration.name} WHERE ${AS_OF_PREDICATE}${filter(options)}${order(options)}${tail}`)
+			.prepare(
+				`SELECT * FROM ${quoted(declaration.name)} WHERE ${AS_OF_PREDICATE}${filter(options)}${order(options)}${tail}`,
+			)
 			.bind(blockNumber, blockNumber, ...(options.args ?? []), ...tailArgs)
 			.all<T>();
 		return result.results;
@@ -511,7 +518,9 @@ export class VersionedStateStore implements StateStore {
 		const declaration = mustGet(this.entities, entity);
 		const {tail, tailArgs} = paginate(options);
 		const result = await this.db
-			.prepare(`SELECT * FROM ${declaration.name} WHERE ${CURRENT_PREDICATE}${filter(options)}${order(options)}${tail}`)
+			.prepare(
+				`SELECT * FROM ${quoted(declaration.name)} WHERE ${CURRENT_PREDICATE}${filter(options)}${order(options)}${tail}`,
+			)
 			.bind(...(options.args ?? []), ...tailArgs)
 			.all<T>();
 		return result.results;

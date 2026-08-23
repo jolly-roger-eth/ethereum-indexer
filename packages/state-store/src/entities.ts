@@ -10,10 +10,18 @@ import type {EntityId, FieldType, EntityDeclaration, NormalizedEntity} from './t
  * parameter, so it needs names it can trust; an object-store backend would
  * happily take anything. If each backend validated to its own taste, a
  * declaration would be accepted in a browser and fatal on a server, which is
- * exactly the failure `work/notes/findings/sqlite-in-the-browser.md` recorded
- * (an entity field named `index` passes this check and then fails at migration
- * because `INDEX` is a SQL keyword; the remaining half of that hole is
- * `entity-identifier-sql-keyword`).
+ * exactly the failure `work/notes/findings/sqlite-in-the-browser.md` recorded.
+ *
+ * The rule is a SHAPE rule, and it deliberately does not know about SQL KEYWORDS.
+ * `index`, `order`, `group` and the rest have ordinary identifier shapes, and
+ * refusing them here would push one engine's reserved-word list into the surface
+ * every backend shares, break declarations that are legal today, and re-open the
+ * hole the day a second SQL backend arrives with a different list. A SQL backend
+ * QUOTES what it interpolates instead (`identifiers.ts` in
+ * `@etherfold/state-store-sqlite`), so it accepts exactly what this function
+ * accepts. That agreement is asserted for every backend by the
+ * `a declaration means the same thing on every backend` group of
+ * `@etherfold/state-store-conformance`.
  */
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]*$/;
 

@@ -39,7 +39,9 @@ describe('entity DDL is issued from the declaration alone', () => {
 		expect(byName['token_open']).toMatch(/UNIQUE INDEX/i);
 		expect(byName['token_open']).toMatch(/WHERE\s+_upper\s+IS\s+NULL/i);
 		// as-of probes ride (id, _lower); revert scans ride _lower and _upper.
-		expect(byName['token_history']).toMatch(/\(id,\s*_lower\)/i);
+		// the declared columns are QUOTED, so a name that is a SQL keyword survives
+		// interpolation (`src/identifiers.ts`, `test/identifiers.test.ts`).
+		expect(byName['token_history']).toMatch(/\("id",\s*_lower\)/i);
 		expect(byName['token_lower']).toMatch(/\(_lower\)/i);
 		expect(byName['token_upper']).toMatch(/\(_upper\)/i);
 	});
@@ -68,7 +70,7 @@ describe('entity DDL is issued from the declaration alone', () => {
 		await store.migrate();
 
 		const index = (await schemaObjects(db)).find((o) => o.name === 'holding_open');
-		expect(index?.sql).toMatch(/\(account,\s*token\)/i);
+		expect(index?.sql).toMatch(/\("account",\s*"token"\)/i);
 
 		await store.applyBlock(block(10), [
 			{type: 'upsert', entity: 'holding', id: {account: '0xa', token: '1'}, values: {amount: 5}},
