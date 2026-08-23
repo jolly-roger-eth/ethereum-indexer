@@ -65,7 +65,7 @@ type Row = {entity: string; id: readonly string[]; versions: Version[]};
  *
  * What it is NOT: durable, or a browser backend. It holds every retained version
  * in memory for as long as the process lives and goes with the process;
- * `indexeddb-row-backend-browser-default` is the browser answer.
+ * `@etherfold/state-store-indexeddb` is the browser answer (ADR-0024).
  */
 export class MemoryStateStore implements StateStore {
 	private readonly entities: ReadonlyMap<string, NormalizedEntity>;

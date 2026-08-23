@@ -18,15 +18,19 @@
 		"entryPoint": "src/index.ts"
 	},
 	"devDependencies": {
+		"@etherfold/state-store-patch": "workspace:*",
 		"as-soon": "^0.1.5",
+		"fake-indexeddb": "^6.2.5",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
-		"eip-1193": "^0.6.5",
 		"@etherfold/core": "workspace:*",
+		"@etherfold/state-store": "workspace:*",
+		"@etherfold/state-store-indexeddb": "workspace:*",
 		"@etherfold/utils": "workspace:*",
+		"eip-1193": "^0.6.5",
 		"idb-keyval": "^6.2.4",
 		"named-logs": "^0.4.1",
 		"sveltore": "^0.0.2",

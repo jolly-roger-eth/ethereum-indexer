@@ -312,6 +312,12 @@ importers:
       '@etherfold/core':
         specifier: workspace:*
         version: link:../core
+      '@etherfold/state-store':
+        specifier: workspace:*
+        version: link:../state-store
+      '@etherfold/state-store-indexeddb':
+        specifier: workspace:*
+        version: link:../state-store-indexeddb
       '@etherfold/utils':
         specifier: workspace:*
         version: link:../utils
@@ -331,9 +337,15 @@ importers:
         specifier: ^0.2.1
         version: 0.2.1
     devDependencies:
+      '@etherfold/state-store-patch':
+        specifier: workspace:*
+        version: link:../state-store-patch
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -666,6 +678,9 @@ importers:
         specifier: ^0.4.1
         version: 0.4.1
     devDependencies:
+      '@etherfold/state-store-indexeddb':
+        specifier: workspace:*
+        version: link:../state-store-indexeddb
       '@etherfold/state-store-patch':
         specifier: workspace:*
         version: link:../state-store-patch
@@ -681,6 +696,9 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
       remote-sql:
         specifier: ^0.0.7
         version: 0.0.7
@@ -801,6 +819,49 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/state-store-indexeddb:
+    dependencies:
+      '@etherfold/state-store':
+        specifier: workspace:*
+        version: link:../state-store
+    devDependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
+      '@etherfold/processor-entities':
+        specifier: workspace:*
+        version: link:../processor-entities
+      '@etherfold/state-store-conformance':
+        specifier: workspace:*
+        version: link:../state-store-conformance
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.62.1
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      as-soon:
+        specifier: ^0.1.5
+        version: 0.1.6
+      esbuild:
+        specifier: ^0.28.0
+        version: 0.28.1
+      fake-indexeddb:
+        specifier: ^6.2.2
+        version: 6.2.5
+      playwright-browser-harness:
+        specifier: ^0.3.0
+        version: 0.3.0(@playwright/test@1.62.1)(buffer@6.0.3)(esbuild@0.28.1)
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -2237,6 +2298,11 @@ packages:
     resolution: {integrity: sha512-tmmZ3lQxAe/k/+rNnXQRawJ4NjxO2hqiOLTHvWchtGZULp4RyFeh6aU4XdOYBFe2KE1oShQTv4AblOs2iOrNnQ==}
     engines: {node: '>= 10.0.0'}
 
+  '@playwright/test@1.62.1':
+    resolution: {integrity: sha512-DTcUc8qii+cpHvtOwggMtBRMjKZHXYWdw8syRYu2vtzuq4Wxphqq4NfCs5Zt44L6mA8rfDfj+PHnxFc/FeK6mQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   '@poppinss/colors@4.1.6':
     resolution: {integrity: sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg==}
 
@@ -3585,6 +3651,10 @@ packages:
     resolution: {integrity: sha512-11Ndz7Nv+mvAC1j0ktTa7fAb0vLyGGX+rMHNBYQviQDGU0Hw7lhctJANqbPhu9nV9/izT/IntTgZ7Im/9LJs9g==}
     engines: {'0': node >=0.6.0}
 
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
+    engines: {node: '>=18'}
+
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
 
@@ -3669,6 +3739,11 @@ packages:
   fs-extra@8.1.0:
     resolution: {integrity: sha512-yhlQgA6mnOJUKOsRUFsgJdQCvkKhcz8tlZG5HBQfReYZy46OwLcY+Zia0mtdHsOo9y/hP+CxMN0TU9QxoOtG4g==}
     engines: {node: '>=6 <7 || >=8'}
+
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -4660,6 +4735,27 @@ packages:
 
   pixelmatch@4.0.2:
     resolution: {integrity: sha512-J8B6xqiO37sU/gkcMglv6h5Jbd9xNER7aHzpfRdNmV4IbQBzBpe4l9XmbG+xPF/znacgu2jfEw+wHffaq/YkXA==}
+    hasBin: true
+
+  playwright-browser-harness@0.3.0:
+    resolution: {integrity: sha512-DxyBFTSzSSvmkeM1GNBn+yEEwVFJwABeA0/JihwRo3HMUO9472gVrFPgRiuSYmwz6UaHshF0Xr+gu1ZexvSSzg==}
+    hasBin: true
+    peerDependencies:
+      '@playwright/test': '>=1.40.0'
+      buffer: '>=6.0.0'
+      esbuild: '>=0.20.0'
+    peerDependenciesMeta:
+      buffer:
+        optional: true
+
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.62.1:
+    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
+    engines: {node: '>=20'}
     hasBin: true
 
   pngjs@3.4.0:
@@ -6849,6 +6945,10 @@ snapshots:
       '@parcel/watcher-win32-ia32': 2.5.6
       '@parcel/watcher-win32-x64': 2.5.6
 
+  '@playwright/test@1.62.1':
+    dependencies:
+      playwright: 1.62.1
+
   '@poppinss/colors@4.1.6':
     dependencies:
       kleur: 4.1.5
@@ -8191,6 +8291,8 @@ snapshots:
 
   extsprintf@1.3.0: {}
 
+  fake-indexeddb@6.2.5: {}
+
   fast-deep-equal@3.1.3: {}
 
   fast-glob@3.3.2:
@@ -8272,6 +8374,9 @@ snapshots:
       graceful-fs: 4.2.11
       jsonfile: 4.0.0
       universalify: 0.1.2
+
+  fsevents@2.3.2:
+    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -9365,6 +9470,21 @@ snapshots:
   pixelmatch@4.0.2:
     dependencies:
       pngjs: 3.4.0
+
+  playwright-browser-harness@0.3.0(@playwright/test@1.62.1)(buffer@6.0.3)(esbuild@0.28.1):
+    dependencies:
+      '@playwright/test': 1.62.1
+      esbuild: 0.28.1
+    optionalDependencies:
+      buffer: 6.0.3
+
+  playwright-core@1.62.1: {}
+
+  playwright@1.62.1:
+    dependencies:
+      playwright-core: 1.62.1
+    optionalDependencies:
+      fsevents: 2.3.2
 
   pngjs@3.4.0: {}
 
