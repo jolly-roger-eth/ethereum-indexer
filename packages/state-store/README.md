@@ -14,6 +14,7 @@ await store.applyBlock({number: 100, hash: '0xa', timestamp: 1_700_000_000}, mut
 
 await store.getCurrent('token', {id: '1'}); // at the tip
 await store.getAsOf('token', {id: '1'}, 99); // as of a block number: undefined, it did not exist yet
+await store.listCurrent('placement', {epoch: 7}, 8); // the children of a key, bounded: {rows, truncated}
 await store.revertTo(99); // a reorg: the write above is undone, counters go back DOWN
 ```
 
@@ -22,6 +23,7 @@ await store.revertTo(99); // a reorg: the write above is undone, counters go bac
 - **entity declaration** — `{name, id, fields}`, and nothing else. The store owns the layout, the versions, the as-of read and the revert.
 - **version** — a COMPLETE row with a half-open block-validity range. `set` writes a whole row, so a declared field it does not list becomes `NULL`; `delete` closes the live version without opening a new one, so the entity is absent from that block on and readable before it.
 - **mutation context** — the write surface a handler gets for ONE block, with read-your-writes inside that block. `update` is sugar over get-then-spread-then-set, so the storage model stays visible.
+- **listing** — the one SET read: the rows whose declared id starts with a PREFIX (a leading run of its id columns), ascending in the id's own order, bounded by a REQUIRED limit. No predicate, no caller-supplied ordering, no offset, so an accidental full scan cannot be expressed and the operation stays one indexed range scan on every backend. `truncated` says whether more matched, because a set that exactly fills the limit is otherwise indistinguishable from a cut-off one.
 - **retention** — how far back superseded versions are kept, in BLOCK NUMBERS. Never in updates (on the real measured stream event-bearing blocks are median 429 apart, so a 64-block window holds one of them), never in time (that prunes on wall-clock rather than chain progress).
 - **capabilities** — what a store declares about itself, readable before `migrate` and before any read, so a caller discovers a missing capability at startup instead of from a wrong answer.
 
@@ -31,7 +33,7 @@ A processor could have been written against raw SQL, forcing wasm SQLite into ev
 
 ## What is deliberately NOT here
 
-- **A listing.** `bounded-id-prefix-listing` adds the one read the model is missing: rows whose declared id starts with a prefix, with a required limit.
+- **Any richer read.** The listing above is the whole of the set-read surface. A predicate, a sort or a page belongs to a backend that has a query planner under it (`queryCurrent` / `queryAsOf` in `@etherfold/state-store-sqlite`), because a handler runs once per event on every backend including the ones that have none. See ADR-0021.
 - **Block addressing by hash or time**, and the refusal for an address that resolves to nothing. `getAsOf` takes a resolved block NUMBER; addressing is the read layer above (`@etherfold/state-store-sqlite`, ADR-0015).
 - **The sync cursor.** Where a processor keeps `LastSync` is the processor package's business (ADR-0016).
 - **Anything ABI-shaped.** The `on<EventName>` handler map is `@etherfold/processor-entities`, which depends on this package and on `@etherfold/core`. Keeping it out is what lets a storage backend depend on this package without inheriting the whole indexer. See ADR-0018.

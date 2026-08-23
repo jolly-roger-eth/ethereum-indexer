@@ -16,6 +16,19 @@ export const ACCOUNT: EntityDeclaration = {
 	fields: {balance: 'integer'},
 };
 
+/**
+ * The ordered child collection keyed by its parent, the shape a bounded listing
+ * exists for, with the same declaration the seam's tests use.
+ *
+ * Its three-column id is what makes a PREFIX worth having: `{epoch}` is one
+ * parent's children, `{epoch, position}` is one cell's.
+ */
+export const PLACEMENT: EntityDeclaration = {
+	name: 'placement',
+	id: ['epoch', 'position', 'playerIndex'],
+	fields: {player: 'text'},
+};
+
 export function block(
 	number: number,
 	hash = `0x${number.toString(16)}`,
@@ -30,4 +43,8 @@ export function owns(id: string, owner: string, transferCount: number): Mutation
 
 export function burn(id: string): Mutation {
 	return {type: 'delete', entity: 'token', id: {id}};
+}
+
+export function placed(epoch: number, position: number, playerIndex: number, player: string): Mutation {
+	return {type: 'upsert', entity: 'placement', id: {epoch, position, playerIndex}, values: {player}};
 }

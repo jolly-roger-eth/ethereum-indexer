@@ -1,4 +1,5 @@
 import {blockAtomicityCases} from './cases/block-atomicity.js';
+import {boundedListingCases} from './cases/bounded-listing.js';
 import {declaredCapabilityCases} from './cases/declared-capabilities.js';
 import {readYourWritesCases} from './cases/read-your-writes.js';
 import {reorgRevertCases} from './cases/reorg-revert.js';
@@ -19,8 +20,9 @@ import type {ConformanceCase, ConformanceFailure, ConformanceResult, StateStoreF
  * against LESS than it claimed is what lets a claim become fiction.
  *
  * Everything else is asked of everyone: versioned reads, the reorg revert with
- * its counter that must go back DOWN, read-your-writes inside a block, and a
- * block applying as one unit.
+ * its counter that must go back DOWN, read-your-writes inside a block, the
+ * bounded id-prefix listing a one-to-many is derived through, and a block
+ * applying as one unit.
  */
 export async function stateStoreConformanceCases(factory: StateStoreFactory): Promise<ConformanceCase[]> {
 	const probe = await factory(CONFORMANCE_ENTITIES);
@@ -31,6 +33,7 @@ export async function stateStoreConformanceCases(factory: StateStoreFactory): Pr
 		...declaredCapabilityCases(factory, capabilities),
 		...reorgRevertCases(factory, capabilities),
 		...readYourWritesCases(factory, capabilities),
+		...boundedListingCases(factory, capabilities),
 		...blockAtomicityCases(factory),
 	];
 }
