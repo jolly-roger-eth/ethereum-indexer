@@ -1,6 +1,8 @@
 import type {
 	BlockAddress,
 	EntityId,
+	EntityIdPrefix,
+	Listing,
 	QueryOptions,
 	RecordedBlock,
 	StateStoreCapabilities,
@@ -67,6 +69,39 @@ export class VersionedStateView {
 	/** One entity at the tip. */
 	getCurrent<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined> {
 		return this.store.getCurrent<T>(entity, id);
+	}
+
+	/**
+	 * The rows whose declared id starts with `prefix`, at the tip, ascending, at
+	 * most `limit` of them, with `truncated` saying whether more matched.
+	 *
+	 * This is the seam's one SET read, and it is here because it is how a
+	 * one-to-many is meant to be read: children keyed by their parent, derived
+	 * when read. Without it a consumer holding this handle reaches the same rows
+	 * through `queryCurrent` and a hand-written `WHERE`, which is the surface the
+	 * bounded listing exists to make unnecessary (ADR-0021).
+	 */
+	listCurrent<T = Record<string, unknown>>(entity: string, prefix: EntityIdPrefix, limit: number): Promise<Listing<T>> {
+		return this.store.listCurrent<T>(entity, prefix, limit);
+	}
+
+	/**
+	 * The same listing as of a block hash, a height, or a timestamp: the children
+	 * that were live then.
+	 *
+	 * Same two refusals as `getAsOf`, for the same reason: an address that
+	 * identifies no block throws `NoSuchBlockError` and a block outside this
+	 * view's retention throws `BlockNotRetainedError`, rather than either being
+	 * served from the tip. An EMPTY listing means the block is known and the
+	 * prefix had no children then.
+	 */
+	listAsOf<T = Record<string, unknown>>(
+		entity: string,
+		prefix: EntityIdPrefix,
+		at: BlockAddress,
+		limit: number,
+	): Promise<Listing<T>> {
+		return this.store.listAsOf<T>(entity, prefix, at, limit);
 	}
 
 	/** A whole entity table as of a block hash, a height, or a timestamp. */
