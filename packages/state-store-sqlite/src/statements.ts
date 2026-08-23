@@ -59,6 +59,18 @@ export function blockAtOrBeforeStatement(timestamp: number): Statement {
 	};
 }
 
+/**
+ * The highest recorded block: the TIP a retention window is measured back from.
+ *
+ * It rides the primary key, so it is a one-row index probe rather than a scan.
+ * Only a store that claims a WINDOW ever asks for it: an `unbounded` store
+ * refuses nothing and a `revert-only` store refuses everything, so neither pays
+ * this round-trip.
+ */
+export function latestBlockStatement(): Statement {
+	return {sql: `SELECT ${BLOCK_COLUMNS} FROM ${BLOCKS_TABLE} ORDER BY number DESC LIMIT 1`, args: []};
+}
+
 export function idPredicate(entity: NormalizedEntity): string {
 	return entity.id.map((column) => `${column} = ?`).join(' AND ');
 }

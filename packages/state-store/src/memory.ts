@@ -1,8 +1,29 @@
 import {normalizeBlockHash} from './blocks.js';
-import type {StateStoreCapabilities} from './capabilities.js';
+import type {Retention, StateStoreCapabilities} from './capabilities.js';
 import {entityKey, idValues, mustGet, normalizeEntities} from './entities.js';
+import {
+	assertRetained,
+	resolveRetention,
+	retentionWithoutPruning,
+	type RetentionOptions,
+	type RetentionSetting,
+} from './retention.js';
 import type {StateStore} from './store.js';
 import type {BlockPointer, EntityDeclaration, EntityId, Mutation, NormalizedEntity} from './types.js';
+
+export type MemoryStateStoreOptions = RetentionOptions & {
+	/**
+	 * What the deployment asks this store to keep. Defaults to `unbounded`.
+	 *
+	 * A window is accepted and VALIDATED (a window below the finality depth is
+	 * refused here, at construction, rather than at the first read it would have
+	 * answered wrongly), but it is not what gets reported: this store prunes
+	 * nothing, so it keeps everything and says so. `revert-only` IS honoured,
+	 * because refusing every historical read needs no pruning, and it is how the
+	 * refusal a patch-log backend will produce is exercised today.
+	 */
+	readonly retention?: RetentionSetting;
+};
 
 /** One version of one entity: a complete row plus its half-open validity range. */
 type Version = {values: Record<string, unknown>; lower: number; upper: number | null};
@@ -32,9 +53,15 @@ export class MemoryStateStore implements StateStore {
 	private readonly versions = new Map<string, Version[]>();
 	private readonly blocks = new Map<number, BlockPointer>();
 	private readonly hashes = new Map<string, number>();
+	private readonly provided: Retention;
+	private tip: number | undefined;
 
-	constructor(declarations: Iterable<EntityDeclaration>) {
+	constructor(declarations: Iterable<EntityDeclaration>, options: MemoryStateStoreOptions = {}) {
 		this.entities = normalizeEntities(declarations);
+		// resolved at CONSTRUCTION: a retention below the finality floor is a
+		// configuration error, and it should land where it was configured rather
+		// than on the first read that would have been served wrongly.
+		this.provided = retentionWithoutPruning(resolveRetention(options.retention, options));
 	}
 
 	get declarations(): ReadonlyMap<string, NormalizedEntity> {
@@ -44,9 +71,14 @@ export class MemoryStateStore implements StateStore {
 	/**
 	 * Everything, forever, and it answers history: the honest report for a store
 	 * that never prunes.
+	 *
+	 * A deployment that asks for a `revert-only` store gets that report instead,
+	 * and every as-of read refused with it. A deployment that asks for a WINDOW
+	 * still gets `unbounded` here, because this store keeps everything whatever it
+	 * was asked, and the report says what is true rather than what was wanted.
 	 */
 	get capabilities(): StateStoreCapabilities {
-		return {retention: {kind: 'unbounded'}, asOf: true};
+		return {retention: this.provided, asOf: this.provided.kind !== 'revert-only'};
 	}
 
 	/** Nothing to create: the shape is the declaration, and it is already validated. */
@@ -79,6 +111,7 @@ export class MemoryStateStore implements StateStore {
 
 		this.blocks.set(block.number, {...block, hash});
 		this.hashes.set(hash, block.number);
+		if (this.tip === undefined || block.number > this.tip) this.tip = block.number;
 
 		for (const {mutation, entity, key, id} of planned) {
 			const versions = this.versions.get(key) ?? [];
@@ -104,7 +137,17 @@ export class MemoryStateStore implements StateStore {
 		return this.read<T>(entity, id, (version) => version.upper === null);
 	}
 
+	/**
+	 * One entity as of a block number, or a refusal.
+	 *
+	 * The refusal is the seam's (`assertRetained`), not a second copy written
+	 * here, and it comes BEFORE the read: a historical read this store's declared
+	 * retention does not cover throws rather than answering, because an as-of read
+	 * quietly served from the tip is a plausible wrong number nothing downstream
+	 * can tell apart from a true one.
+	 */
 	async getAsOf<T = Record<string, unknown>>(entity: string, id: EntityId, at: number): Promise<T | undefined> {
+		await assertRetained(this.capabilities, at, () => this.tip);
 		return this.read<T>(entity, id, (version) => version.lower <= at && (version.upper === null || at < version.upper));
 	}
 
@@ -130,6 +173,12 @@ export class MemoryStateStore implements StateStore {
 				this.blocks.delete(number);
 				this.hashes.delete(block.hash);
 			}
+		}
+		// the tip moves DOWN with the revert: a retention window is a distance from
+		// it, so a stale tip would refuse reads that are inside the window again.
+		this.tip = undefined;
+		for (const number of this.blocks.keys()) {
+			if (this.tip === undefined || number > this.tip) this.tip = number;
 		}
 	}
 

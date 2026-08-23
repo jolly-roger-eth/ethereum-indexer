@@ -1,4 +1,4 @@
-import {normalizeBlockHash, normalizeBlockTimestamp} from '@etherfold/state-store';
+import {BlockUnavailableError, normalizeBlockHash, normalizeBlockTimestamp} from '@etherfold/state-store';
 
 /**
  * The normalisation of a block's own fields is the SEAM's, not this store's:
@@ -87,8 +87,15 @@ export type NoSuchBlockReason =
  *
  * The soft form, for callers that want to branch rather than catch, is
  * `resolveBlockNumber`, which answers `undefined` and throws nothing.
+ *
+ * It is one member of the `BlockUnavailableError` family defined at the seam.
+ * The other is `BlockNotRetainedError`, thrown when the address resolves
+ * perfectly well and the store simply does not keep the versions needed to
+ * answer about it. A caller that only needs "my historical read did not happen"
+ * catches the base; a caller that must tell a reorg from a retention boundary
+ * catches the member.
  */
-export class NoSuchBlockError extends Error {
+export class NoSuchBlockError extends BlockUnavailableError {
 	readonly name = 'NoSuchBlockError';
 
 	constructor(
