@@ -96,6 +96,92 @@ export const RESERVED_WORDS: readonly string[] = [
 export const CONFORMANCE_ENTITIES: readonly EntityDeclaration[] = [TOKEN, PLAYER, CELL, PLACEMENT, RESERVED];
 
 /**
+ * A declaration that some engine might not be able to store, and the write that
+ * proves it did.
+ *
+ * These are the audited edges of the identifier rule: names with a legal SHAPE
+ * that nonetheless strain a particular backend. The case they feed asserts the
+ * property rather than the outcome -- refused when the store is CONSTRUCTED, or
+ * stored and read back correctly, and never accepted-then-fatal-at-`migrate()`
+ * -- so a backend is free to refuse one and free to accept it, and is not free
+ * to discover it late.
+ */
+export type DeclarationProbe = {
+	/** The strained shape, as a noun phrase: it becomes the case's name. */
+	readonly shape: string;
+	readonly declarations: readonly EntityDeclaration[];
+	/** Written and read back, if the factory accepted the declarations. */
+	readonly write: Mutation;
+	readonly read: {readonly entity: string; readonly id: Record<string, string | number>};
+	readonly expect: Record<string, unknown>;
+};
+
+/** Long enough to be unreasonable, short enough to read in a failure message. */
+const LONG = `long${'x'.repeat(196)}`;
+
+function probeRow(entity: string, idColumn: string, field: string): DeclarationProbe['write'] {
+	return {type: 'upsert', entity, id: {[idColumn]: 'k'}, values: {[field]: 'v'}};
+}
+
+/**
+ * The audited edges, one probe each. Extending this list is how a newly
+ * discovered engine limit becomes every backend's problem at once.
+ */
+export const DECLARATION_PROBES: readonly DeclarationProbe[] = [
+	{
+		// SQLite reserves every schema-object name beginning with `sqlite_` for
+		// itself and refuses it however it is quoted, so this one is genuinely an
+		// engine's limit: `@etherfold/state-store-sqlite` refuses it when the store
+		// is constructed, and the other backends store it.
+		shape: 'an entity name in an engine-internal namespace (`sqlite_`)',
+		declarations: [{name: 'sqlite_thing', id: ['id'], fields: {owner: 'text'}}],
+		write: probeRow('sqlite_thing', 'id', 'owner'),
+		read: {entity: 'sqlite_thing', id: {id: 'k'}},
+		expect: {owner: 'v'},
+	},
+	{
+		// the other direction of the same probe, and the failure that is just as
+		// visible to an author: a `sqlite_` COLUMN is legal in SQLite, so a backend
+		// refusing one would be narrowing the seam for no engine reason.
+		shape: 'a `sqlite_` column name, which SQLite itself allows',
+		declarations: [{name: 'strained', id: ['sqlite_key'], fields: {sqlite_value: 'text'}}],
+		write: probeRow('strained', 'sqlite_key', 'sqlite_value'),
+		read: {entity: 'strained', id: {sqlite_key: 'k'}},
+		expect: {sqlite_value: 'v'},
+	},
+	{
+		// audited and left legal: no backend imposes an identifier length (SQLite
+		// stores a 2,000-character table name and its indexes without complaint,
+		// and the others hold names as ordinary JS strings), so the seam does not
+		// invent one. This probe is what would notice a backend that does.
+		shape: 'a 200-character entity name',
+		declarations: [{name: LONG, id: ['id'], fields: {owner: 'text'}}],
+		write: probeRow(LONG, 'id', 'owner'),
+		read: {entity: LONG, id: {id: 'k'}},
+		expect: {owner: 'v'},
+	},
+	{
+		// the same, at the other two levels: the original report was an id COLUMN.
+		shape: 'a 200-character id column and field',
+		declarations: [{name: 'strained', id: [`${LONG}Key`], fields: {[`${LONG}Field`]: 'text'}}],
+		write: probeRow('strained', `${LONG}Key`, `${LONG}Field`),
+		read: {entity: 'strained', id: {[`${LONG}Key`]: 'k'}},
+		expect: {[`${LONG}Field`]: 'v'},
+	},
+	{
+		// a backend's OWN derived names are part of the space a declaration draws
+		// from: an index and a table share one namespace in SQLite, so `token` and
+		// `token_open` used to be fatal at migrate() there and two ordinary
+		// entities everywhere else. Fixed by construction rather than refused.
+		shape: "an entity named like another entity's derived index (`token` + `token_open`)",
+		declarations: [TOKEN, {name: 'token_open', id: ['id'], fields: {owner: 'text'}}],
+		write: probeRow('token_open', 'id', 'owner'),
+		read: {entity: 'token_open', id: {id: 'k'}},
+		expect: {owner: 'v'},
+	},
+];
+
+/**
  * The block the ladder cases start from, and the span they cover.
  *
  * A store that claims a window shorter than the span cannot be asked these

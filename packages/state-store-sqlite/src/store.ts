@@ -27,7 +27,7 @@ import {
 	type StateStoreCapabilities,
 } from '@etherfold/state-store';
 import {ROWID, migrationStatements} from './ddl.js';
-import {quoted} from './identifiers.js';
+import {assertStorableEntityNames, quoted} from './identifiers.js';
 import {
 	AS_OF_PREDICATE,
 	CURRENT_PREDICATE,
@@ -122,6 +122,10 @@ export class VersionedStateStore implements StateStore {
 		options: VersionedStateStoreOptions = {},
 	) {
 		this.entities = normalizeEntities(declarations);
+		// The seam's rule, then THIS engine's one addition, both at DECLARATION time:
+		// `sqlite_` is a namespace SQLite refuses however the name is quoted, so it
+		// has to fail here rather than at `migrate()` (`identifiers.ts`).
+		assertStorableEntityNames(this.entities.values());
 		this.bounds = {...DEFAULT_BATCH_BOUNDS, ...options.bounds};
 		// Resolved at CONSTRUCTION, before `migrate` and before any read: a window
 		// below the finality depth is a configuration error, and it belongs where it

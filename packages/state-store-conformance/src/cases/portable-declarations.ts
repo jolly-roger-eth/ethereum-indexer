@@ -1,6 +1,11 @@
 import {expect} from 'vitest';
-import {RESERVED_WORDS, block, cases, opened, ordered} from '../fixtures.js';
+import {DECLARATION_PROBES, RESERVED_WORDS, block, cases, opened, ordered} from '../fixtures.js';
 import type {ConformanceCase, StateStoreFactory} from '../types.js';
+
+/** A factory call as a promise, so a synchronous throw and a rejection assert alike. */
+function declaring(factory: StateStoreFactory, declarations: Parameters<StateStoreFactory>[0]) {
+	return Promise.resolve().then(() => factory(declarations));
+}
 
 const GROUP = 'a declaration means the same thing on every backend';
 
@@ -28,6 +33,19 @@ const GROUP = 'a declaration means the same thing on every backend';
  * refused everywhere, at DECLARATION time -- which is what the store's `_`
  * namespace is, and the reason it is checked here and not only where it is
  * enforced.
+ *
+ * ## Three outcomes, and only one of them is a bug
+ *
+ * A declaration may be LEGAL EVERYWHERE (the keyword cases above: quoting made
+ * the SQL backend accept exactly what the seam accepts), or REFUSED EVERYWHERE
+ * at declaration time (the `_` namespace, a name that is not an identifier, and
+ * now two names differing only in CASE, which no engine spelling can keep
+ * apart), or -- for a limit that is genuinely one engine's -- REFUSED BY THAT
+ * BACKEND, still at declaration time. `DECLARATION_PROBES` is that third
+ * outcome made testable: each probe asserts only that the store refuses when it
+ * is CONSTRUCTED or stores the row correctly, so a backend picks either and is
+ * never allowed the fourth thing, which is to accept the declaration and then
+ * die at `migrate()` or answer differently from its peers.
  */
 export function portableDeclarationCases(factory: StateStoreFactory): ConformanceCase[] {
 	return cases(GROUP, {
@@ -99,5 +117,76 @@ export function portableDeclarationCases(factory: StateStoreFactory): Conformanc
 				Promise.resolve().then(() => factory([{name: 'token', id: ['id'], fields: {'a-b': 'text'}}])),
 			).rejects.toThrow(/identifier/i);
 		},
+
+		'two entity names differing only in case are refused at DECLARATION time, everywhere': async () => {
+			// The second half of the same defect, and the one QUOTING cannot reach: a
+			// SQL backend folds identifier case even inside quotes, so `Token` matches
+			// the existing `token` table and `CREATE TABLE IF NOT EXISTS` is silently
+			// SKIPPED -- one table, and `getCurrent('Token', ...)` answering with
+			// `token`'s row -- while the memory, patch and IndexedDB backends keep two
+			// entities. There is no DDL that makes both engines agree, so the
+			// declaration is refused instead, for everyone, where it was written.
+			await expect(
+				declaring(factory, [
+					{name: 'token', id: ['id'], fields: {owner: 'text'}},
+					{name: 'Token', id: ['id'], fields: {owner: 'text'}},
+				]),
+			).rejects.toThrow(/case/i);
+
+			// and it names BOTH spellings, because the author is looking at one of them
+			const error = await declaring(factory, [
+				{name: 'token', id: ['id'], fields: {owner: 'text'}},
+				{name: 'TOKEN', id: ['id'], fields: {owner: 'text'}},
+			]).catch((thrown: unknown) => String(thrown));
+			expect(error).toContain('token');
+			expect(error).toContain('TOKEN');
+		},
+
+		'an id column and a field differing only in case are refused at DECLARATION time, everywhere': async () => {
+			// the SAME rule at the other two levels, because the original report was an
+			// id COLUMN: a table cannot hold `epoch` and `Epoch` either.
+			await expect(declaring(factory, [{name: 'token', id: ['id', 'ID'], fields: {}}])).rejects.toThrow(/case/i);
+
+			await expect(
+				declaring(factory, [{name: 'token', id: ['id'], fields: {owner: 'text', Owner: 'text'}}]),
+			).rejects.toThrow(/case/i);
+
+			// id columns and fields are ONE namespace: they are columns of one row.
+			await expect(declaring(factory, [{name: 'token', id: ['owner'], fields: {Owner: 'text'}}])).rejects.toThrow(
+				/case/i,
+			);
+		},
+
+		'a non-ASCII name is refused at DECLARATION time, everywhere': async () => {
+			// The reason there is no NFC/NFD rule to write: identifiers are ASCII-only,
+			// so the composed and decomposed spellings of the same name are BOTH refused
+			// and can never become the case collision above in another alphabet.
+			await expect(declaring(factory, [{name: 'caf\u00e9', id: ['id'], fields: {}}])).rejects.toThrow(/identifier/i);
+			await expect(declaring(factory, [{name: 'cafe\u0301', id: ['id'], fields: {}}])).rejects.toThrow(/identifier/i);
+			await expect(declaring(factory, [{name: 'token', id: ['\u0130d'], fields: {}}])).rejects.toThrow(/identifier/i);
+		},
+
+		...Object.fromEntries(
+			DECLARATION_PROBES.map((probe) => [
+				`a declaration carrying ${probe.shape} is stored, or refused at DECLARATION time, never fatal at migrate()`,
+				async () => {
+					// The third outcome is the one under test. A backend may refuse a name
+					// its engine genuinely cannot hold -- that is a loud failure where the
+					// store was constructed -- and a backend may store it. What no backend
+					// may do is accept the declaration and then die, or diverge, later: that
+					// is the failure that reaches a deployed server rather than an author.
+					let store;
+					try {
+						store = await factory(probe.declarations);
+					} catch {
+						return;
+					}
+
+					await store.migrate();
+					await store.applyBlock(block(100), [probe.write]);
+					expect(await store.getCurrent(probe.read.entity, probe.read.id)).toMatchObject(probe.expect);
+				},
+			]),
+		),
 	});
 }
