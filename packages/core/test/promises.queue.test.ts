@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {createAction} from '../src/internal/utils/promises';
+import {createAction} from '../src/internal/utils/promises.js';
 
 // These tests pin down the intended behaviour of `next()` (mode 'queue'):
 // when an execution is in-flight, a subsequent `next()` must be QUEUED to run

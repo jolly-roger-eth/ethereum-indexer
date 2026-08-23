@@ -39,12 +39,14 @@ describe('a version is mandatory', () => {
 	});
 
 	it('refuses an empty or whitespace-only version', () => {
-		expect(() => new VersionedStateEventProcessor(createTestDB(), {...processor, version: ''})).toThrow(
-			/has no `version`/,
-		);
-		expect(() => new VersionedStateEventProcessor(createTestDB(), {...processor, version: '  '})).toThrow(
-			/has no `version`/,
-		);
+		// Every VARIANT below is annotated `SQLProcessor<TestABI>`. The handler map
+		// MAPS over the ABI's event names, so `ABI` is not inferrable from an object
+		// LITERAL: a bare spread of `processor` widens to the `Abi` constraint and the
+		// handlers it just copied stop matching the resulting index signature.
+		const empty: SQLProcessor<TestABI> = {...processor, version: ''};
+		const whitespace: SQLProcessor<TestABI> = {...processor, version: '  '};
+		expect(() => new VersionedStateEventProcessor(createTestDB(), empty)).toThrow(/has no `version`/);
+		expect(() => new VersionedStateEventProcessor(createTestDB(), whitespace)).toThrow(/has no `version`/);
 	});
 
 	it('names the processor and says why the version is required', () => {
@@ -90,11 +92,12 @@ describe('getVersionHash', () => {
 	it('still changes when the entity SCHEMA changes at a fixed version', () => {
 		// The schema is part of what the stored rows MEAN, and folding it into one
 		// digest with the config must not lose that.
-		const a = new VersionedStateEventProcessor(createTestDB(), processor);
-		const b = new VersionedStateEventProcessor(createTestDB(), {
+		const renamedField: SQLProcessor<TestABI> = {
 			...processor,
 			entities: [{name: 'token', id: ['id'], fields: {holder: 'text'}}, processor.entities[1]],
-		});
+		};
+		const a = new VersionedStateEventProcessor(createTestDB(), processor);
+		const b = new VersionedStateEventProcessor(createTestDB(), renamedField);
 		expect(a.getVersionHash()).not.toBe(b.getVersionHash());
 	});
 
@@ -123,8 +126,9 @@ describe('the code fingerprint', () => {
 	});
 
 	it('does not move when only the version changes', () => {
+		const bumped: SQLProcessor<TestABI> = {...processor, version: '9.9.9'};
 		const a = new VersionedStateEventProcessor(createTestDB(), processor);
-		const b = new VersionedStateEventProcessor(createTestDB(), {...processor, version: '9.9.9'});
+		const b = new VersionedStateEventProcessor(createTestDB(), bumped);
 		expect(a.getCodeFingerprint()).toBe(b.getCodeFingerprint());
 	});
 });

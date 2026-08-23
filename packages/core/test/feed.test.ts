@@ -1,8 +1,8 @@
 import type {Abi} from 'abitype';
 import {describe, expect, it} from 'vitest';
-import {EthereumIndexer} from '../src/indexer';
-import {groupStreamPerBlock} from '../src/internal/engine/utils';
-import type {IndexingSource, LastSync, LogEvent} from '../src/types';
+import {EthereumIndexer} from '../src/indexer.js';
+import {groupStreamPerBlock} from '../src/internal/engine/utils.js';
+import type {IndexingSource, LastSync, LogEvent} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
 // The feed path must deliver retractions

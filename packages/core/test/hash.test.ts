@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {simple_hash} from '../src/utils/hash';
+import {simple_hash} from '../src/utils/hash.js';
 
 // ---------------------------------------------------------------------------
 // simple_hash: what it must distinguish, and what it must not

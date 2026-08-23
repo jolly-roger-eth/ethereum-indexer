@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {createAction} from '../src/internal/utils/promises';
+import {createAction} from '../src/internal/utils/promises.js';
 
 describe('createAction - argument passing', () => {
 	it('passes a truthy object arg through to the executor', async () => {

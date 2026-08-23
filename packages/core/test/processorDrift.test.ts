@@ -1,8 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import type {Abi} from 'abitype';
-import {EthereumIndexer} from '../src/indexer';
-import {simple_hash} from '../src/utils/hash';
-import type {ContextIdentifier, EventProcessor, IndexingSource, LastSync, ProcessorDriftReport} from '../src/types';
+import {EthereumIndexer} from '../src/indexer.js';
+import {simple_hash} from '../src/utils/hash.js';
+import type {ContextIdentifier, EventProcessor, IndexingSource, LastSync, ProcessorDriftReport} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
 // PROCESSOR DRIFT: the declared version says "unchanged", the code says otherwise

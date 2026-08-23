@@ -1,9 +1,11 @@
 import {describe, expect, it, vi} from 'vitest';
+import type {Abi, ContractData} from '@etherfold/core';
 import {
 	loadProcessorModule,
 	instantiateProcessor,
 	resolveSource,
 	resolveProcessorAndSource,
+	type ProcessorModule,
 } from '../src/processorSetup.js';
 
 // ---------------------------------------------------------------------------------------------------
@@ -29,7 +31,21 @@ function fakeProcessor(tag = 'p') {
 	return {tag, keepState: vi.fn(), getVersionHash: () => 'h'} as any;
 }
 
-const SAMPLE_CONTRACTS = [{address: '0xabc', abi: [], startBlock: 1}];
+const SAMPLE_CONTRACTS: ContractData<[]>[] = [{address: '0xabc', abi: [], startBlock: 1}];
+
+/**
+ * A processor module as `import()` actually delivers one: UNVALIDATED.
+ *
+ * `ProcessorModule` describes what a WELL-FORMED processor module looks like,
+ * but `loadProcessorModule` gets its value from a dynamic `import()` of foreign
+ * JS, so nothing checks it. `instantiateProcessor`'s guards exist exactly
+ * because that shape can be a lie, and a case that exercises one of those guards
+ * therefore has to build its module through the same unchecked door production
+ * does, rather than as a well-typed literal that could never reach the guard.
+ */
+function asImported<ABI extends Abi, ProcessResultType>(mod: object): ProcessorModule<ABI, ProcessResultType> {
+	return mod as ProcessorModule<ABI, ProcessResultType>;
+}
 
 // ---------------------------------------------------------------------------------------------------
 // loadProcessorModule — module resolution (createRequire fallback is the superset behaviour)
@@ -117,7 +133,9 @@ describe('instantiateProcessor', () => {
 
 	it('throws when the factory returns nothing', () => {
 		const createProcessor = vi.fn(() => undefined);
-		expect(() => instantiateProcessor({createProcessor}, {processorPath: 'p.js'})).toThrow(/could not be created/);
+		expect(() => instantiateProcessor(asImported({createProcessor}), {processorPath: 'p.js'})).toThrow(
+			/could not be created/,
+		);
 	});
 });
 

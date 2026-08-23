@@ -411,6 +411,9 @@ importers:
         specifier: ^2.52.0
         version: 2.52.0(typescript@6.0.3)(zod@4.4.3)
     devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
@@ -635,6 +638,9 @@ importers:
         specifier: ^0.4.1
         version: 0.4.1
     devDependencies:
+      abitype:
+        specifier: ^1.2.4
+        version: 1.2.4(typescript@6.0.3)(zod@4.4.3)
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6

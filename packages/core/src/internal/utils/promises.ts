@@ -96,7 +96,14 @@ export function createCancellablePromise<T>(
 	return promise as PromiseLike<T> as CancellablePromise<T>;
 }
 
-type Func<T, U> = U extends undefined ? () => Promise<T> : (args: U) => Promise<T>;
+// `[U] extends [undefined]` rather than `U extends undefined`: a NAKED type
+// parameter in the checked position makes the conditional DISTRIBUTE, so a union
+// argument type (`boolean`, i.e. `true | false`) would produce a UNION of
+// signatures instead of one signature taking the union. That union has no single
+// call signature, so the executor's parameters lose their contextual types and
+// `next(...)` ends up demanding the intersection (`never`). The tuple wrapper
+// switches the conditional off distribution and keeps `U` whole.
+type Func<T, U> = [U] extends [undefined] ? () => Promise<T> : (args: U) => Promise<T>;
 
 export type CancelOperations = {
 	unlessCancelled: <P>(p: Promise<P>) => Promise<P>;
@@ -112,7 +119,8 @@ export type ActionOperations<T> = CancelOperations & {
  * An action is a special object that manage an underlying promise to ensure it is executed in a proper manner
  */
 export function createAction<T, U = undefined, C = undefined>(
-	execute: U extends undefined
+	// Non-distributive, for the same reason as `Func` above.
+	execute: [U] extends [undefined]
 		? (action: ActionOperations<T>) => void | Promise<T>
 		: (args: U, action: ActionOperations<T>) => void | Promise<T>,
 ) {

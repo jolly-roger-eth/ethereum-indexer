@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
-import {EthereumIndexer} from '../src/indexer';
-import type {EventProcessor, IndexingSource} from '../src/types';
+import {EthereumIndexer} from '../src/indexer.js';
+import type {EventProcessor, IndexingSource} from '../src/types.js';
 
 // Minimal provider: empty chain, no logs.
 function makeProvider() {
