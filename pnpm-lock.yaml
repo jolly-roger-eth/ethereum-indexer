@@ -678,9 +678,6 @@ importers:
         specifier: ^0.4.1
         version: 0.4.1
     devDependencies:
-      '@etherfold/state-store-indexeddb':
-        specifier: workspace:*
-        version: link:../state-store-indexeddb
       '@etherfold/state-store-patch':
         specifier: workspace:*
         version: link:../state-store-patch
@@ -696,9 +693,6 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      fake-indexeddb:
-        specifier: ^6.2.5
-        version: 6.2.5
       remote-sql:
         specifier: ^0.0.7
         version: 0.0.7

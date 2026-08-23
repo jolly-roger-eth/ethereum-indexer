@@ -19,6 +19,35 @@ await store.revertTo(99); // a reorg: the write above is undone, counters go bac
 await store.prune(); // enforce the declared retention against storage; a no-op when there is none
 ```
 
+## Reading it back, typed off the same declarations
+
+The declarations that drive the storage also GENERATE the read surface, so a consumer never writes (and never maintains) a second description of the data:
+
+```ts
+import {createReadSurface, declareEntities, MemoryStateStore} from '@etherfold/state-store';
+
+const entities = declareEntities([
+	{name: 'token', id: 'id', fields: {owner: 'text', transferCount: 'integer'}},
+	{name: 'placement', id: ['epoch', 'position'], fields: {player: 'text'}},
+]);
+
+const store = new MemoryStateStore(entities); // the SAME array: one description, both halves
+const surface = createReadSurface(store, entities);
+
+const token = await surface.token.getCurrent({id: '1'}); // {id: string; owner: string | null; ...} | undefined
+await surface.token.getAsOf({id: '1'}, 100); // as of a block
+await surface.placement.listCurrent({epoch: 7}, 8); // the children of a key, bounded
+```
+
+No table name, no column string, no hand-written row type. Rename `owner` in the declaration and the consumer stops COMPILING, rather than reading `undefined` in production, which is the whole reason the surface is generated rather than written.
+
+- **`declareEntities` is an identity function**, there only to keep the literal types. An annotated declaration (`const TOKEN: EntityDeclaration = ...`) widens `'owner'` to `string`, after which nothing can be derived from it.
+- **Rows are the DECLARED columns only**, with an unlisted field as `null` (a version is a whole row) and the version columns dropped: they are storage, not state, and a projected row cannot be spread back into a write. It decodes nothing further, so a `uint256` stored as decimal `text` comes back as the string it is (ADR-0025).
+- **The as-of parameter is whatever the STORE takes.** At the seam that is a block number; a backend with an addressing layer above it (`@etherfold/state-store-sqlite`) also takes `{hash}` and `{timestamp}`, and the surface accepts them because it reads the parameter off the store it was handed. A hash passed to a store that cannot resolve one does not compile.
+- **Refusals travel through untouched**: `NoSuchBlockError` and `BlockNotRetainedError` are thrown, never folded into `undefined`.
+- **This tier is the BOUNDED one.** The richer form that takes predicates is a backend's own (`createQuerySurface` in `@etherfold/state-store-sqlite`), for the same reason the listing is bounded here: a handler runs once per event on every backend, a server-side reader does not.
+- **A GraphQL layer is an addition over this, not a refactor of it.** The decided stack (Hono, then Yoga, then Pothos, built programmatically, no SDL and no deploy-time codegen) walks the same `declareEntities` array for its object types (a field per declared column, `FieldValue` giving the scalar) and resolves them through this surface: `getCurrent` for a node, `listCurrent` for a `@derivedFrom`-style child collection, `getAsOf` / `listAsOf` for a block argument. Nothing here ships it.
+
 ## The vocabulary
 
 - **entity declaration** — `{name, id, fields}`, and nothing else. The store owns the layout, the versions, the as-of read and the revert.
@@ -35,8 +64,8 @@ A processor could have been written against raw SQL, forcing wasm SQLite into ev
 
 ## What is deliberately NOT here
 
-- **Any richer read.** The listing above is the whole of the set-read surface. A predicate, a sort or a page belongs to a backend that has a query planner under it (`queryCurrent` / `queryAsOf` in `@etherfold/state-store-sqlite`), because a handler runs once per event on every backend including the ones that have none. See ADR-0021.
-- **Block addressing by hash or time**, and the refusal for an address that resolves to nothing. `getAsOf` takes a resolved block NUMBER; addressing is the read layer above (`@etherfold/state-store-sqlite`, ADR-0015).
+- **Any richer read.** The listing above is the whole of the set-read surface, and the generated read surface offers exactly the same four reads. A predicate, a sort or a page belongs to a backend that has a query planner under it (`queryCurrent` / `queryAsOf` in `@etherfold/state-store-sqlite`), because a handler runs once per event on every backend including the ones that have none. See ADR-0021.
+- **Block addressing by hash or time**, and the refusal for an address that resolves to nothing. `getAsOf` takes a resolved block NUMBER; addressing is the read layer above (`@etherfold/state-store-sqlite`, ADR-0015). The generated surface does not add one either: it takes whatever address ITS store takes.
 - **The sync cursor.** Where a processor keeps `LastSync` is the processor package's business (ADR-0016).
 - **Anything ABI-shaped.** The `on<EventName>` handler map is `@etherfold/processor-entities`, which depends on this package and on `@etherfold/core`. Keeping it out is what lets a storage backend depend on this package without inheriting the whole indexer. See ADR-0018.
 
