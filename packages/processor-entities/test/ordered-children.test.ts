@@ -1,5 +1,6 @@
 import type {Abi, LogEvent} from '@etherfold/core';
 import {MemoryStateStore, type StateStore} from '@etherfold/state-store';
+import {PatchStateStore} from '@etherfold/state-store-patch';
 import {VersionedStateStore} from '@etherfold/state-store-sqlite';
 import {createClient} from '@libsql/client';
 import {RemoteLibSQL} from 'remote-sql-libsql';
@@ -34,8 +35,10 @@ import {timestampOf} from './utils/fixtures.js';
  *   in the id's own order, which is the order a range scan gives for free and is
  *   therefore LEXICOGRAPHIC over the stringified id: `'10'` sorts before `'9'`.
  *
- * Both backends run it, because "expressible" has to mean expressible wherever
- * the processor is deployed.
+ * Every backend runs it, because "expressible" has to mean expressible wherever
+ * the processor is deployed -- including the patch store, where the same listing
+ * is a sorted walk over a plain object rather than an indexed range scan, and
+ * where the eviction below reads a collection this block has been writing to.
  */
 
 const abi = [
@@ -155,6 +158,7 @@ const backends = [
 		make: (): StateStore =>
 			new VersionedStateStore(new RemoteLibSQL(createClient({url: ':memory:'})), processor.entities),
 	},
+	{name: 'patch', make: (): StateStore => new PatchStateStore(processor.entities, {retention: 'revert-only'})},
 ];
 
 /** Epochs deliberately repeat and go BACKWARDS: arrival order is not `epoch` order. */
