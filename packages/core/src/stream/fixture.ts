@@ -1,0 +1,206 @@
+import type {Abi} from 'abitype';
+import type {EventProcessor, ExistingStream, IndexingSource, LastSync, LogEvent, UsedStreamConfig} from '../types.js';
+import {bnReplacer, bnReviver} from '../utils/bigint.js';
+
+/**
+ * The on-disk format version of a captured stream.
+ *
+ * A fixture is a SNAPSHOT, so it is read long after it was written, by code that
+ * has moved on. The version is what lets a reader refuse a shape it does not
+ * understand instead of half-parsing it.
+ */
+export const STREAM_FIXTURE_FORMAT = 1;
+
+/**
+ * Where a fixture came from, in enough detail that a reader can judge it.
+ *
+ * Free-form beyond the four fields that are always knowable at capture time,
+ * because what makes a capture trustworthy is domain-specific: which contracts
+ * repo and commit the addresses came from, which node served the logs, who ran
+ * it. Those go in as extra keys rather than being guessed at here.
+ */
+export type StreamFixtureProvenance = {
+	/** ISO-8601, when the capture ran. */
+	capturedAt: string;
+	chainId: string;
+	fromBlock: number;
+	toBlock: number;
+	[key: string]: unknown;
+};
+
+/**
+ * A captured event stream: everything needed to replay an indexing run with no
+ * node in the loop.
+ *
+ * `source` travels WITH the events on purpose. The events are already decoded,
+ * so the ABI is not needed to read them back, but it IS needed to know what was
+ * asked for: a stream captured over two contracts and one captured over three
+ * are different inputs even when they happen to contain the same logs, and a
+ * fixture that cannot say which it is cannot be compared against another run.
+ */
+export type StreamFixture<ABI extends Abi> = {
+	format: typeof STREAM_FIXTURE_FORMAT;
+	provenance: StreamFixtureProvenance;
+	source: IndexingSource<ABI>;
+	/** The cursor as it stood at the end of the capture. */
+	lastSync: LastSync<ABI>;
+	/** Every event captured, in stream order (block, then log index). */
+	eventStream: LogEvent<ABI>[];
+};
+
+/** One block's worth of a fixture, as `blocksOf` groups it. */
+export type FixtureBlock<ABI extends Abi> = {
+	number: number;
+	hash: string;
+	/** Seconds since the epoch, when the node put it on the logs; absent if it did not. */
+	timestamp?: number;
+	events: LogEvent<ABI>[];
+};
+
+/**
+ * A fixture as text.
+ *
+ * BigInts go out through `bnReplacer` (the `"123n"` convention every storage
+ * adapter in this repo already uses), because decoded `uint256` arguments are
+ * ordinary and `JSON.stringify` throws on them.
+ */
+export function serializeStreamFixture<ABI extends Abi>(fixture: StreamFixture<ABI>, indent = 0): string {
+	return JSON.stringify(fixture, bnReplacer, indent);
+}
+
+/**
+ * Read a fixture back, refusing anything that is not one.
+ *
+ * The checks are deliberately shallow: enough that a truncated file, a
+ * newer-format file or an unrelated JSON document fails HERE, with a message
+ * naming the fixture, rather than three layers down as `undefined is not
+ * iterable` inside a processor.
+ */
+export function parseStreamFixture<ABI extends Abi>(text: string): StreamFixture<ABI> {
+	const parsed = JSON.parse(text, bnReviver) as Partial<StreamFixture<ABI>>;
+	if (!parsed || typeof parsed !== 'object') {
+		throw new Error(`not a stream fixture: expected an object`);
+	}
+	if (parsed.format !== STREAM_FIXTURE_FORMAT) {
+		throw new Error(`unsupported stream fixture format: ${parsed.format} (this build reads ${STREAM_FIXTURE_FORMAT})`);
+	}
+	if (!parsed.source || !parsed.lastSync || !Array.isArray(parsed.eventStream)) {
+		throw new Error(`not a stream fixture: missing source, lastSync or eventStream`);
+	}
+	return parsed as StreamFixture<ABI>;
+}
+
+/**
+ * The fixture's events grouped into blocks, in order.
+ *
+ * One block is the unit a processor applies atomically, so it is the unit a
+ * replay hands over, and the unit a benchmark should time. Blocks with no
+ * events do not appear, because the capture never saw them.
+ */
+export function blocksOf<ABI extends Abi>(fixture: StreamFixture<ABI>): FixtureBlock<ABI>[] {
+	const blocks: FixtureBlock<ABI>[] = [];
+	let current: FixtureBlock<ABI> | undefined;
+	for (const event of fixture.eventStream) {
+		if (!current || current.hash !== event.blockHash) {
+			current = {
+				number: event.blockNumber,
+				hash: event.blockHash,
+				...(event.blockTimestamp === undefined ? {} : {timestamp: event.blockTimestamp}),
+				events: [],
+			};
+			blocks.push(current);
+		}
+		current.events.push(event);
+	}
+	return blocks;
+}
+
+/**
+ * An `ExistingStream` that serves a captured fixture and never writes.
+ *
+ * This is the seam the indexer already consults before fetching, so pointing it
+ * at a fixture is how a run gets its events from disk instead of from a node.
+ * `saveNewEvents` is a no-op rather than an error: a fixture is immutable by
+ * definition, and a replay that appended to it would stop being a replay of the
+ * thing whose provenance is recorded at the top of the file.
+ */
+export function replayStream<ABI extends Abi>(fixture: StreamFixture<ABI>): ExistingStream<ABI> {
+	return {
+		fetchFrom: async (source: IndexingSource<ABI>, fromBlock: number) => {
+			if (source.chainId !== fixture.source.chainId) {
+				throw new Error(`stream fixture is for chain ${fixture.source.chainId}, asked for chain ${source.chainId}`);
+			}
+			return {
+				eventStream: fixture.eventStream.filter((event) => event.blockNumber >= fromBlock),
+				lastSync: fixture.lastSync,
+			};
+		},
+		saveNewEvents: async () => {
+			// a fixture is a snapshot; replaying it must not change it
+		},
+		clear: async () => {
+			// nothing is stored, so nothing is cleared
+		},
+	};
+}
+
+export type ReplayOptions<ABI extends Abi> = {
+	/**
+	 * What each per-block `LastSync` reports as the chain tip.
+	 *
+	 * `'live'` (the default) says the block being applied IS the tip, which is
+	 * what it was when the events first arrived, and therefore what keeps a
+	 * processor's reorg-eligible path (in the js-processor, its immer reverse
+	 * patches) doing the work it did live. `'final'` says the capture's own last
+	 * block is the tip, so every block is already past finality and a processor
+	 * may take its cheaper, no-history path.
+	 */
+	chainTip?: 'live' | 'final';
+	/** Called after each block has been applied. */
+	onBlock?(block: FixtureBlock<ABI>, index: number): void | Promise<void>;
+};
+
+/**
+ * Replay a fixture through a processor, one block at a time, with no node.
+ *
+ * One block is one `process` call because that is how blocks arrive and how
+ * they are applied: batching several into one call would measure a batch size
+ * that never occurs at the tip, and splitting one across two calls would let a
+ * half-applied block be observed, which live indexing never does.
+ *
+ * The caller is expected to have configured the processor already (`configure`,
+ * `keepState`); this drives `load` and then `process`, and returns the cursor as
+ * it stands at the end.
+ */
+export async function replayFixtureInto<ABI extends Abi, ProcessResultType>(
+	processor: EventProcessor<ABI, ProcessResultType>,
+	fixture: StreamFixture<ABI>,
+	streamConfig: UsedStreamConfig,
+	options: ReplayOptions<ABI> = {},
+): Promise<LastSync<ABI>> {
+	const {chainTip = 'live', onBlock} = options;
+	await processor.load(fixture.source, streamConfig);
+
+	const blocks = blocksOf(fixture);
+	let lastSync: LastSync<ABI> = {
+		...fixture.lastSync,
+		lastFromBlock: fixture.lastSync.lastFromBlock,
+		lastToBlock: 0,
+		unconfirmedBlocks: [],
+	};
+	for (let i = 0; i < blocks.length; i++) {
+		const block = blocks[i];
+		lastSync = {
+			context: fixture.lastSync.context,
+			latestBlock: chainTip === 'live' ? block.number : fixture.lastSync.latestBlock,
+			lastFromBlock: block.number,
+			lastToBlock: block.number,
+			unconfirmedBlocks: [],
+		};
+		await processor.process(block.events, lastSync);
+		if (onBlock) {
+			await onBlock(block, i);
+		}
+	}
+	return lastSync;
+}

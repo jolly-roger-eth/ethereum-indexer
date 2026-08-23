@@ -1,6 +1,8 @@
 export * from './types.js';
 export * from './indexer.js';
 export * from './utils/index.js';
+export * from './stream/fixture.js';
+export * from './stream/capture.js';
 
 export type {
 	Abi,
