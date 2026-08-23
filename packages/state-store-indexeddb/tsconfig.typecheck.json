@@ -10,12 +10,7 @@
 		"sourceMap": false,
 		"rootDir": "."
 	},
-	"include": [
-		"src/**/*.ts",
-		"test/**/*.ts",
-		"browser/**/*.ts",
-		"playwright.config.ts"
-	],
+	"include": ["**/*.ts"],
 	"exclude": [
 		"node_modules",
 		"dist"

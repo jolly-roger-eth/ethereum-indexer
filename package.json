@@ -30,7 +30,7 @@
     "dev": "ldenv pnpm --filter './packages/*' --filter './platforms/*' dev",
     "---------------------- TEST ----------------------": "",
     "test": "ldenv pnpm --filter './packages/*' --filter './platforms/*' test",
-    "------- TYPECHECK (src + test; RUN AFTER build: cross-package types resolve through dist/) -------": "",
+    "------- TYPECHECK (every .ts in a package, dist/ aside; RUN AFTER build: cross-package types resolve through dist/) -------": "",
     "typecheck": "ldenv pnpm --filter './packages/*' --filter './platforms/*' typecheck",
     "---------------------- BUILD ----------------------": "",
     "build": "ldenv pnpm --filter './packages/*' --filter './platforms/*' build",
@@ -45,5 +45,10 @@
     "stop": "zellij kill-session $npm_package_name",
     "start:pnpm": "pnpm -r dev",
     "start": "zellij-launcher a $npm_package_name || zellij -n zellij.kdl -s $npm_package_name"
+  },
+  "pnpm": {
+    "overrides": {
+      "abitype": "1.2.4"
+    }
   }
 }
