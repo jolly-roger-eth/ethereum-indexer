@@ -1,5 +1,5 @@
 ---
-'@ethereum-indexer/state-store-sqlite': minor
+'@etherfold/state-store-sqlite': minor
 ---
 
 New package: the versioned-row state store the server-side design rests on (`docs/design/historical-state-database.md`).
@@ -10,4 +10,4 @@ Entity state is kept as versioned rows with a half-open block-validity range (`_
 
 Per-request statement and payload limits are a configurable bound with a conservative default (`DEFAULT_BATCH_BOUNDS`), not a hardcoded assumption about any one provider.
 
-This is the first package published under the `@ethereum-indexer` scope, and the first to follow the `<role>-store-<backend>` naming scheme. See `docs/adr/0014` for the scope migration and why the backend is named rather than left as a generic `sql`.
+This is the first package published under the `@etherfold` scope, and the first to follow the `<role>-store-<backend>` naming scheme. See `docs/adr/0014` for the scope migration and why the backend is named rather than left as a generic `sql`, and `docs/adr/0017` for the word the scope ended up spelling.

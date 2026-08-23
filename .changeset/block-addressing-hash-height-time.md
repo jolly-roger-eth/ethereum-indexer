@@ -1,5 +1,5 @@
 ---
-'@ethereum-indexer/state-store-sqlite': minor
+'@etherfold/state-store-sqlite': minor
 ---
 
 State can now be read as of a block **hash**, a **height** or a **timestamp**.

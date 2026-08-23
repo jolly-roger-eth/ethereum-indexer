@@ -14,12 +14,9 @@
     "named-logs": "^0.4.1"
   },
   "devDependencies": {
-    "ethereum-indexer-server": "workspace:*",
     "typescript": "^6.0.3"
   },
   "scripts": {
-    "eis": "eis",
-    "test": "eis run -p ./dist/index.js --disable-cache",
     "build": "tsc",
     "dev": "as-soon -w src pnpm build"
   }

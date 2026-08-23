@@ -1,5 +1,5 @@
 ---
-'ethereum-indexer': patch
+'@etherfold/core': patch
 ---
 
 Cache fetched block timestamps, so the unconfirmed window is not re-fetched every round.

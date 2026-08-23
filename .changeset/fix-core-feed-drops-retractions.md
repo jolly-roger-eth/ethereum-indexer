@@ -1,5 +1,5 @@
 ---
-'ethereum-indexer': patch
+'@etherfold/core': patch
 ---
 
 fix(core): `feed()` dropped every retraction, so the feed path could not revert

@@ -1,5 +1,5 @@
 ---
-'ethereum-indexer-utils': minor
+'@etherfold/utils': minor
 ---
 
 Add a shared `resolveProcessorAndSource` helper (plus the smaller `loadProcessorModule`, `instantiateProcessor` and `resolveSource` building blocks) that turns a processor module path + options into `{processor, processorModule, source}`. This extracts the near-identical processor/source setup that was previously copy-pasted between the CLI's `init()` and the server's `setupIndexing()` (LOW-4 in the server/CLI batch audit), removing the divergence risk between the two copies.

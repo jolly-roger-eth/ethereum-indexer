@@ -1,5 +1,5 @@
 ---
-'ethereum-indexer': patch
+'@etherfold/core': patch
 ---
 
 Distinguish the two ways a reorg is concluded, and report the dangerous one loudly. `generateStreamToAppend` now returns an optional `reorg: {cause, blockNumber, blockHash}` alongside the stream, where `cause` is either `contradiction` (the same height now carries a different hash, which is proof) or `absence` (a block we held is simply not in the re-fetched range, which is an inference).

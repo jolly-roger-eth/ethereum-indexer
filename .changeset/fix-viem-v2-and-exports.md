@@ -1,13 +1,11 @@
 ---
-'ethereum-indexer': minor
-'ethereum-indexer-browser': minor
-'ethereum-indexer-cli': minor
-'ethereum-indexer-db-utils': minor
-'ethereum-indexer-fs': minor
-'ethereum-indexer-fs-cache': minor
-'ethereum-indexer-js-processor': minor
-'ethereum-indexer-server': minor
-'ethereum-indexer-utils': minor
+'@etherfold/core': minor
+'@etherfold/browser': minor
+'etherfold': minor
+'@etherfold/fs': minor
+'@etherfold/fs-cache': minor
+'@etherfold/js-processor': minor
+'@etherfold/utils': minor
 ---
 
 Update all dependencies to their latest versions and fix the resulting build.
@@ -20,9 +18,9 @@ Dependency updates (notable):
 
 Fixes required by the updates:
 
-- `ethereum-indexer`: handle viem v2's stricter `encodeEventTopics` return type (`(Hex | Hex[] | null)[]`) and the generic `eventName` returned by `decodeEventLog` over `AbiEvent[]`.
-- `ethereum-indexer-browser` / `ethereum-indexer-server`: align `LastSync`/`ExistingStream` generic vs. base `Abi` usage that broke under viem v2's tighter `DecodeEventLogReturnType`.
-- `ethereum-indexer-fs-cache`: spread typed event args safely; make the package explicitly ESM (`type: module`) with `.js` import extensions.
+- `@etherfold/core`: handle viem v2's stricter `encodeEventTopics` return type (`(Hex | Hex[] | null)[]`) and the generic `eventName` returned by `decodeEventLog` over `AbiEvent[]`.
+- `@etherfold/browser`: align `LastSync`/`ExistingStream` generic vs. base `Abi` usage that broke under viem v2's tighter `DecodeEventLogReturnType`.
+- `@etherfold/fs-cache`: spread typed event args safely; make the package explicitly ESM (`type: module`) with `.js` import extensions.
 - All published packages: add a standard `exports` map (ESM-only, no `main`) so modern bundlers/test runners (Vite/Vitest v4) resolve the package entry correctly.
 
 JS processor authoring keeps full ABI-derived type safety (`event.args` typed from the ABI).

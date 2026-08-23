@@ -1,5 +1,7 @@
 # Findings: server / CLI batch-indexing path (one-shot + long-running)
 
+> Paths below are as they were at review time. `ethereum-indexer-cli` is now `packages/cli/` (published as `etherfold`, ADR-0017), and `packages/ethereum-indexer-server/` is now `archive/ethereum-indexer-server/`, retired under ADR-0010 and superseded by ADR-0003's split server.
+
 Review of the **batch / long-running** indexing path in `ethereum-indexer-cli` and
 `ethereum-indexer-server`, plus the `keepState` / `keepStream` persistence they rely on. These
 packages are **not** live-reconfigurable (intentionally — see `tasks/audit-server-cli-batch-indexing.md`),
