@@ -75,7 +75,7 @@ describe('a listing is ONE indexed range scan', () => {
 		const plan = await queryPlan(db, statement.sql, statement.args);
 
 		expect(plan).toHaveLength(1);
-		expect(plan[0]).toMatch(/^SEARCH placement USING INDEX placement_\w+ \(epoch=\?\)$/);
+		expect(plan[0]).toMatch(/^SEARCH placement USING INDEX _placement_\w+ \(epoch=\?\)$/);
 		expect(plan.join('\n')).not.toMatch(/TEMP B-TREE|SCAN placement/);
 	});
 
@@ -86,7 +86,7 @@ describe('a listing is ONE indexed range scan', () => {
 		const plan = await queryPlan(db, statement.sql, statement.args);
 
 		expect(plan).toHaveLength(1);
-		expect(plan[0]).toMatch(/USING INDEX placement_\w+ \(epoch=\? AND position=\?\)/);
+		expect(plan[0]).toMatch(/USING INDEX _placement_\w+ \(epoch=\? AND position=\?\)/);
 	});
 
 	it('rides it for an as-of listing, which is the same range under the validity predicate', async () => {
@@ -96,7 +96,7 @@ describe('a listing is ONE indexed range scan', () => {
 		const plan = await queryPlan(db, statement.sql, statement.args);
 
 		expect(plan).toHaveLength(1);
-		expect(plan[0]).toMatch(/^SEARCH placement USING INDEX placement_\w+ \(epoch=\?\)$/);
+		expect(plan[0]).toMatch(/^SEARCH placement USING INDEX _placement_\w+ \(epoch=\?\)$/);
 		expect(plan.join('\n')).not.toMatch(/TEMP B-TREE|SCAN placement/);
 	});
 });

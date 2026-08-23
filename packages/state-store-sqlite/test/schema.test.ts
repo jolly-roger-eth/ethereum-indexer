@@ -36,14 +36,17 @@ describe('entity DDL is issued from the declaration alone', () => {
 		const indexes = (await schemaObjects(db)).filter((o) => o.type === 'index' && o.tbl_name === 'token');
 		const byName = Object.fromEntries(indexes.map((i) => [i.name, i.sql ?? '']));
 
-		expect(byName['token_open']).toMatch(/UNIQUE INDEX/i);
-		expect(byName['token_open']).toMatch(/WHERE\s+_upper\s+IS\s+NULL/i);
+		// the index names carry the store's `_` prefix, so they cannot collide with
+		// an ENTITY named `token_open`: in SQLite an index and a table share one
+		// namespace (`src/ddl.ts`, `test/reserved-names.test.ts`).
+		expect(byName['_token_open']).toMatch(/UNIQUE INDEX/i);
+		expect(byName['_token_open']).toMatch(/WHERE\s+_upper\s+IS\s+NULL/i);
 		// as-of probes ride (id, _lower); revert scans ride _lower and _upper.
 		// the declared columns are QUOTED, so a name that is a SQL keyword survives
 		// interpolation (`src/identifiers.ts`, `test/identifiers.test.ts`).
-		expect(byName['token_history']).toMatch(/\("id",\s*_lower\)/i);
-		expect(byName['token_lower']).toMatch(/\(_lower\)/i);
-		expect(byName['token_upper']).toMatch(/\(_upper\)/i);
+		expect(byName['_token_history']).toMatch(/\("id",\s*_lower\)/i);
+		expect(byName['_token_lower']).toMatch(/\(_lower\)/i);
+		expect(byName['_token_upper']).toMatch(/\(_upper\)/i);
 	});
 
 	it('creates the canonical block table', async () => {
@@ -69,7 +72,7 @@ describe('entity DDL is issued from the declaration alone', () => {
 		]);
 		await store.migrate();
 
-		const index = (await schemaObjects(db)).find((o) => o.name === 'holding_open');
+		const index = (await schemaObjects(db)).find((o) => o.name === '_holding_open');
 		expect(index?.sql).toMatch(/\("account",\s*"token"\)/i);
 
 		await store.applyBlock(block(10), [

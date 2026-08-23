@@ -1,5 +1,5 @@
 import {normalizeEntity, type FieldType} from '@etherfold/state-store';
-import {quoted, quotedList} from './identifiers.js';
+import {assertStorableEntityNames, quoted, quotedList} from './identifiers.js';
 import type {EntityDeclaration, Statement} from './types.js';
 
 /**
@@ -21,6 +21,26 @@ import type {EntityDeclaration, Statement} from './types.js';
  * on the way out (`quoted`, `identifiers.ts`), because a validated SHAPE can
  * still be a SQL keyword and this backend must accept exactly what the seam
  * accepts.
+ *
+ * ## Why the derived index names carry the store's `_` prefix
+ *
+ * In SQLite an index and a table share ONE namespace, so an index named
+ * `token_open` and a table named `token_open` cannot both exist. Deriving an
+ * index name from an entity name without a prefix therefore put this store's
+ * OWN names into the space a declaration draws from: declaring `token` and
+ * `token_open` together was accepted by the seam, stored as two entities by
+ * every other backend, and killed `migrate()` here with
+ * `SQLITE_ERROR: there is already an index named token_open` (or
+ * `...already a table named...`, depending which was created first).
+ *
+ * Prefixing with `_` fixes it by CONSTRUCTION rather than by a new refusal, and
+ * that is the point: the seam already reserves the `_` prefix for the store, so
+ * no declaration can reach into `_token_open` and no entity name has to be
+ * refused for a reason that would be nonsense on a backend with no indexes in
+ * it. The alternative -- refusing an entity whose name happens to equal another
+ * entity's derived index name -- would have made a declaration's legality depend
+ * on which OTHER entities were declared beside it, and leaked this store's
+ * naming scheme into the shared surface.
  */
 
 /** Block number at which a version became valid (inclusive). */
@@ -77,8 +97,11 @@ function sqlType(type: FieldType): string {
  */
 export function ddlForEntity(declaration: EntityDeclaration): string[] {
 	const entity = normalizeEntity(declaration);
+	assertStorableEntityNames([entity]);
 	const table = quoted(entity.name);
 	const idList = quotedList(entity.id);
+	/** An index of this entity, in the store's own `_` namespace. See the module note. */
+	const index = (suffix: string) => quoted(`_${entity.name}_${suffix}`);
 
 	const columns = [
 		`${ROWID} INTEGER PRIMARY KEY AUTOINCREMENT`,
@@ -95,14 +118,14 @@ export function ddlForEntity(declaration: EntityDeclaration): string[] {
 		`CREATE TABLE IF NOT EXISTS ${table} (\n\t${columns.join(',\n\t')}\n)`,
 		// The live set, and the invariant SQLite cannot express as a constraint:
 		// at most one open version per business key.
-		`CREATE UNIQUE INDEX IF NOT EXISTS ${quoted(`${entity.name}_open`)} ON ${table} (${idList}) WHERE ${UPPER} IS NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS ${index('open')} ON ${table} (${idList}) WHERE ${UPPER} IS NULL`,
 		// Time travel: the point as-of probe rides this B-tree, which is why it
 		// stays effectively flat as history accumulates.
-		`CREATE INDEX IF NOT EXISTS ${quoted(`${entity.name}_history`)} ON ${table} (${idList}, ${LOWER})`,
+		`CREATE INDEX IF NOT EXISTS ${index('history')} ON ${table} (${idList}, ${LOWER})`,
 		// Revert leg A: versions opened above the fork.
-		`CREATE INDEX IF NOT EXISTS ${quoted(`${entity.name}_lower`)} ON ${table} (${LOWER})`,
+		`CREATE INDEX IF NOT EXISTS ${index('lower')} ON ${table} (${LOWER})`,
 		// Revert leg B: versions closed above the fork.
-		`CREATE INDEX IF NOT EXISTS ${quoted(`${entity.name}_upper`)} ON ${table} (${UPPER})`,
+		`CREATE INDEX IF NOT EXISTS ${index('upper')} ON ${table} (${UPPER})`,
 	];
 }
 

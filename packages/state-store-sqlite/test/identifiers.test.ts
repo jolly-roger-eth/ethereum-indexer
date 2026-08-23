@@ -119,7 +119,12 @@ describe('an identifier that is a SQL keyword', () => {
 			db,
 			`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'order'`,
 		);
-		expect(indexes.map((i) => i.name).sort()).toEqual(['order_history', 'order_lower', 'order_open', 'order_upper']);
+		expect(indexes.map((i) => i.name).sort()).toEqual([
+			'_order_history',
+			'_order_lower',
+			'_order_open',
+			'_order_upper',
+		]);
 
 		// quoting must not cost the access path: a listing over a keyword id column
 		// is still one indexed range scan, which is the whole reason the surface has
@@ -127,7 +132,7 @@ describe('an identifier that is a SQL keyword', () => {
 		const statement = listCurrentStatement(normalizeEntity(declaration), {group: 'a'}, 3);
 		const plan = await rows<{detail: string}>(db, `EXPLAIN QUERY PLAN ${statement.sql}`, ...statement.args);
 		expect(plan).toHaveLength(1);
-		expect(plan[0].detail).toMatch(/^SEARCH "?order"? USING INDEX order_\w+ \(group=\?\)$/);
+		expect(plan[0].detail).toMatch(/^SEARCH "?order"? USING INDEX _order_\w+ \(group=\?\)$/);
 	});
 });
 

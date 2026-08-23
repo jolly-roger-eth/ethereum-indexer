@@ -22,12 +22,51 @@ import type {EntityId, FieldType, EntityDeclaration, NormalizedEntity} from './t
  * accepts. That agreement is asserted for every backend by the
  * `a declaration means the same thing on every backend` group of
  * `@etherfold/state-store-conformance`.
+ *
+ * ## Why CASE is refused here when a keyword list is not
+ *
+ * The two look contradictory side by side, and they are not. A keyword list is
+ * one engine's VOCABULARY: `index` is a word SQLite happens to have taken, it
+ * means nothing to a key-value store, and quoting removes the problem entirely,
+ * so the list has no business being at a surface every backend shares.
+ *
+ * Case is not vocabulary, it is IDENTITY. `token` and `Token` are two names
+ * asking whether they are two THINGS, and the backends disagree about the
+ * answer: SQLite folds identifier case (quoted or not -- quoting does not help
+ * here the way it helps with a keyword), so it stores one table, while the
+ * memory, patch and IndexedDB backends key by the exact string and store two
+ * entities. There is no spelling of the DDL that makes SQLite keep them apart,
+ * so the choice is not "where does the workaround go" but "which answer is the
+ * declaration's", and the only answer that is the same everywhere is: two names
+ * a backend could confuse are ONE name, and declaring both is a mistake.
+ *
+ * The rule is therefore a PORTABILITY rule -- it exists because the backends
+ * disagree -- rather than one engine's vocabulary, which is why it lives at the
+ * seam and the keyword list does not.
+ *
+ * Its ASCII-only companion falls out of `IDENTIFIER` for free: a name may not
+ * contain a non-ASCII character at all, so there is no pair of identifiers that
+ * are equal only after NFC/NFD normalisation (the same collision SHAPE as case),
+ * and `fold` below has no dotted I and no eszett to get wrong. That is not an
+ * accident of the regex; it is the reason the regex stays ASCII-only.
  */
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 /** The store owns the `_` prefix: version columns, and its own fixed tables. */
 function isReserved(name: string): boolean {
 	return name.startsWith('_');
+}
+
+/**
+ * The form two identifiers are compared in when asking whether SOME backend
+ * would store them as one.
+ *
+ * `toLowerCase` and never `toLocaleLowerCase`: this must not depend on the
+ * host's locale, and it does not have to, because `IDENTIFIER` admits ASCII
+ * only. Under that alphabet the fold is exact rather than approximate.
+ */
+function fold(name: string): string {
+	return name.toLowerCase();
 }
 
 function assertIdentifier(name: unknown, what: string): asserts name is string {
@@ -70,19 +109,55 @@ export function normalizeEntity(declaration: EntityDeclaration): NormalizedEntit
 		}
 	}
 
+	// The id columns and the fields are ONE namespace -- they are the columns of
+	// one row -- so they are folded together rather than a set each.
+	const columns = new Map<string, string>();
+	for (const column of [...id, ...Object.keys(fields)]) {
+		const declared = columns.get(fold(column));
+		if (declared === column) {
+			throw new Error(`entity ${name} declares the id column ${JSON.stringify(column)} twice`);
+		}
+		if (declared !== undefined) {
+			throw new Error(differOnlyInCase(`entity ${name} declares two columns`, declared, column));
+		}
+		columns.set(fold(column), column);
+	}
+
 	return Object.freeze({name, id: Object.freeze([...id]), fields: Object.freeze({...fields})});
 }
 
 export function normalizeEntities(declarations: Iterable<EntityDeclaration>): Map<string, NormalizedEntity> {
 	const entities = new Map<string, NormalizedEntity>();
+	const folded = new Map<string, string>();
 	for (const declaration of declarations) {
 		const entity = normalizeEntity(declaration);
 		if (entities.has(entity.name)) {
 			throw new Error(`entity ${entity.name} is declared more than once`);
 		}
+		const declared = folded.get(fold(entity.name));
+		if (declared !== undefined) {
+			throw new Error(differOnlyInCase('two entity names', declared, entity.name));
+		}
+		folded.set(fold(entity.name), entity.name);
 		entities.set(entity.name, entity);
 	}
 	return entities;
+}
+
+/**
+ * The one message both halves of the case rule are refused with.
+ *
+ * It names BOTH spellings, because the author sees one of them at the point they
+ * are reading and the other is the whole content of the complaint; and it says
+ * what to do, because "rename one" is the only fix (there is no escaping,
+ * quoting or configuration that makes SQLite keep the two apart).
+ */
+function differOnlyInCase(what: string, declared: string, clashing: string): string {
+	return (
+		`${what} that differ only in case: ${JSON.stringify(declared)} and ${JSON.stringify(clashing)}. ` +
+		`Identifiers are compared case-insensitively for EVERY backend, because at least one folds them ` +
+		`(SQLite, quoted or not) and would store the two as one where the others store two. Rename one of them.`
+	);
 }
 
 export function mustGet(entities: ReadonlyMap<string, NormalizedEntity>, name: string): NormalizedEntity {
