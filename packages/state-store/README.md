@@ -16,6 +16,7 @@ await store.getCurrent('token', {id: '1'}); // at the tip
 await store.getAsOf('token', {id: '1'}, 99); // as of a block number: undefined, it did not exist yet
 await store.listCurrent('placement', {epoch: 7}, 8); // the children of a key, bounded: {rows, truncated}
 await store.revertTo(99); // a reorg: the write above is undone, counters go back DOWN
+await store.prune(); // enforce the declared retention against storage; a no-op when there is none
 ```
 
 ## The vocabulary
@@ -25,6 +26,7 @@ await store.revertTo(99); // a reorg: the write above is undone, counters go bac
 - **mutation context** — the write surface a handler gets for ONE block, with read-your-writes inside that block. `update` is sugar over get-then-spread-then-set, so the storage model stays visible.
 - **listing** — the one SET read: the rows whose declared id starts with a PREFIX (a leading run of its id columns), ascending in the id's own order, bounded by a REQUIRED limit. No predicate, no caller-supplied ordering, no offset, so an accidental full scan cannot be expressed and the operation stays one indexed range scan on every backend. `truncated` says whether more matched, because a set that exactly fills the limit is otherwise indistinguishable from a cut-off one.
 - **retention** — how far back superseded versions are kept, in BLOCK NUMBERS. Never in updates (on the real measured stream event-bearing blocks are median 429 apart, so a 64-block window holds one of them), never in time (that prunes on wall-clock rather than chain progress).
+- **prune** — the enforcement of retention against STORAGE, as opposed to against answers. A window bounds what a read may ask about from the moment it is configured; `prune` is what drops the versions it no longer covers. It is an explicit call the host schedules, never a side effect of a write, because it costs time proportional to what it drops and a store is the wrong place to pick a maintenance cadence (ADR-0022). The LIVE version of an entity survives it however old it is: that row is the current state.
 - **capabilities** — what a store declares about itself, readable before `migrate` and before any read, so a caller discovers a missing capability at startup instead of from a wrong answer.
 
 ## Why the seam is here and not lower

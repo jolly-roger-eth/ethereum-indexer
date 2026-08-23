@@ -4,7 +4,11 @@ import {describe, expect, it} from 'vitest';
 import {NoSuchBlockError, VersionedStateStore, type EntityDeclaration} from '../src/index.js';
 import {createTestDB} from './utils/db.js';
 import {TOKEN, block, owns} from './utils/fixtures.js';
-import {WindowedStore} from './utils/windowed-store.js';
+
+/** A shipped store configured with a window, which it now enforces on both halves. */
+function windowed(blocks = 60, declarations: EntityDeclaration[] = [TOKEN]) {
+	return new VersionedStateStore(createTestDB(), declarations, {retention: {blocks}, finalityDepth: blocks});
+}
 
 /**
  * A backend states what it can do BEFORE anyone asks it a question, which is the
@@ -26,14 +30,15 @@ describe('declared capabilities', () => {
 		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});
 	});
 
-	it('claim `unbounded` because that is what is TRUE: this package does not prune', async () => {
+	it('default to `unbounded`, which keeps everything and prunes nothing', async () => {
 		const store = new VersionedStateStore(createTestDB(), [TOKEN]);
 		await store.migrate();
 		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
 		await store.applyBlock(block(1_000_000), [owns('1', '0xbob', 2)]);
+		await store.prune();
 
-		// a million blocks later, the first version is still readable. A store that
-		// reported a window here would be claiming an enforcement it does not have.
+		// a million blocks later, and after a prune, the first version is still
+		// readable: nothing was ever asked to be dropped.
 		expect(store.capabilities.retention).toEqual({kind: 'unbounded'});
 		expect(await store.getAsOf<{owner: string}>('token', {id: '1'}, 10)).toMatchObject({owner: '0xalice'});
 	});
@@ -46,17 +51,16 @@ describe('a retention setting a deployment writes', () => {
 		).toThrow(/32[\s\S]*64|64[\s\S]*32/);
 	});
 
-	it('accepts a window and STILL reports `unbounded`, because nothing here prunes', async () => {
+	it('is REPORTED, because this store enforces the window it was given', async () => {
 		const store = new VersionedStateStore(createTestDB(), [TOKEN], {retention: {blocks: 128}, finalityDepth: 64});
 		await store.migrate();
 		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
 		await store.applyBlock(block(1_000_000), [owns('1', '0xbob', 2)]);
 
-		// The report says what this store DOES, not what it was asked to do. It kept
-		// the old version (it prunes nothing), so refusing to read it would be a
-		// second lie on top of the first.
-		expect(store.capabilities.retention).toEqual({kind: 'unbounded'});
-		expect(await store.getAsOf<{owner: string}>('token', {id: '1'}, 10)).toMatchObject({owner: '0xalice'});
+		expect(store.capabilities.retention).toEqual({kind: 'window', blocks: 128});
+		// refused on read whether or not the host has pruned yet: the report is about
+		// what a caller may rely on, and it must never promise history that is gone.
+		await expect(store.getAsOf('token', {id: '1'}, 10)).rejects.toBeInstanceOf(BlockNotRetainedError);
 	});
 
 	it('refuses a duration on the way in', () => {
@@ -93,7 +97,7 @@ describe('a store set to `revert-only`', () => {
 
 describe('a store that claims a window', () => {
 	it('refuses a whole-table query outside the window too', async () => {
-		const store = new WindowedStore(createTestDB(), [TOKEN]);
+		const store = windowed();
 		await store.migrate();
 		await store.applyBlock(block(1_000), [owns('1', '0xalice', 1)]);
 
@@ -102,7 +106,7 @@ describe('a store that claims a window', () => {
 	});
 
 	it('refuses on the address axes as well, after they resolve', async () => {
-		const store = new WindowedStore(createTestDB(), [TOKEN]);
+		const store = windowed();
 		await store.migrate();
 		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
 		await store.applyBlock(block(1_000), [owns('1', '0xbob', 2)]);
@@ -118,7 +122,7 @@ describe('a store that claims a window', () => {
 
 describe('the refusals are one family', () => {
 	it('so a caller can catch "my historical read did not happen" once', async () => {
-		const store = new WindowedStore(createTestDB(), [TOKEN]);
+		const store = windowed();
 		await store.migrate();
 		await store.applyBlock(block(1_000), [owns('1', '0xalice', 1)]);
 

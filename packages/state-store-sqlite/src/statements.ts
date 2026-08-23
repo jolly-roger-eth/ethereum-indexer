@@ -7,7 +7,7 @@ import {
 	prefixValues,
 	type EntityIdPrefix,
 } from '@etherfold/state-store';
-import {BLOCKS_TABLE, LOWER, UPPER} from './ddl.js';
+import {BLOCKS_TABLE, LOWER, ROWID, UPPER} from './ddl.js';
 import type {BlockPointer, EntityDeclaration, Mutation, NormalizedEntity, Statement} from './types.js';
 
 /**
@@ -180,6 +180,55 @@ export function applyBlockStatements(
 	}
 
 	return statements;
+}
+
+/**
+ * The next versions a retention floor puts out of reach, as row ids, at most
+ * `limit` of them.
+ *
+ * `${UPPER} IS NOT NULL` is the whole safety property and is written out rather
+ * than left to SQL's NULL semantics, because it is the line between bounding a
+ * store and destroying it: a version with no upper bound is the LIVE one, it is
+ * the current state however old it is, and an entity written once at block
+ * 12,082,307 and never touched again is a normal row on the real stream rather
+ * than an edge case. A prune expressed as "delete rows older than the floor"
+ * deletes it.
+ *
+ * `${UPPER} <= ?` and not `<`: the floor is the OLDEST block a read may still
+ * ask about, and a version closed AT that block was already superseded when it
+ * was reached, so nothing inside the window can see it.
+ *
+ * It rides `<table>_upper`, the index revert leg B already needs, so the range
+ * is a seek and the `ORDER BY` is free. That ordering is not decoration: a pass
+ * stopped by a budget must have dropped the OLDEST unreachable versions, so a
+ * partially pruned store converges towards the window from the far end instead
+ * of keeping arbitrary holes.
+ */
+export function prunableVersionsStatement(entity: NormalizedEntity, floor: number, limit: number): Statement {
+	return {
+		sql:
+			`SELECT ${ROWID} FROM ${entity.name} ` + `WHERE ${UPPER} IS NOT NULL AND ${UPPER} <= ? ORDER BY ${UPPER} LIMIT ?`,
+		args: [floor, limit],
+	};
+}
+
+/**
+ * Delete an EXPLICIT, bounded set of versions, by row id.
+ *
+ * The obvious `DELETE FROM t WHERE _upper <= ?` is one small statement that
+ * deletes an unbounded number of rows, which is precisely what a hosted backend
+ * refuses (see `maxRowsPerStatement`). Naming the rows also makes the deletion
+ * auditable in the same way every other statement here is -- a test can look at
+ * what a prune was about to do -- and it makes the COUNT exact, which
+ * `remote-sql` could not otherwise supply: its result shape carries rows and no
+ * affected-row count, so a blind bounded DELETE could not report what it did or
+ * know when it was finished.
+ */
+export function dropVersionsStatement(entity: NormalizedEntity, rowids: readonly number[]): Statement {
+	return {
+		sql: `DELETE FROM ${entity.name} WHERE ${ROWID} IN (${rowids.map(() => '?').join(', ')})`,
+		args: [...rowids],
+	};
 }
 
 /**

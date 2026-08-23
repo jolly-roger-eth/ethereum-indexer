@@ -189,8 +189,7 @@ describe.each(backends)('the seam behaves the same on $name', (backend) => {
 	});
 
 	it('reports its capabilities before anything is read', () => {
-		// Both keep everything today, and say so. Neither claims a window it does
-		// not enforce: no store here prunes yet.
+		// Nothing was configured, so both keep everything and say so.
 		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});
 	});
 });
@@ -218,14 +217,16 @@ describe.each(backends)('a retention setting is written the same way on $name', 
 		expect(() => backend.make({retention: {updates: 100} as never})).toThrow(/block/i);
 	});
 
-	it('accepts a window and still reports `unbounded`, because neither backend prunes', async () => {
+	it('turns a window into the same claim on both, and enforces it on both', async () => {
 		const store = backend.make({retention: {blocks: 128}, finalityDepth: 64});
 		await store.migrate();
 		await applyEventStream(store, processor, STREAM, undefined);
 
-		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});
-		// and it answers a read a 128-block window would have refused, which is the
-		// point of not claiming the window: the versions are all still there.
+		expect(store.capabilities).toEqual({retention: {kind: 'window', blocks: 128}, asOf: true});
+		// inside the window (the tip is block 102, so 100 is well inside it) both
+		// answer, and both keep answering after a prune has run.
+		expect(await store.getAsOf<{value: number}>('counter', {name: 'transfers'}, 100)).toMatchObject({value: 3});
+		expect(await store.prune()).toMatchObject({tip: 102, floor: 0, versionsDeleted: 0});
 		expect(await store.getAsOf<{value: number}>('counter', {name: 'transfers'}, 100)).toMatchObject({value: 3});
 	});
 

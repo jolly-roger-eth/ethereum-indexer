@@ -11,10 +11,12 @@
  * the report teeth are all in `retention.ts`.
  *
  * The report is bounded by what a store can actually do, never by what it was
- * asked for: the pruning that lets a store honestly claim a window is
- * `prune-versions-outside-retention-window`, so until then a store that keeps
- * everything says `unbounded` (`retentionWithoutPruning`), and none of them may
- * claim a window they do not enforce.
+ * asked for. A store may claim a window only if it ENFORCES one, and enforcing
+ * it has two halves: refusing a read outside it (`assertRetained`, which happens
+ * on every read whatever the host does) and dropping the versions it no longer
+ * covers (`StateStore.prune`, which the host schedules). A store that could do
+ * neither would have to report `unbounded`, which is what both shipped stores
+ * did until pruning existed.
  */
 
 /**
@@ -37,7 +39,11 @@ export type Retention =
 	 * is the floor every store pays anyway. Historical reads are not available.
 	 */
 	| {readonly kind: 'revert-only'}
-	/** Superseded versions are kept for `blocks` block numbers behind the tip. */
+	/**
+	 * Superseded versions are kept for `blocks` block numbers behind the tip, and
+	 * `prune` is what drops the rest (`retentionFloor` is the one boundary both
+	 * the refusal and the deletion are computed from).
+	 */
 	| {readonly kind: 'window'; readonly blocks: number}
 	/** Nothing is ever pruned: the whole history is readable. */
 	| {readonly kind: 'unbounded'};

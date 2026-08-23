@@ -6,6 +6,8 @@ import {
 	type Listing,
 	type Mutation,
 	type NormalizedEntity,
+	type PruneOptions,
+	type PruneReport,
 	type StateStore,
 	type StateStoreCapabilities,
 } from '@etherfold/state-store';
@@ -69,6 +71,10 @@ class Decorated implements StateStore {
 
 	applyBlock(block: BlockPointer, mutations?: readonly Mutation[]): Promise<void> {
 		return this.inner.applyBlock(block, mutations);
+	}
+
+	prune(options?: PruneOptions): Promise<PruneReport> {
+		return this.inner.prune(options);
 	}
 
 	getCurrent<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined> {

@@ -95,7 +95,54 @@ describe('the retention floor and the stream that reorgs against it', () => {
 			finalityDepth: 64,
 		});
 		await expect(p.load(SOURCE, {finality: 12, alwaysFetchTimestamps: true})).resolves.toBeUndefined();
-		// and the window is still not CLAIMED, because nothing prunes it yet
-		expect(p.state.capabilities.retention).toEqual({kind: 'unbounded'});
+		// and the window IS claimed, because the store enforces it: refused on read,
+		// and dropped from storage by `prune`.
+		expect(p.state.capabilities.retention).toEqual({kind: 'window', blocks: 128});
+	});
+});
+
+/**
+ * Enforcing retention against the STORAGE, from where a deployment sits.
+ *
+ * The window bounds what the state answers from the moment it is configured;
+ * this is the other half, and it is a call the deployment makes rather than
+ * something `process` does behind its back, because it costs time proportional
+ * to what it drops. It sits on the processor and not on `state` because it is a
+ * WRITE, and the view is read-only on purpose.
+ */
+describe('a deployment enforcing its window against the storage', () => {
+	it('drops the versions the window no longer covers, and keeps answering inside it', async () => {
+		const p = new VersionedStateEventProcessor<TestABI>(createTestDB(), processor, {
+			retention: {blocks: 64},
+			finalityDepth: 64,
+		});
+		await p.load(SOURCE, {finality: 64, alwaysFetchTimestamps: true});
+		await p.process(
+			[
+				transfer(1_000, '0xA', {from: '0x0', to: '0xalice', id: 1n}),
+				transfer(1_010, '0xB', {from: '0xalice', to: '0xbob', id: 1n}),
+				transfer(1_100, '0xC', {from: '0xbob', to: '0xcarol', id: 1n}),
+			],
+			lastSync({latestBlock: 1_100, lastToBlock: 1_100}),
+		);
+
+		// tip 1_100, window 64, floor 1_036: Alice's version closed at 1_010 and is
+		// unreachable by any legal read.
+		const report = await p.prune();
+
+		expect(report).toMatchObject({tip: 1_100, floor: 1_036, complete: true});
+		expect(report.versionsDeleted).toBeGreaterThan(0);
+		expect(await p.state.getAsOf('token', {id: '1'}, 1_036)).toMatchObject({owner: '0xbob'});
+		expect(await ownerOf(p, '1')).toBe('0xcarol');
+	});
+
+	it('is a no-op on the default retention, so a host may schedule it unconditionally', async () => {
+		const p = await loaded();
+		await p.process(
+			[transfer(100, '0xA', {from: '0x0', to: '0xalice', id: 1n})],
+			lastSync({latestBlock: 100, lastToBlock: 100}),
+		);
+
+		expect(await p.prune()).toMatchObject({floor: undefined, versionsDeleted: 0, complete: true});
 	});
 });

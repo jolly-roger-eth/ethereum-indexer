@@ -12,8 +12,11 @@ import {
 } from './listing.js';
 import {
 	assertRetained,
+	pruneBudget,
 	resolveRetention,
-	retentionWithoutPruning,
+	retentionFloor,
+	type PruneOptions,
+	type PruneReport,
 	type RetentionOptions,
 	type RetentionSetting,
 } from './retention.js';
@@ -24,12 +27,11 @@ export type MemoryStateStoreOptions = RetentionOptions & {
 	/**
 	 * What the deployment asks this store to keep. Defaults to `unbounded`.
 	 *
-	 * A window is accepted and VALIDATED (a window below the finality depth is
-	 * refused here, at construction, rather than at the first read it would have
-	 * answered wrongly), but it is not what gets reported: this store prunes
-	 * nothing, so it keeps everything and says so. `revert-only` IS honoured,
-	 * because refusing every historical read needs no pruning, and it is how the
-	 * refusal a patch-log backend will produce is exercised today.
+	 * Validated at construction rather than at the first read it would have
+	 * answered wrongly: a window below the finality depth is refused here, naming
+	 * both numbers. What is set is what gets REPORTED, because this store enforces
+	 * it on both halves -- a read outside the window is refused, and `prune` drops
+	 * the versions the window no longer covers.
 	 */
 	readonly retention?: RetentionSetting;
 };
@@ -61,9 +63,9 @@ type Row = {entity: string; id: readonly string[]; versions: Version[]};
  * implementation would be worse than none: it would let a caller bug through in
  * a test and surface it in production.
  *
- * What it is NOT: bounded. It keeps every version for as long as the process
- * lives, which is why it reports `unbounded` honestly and why it is unsuitable
- * as a browser backend (`indexeddb-row-backend-browser-default` is that).
+ * What it is NOT: durable, or a browser backend. It holds every retained version
+ * in memory for as long as the process lives and goes with the process;
+ * `indexeddb-row-backend-browser-default` is the browser answer.
  */
 export class MemoryStateStore implements StateStore {
 	private readonly entities: ReadonlyMap<string, NormalizedEntity>;
@@ -72,6 +74,7 @@ export class MemoryStateStore implements StateStore {
 	private readonly blocks = new Map<number, BlockPointer>();
 	private readonly hashes = new Map<string, number>();
 	private readonly provided: Retention;
+	private readonly finalityDepth: number | undefined;
 	private tip: number | undefined;
 
 	constructor(declarations: Iterable<EntityDeclaration>, options: MemoryStateStoreOptions = {}) {
@@ -79,7 +82,8 @@ export class MemoryStateStore implements StateStore {
 		// resolved at CONSTRUCTION: a retention below the finality floor is a
 		// configuration error, and it should land where it was configured rather
 		// than on the first read that would have been served wrongly.
-		this.provided = retentionWithoutPruning(resolveRetention(options.retention, options));
+		this.provided = resolveRetention(options.retention, options);
+		this.finalityDepth = options.finalityDepth;
 	}
 
 	get declarations(): ReadonlyMap<string, NormalizedEntity> {
@@ -87,13 +91,12 @@ export class MemoryStateStore implements StateStore {
 	}
 
 	/**
-	 * Everything, forever, and it answers history: the honest report for a store
-	 * that never prunes.
+	 * What was configured, because this store enforces all of it.
 	 *
-	 * A deployment that asks for a `revert-only` store gets that report instead,
-	 * and every as-of read refused with it. A deployment that asks for a WINDOW
-	 * still gets `unbounded` here, because this store keeps everything whatever it
-	 * was asked, and the report says what is true rather than what was wanted.
+	 * `unbounded` by default (keep everything, answer at any depth). A window is
+	 * reported as a window: reads outside it are refused by `getAsOf` / `listAsOf`
+	 * at all times, and `prune` drops the versions it no longer covers.
+	 * `revert-only` refuses every historical read while `revertTo` keeps working.
 	 */
 	get capabilities(): StateStoreCapabilities {
 		return {retention: this.provided, asOf: this.provided.kind !== 'revert-only'};
@@ -227,6 +230,47 @@ export class MemoryStateStore implements StateStore {
 		for (const number of this.blocks.keys()) {
 			if (this.tip === undefined || number > this.tip) this.tip = number;
 		}
+	}
+
+	/**
+	 * Drop the versions the retention floor puts out of reach, oldest first.
+	 *
+	 * The predicate is the seam's (`retentionFloor`) and the whole of it is
+	 * `upper !== null && upper <= floor`: a version with NO upper bound is the LIVE
+	 * one and is the current state however old it is, which is the case a prune
+	 * written as "drop what is older than the floor" destroys. On the real measured
+	 * stream that is not an edge case: event-bearing blocks are median 429 apart
+	 * and the state contains rows written once and never revisited.
+	 *
+	 * Oldest first matters when a budget stops the pass: what survives a partial
+	 * prune is then the newest of the unreachable versions, so the store converges
+	 * towards the window from the far end rather than leaving arbitrary holes. The
+	 * SQL backend orders by the same column for the same reason.
+	 */
+	async prune(options: PruneOptions = {}): Promise<PruneReport> {
+		const tip = this.tip;
+		const floor = tip === undefined ? undefined : retentionFloor(this.provided, tip, this.finalityDepth);
+		const budget = pruneBudget(options);
+		if (floor === undefined) return {tip, floor: undefined, versionsDeleted: 0, complete: true};
+
+		const unreachable: Version[] = [];
+		for (const row of this.rows.values()) {
+			for (const version of row.versions) {
+				if (version.upper !== null && version.upper <= floor) unreachable.push(version);
+			}
+		}
+		unreachable.sort((a, b) => (a.upper as number) - (b.upper as number));
+
+		const doomed = new Set(unreachable.slice(0, budget === Number.POSITIVE_INFINITY ? undefined : budget));
+		if (doomed.size > 0) {
+			for (const [key, row] of this.rows) {
+				if (!row.versions.some((version) => doomed.has(version))) continue;
+				row.versions = row.versions.filter((version) => !doomed.has(version));
+				if (row.versions.length === 0) this.rows.delete(key);
+			}
+		}
+
+		return {tip, floor, versionsDeleted: doomed.size, complete: doomed.size === unreachable.length};
 	}
 
 	/**

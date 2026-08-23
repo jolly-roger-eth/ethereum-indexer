@@ -5,16 +5,31 @@ const logger = logs('@etherfold/state-store-sqlite');
 
 /**
  * Backends that are reached over the network cap how much one request may carry:
- * a number of statements, and a payload size. Those caps differ per backend and
- * per plan, so they are configuration here, never constants: this package
- * targets the `remote-sql` interface, and a hosted backend is one backend among
- * several rather than the thing being built for.
+ * a number of statements, a payload size, and how much one statement may touch.
+ * Those caps differ per backend and per plan, so they are configuration here,
+ * never constants: this package targets the `remote-sql` interface, and a hosted
+ * backend is one backend among several rather than the thing being built for.
  */
 export type BatchBounds = {
 	/** Maximum statements in one `batch([...])`. */
 	maxStatementsPerBatch: number;
 	/** Approximate maximum payload of one `batch([...])`, in bytes. */
 	maxBytesPerBatch: number;
+	/**
+	 * Maximum rows ONE statement may name, which is what keeps `prune` runnable.
+	 *
+	 * The other two bounds are about a batch and say nothing about a single
+	 * statement that touches an unbounded number of rows: `DELETE FROM t WHERE
+	 * _upper <= ?` is one statement of eighty bytes that can delete a hundred
+	 * thousand rows, and a hosted backend caps rows written and wall-clock per
+	 * request, so that statement is exactly the shape that runs locally and is
+	 * rejected in production. A prune therefore deletes by an explicit, bounded
+	 * list of row ids, and this is the bound.
+	 *
+	 * It is also a bound on BOUND PARAMETERS, since each row id is one, so it must
+	 * stay under the engine's variable limit (999 on a stock SQLite build).
+	 */
+	maxRowsPerStatement: number;
 };
 
 /**
@@ -26,6 +41,7 @@ export type BatchBounds = {
 export const DEFAULT_BATCH_BOUNDS: BatchBounds = {
 	maxStatementsPerBatch: 100,
 	maxBytesPerBatch: 90_000,
+	maxRowsPerStatement: 500,
 };
 
 /** Rough payload cost of a statement: enough to stay under a size cap. */

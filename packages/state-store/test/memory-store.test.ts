@@ -74,3 +74,66 @@ describe('capabilities are data, readable before any read is attempted', () => {
 		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});
 	});
 });
+
+describe('pruning, in the reference implementation', () => {
+	async function windowed(blocks: number) {
+		const store = new MemoryStateStore([TOKEN, ACCOUNT], {retention: {blocks}, finalityDepth: 64});
+		await store.migrate();
+		return store;
+	}
+
+	it('keeps the LIVE version of an entity written once and never touched again', async () => {
+		const store = await windowed(128);
+		// the dangerous case, and the normal one: the real stream's event-bearing
+		// blocks are median 429 apart and its state has rows written once and never
+		// revisited, so a prune that deletes by AGE destroys the current state.
+		await store.applyBlock(block(12_082_307), [owns('ancient', '0xalice', 1)]);
+		await store.applyBlock(block(13_000_000), [owns('busy', '0xbob', 1)]);
+
+		expect(await store.prune()).toMatchObject({versionsDeleted: 0, floor: 12_999_872});
+		expect(await store.getCurrent('token', {id: 'ancient'})).toMatchObject({owner: '0xalice'});
+	});
+
+	it('drops the versions the window no longer covers, and counts them', async () => {
+		const store = await windowed(64);
+		await store.applyBlock(block(1_000), [owns('1', '0xalice', 1)]);
+		await store.applyBlock(block(1_010), [owns('1', '0xbob', 2)]);
+		await store.applyBlock(block(1_100), [owns('1', '0xcarol', 3)]);
+
+		// floor 1_036: Alice's version closed at 1_010 is unreachable, Bob's (closed
+		// at 1_100) is the answer across the whole window.
+		expect(await store.prune()).toMatchObject({tip: 1_100, floor: 1_036, versionsDeleted: 1, complete: true});
+		expect(await store.getAsOf('token', {id: '1'}, 1_036)).toMatchObject({owner: '0xbob'});
+	});
+
+	it('stops at a budget and says the pass is not finished', async () => {
+		const store = await windowed(64);
+		for (let number = 1_000; number <= 1_005; number++) {
+			await store.applyBlock(block(number), [owns('1', `0x${number}`, number)]);
+		}
+		await store.applyBlock(block(1_100), [owns('2', '0xother', 1)]);
+
+		expect(await store.prune({maxVersions: 2})).toMatchObject({versionsDeleted: 2, complete: false});
+		expect(await store.prune()).toMatchObject({versionsDeleted: 3, complete: true});
+		expect(await store.prune()).toMatchObject({versionsDeleted: 0, complete: true});
+	});
+
+	it('is a no-op on an unbounded store rather than an error', async () => {
+		const store = await migrated();
+		await store.applyBlock(block(10), [owns('1', '0xalice', 1)]);
+		await store.applyBlock(block(1_000_000), [owns('1', '0xbob', 2)]);
+
+		expect(await store.prune()).toMatchObject({floor: undefined, versionsDeleted: 0, complete: true});
+		expect(await store.getAsOf('token', {id: '1'}, 10)).toMatchObject({owner: '0xalice'});
+	});
+
+	it('drops the last trace of an entity deleted long ago', async () => {
+		const store = await windowed(64);
+		await store.applyBlock(block(1_000), [owns('1', '0xalice', 1)]);
+		await store.applyBlock(block(1_001), [{type: 'delete', entity: 'token', id: {id: '1'}}]);
+		await store.applyBlock(block(1_100), [owns('2', '0xother', 1)]);
+
+		expect((await store.prune()).versionsDeleted).toBe(1);
+		expect(await store.getCurrent('token', {id: '1'})).toBeUndefined();
+	});
+});

@@ -13,17 +13,20 @@ import {
 	boundedListing,
 	mustGet,
 	normalizeEntities,
+	pruneBudget,
 	resolveRetention,
-	retentionWithoutPruning,
+	retentionFloor,
 	type EntityIdPrefix,
 	type Listing,
+	type PruneOptions,
+	type PruneReport,
 	type Retention,
 	type RetentionOptions,
 	type RetentionSetting,
 	type StateStore,
 	type StateStoreCapabilities,
 } from '@etherfold/state-store';
-import {migrationStatements} from './ddl.js';
+import {ROWID, migrationStatements} from './ddl.js';
 import {
 	AS_OF_PREDICATE,
 	CURRENT_PREDICATE,
@@ -31,11 +34,13 @@ import {
 	blockAtOrBeforeStatement,
 	blockByHashStatement,
 	blockByNumberStatement,
+	dropVersionsStatement,
 	idPredicate,
 	idValues,
 	latestBlockStatement,
 	listAsOfStatement,
 	listCurrentStatement,
+	prunableVersionsStatement,
 	revertToStatements,
 } from './statements.js';
 import type {
@@ -55,12 +60,15 @@ export type VersionedStateStoreOptions = RetentionOptions & {
 	bounds?: Partial<BatchBounds>;
 	/**
 	 * How far back this deployment wants superseded versions kept, in BLOCK
-	 * NUMBERS. Defaults to `unbounded`, which is what this store does today.
+	 * NUMBERS. Defaults to `unbounded`.
 	 *
-	 * A window is validated here (below the finality depth it is refused, naming
-	 * both numbers) and then NOT claimed, because this package has no pruning:
-	 * see `capabilities`. `revert-only` is honoured in full, since refusing every
-	 * historical read needs no pruning at all.
+	 * Validated here: a window below the finality depth is refused naming both
+	 * numbers. Whatever is set is also what gets REPORTED, because both halves of
+	 * it are enforced: a read outside the window is refused on every read, and
+	 * `prune` drops the versions the window no longer covers. Pruning is an
+	 * explicit call the HOST schedules, so a deployment that sets a window and
+	 * never prunes gets a store bounded in what it answers and unbounded in what
+	 * it holds; see `prune`.
 	 */
 	retention?: RetentionSetting;
 };
@@ -105,6 +113,7 @@ export class VersionedStateStore implements StateStore {
 	private readonly entities: ReadonlyMap<string, NormalizedEntity>;
 	private readonly bounds: BatchBounds;
 	private readonly provided: Retention;
+	private readonly finalityDepth: number | undefined;
 
 	constructor(
 		private readonly db: RemoteSQL,
@@ -116,15 +125,10 @@ export class VersionedStateStore implements StateStore {
 		// Resolved at CONSTRUCTION, before `migrate` and before any read: a window
 		// below the finality depth is a configuration error, and it belongs where it
 		// was configured rather than on the first read it would have answered wrongly.
-		const requested = resolveRetention(options.retention, options);
-		this.provided = retentionWithoutPruning(requested);
-		if (requested.kind === 'window') {
-			logger.warn(
-				`retention was set to a window of ${requested.blocks} blocks, and this store has no pruning: it keeps every ` +
-					`version and reports \`unbounded\`. Reads are unaffected (nothing is missing); storage is NOT bounded by ` +
-					`that window.`,
-			);
-		}
+		this.provided = resolveRetention(options.retention, options);
+		// kept beside the retention because it is `revert-only`'s prune floor: that
+		// kind means "as long as reorg revert needs", and the depth is how long.
+		this.finalityDepth = options.finalityDepth;
 	}
 
 	/** The declared entities, after validation. */
@@ -136,17 +140,18 @@ export class VersionedStateStore implements StateStore {
 	 * What this store keeps, and what it can answer, as data a caller reads at
 	 * startup rather than inferring from a wrong answer later.
 	 *
-	 * `unbounded` is the HONEST report, not an aspiration: this package has no
-	 * pruning at all, so every version ever written is still here whatever a
-	 * deployment set. A window is therefore accepted, validated, and then NOT
-	 * claimed (it is reported as `unbounded`, with a warning), because a store
-	 * that claimed a window it cannot enforce would be making exactly the claim
-	 * this report exists to prevent. `prune-versions-outside-retention-window` is
-	 * what earns the right to report a window.
+	 * It reports what was CONFIGURED, because this store enforces all three kinds.
+	 * `unbounded` (the default) keeps everything and answers at any depth. A
+	 * WINDOW is refused outside on every as-of read here and on every as-of read
+	 * this backend adds of its own (`queryAsOf`, and the hash and timestamp
+	 * address axes), and `prune` drops the versions it no longer covers.
+	 * `revert-only` refuses every historical read while `revertTo` keeps working.
 	 *
-	 * `revert-only` IS reported when it is set, because it is enforceable with no
-	 * pruning: every as-of read is refused (`getAsOf`, `queryAsOf`) while
-	 * `revertTo` keeps working.
+	 * The report is about what a caller may RELY on, never about bytes on disk,
+	 * and the two are allowed to differ in the SAFE direction: a store whose host
+	 * has not pruned yet still holds versions it refuses to read, exactly as a
+	 * `revert-only` store holds the whole history it will not answer about. What
+	 * the report may never do is promise history that is gone.
 	 */
 	get capabilities(): StateStoreCapabilities {
 		return {retention: this.provided, asOf: this.provided.kind !== 'revert-only'};
@@ -231,6 +236,87 @@ export class VersionedStateStore implements StateStore {
 		// one batch: a partially reverted store would violate the one-live-version
 		// invariant while it lasted.
 		await this.db.batch(this.prepare(statements));
+	}
+
+	/**
+	 * Delete the versions this store's retention no longer covers.
+	 *
+	 * ## When it runs, which is a decision and not a default
+	 *
+	 * It runs when the HOST calls it, and nowhere else. It is deliberately not
+	 * folded into `applyBlock`: a prune plus `VACUUM` measured 1.1 seconds at
+	 * 62,553 versions (`work/notes/findings/sqlite-in-the-browser.md`) while a
+	 * block on the same stream carries a median of 7 mutations, so a prune in the
+	 * write path would stall whichever block happened to cross a threshold by a
+	 * second, for work that block did not cause. An amortised policy is
+	 * `prune({maxVersions: n})` on a schedule the host owns; a background policy is
+	 * this call on a timer. Both are built on this verb; neither is guessed here.
+	 *
+	 * ## What it is bounded by, per request
+	 *
+	 * One statement never names more than `bounds.maxRowsPerStatement` row ids, so
+	 * a prune of a hundred thousand versions is a sequence of ordinary small
+	 * requests rather than one statement a hosted backend rejects. The row ids are
+	 * SELECTed first rather than deleted blind by predicate, because `remote-sql`
+	 * reports rows and not an affected-row count: selecting is what makes the
+	 * report a fact and what tells the loop it has finished.
+	 *
+	 * ## What it never touches
+	 *
+	 * The LIVE version of every entity, however old (`prunableVersionsStatement`),
+	 * and the block table. A block row is 3 columns and is how an address resolves;
+	 * dropping it would turn `BlockNotRetainedError` ("that block is fine, its
+	 * state is outside what I keep") into `NoSuchBlockError` ("never indexed, or
+	 * reorged out"), which is a worse answer and, for a consumer that pinned the
+	 * hash, a wrong one.
+	 *
+	 * It does not `VACUUM` either. `VACUUM` cannot run inside a transaction, which
+	 * is the only thing `remote-sql` exposes for writes, it rewrites the whole file,
+	 * and it is not available on every backend behind that interface. Without it
+	 * SQLite keeps the freed pages on its freelist and REUSES them, so the file
+	 * stops growing even though it does not shrink; an operator who wants the space
+	 * back runs `VACUUM` on the database itself, at a moment of their choosing.
+	 */
+	async prune(options: PruneOptions = {}): Promise<PruneReport> {
+		const budget = pruneBudget(options);
+		const tip = await this.tipBlockNumber();
+		const floor = tip === undefined ? undefined : retentionFloor(this.provided, tip, this.finalityDepth);
+		if (floor === undefined) return {tip, floor: undefined, versionsDeleted: 0, complete: true};
+
+		let versionsDeleted = 0;
+		for (const entity of this.entities.values()) {
+			while (versionsDeleted < budget) {
+				const limit = Math.min(this.bounds.maxRowsPerStatement, budget - versionsDeleted);
+				// keyed off ROWID rather than a literal: the column name is `ddl.ts`'s to
+				// choose, and renaming it must not silently produce a list of undefineds.
+				const found = await this.select<Record<typeof ROWID, number>>(prunableVersionsStatement(entity, floor, limit));
+				if (found.length === 0) break;
+				await this.db.batch(
+					this.prepare([
+						dropVersionsStatement(
+							entity,
+							found.map((row) => row[ROWID]),
+						),
+					]),
+				);
+				versionsDeleted += found.length;
+			}
+		}
+
+		// Without a budget every table was drained, so the pass is complete by
+		// construction. With one, "is there more" is a question only the database can
+		// answer, and one bounded probe is cheaper than making the caller guess.
+		const complete = versionsDeleted < budget || !(await this.hasPrunableVersions(floor));
+		logger.info(`pruned ${versionsDeleted} versions closed at or below block ${floor} (tip ${tip})`);
+		return {tip, floor, versionsDeleted, complete};
+	}
+
+	/** Whether any version is still unreachable at `floor`: one indexed probe per table. */
+	private async hasPrunableVersions(floor: number): Promise<boolean> {
+		for (const entity of this.entities.values()) {
+			if ((await this.select(prunableVersionsStatement(entity, floor, 1))).length > 0) return true;
+		}
+		return false;
 	}
 
 	// -- block addressing ----------------------------------------------------
