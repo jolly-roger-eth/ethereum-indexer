@@ -18,7 +18,21 @@ export type {
 	FieldType,
 	Mutation,
 	NormalizedEntity,
+	RetainedRange,
+	Retention,
+	RetentionSetting,
+	StateStoreCapabilities,
 } from '@etherfold/state-store';
+
+/**
+ * The refusal this store's as-of reads throw when the block is fine and the
+ * history is not, re-exported for the same reason `NoSuchBlockError` is defined
+ * here: a caller catching what these reads throw should not need a second
+ * package to name it. The class itself lives at the seam because every backend
+ * throws it, and two classes of one name would break `instanceof` across the
+ * boundary.
+ */
+export {BlockNotRetainedError, BlockUnavailableError} from '@etherfold/state-store';
 
 import type {FieldType} from '@etherfold/state-store';
 

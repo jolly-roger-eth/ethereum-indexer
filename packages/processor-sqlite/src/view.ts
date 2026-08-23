@@ -3,6 +3,7 @@ import type {
 	EntityId,
 	QueryOptions,
 	RecordedBlock,
+	StateStoreCapabilities,
 	VersionedStateStore,
 } from '@etherfold/state-store-sqlite';
 
@@ -37,13 +38,27 @@ export class VersionedStateView {
 	constructor(private readonly store: VersionedStateStore) {}
 
 	/**
+	 * What history this state can answer about, readable before anything is asked
+	 * of it.
+	 *
+	 * This is the point of the report being on the read handle: a consumer that
+	 * needs as-of reads discovers at startup whether they are available, instead
+	 * of discovering it from a refusal in production or, worse, from a plausible
+	 * wrong number.
+	 */
+	get capabilities(): StateStoreCapabilities {
+		return this.store.capabilities;
+	}
+
+	/**
 	 * One entity as of a block hash, a height, or a timestamp.
 	 *
 	 * `undefined` means the block is known and the entity was absent from it. An
 	 * address identifying no block throws `NoSuchBlockError` instead (ADR-0015):
 	 * a hash that no longer resolves is the signal that a consumer's pinned block
 	 * was reorged out, and it must not arrive wearing "entity absent" as a
-	 * disguise.
+	 * disguise. A block outside the retention this view reports throws
+	 * `BlockNotRetainedError`, the other member of that family.
 	 */
 	getAsOf<T = Record<string, unknown>>(entity: string, id: EntityId, at: BlockAddress): Promise<T | undefined> {
 		return this.store.getAsOf<T>(entity, id, at);

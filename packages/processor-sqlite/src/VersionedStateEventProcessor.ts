@@ -1,4 +1,4 @@
-import {VersionedStateStore} from '@etherfold/state-store-sqlite';
+import {VersionedStateStore, type VersionedStateStoreOptions} from '@etherfold/state-store-sqlite';
 import {applyEventStream, type EntityProcessor} from '@etherfold/processor-entities';
 import {
 	assertProcessorVersion,
@@ -24,7 +24,18 @@ export {forkPoint, groupByBlock} from '@etherfold/processor-entities';
 
 const logger = logs('@etherfold/processor-sqlite');
 
-export type VersionedStateProcessorOptions = Record<string, never>;
+/**
+ * What a deployment chooses about WHERE the state is kept, as opposed to what
+ * the processor computes.
+ *
+ * Retention is the whole of it today, and it is passed straight through to the
+ * store, which validates it at construction (a window below the finality depth
+ * is refused there, naming both numbers). `finalityDepth` is checked a second
+ * time at `load`, against the finality the stream actually runs with; see the
+ * note there for why one number configured in two places has to be reconciled
+ * rather than trusted.
+ */
+export type VersionedStateProcessorOptions = Pick<VersionedStateStoreOptions, 'retention' | 'finalityDepth'>;
 
 /**
  * An `EventProcessor` whose derived state is versioned rows in a SQL store
@@ -62,12 +73,16 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 	constructor(
 		private readonly db: RemoteSQL,
 		private readonly processor: EntityProcessor<ABI, ProcessorConfig>,
+		private readonly options: VersionedStateProcessorOptions = {},
 	) {
 		// Refused at construction, not at load: a version-less processor's hash is a
 		// constant, and a constant invalidates nothing, ever.
 		assertProcessorVersion(processor, 'VersionedStateEventProcessor');
 		this.version = processor.version;
-		this.store = new VersionedStateStore(db, processor.entities);
+		// The retention setting is validated here too, by the store, and for the same
+		// reason: a floor violation is a configuration error and belongs where it was
+		// configured, not on the first read it would have answered wrongly.
+		this.store = new VersionedStateStore(db, processor.entities, options);
 		this.view = new VersionedStateView(this.store);
 	}
 
@@ -120,6 +135,7 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 	): Promise<{state: VersionedStateView; lastSync: LastSync<ABI>} | undefined> {
 		this.source = source;
 		this.finality = streamConfig.finality;
+		this.assertRetentionCoversReorgs(streamConfig.finality);
 
 		// No gate here on purpose. Every node implementing execution-apis#639 puts
 		// `blockTimestamp` on the log itself, so requiring `alwaysFetchTimestamps`
@@ -201,6 +217,32 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 
 	// -- internals -----------------------------------------------------------
 
+	/**
+	 * Reconcile the two places the finality depth is stated.
+	 *
+	 * A retention window is validated at construction against the depth the
+	 * DEPLOYMENT declared, because that is the only number available before a
+	 * stream exists. The number that decides how deep a reorg can actually reach
+	 * is the stream's, and it arrives here. If the declared floor is shallower
+	 * than the stream's finality, the window was validated against the wrong
+	 * number: a reorg could reach past the versions retention promised to keep,
+	 * and nothing would say so until a deep reorg found out.
+	 *
+	 * Raised rather than warned, and only ever for a deployment that opted into
+	 * retention: the default (`unbounded`) states no floor and cannot disagree
+	 * with one.
+	 */
+	private assertRetentionCoversReorgs(streamFinality: number): void {
+		const declared = this.options.finalityDepth;
+		if (declared === undefined || declared >= streamFinality) return;
+		throw new Error(
+			`retention was configured against a finality depth of ${declared}, but this stream runs with a finality of ` +
+				`${streamFinality}: a reorg can reach ${streamFinality} blocks back, deeper than the floor the retention ` +
+				`window was checked against. Set the processor's finalityDepth to ${streamFinality} or more (and the ` +
+				`retention window at or above it).`,
+		);
+	}
+
 	private async ensureMigrated(): Promise<void> {
 		if (this.migrated) return;
 		await this.store.migrate();
@@ -212,10 +254,12 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 /** Mirrors `fromJSProcessor`: a factory, so each indexer gets its own instance. */
 export function fromSQLProcessor<ABI extends Abi, ProcessorConfig = undefined>(
 	processor: EntityProcessor<ABI, ProcessorConfig> | (() => EntityProcessor<ABI, ProcessorConfig>),
+	options: VersionedStateProcessorOptions = {},
 ): (db: RemoteSQL) => VersionedStateEventProcessor<ABI, ProcessorConfig> {
 	return (db) =>
 		new VersionedStateEventProcessor<ABI, ProcessorConfig>(
 			db,
 			typeof processor === 'function' ? processor() : processor,
+			options,
 		);
 }

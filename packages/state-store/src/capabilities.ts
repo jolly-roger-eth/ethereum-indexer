@@ -6,13 +6,15 @@
  * read silently served from the tip is a plausible number that nothing
  * downstream can tell apart from a true one.
  *
- * This module lands the SHAPE. The refusal that gives it teeth (an out-of-window
- * read throwing a typed error of the `NoSuchBlockError` family rather than
- * answering), the deployment setting, and the finality-depth floor all belong to
- * `retention-capability-and-refusal`; the pruning that lets a store honestly
- * claim a window belongs to `prune-versions-outside-retention-window`. Until
- * then a store that keeps everything says so, and none of them may claim a
- * window they do not enforce.
+ * This module is what a store REPORTS. What a deployment SETS, how it is
+ * validated against the finality-depth floor, and the typed refusal that gives
+ * the report teeth are all in `retention.ts`.
+ *
+ * The report is bounded by what a store can actually do, never by what it was
+ * asked for: the pruning that lets a store honestly claim a window is
+ * `prune-versions-outside-retention-window`, so until then a store that keeps
+ * everything says `unbounded` (`retentionWithoutPruning`), and none of them may
+ * claim a window they do not enforce.
  */
 
 /**
@@ -28,6 +30,8 @@
  * tip.
  */
 export type Retention =
+	// (what a deployment writes is `RetentionSetting` in `retention.ts`; this is
+	// the resolved report shape)
 	/**
 	 * Superseded versions survive only as long as reorg revert needs them, which
 	 * is the floor every store pays anyway. Historical reads are not available.

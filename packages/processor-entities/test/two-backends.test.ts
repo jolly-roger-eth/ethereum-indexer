@@ -1,5 +1,11 @@
 import {createClient} from '@libsql/client';
-import {MemoryStateStore, type StateStore} from '@etherfold/state-store';
+import {
+	BlockNotRetainedError,
+	MemoryStateStore,
+	type RetentionOptions,
+	type RetentionSetting,
+	type StateStore,
+} from '@etherfold/state-store';
 import {VersionedStateStore} from '@etherfold/state-store-sqlite';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import {beforeEach, describe, expect, it} from 'vitest';
@@ -21,13 +27,17 @@ import {processor, transfer, type TestABI} from './utils/fixtures.js';
  * backend.
  */
 
-type Backend = {name: string; make(): StateStore};
+/** What a deployment sets about the store, in the one spelling both backends take. */
+type StoreOptions = RetentionOptions & {retention?: RetentionSetting};
+
+type Backend = {name: string; make(options?: StoreOptions): StateStore};
 
 const backends: Backend[] = [
-	{name: 'memory', make: () => new MemoryStateStore(processor.entities)},
+	{name: 'memory', make: (options) => new MemoryStateStore(processor.entities, options)},
 	{
 		name: 'sqlite',
-		make: () => new VersionedStateStore(new RemoteLibSQL(createClient({url: ':memory:'})), processor.entities),
+		make: (options) =>
+			new VersionedStateStore(new RemoteLibSQL(createClient({url: ':memory:'})), processor.entities, options),
 	},
 ];
 
@@ -188,5 +198,52 @@ describe.each(backends)('the seam behaves the same on $name', (backend) => {
 		// Both keep everything today, and say so. Neither claims a window it does
 		// not enforce: no store here prunes yet.
 		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});
+	});
+});
+
+/**
+ * The capability cases: what a store CLAIMS, tested against what it DOES.
+ *
+ * They live here, next to the two-backend run, because that is what makes them
+ * worth writing: a claim that means one thing on SQLite and another on a Map is
+ * not a capability report, it is a per-backend README. `state-store-conformance-suite`
+ * absorbs these into the shared suite it exports; until then this is where they
+ * run against both.
+ */
+describe.each(backends)('the capability report means the same thing on $name', (backend) => {
+	it('rejects a window below the finality depth where it is CONFIGURED', () => {
+		// not at the first read it would have answered wrongly: both numbers are
+		// known at construction, so that is where the two are compared.
+		expect(() => backend.make({retention: {blocks: 32}, finalityDepth: 64})).toThrow(/finality/i);
+	});
+
+	it('refuses a retention that is not a distance in block numbers', () => {
+		expect(() => backend.make({retention: {seconds: 3_600} as never})).toThrow(/block/i);
+		expect(() => backend.make({retention: {updates: 100} as never})).toThrow(/block/i);
+	});
+
+	it('accepts a window and still reports `unbounded`, because neither backend prunes', async () => {
+		const store = backend.make({retention: {blocks: 128}, finalityDepth: 64});
+		await store.migrate();
+		await applyEventStream(store, processor, STREAM, undefined);
+
+		expect(store.capabilities).toEqual({retention: {kind: 'unbounded'}, asOf: true});
+		// and it answers a read a 128-block window would have refused, which is the
+		// point of not claiming the window: the versions are all still there.
+		expect(await store.getAsOf<{value: number}>('counter', {name: 'transfers'}, 100)).toMatchObject({value: 3});
+	});
+
+	it('refuses every historical read when it declares `revert-only`', async () => {
+		const store = backend.make({retention: 'revert-only'});
+		await store.migrate();
+		await applyEventStream(store, processor, STREAM, undefined);
+
+		expect(store.capabilities).toEqual({retention: {kind: 'revert-only'}, asOf: false});
+		await expect(store.getAsOf('counter', {name: 'transfers'}, 100)).rejects.toBeInstanceOf(BlockNotRetainedError);
+		await expect(store.getAsOf('counter', {name: 'transfers'}, 102)).rejects.toBeInstanceOf(BlockNotRetainedError);
+		// the tip is not a historical read, and revert is the capability it kept
+		expect(await store.getCurrent<{value: number}>('counter', {name: 'transfers'})).toMatchObject({value: 5});
+		await store.revertTo(101);
+		expect(await store.getCurrent<{value: number}>('counter', {name: 'transfers'})).toMatchObject({value: 4});
 	});
 });

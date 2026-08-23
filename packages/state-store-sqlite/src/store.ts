@@ -8,7 +8,18 @@ import {
 	type ParsedBlockAddress,
 	type RecordedBlock,
 } from './blocks.js';
-import {mustGet, normalizeEntities, type StateStore, type StateStoreCapabilities} from '@etherfold/state-store';
+import {
+	assertRetained,
+	mustGet,
+	normalizeEntities,
+	resolveRetention,
+	retentionWithoutPruning,
+	type Retention,
+	type RetentionOptions,
+	type RetentionSetting,
+	type StateStore,
+	type StateStoreCapabilities,
+} from '@etherfold/state-store';
 import {migrationStatements} from './ddl.js';
 import {
 	AS_OF_PREDICATE,
@@ -19,6 +30,7 @@ import {
 	blockByNumberStatement,
 	idPredicate,
 	idValues,
+	latestBlockStatement,
 	revertToStatements,
 } from './statements.js';
 import type {
@@ -33,9 +45,19 @@ import type {
 
 const logger = logs('@etherfold/state-store-sqlite');
 
-export type VersionedStateStoreOptions = {
+export type VersionedStateStoreOptions = RetentionOptions & {
 	/** Per-request limits of the backend. See `DEFAULT_BATCH_BOUNDS`. */
 	bounds?: Partial<BatchBounds>;
+	/**
+	 * How far back this deployment wants superseded versions kept, in BLOCK
+	 * NUMBERS. Defaults to `unbounded`, which is what this store does today.
+	 *
+	 * A window is validated here (below the finality depth it is refused, naming
+	 * both numbers) and then NOT claimed, because this package has no pruning:
+	 * see `capabilities`. `revert-only` is honoured in full, since refusing every
+	 * historical read needs no pruning at all.
+	 */
+	retention?: RetentionSetting;
 };
 
 /** Options for a query over a whole entity table. */
@@ -77,6 +99,7 @@ export type QueryOptions = {
 export class VersionedStateStore implements StateStore {
 	private readonly entities: ReadonlyMap<string, NormalizedEntity>;
 	private readonly bounds: BatchBounds;
+	private readonly provided: Retention;
 
 	constructor(
 		private readonly db: RemoteSQL,
@@ -85,6 +108,18 @@ export class VersionedStateStore implements StateStore {
 	) {
 		this.entities = normalizeEntities(declarations);
 		this.bounds = {...DEFAULT_BATCH_BOUNDS, ...options.bounds};
+		// Resolved at CONSTRUCTION, before `migrate` and before any read: a window
+		// below the finality depth is a configuration error, and it belongs where it
+		// was configured rather than on the first read it would have answered wrongly.
+		const requested = resolveRetention(options.retention, options);
+		this.provided = retentionWithoutPruning(requested);
+		if (requested.kind === 'window') {
+			logger.warn(
+				`retention was set to a window of ${requested.blocks} blocks, and this store has no pruning: it keeps every ` +
+					`version and reports \`unbounded\`. Reads are unaffected (nothing is missing); storage is NOT bounded by ` +
+					`that window.`,
+			);
+		}
 	}
 
 	/** The declared entities, after validation. */
@@ -98,15 +133,18 @@ export class VersionedStateStore implements StateStore {
 	 *
 	 * `unbounded` is the HONEST report, not an aspiration: this package has no
 	 * pruning at all, so every version ever written is still here whatever a
-	 * deployment might wish. It deliberately takes no retention option, because a
-	 * store that accepted a window it cannot enforce would be making exactly the
-	 * claim this report exists to prevent. `prune-versions-outside-retention-window`
-	 * is what earns the right to report a window, and
-	 * `retention-capability-and-refusal` is what makes the report load-bearing by
-	 * refusing an out-of-window read.
+	 * deployment set. A window is therefore accepted, validated, and then NOT
+	 * claimed (it is reported as `unbounded`, with a warning), because a store
+	 * that claimed a window it cannot enforce would be making exactly the claim
+	 * this report exists to prevent. `prune-versions-outside-retention-window` is
+	 * what earns the right to report a window.
+	 *
+	 * `revert-only` IS reported when it is set, because it is enforceable with no
+	 * pruning: every as-of read is refused (`getAsOf`, `queryAsOf`) while
+	 * `revertTo` keeps working.
 	 */
 	get capabilities(): StateStoreCapabilities {
-		return {retention: {kind: 'unbounded'}, asOf: true};
+		return {retention: this.provided, asOf: this.provided.kind !== 'revert-only'};
 	}
 
 	/**
@@ -228,6 +266,23 @@ export class VersionedStateStore implements StateStore {
 		return this.lookupBlock(parseBlockAddress(address));
 	}
 
+	/**
+	 * The highest recorded block, or `undefined` before the first one is applied.
+	 *
+	 * This is the TIP a retention window is measured back from, and it is read
+	 * ONLY when a window is claimed: `assertRetained` takes it as a thunk, so an
+	 * `unbounded` store (which refuses nothing) and a `revert-only` store (which
+	 * refuses everything) never pay the round-trip.
+	 */
+	private async tipBlockNumber(): Promise<number | undefined> {
+		const statement = latestBlockStatement();
+		const result = await this.db
+			.prepare(statement.sql)
+			.bind(...statement.args)
+			.all<RecordedBlock>();
+		return result.results[0]?.number;
+	}
+
 	private async lookupBlock(parsed: ParsedBlockAddress): Promise<RecordedBlock | undefined> {
 		const statement =
 			parsed.axis === 'hash'
@@ -270,11 +325,15 @@ export class VersionedStateStore implements StateStore {
 	 *
 	 * `undefined` means the block is known and the entity was absent from it. An
 	 * address that identifies no block THROWS `NoSuchBlockError` instead, because
-	 * those two are not the same news: see `blocks.ts`.
+	 * those two are not the same news: see `blocks.ts`. A block this store does
+	 * not RETAIN throws `BlockNotRetainedError`, the other member of that family:
+	 * the address was fine, the history is gone, and answering from the tip would
+	 * be a plausible wrong number.
 	 */
 	async getAsOf<T = Record<string, unknown>>(entity: string, id: EntityId, at: BlockAddress): Promise<T | undefined> {
 		const declaration = mustGet(this.entities, entity);
 		const blockNumber = await this.resolveForRead(at);
+		await assertRetained(this.capabilities, blockNumber, () => this.tipBlockNumber());
 		const result = await this.db
 			.prepare(`SELECT * FROM ${declaration.name} WHERE ${idPredicate(declaration)} AND ${AS_OF_PREDICATE} LIMIT 1`)
 			.bind(...idValues(declaration, id), blockNumber, blockNumber)
@@ -295,9 +354,10 @@ export class VersionedStateStore implements StateStore {
 	/**
 	 * A whole entity table as of a block hash, a height, or a timestamp.
 	 *
-	 * Same resolution and the same "no such block" contract as `getAsOf`: an empty
-	 * array means the block is known and nothing matched, while an address that
-	 * identifies no block throws.
+	 * Same resolution, the same "no such block" contract and the same retention
+	 * refusal as `getAsOf`: an empty array means the block is known and nothing
+	 * matched, while an address that identifies no block, or a block outside what
+	 * this store retains, throws.
 	 */
 	async queryAsOf<T = Record<string, unknown>>(
 		entity: string,
@@ -306,6 +366,7 @@ export class VersionedStateStore implements StateStore {
 	): Promise<T[]> {
 		const declaration = mustGet(this.entities, entity);
 		const blockNumber = await this.resolveForRead(at);
+		await assertRetained(this.capabilities, blockNumber, () => this.tipBlockNumber());
 		const {tail, tailArgs} = paginate(options);
 		const result = await this.db
 			.prepare(`SELECT * FROM ${declaration.name} WHERE ${AS_OF_PREDICATE}${filter(options)}${order(options)}${tail}`)
