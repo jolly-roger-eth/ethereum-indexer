@@ -47,6 +47,30 @@ import {IndexedDBStateStore} from '@etherfold/state-store-indexeddb';
  * existing on disk; it is on the report of the one backend for which the answer
  * is interesting. See `PatchStateStoreCapabilities`.
  *
+ * ## Starting from a published snapshot instead of replaying the chain
+ *
+ * A tab does not have to index from the start block. `@etherfold/processor-entities`
+ * can install state another indexer already computed, which is the entity path's
+ * counterpart of what `keepStateOnIndexedDB(name, remote)` does for the
+ * free-form path -- several published locations, the most advanced one wins,
+ * local state kept when local is already ahead, an unreachable mirror skipped:
+ *
+ * ```ts
+ * const {store} = await openAndBootstrap(
+ *   await createBrowserStateStore(processor.entities),
+ *   ['https://mirror-a.example/state.json', 'https://mirror-b.example/state.json'],
+ *   {processor: eventProcessor.getVersionHash(), finalityDepth: 64},
+ * );
+ * ```
+ *
+ * **Open it through `openSnapshotAware` on EVERY boot, not only the one that
+ * installs a snapshot** (`openAndBootstrap` above does it for you). A snapshot
+ * carries no history below the block it was taken at, so a bootstrapped store
+ * must report a floor there and refuse as-of reads below it; the floor is
+ * persisted, and a handle constructed without reading it back would go on
+ * claiming the history of a store that has been indexing since genesis. See
+ * ADR-0028.
+ *
  * ## Why IndexedDB is the default
  *
  * Measured rather than preferred, on the real workload, and recorded as a

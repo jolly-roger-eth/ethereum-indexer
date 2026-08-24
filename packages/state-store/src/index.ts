@@ -9,5 +9,6 @@ export * from './cursor.js';
 export * from './retention.js';
 export * from './errors.js';
 export * from './store.js';
+export * from './snapshot.js';
 export * from './mutation-context.js';
 export * from './memory.js';
