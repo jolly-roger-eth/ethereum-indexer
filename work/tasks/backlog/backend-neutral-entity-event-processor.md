@@ -20,9 +20,15 @@ Three things bind the shell to SQLite, and only the second is a real design ques
 
 **2. The sync cursor is persisted in SQL.** `packages/processor-sqlite/src/sync.ts` keeps `LastSync` in a `_sync` table: `SYNC_SCHEMA_DDL`, a `SELECT`, and an `INSERT ... ON CONFLICT` upsert, reached through `this.db` directly in `load`, `process` and `reset`. A browser deployment on IndexedDB has no SQL to write a cursor into, so this is the thing that actually has to move.
 
-The good news is that the hard half is already neutral: `serializeLastSync` / `deserializeLastSync` are plain JSON with a bigint replacer/reviver and know nothing about SQL. Only the STORAGE is SQL-shaped, and what it stores is one string under one key.
+The good news is that the hard half is already neutral: `serializeLastSync` / `deserializeLastSync` are plain JSON with a bigint replacer/reviver and know nothing about SQL. Only the STORAGE is SQL-shaped, and what it stores is one string under one key. Its home is decided; the section below says which and why.
 
-**The cursor goes behind the storage seam, as an OPAQUE STRING. That is decided; what follows is why, so you can push back if building it reveals something this cannot see.**
+**3. The read handle cannot be the same handle.** `VersionedStateView` forwards `queryCurrent` / `queryAsOf`, which take caller-supplied SQL and exist only on the SQLite store. A neutral processor's handle can offer the seam tier — `getCurrent`, `getAsOf`, `listCurrent`, `listAsOf` — and must NOT pretend to offer the predicate tier. Do not stub it to throw; leave it off the type, so a consumer that needs SQL predicates is told at compile time that it is asking a backend-neutral handle for a backend-specific thing.
+
+**What happens to `VersionedStateEventProcessor`.** It is published, and the honest end state is that it becomes a thin SQLite-flavoured convenience over the neutral one (construct the store from a `RemoteSQL`, keep the SQL-tier view, delegate the rest) rather than a second implementation of the same logic. Migrating existing consumers is explicitly not a constraint (the spec's Out of Scope), but two copies of revert-then-apply would be exactly the drift this spec exists to prevent.
+
+## Where the cursor lives
+
+**It goes behind the storage seam, as an OPAQUE STRING. That is decided; what follows is why, so you can push back if building it reveals something this cannot see.**
 
 The seam gains a small cursor port: read, write and clear an opaque string under a context key. Every backend implements it, and on all four that is a handful of lines, because it is one key and one value.
 
@@ -48,11 +54,7 @@ Building that for the entity path is NOT this task. What IS this task's business
 - **A store's contents and its cursor must be settable together, from outside, as one unit.** A bootstrap installs rows and a cursor that belong to each other; if the only way to advance the cursor is `applyBlock`, a snapshot can only be loaded by replaying it, which defeats the point.
 - **A bootstrapped store must be able to report a retention floor it did not compute itself.** This is where the capability work already done pays off and where the trap is. A snapshot carrying only CURRENT rows gives a store no versions below the snapshot's block, so it cannot answer an as-of read below it and must not claim it can. Its honest report is a window starting at the snapshot block (or `revert-only`), not the `unbounded` a freshly-migrated store would say. A store that bootstraps and then claims history it never received is exactly the plausible-wrong-answer failure this whole spec exists to prevent.
 
-You do not have to implement either. You do have to leave the door open, and say in your report which of the two your design supports today and which would need more.
-
-**3. The read handle cannot be the same handle.** `VersionedStateView` forwards `queryCurrent` / `queryAsOf`, which take caller-supplied SQL and exist only on the SQLite store. A neutral processor's handle can offer the seam tier — `getCurrent`, `getAsOf`, `listCurrent`, `listAsOf` — and must NOT pretend to offer the predicate tier. Do not stub it to throw; leave it off the type, so a consumer that needs SQL predicates is told at compile time that it is asking a backend-neutral handle for a backend-specific thing.
-
-**What happens to `VersionedStateEventProcessor`.** It is published, and the honest end state is that it becomes a thin SQLite-flavoured convenience over the neutral one (construct the store from a `RemoteSQL`, keep the SQL-tier view, delegate the rest) rather than a second implementation of the same logic. Migrating existing consumers is explicitly not a constraint (the spec's Out of Scope), but two copies of revert-then-apply would be exactly the drift this spec exists to prevent.
+You do not have to implement either. You do have to leave the door open, and say in your report which of the two your design supports today and which would need more. `bootstrap-an-entity-store-from-a-snapshot` is the task that builds on it.
 
 ## Acceptance criteria
 
