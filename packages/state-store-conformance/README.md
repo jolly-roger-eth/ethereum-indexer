@@ -23,6 +23,8 @@ External behaviour only: what a read returns after a write, after a revert, as o
 - **A block is one atomic unit.** A block whose mutations include a rejected one applies none of them and does not take its height; applying one block twice raises.
 - **The sync cursor, and that it is never AHEAD of the last applied block.** The round trip and the clear are the easy half (an opaque string under a key, byte for byte); the case that matters is atomicity, because a caller cannot get it from outside. A block handed a cursor moves both or neither, so a REFUSED block leaves the cursor exactly where it was — a cursor describing a block the store does not hold sends the next run silently past it, and one left behind wedges the run instead, since the replay hands `applyBlock` a block it already holds. Installing rows and a cursor together is the same verb, which is what a snapshot bootstrap needs (ADR-0027).
 
+- **Bootstrapping from a snapshot, and the floor it must then report.** A store loaded from state somebody else computed inherits a trap every backend would otherwise meet for the first time in somebody's browser tab: a snapshot carries nothing below its own block, and a freshly migrated store of any backend reports `unbounded`, because that is true of a store that has been indexing since genesis and it has no way to know it is not one. So the cases assert that rows and their cursor install as one unit, that the origin survives a FRESH HANDLE over the same storage (a floor held in a closure is gone on reload), that a revert reaching below the snapshot is refused and changes nothing while a wipe still works, and -- selected on the claim, like every other as-of case -- that a read below the floor is refused and one at or above it is answered. See ADR-0028.
+
 What is NOT here: any access path. That a listing is one indexed range scan rather than a scan-and-sort is a property of a particular backend, and it is pinned in that backend's own tests (`state-store-sqlite/test/listing.test.ts` reads it back out of `EXPLAIN QUERY PLAN`).
 
 ## Why the claim is read first
@@ -45,6 +47,7 @@ const {passed, failures} = await runStateStoreConformance(factory);
 
 - [`@etherfold/state-store`](../state-store)'s `MemoryStateStore`, under three retention claims (here, because that package cannot depend on this one).
 - [`@etherfold/state-store-sqlite`](../state-store-sqlite)'s `VersionedStateStore`, on a real libSQL database, under the same three.
+- [`@etherfold/state-store-indexeddb`](../state-store-indexeddb)'s `IndexedDBStateStore`, and [`@etherfold/state-store-patch`](../state-store-patch)'s `PatchStateStore`, each under the claims it can honestly make.
 
 The workload here is deliberately small and hand-written. The heavy one, [`@etherfold/conformance-workload-stratagems`](../conformance-workload-stratagems), replays 31,332 real logs from a launched game on Base through the same backends and compares against the state that game's ORIGINAL processor computed. It is a second SUBJECT for the same backends and not a replacement: a case that fails on 31,332 real events is a bug report nobody can read, so these small cases go first and that one asks the question they are too small to ask.
 

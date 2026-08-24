@@ -5,6 +5,7 @@ import {portableDeclarationCases} from './cases/portable-declarations.js';
 import {readYourWritesCases} from './cases/read-your-writes.js';
 import {reorgRevertCases} from './cases/reorg-revert.js';
 import {retentionPruningCases} from './cases/retention-pruning.js';
+import {snapshotBootstrapCases} from './cases/snapshot-bootstrap.js';
 import {syncCursorCases} from './cases/sync-cursor.js';
 import {versionedReadCases} from './cases/versioned-reads.js';
 import {CONFORMANCE_ENTITIES} from './fixtures.js';
@@ -28,8 +29,10 @@ import type {ConformanceCase, ConformanceFailure, ConformanceResult, StateStoreF
  * as one unit (with the sync cursor that describes it, which is the half a
  * caller cannot make atomic from outside), what a prune must never delete (the
  * same claim-driven selection: what a store may drop is what it stopped
- * promising to answer), and that a DECLARATION means the same thing here as it
- * does on every other backend.
+ * promising to answer), what a store bootstrapped from a snapshot may claim
+ * about history it never received (claim-driven again, and the one trap a new
+ * backend would otherwise rediscover in a browser tab), and that a DECLARATION
+ * means the same thing here as it does on every other backend.
  */
 export async function stateStoreConformanceCases(factory: StateStoreFactory): Promise<ConformanceCase[]> {
 	const probe = await factory(CONFORMANCE_ENTITIES);
@@ -44,6 +47,7 @@ export async function stateStoreConformanceCases(factory: StateStoreFactory): Pr
 		...boundedListingCases(factory, capabilities),
 		...blockAtomicityCases(factory),
 		...syncCursorCases(factory),
+		...snapshotBootstrapCases(factory, capabilities),
 		...portableDeclarationCases(factory),
 	];
 }

@@ -2,6 +2,7 @@ export * from './types.js';
 export * from './stream.js';
 export * from './apply.js';
 export * from './cursor.js';
+export * from './snapshot.js';
 export * from './view.js';
 export * from './EntityEventProcessor.js';
 
@@ -11,6 +12,7 @@ export * from './EntityEventProcessor.js';
  * store must understand, not what a processor invents.
  */
 export type {
+	BlockPointer,
 	CursorWrite,
 	EntityDeclaration,
 	EntityId,
@@ -19,10 +21,30 @@ export type {
 	Mutation,
 	PruneOptions,
 	PruneReport,
+	SnapshotAwareStateStore,
+	SnapshotHead,
+	StateSnapshot,
 	StateStore,
 	StateStoreCapabilities,
 	Retention,
 	RetentionSetting,
+} from '@etherfold/state-store';
+
+/**
+ * The bootstrap primitives, re-exported for the same reason: an application
+ * that starts a store from a published snapshot writes one import.
+ *
+ * They are DEFINED in `@etherfold/state-store` because a history floor is a
+ * fact about a store rather than about a processor, and every backend inherits
+ * it (the conformance suite asserts it of all of them).
+ */
+export {
+	openSnapshotAware,
+	RevertBeyondSnapshotError,
+	SnapshotFormatError,
+	SnapshotProcessorMismatchError,
+	SNAPSHOT_FORMAT,
+	SNAPSHOT_ORIGIN_KEY,
 } from '@etherfold/state-store';
 
 /**

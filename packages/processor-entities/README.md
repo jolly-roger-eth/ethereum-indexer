@@ -73,6 +73,25 @@ await surface.token.getCurrent({id: '1'}); // {id: string; owner: string | null;
 
 The same four reads the seam has (`getCurrent` / `getAsOf` / `listCurrent` / `listAsOf`), typed off the declaration, so renaming a field breaks the consumer at COMPILE time; `declareEntities` is an identity function that exists only to keep the literal types an annotation would widen away. `test/read-surface.test.ts` runs one reader, unchanged, against all three backends. See [`@etherfold/state-store`](../state-store) for the details, and `createQuerySurface` in [`@etherfold/state-store-sqlite`](../state-store-sqlite) for the server-side tier that also takes predicates.
 
+## Starting from a published snapshot
+
+A client does not have to replay the chain from the start block. `openAndBootstrap` installs state another indexer already computed and then resumes from its cursor:
+
+```ts
+import {openAndBootstrap} from '@etherfold/processor-entities';
+
+const {store, outcome} = await openAndBootstrap(await createBrowserStateStore(processor.entities), [
+	'https://mirror-a.example/state.json',
+	{url: 'https://mirror-b.example/state.json', head: 'https://mirror-b.example/head.json'},
+], {processor: eventProcessor.getVersionHash(), finalityDepth: 64});
+```
+
+The selection is the free-form path's, point for point (`keepStateOnIndexedDB(name, remote)` in `@etherfold/browser`): every location is asked how far it has got, the furthest wins, local state that is already ahead is KEPT, and an unreachable mirror is logged and skipped rather than fatal. Two differences on purpose: failover walks every remaining candidate rather than the winner plus one, and a snapshot computed by another processor version is not a candidate at all.
+
+What has no free-form counterpart is the honesty, because a blob has no history to lie about. A snapshot carries only the rows that are LIVE at its block, so the store it lands in reports a retention window floored THERE rather than the `unbounded` a freshly migrated store would claim, refuses an as-of read below it with `BlockNotRetainedError`, and refuses a reorg reaching under it with `RevertBeyondSnapshotError` (declining a snapshot taken inside the reorg window is the other half, which is what `finalityDepth` above buys). That mechanism is at the seam, so every backend inherits it; ADR-0028 records why, and what a snapshot contains, with the measurement behind it in `docs/spikes/bootstrap-an-entity-store-from-a-snapshot/`.
+
+`createSnapshot` is the MINIMAL producer, for tests and for a host that already knows which ids it wrote. Publishing snapshots as a first-class artifact -- who produces one and when, format versioning, mirror layout, pruning old ones -- is a design of its own and is deliberately not here.
+
 ## Where the pieces live
 
 | | |
@@ -80,6 +99,8 @@ The same four reads the seam has (`getCurrent` / `getAsOf` / `listCurrent` / `li
 | `EntityProcessor`, `EventHandlers` | here: the ABI-typed authoring surface |
 | `applyEventStream`, `runBlockHandlers`, `forkPoint`, `groupByBlock` | here: revert-then-apply, once, for every backend |
 | `EntityEventProcessor`, `EntityStateView`, the `LastSync` codec | here: the `EventProcessor` shell, once, for every backend |
+| `bootstrapFromSnapshot`, `openAndBootstrap`, `createSnapshot` | here: choosing between mirrors needs the cursor's codec |
+| `StateSnapshot`, `openSnapshotAware`, the history floor | [`@etherfold/state-store`](../state-store): a floor is a fact about a store |
 | `MutationContext`, `EntityDeclaration`, `StateStore`, capabilities, the cursor port | [`@etherfold/state-store`](../state-store): what a store must understand |
 | a `RemoteSQL`-flavoured wrapper and the SQL read tier | [`@etherfold/processor-sqlite`](../processor-sqlite) |
 

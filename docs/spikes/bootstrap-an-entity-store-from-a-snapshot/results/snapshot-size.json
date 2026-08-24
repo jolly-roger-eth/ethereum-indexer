@@ -1,0 +1,31 @@
+{
+  "measuredAt": "2026-08-24T14:36:12.939Z",
+  "workload": {
+    "fixture": "stratagems alpha1 (the LAUNCHED game)",
+    "events": 31332,
+    "eventBearingBlocks": 1042,
+    "mutations": 29492,
+    "tip": 23303136,
+    "liveRows": 4046,
+    "versions": 24759
+  },
+  "snapshotOfCurrentRows": {
+    "bytes": 853131,
+    "gzipped": 46659
+  },
+  "snapshotOfEveryVersion": {
+    "bytes": 5519680,
+    "gzipped": 311871
+  },
+  "capturedStream": {
+    "gzippedOnDisk": 634488,
+    "rawJson": 16230783
+  },
+  "ratios": {
+    "versionsPerLiveRow": 6.12,
+    "fullHistoryOverCurrentRows": 6.68,
+    "currentRowsOverGzippedStream": 0.07,
+    "fullHistoryOverGzippedStream": 0.49
+  },
+  "tookSeconds": 0.9
+}
