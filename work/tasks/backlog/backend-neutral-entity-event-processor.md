@@ -22,13 +22,22 @@ Three things bind the shell to SQLite, and only the second is a real design ques
 
 The good news is that the hard half is already neutral: `serializeLastSync` / `deserializeLastSync` are plain JSON with a bigint replacer/reviver and know nothing about SQL. Only the STORAGE is SQL-shaped, and what it stores is one string under one key.
 
-**Where the cursor lives is yours to decide, and it is the decision this task turns on.** Options, none obviously right:
+**The cursor goes behind the storage seam, as an OPAQUE STRING. That is decided; what follows is why, so you can push back if building it reveals something this cannot see.**
 
-- Widen `StateStore` with a small cursor port (read/write an opaque string under a key). One seam, every backend implements it, nothing extra to wire. Cost: it grows the contract with something that is not entity state, and every future backend inherits the obligation.
-- A separate small port the deployment supplies (a `SyncStore` / keeper). Keeps `StateStore` about entity state only, and the browser already has keeper idioms to follow (`packages/browser/src/storage/state/OnIndexedDB.ts`, `OnLocalStorage.ts`, `stream/OnIndexedDB.ts`). Cost: a second thing every deployment must wire, and one more way to misconfigure.
-- Store the cursor as a reserved entity through the seam you already have. No new API at all. Cost: the cursor becomes versioned, revertible entity state, which it is not — and it would be pruned by retention.
+The seam gains a small cursor port: read, write and clear an opaque string under a context key. Every backend implements it, and on all four that is a handful of lines, because it is one key and one value.
 
-Pick deliberately and record the reasoning. Whatever you choose, it must be implementable by the memory, patch, IndexedDB and SQLite stores alike, and it must not break the property ADR-0018 records and `packages/state-store-sqlite/test/no-platform-leakage.test.ts` pins: `@etherfold/state-store` declares NO dependencies, so a storage primitive that depends on the seam inherits nothing.
+**It must be an opaque string, never a typed `LastSync`.** `LastSync<ABI>` is a `@etherfold/core` type carrying `EventBlock<ABI>`, so typing the port with it would make `@etherfold/state-store` depend on core, invert ADR-0016's dependency direction and drag viem into every storage primitive — exactly what ADR-0018 records and `packages/state-store-sqlite/test/no-platform-leakage.test.ts` pins. This costs nothing, because `serializeLastSync` / `deserializeLastSync` in `packages/processor-sqlite/src/sync.ts` are already plain JSON with a bigint replacer and already backend-neutral. The store persists a string; only the processor knows what it means.
+
+**The reason it is the seam and not a keeper is atomicity, and it fixes a live defect.** Only the store holds the transaction the block write happens in, so only the store can write the cursor in the SAME transaction as the block it describes. Today they are two round trips (`applyEventStream`, then a separate `this.db.batch` for the cursor), and `work/notes/observations/sync-cursor-write-is-not-atomic-with-the-block-it-describes.md` records what that costs: a crash in the window leaves state ahead of the cursor, restart replays an already-applied block, `applyBlock` refuses it as a caller bug, and the indexer wedges until a human intervenes. **So write the cursor in the same transaction as the block, and close that.** A backend that genuinely cannot do so (nothing here is known to be in that position) must say so rather than quietly reintroducing the gap.
+
+The two rejected alternatives, recorded so they are not re-proposed:
+
+- **A separate cursor keeper the deployment supplies.** Note this would NOT be the existing `KeepState`: that persists `AllData = {state, lastSync}`, state and cursor together, which is the free-form `JSObjectEventProcessor` model and wrong here, since the versioned store already owns the state and would end up storing it twice. It would therefore be a NEW narrower interface, costing a second thing to wire per deployment, a new way to misconfigure (a store pointed at one database and a cursor keeper at another, diverging in silence), and no atomicity.
+- **A reserved entity through the existing seam.** No new API, but the cursor would become versioned, revertible and prunable entity state — and it must survive exactly the operations that would destroy it.
+
+The honest cost of the chosen route is that the contract gains something that is not entity state, and every future backend inherits the obligation. The defence is that the store already records which blocks it holds, so "how far has this deployment got" is a question it half-answers already.
+
+The conformance suite is where this becomes an obligation rather than a convention: a cursor round-trip, a clear, and — the one that matters — that the cursor a store reports after a block is the block it just applied, never one ahead of it.
 
 **3. The read handle cannot be the same handle.** `VersionedStateView` forwards `queryCurrent` / `queryAsOf`, which take caller-supplied SQL and exist only on the SQLite store. A neutral processor's handle can offer the seam tier — `getCurrent`, `getAsOf`, `listCurrent`, `listAsOf` — and must NOT pretend to offer the predicate tier. Do not stub it to throw; leave it off the type, so a consumer that needs SQL predicates is told at compile time that it is asking a backend-neutral handle for a backend-specific thing.
 
@@ -38,7 +47,9 @@ Pick deliberately and record the reasoning. Whatever you choose, it must be impl
 
 - [ ] One processor definition, written once, runs under this component against the SQLite, memory, IndexedDB and patch stores, and produces the same state from the same input on all four.
 - [ ] The sync cursor round-trips on every one of those backends: index, stop, reload from persisted state, continue, and land where a single uninterrupted run lands.
-- [ ] Where the cursor lives is an explicit decision with its reasoning recorded, and it is implementable by all four backends. If it widened `StateStore`, the seam still declares no dependencies and `no-platform-leakage.test.ts` still passes.
+- [ ] The cursor lives behind the seam as an opaque string; `@etherfold/state-store` still declares NO dependencies and `no-platform-leakage.test.ts` still passes. If you concluded during the build that this is the wrong home, route to needs-attention with what you found rather than silently choosing another.
+- [ ] The cursor is written in the SAME transaction as the block it describes, on every backend that has transactions, and the conformance suite asserts a store never reports a cursor ahead of its last applied block.
+- [ ] The crash window in `work/notes/observations/sync-cursor-write-is-not-atomic-with-the-block-it-describes.md` is closed on the SQLite path, and that observation is DELETED in the same change, because it will no longer be true.
 - [ ] The backend-neutral read handle exposes the seam tier only. Asking it for `queryCurrent` / `queryAsOf` is a COMPILE error, not a runtime throw.
 - [ ] `VersionedStateEventProcessor` still works and its existing tests still pass unchanged in meaning, and revert-then-apply exists ONCE rather than twice.
 - [ ] Reorg is exercised on at least two backends through this component, including a counter that decreases.
@@ -59,9 +70,11 @@ Pick deliberately and record the reasoning. Whatever you choose, it must be impl
 >
 > Three bindings. The store is CONSTRUCTED from a `RemoteSQL` instead of injected: invert that, it is mechanical. The read handle forwards `queryCurrent` / `queryAsOf`, which are SQL-only: the neutral handle offers the seam tier and simply does not have those methods, so asking for them is a compile error rather than a runtime throw.
 >
-> The third is the real decision: the sync cursor is persisted in a SQL `_sync` table (`SYNC_SCHEMA_DDL`, a SELECT, an upsert, all through `this.db`). A browser on IndexedDB has no SQL to write it to. `serializeLastSync` / `deserializeLastSync` are already backend-neutral, so what has to move is the storage of one string under one key. Choose between widening `StateStore` with a small cursor port, a separate keeper the deployment supplies (the browser already has keeper idioms), or a reserved entity through the existing seam — and note that the last one makes the cursor versioned, revertible and prunable, which it is not. Record why you chose what you chose.
+> The third is the cursor, and its home is DECIDED: it goes behind the storage seam as a small port over an OPAQUE STRING (read / write / clear under a context key). It must be a string and never a typed `LastSync`, because `LastSync<ABI>` is a core type and typing the port with it would make `@etherfold/state-store` depend on core, invert ADR-0016 and pull viem into every storage primitive. `serializeLastSync` / `deserializeLastSync` already exist and are already neutral, so this costs nothing.
 >
-> Whatever you add must be implementable by memory, patch, IndexedDB and SQLite alike, and must keep `@etherfold/state-store` free of dependencies (ADR-0018, pinned by `no-platform-leakage.test.ts`).
+> Write the cursor in the SAME transaction as the block it describes. That is the reason it is the seam rather than a keeper: only the store holds that transaction. It also closes a live defect — read `work/notes/observations/sync-cursor-write-is-not-atomic-with-the-block-it-describes.md`, which records how the current two-round-trip ordering can wedge an indexer after a crash. Delete that note as part of this task, since it stops being true.
+>
+> A keeper and a reserved entity were both considered and rejected; the task body says why. If building it convinces you the seam is the wrong home, route to needs-attention with your reasoning rather than quietly picking another.
 >
 > `VersionedStateEventProcessor` is published and must keep working, but it should become a thin SQLite-flavoured wrapper rather than a second copy of revert-then-apply. Two copies of that logic is the drift this whole spec exists to prevent.
 >
