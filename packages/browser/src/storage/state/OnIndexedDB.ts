@@ -1,5 +1,8 @@
 import {Abi, AllData, isBigIntLiteral, simple_hash, LastSync, ProcessorContext} from '@etherfold/core';
-import {contextFilenames} from '@etherfold/utils';
+// the subpath, not the barrel: the barrel re-exports the CLI-side modules, whose
+// top-level `node:fs` / `node:path` / `node:module` imports make this package
+// unbundleable for a browser. See the note at the top of `utils/src/indexer.ts`.
+import {contextFilenames} from '@etherfold/utils/indexer';
 import {get, set, del} from 'idb-keyval';
 
 function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {

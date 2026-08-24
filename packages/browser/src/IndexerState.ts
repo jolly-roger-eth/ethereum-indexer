@@ -1,5 +1,6 @@
 import type {
 	Abi,
+	EventProcessor,
 	EventProcessorWithInitialState,
 	IndexingSource,
 	LastSync,
@@ -41,6 +42,90 @@ export type StatusState = {
 	state: 'Idle' | 'Loading' | 'FetchingEventStream' | 'ProcessingEventStream' | 'CatchingUp' | 'IndexingLatest';
 };
 
+/**
+ * The two kinds of processor a browser deployment can index with.
+ *
+ * `'js-object'` is the free-form path: `@etherfold/js-processor` hands a handler
+ * an immer draft of a plain object, the object IS the state, and a `KeepState`
+ * keeper persists the whole of it. `'entities'` is the storage-seam path:
+ * `@etherfold/processor-entities` hands a handler a `MutationContext` over
+ * declared entities, the state lives in a `StateStore` the deployment chose, and
+ * the sync cursor lives there with it (ADR-0027).
+ *
+ * Neither is deprecated and neither is a migration target for the other. They
+ * persist differently on purpose -- see the note on `createIndexerState`.
+ */
+export type ProcessorKind = 'js-object' | 'entities';
+
+/**
+ * What the hook needs from an entity deployment's processor.
+ *
+ * Structural rather than an import of `EntityEventProcessor`, so that
+ * `@etherfold/browser` does not have to depend on one entity runtime in order to
+ * type the path. `EntityEventProcessor` (`@etherfold/processor-entities`)
+ * satisfies it; so would anything else that runs an entity processor against a
+ * store.
+ *
+ * `state` is the counterpart of the free-form path's `createInitialState()`, and
+ * the difference is the design rather than an inconvenience: there is no initial
+ * state to CREATE, because the state is already in the store and is read back
+ * through a handle. The handle exists the moment the processor does, has stable
+ * identity, and is what `load` and `process` hand back.
+ */
+export type EntityEventProcessorLike<ABI extends Abi, ProcessResultType, ProcessorConfig> = EventProcessor<
+	ABI,
+	ProcessResultType
+> & {
+	readonly state: ProcessResultType;
+	configure(config: ProcessorConfig): void;
+};
+
+/**
+ * A processor plus the KIND it is, said by the caller.
+ *
+ * The discriminant is a tag someone wrote, never a sniff of which fields a value
+ * happens to have. Both kinds are `EventProcessor`s, so "does it have
+ * `createInitialState`" is a guess that a wrapper, a proxy or a decorator can
+ * make wrong in silence -- and the wrong branch does not fail, it seeds a UI
+ * store with the wrong thing and indexes on. A tag is checked by the compiler at
+ * the call site instead.
+ */
+export type TaggedProcessor<ABI extends Abi, ProcessResultType, ProcessorConfig> =
+	| {
+			readonly kind: 'js-object';
+			readonly processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>;
+	  }
+	| {
+			readonly kind: 'entities';
+			readonly processor: EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>;
+	  };
+
+/**
+ * What `createIndexerState` accepts: a tagged processor, or the free-form one
+ * bare.
+ *
+ * The bare form is the shorthand that shipped, and it keeps working unchanged --
+ * `@etherfold/browser` is published and the free-form path is not deprecated. It
+ * means `{kind: 'js-object'}` and nothing else, so no existing caller has to
+ * learn a tag to keep running.
+ */
+export type IndexerStateProcessor<ABI extends Abi, ProcessResultType, ProcessorConfig> =
+	| TaggedProcessor<ABI, ProcessResultType, ProcessorConfig>
+	| EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>;
+
+/**
+ * Read the tag, or supply the one the bare form means.
+ *
+ * `'kind' in value` reads the DISCRIMINANT, which is the one property the caller
+ * put there to be read. Nothing here asks whether `createInitialState` or
+ * `state` is present, which is the distinction the whole tag exists to make.
+ */
+function taggedProcessor<ABI extends Abi, ProcessResultType, ProcessorConfig>(
+	given: IndexerStateProcessor<ABI, ProcessResultType, ProcessorConfig>,
+): TaggedProcessor<ABI, ProcessResultType, ProcessorConfig> {
+	return 'kind' in given ? given : {kind: 'js-object', processor: given};
+}
+
 type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfig extends undefined
 	? (indexerSetup: {
 			provider: EIP1193ProviderWithoutEvents;
@@ -56,26 +141,83 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
 			processorConfig: ProcessorConfig,
 		) => Promise<void>;
 
+/**
+ * The browser indexing hook, over EITHER kind of processor.
+ *
+ * ```ts
+ * // the free-form path, unchanged: the object is the state, a keeper persists it
+ * const indexer = createIndexerState(createProcessor(), {keepState: keepStateOnIndexedDB('mynfts')});
+ *
+ * // the entity path: the state (and its cursor) live in a store the app chose
+ * const store = await createBrowserStateStore(myProcessor.entities);
+ * const indexer = createIndexerState({
+ *   kind: 'entities',
+ *   processor: fromEntityProcessor(myProcessor)(store),
+ * });
+ * ```
+ *
+ * ## Which path persists what, so nobody unifies them wrongly
+ *
+ * Two persistence models sit next to each other here, and finding them without
+ * an explanation is an invitation to collapse one into the other. The INVARIANT
+ * they both hold is that a processor's state and its cursor never diverge: a
+ * reader must never come back to state that has advanced past its recorded
+ * position, or the reverse, however the process died. They hold it by different
+ * mechanisms, because they have different substrates.
+ *
+ * - **`'js-object'`** persists through the `keepState` keeper below. It writes
+ *   `AllData = {state, lastSync}` -- state and cursor together -- in ONE keyed
+ *   write (`storage/state/OnIndexedDB.ts` does a single `set()` of the whole
+ *   object). The bundling IS the atomicity: a blob has no transaction to join,
+ *   so the only way to make two writes one is to make them one write.
+ * - **`'entities'`** persists through its `StateStore`, and passes NO keeper. The
+ *   store writes the cursor in the same transaction as the block it describes
+ *   (ADR-0027), which is why the cursor lives behind the storage seam at all.
+ *   Handing this path a keeper as well would be a deployment with two places to
+ *   persist, so it is refused rather than ignored.
+ *
+ * ## And what a RELOAD does to each
+ *
+ * The free-form path comes back from whatever its keeper kept. The entity path
+ * comes back from its STORE, so how far it survives is a property of the backend
+ * the application chose: versioned rows in IndexedDB (the default, ADR-0024)
+ * resume from the cursor, and `@etherfold/state-store-patch` is memory-only by
+ * design (ADR-0023) and starts over. That is not a defect of the light store; it
+ * reports `durability: 'memory-only'` in its capabilities, which the read handle
+ * exposes, so an app can learn it at startup instead of from an empty tab.
+ */
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
-	processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+	givenProcessor: IndexerStateProcessor<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
 		catchupThreshold?: number;
 		trackNumRequests?: boolean;
 		logRequests?: boolean;
+		/**
+		 * Where a `'js-object'` processor's state is kept.
+		 *
+		 * Optional, and it stays optional: an `'entities'` deployment simply passes
+		 * none, because its store persists both the rows and the cursor. Passing one
+		 * there is refused at construction with a message naming the store.
+		 */
 		keepState?: KeepState<ABI, ProcessResultType, unknown, ProcessorConfig>;
 		keepStream?: ExistingStream<ABI>;
 		// Optional factory used to construct the underlying EthereumIndexer. Receives the same
 		// arguments (already request-tracked/logged provider, configured processor, source, config)
 		// that would otherwise be passed to `new EthereumIndexer(...)`. Useful for injecting a
 		// subclass, a shared instance, or a spy/fake in tests. Defaults to `new EthereumIndexer(...)`.
+		//
+		// The processor arrives as the `EventProcessor` the core drives, which is all
+		// `new EthereumIndexer(...)` takes and the one thing both kinds have in common.
 		createIndexer?: (
 			provider: EIP1193ProviderWithoutEvents,
-			processor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+			processor: EventProcessor<ABI, ProcessResultType>,
 			source: IndexingSource<ABI>,
 			config: ProvidedIndexerConfig<ABI>,
 		) => EthereumIndexer<ABI, ProcessResultType>;
 	},
 ) {
+	const selected = taggedProcessor(givenProcessor);
+	const processor = selected.processor;
 	const {
 		$state: $syncing,
 		set: setSyncing,
@@ -91,18 +233,33 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	});
 
 	if (options?.keepState) {
+		if (selected.kind === 'entities') {
+			throw new Error(
+				`an entity processor persists through its StateStore, not through a "keepState" keeper: ` +
+					`the store already holds both the rows and the sync cursor, and writes the cursor in the same ` +
+					`transaction as the block it describes. Configure the storage instead (createBrowserStateStore), ` +
+					`and pass no keepState.`,
+			);
+		}
 		if (!(processor as any).keepState) {
 			throw new Error(`this processor do not support "keepState" config`);
 		}
 		(processor as any).keepState(options.keepState);
 	}
-	const initialState = processor.createInitialState();
+	// The free-form path CREATES its initial state; the entity path READS its store
+	// through a handle that already exists. Selected by the tag, so a processor of
+	// one kind can never be asked for the other kind's entry point.
+	const initialState =
+		selected.kind === 'entities' ? selected.processor.state : selected.processor.createInitialState();
 
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
 	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(initialState);
 
 	let indexer: EthereumIndexer<ABI, ProcessResultType> | undefined;
-	let indexingTimeout: number | undefined;
+	// `ReturnType<typeof setTimeout>` rather than `number`: this module is browser
+	// code, but its own test tooling puts node's typings in scope, and the handle is
+	// only ever passed back to `clearTimeout`, which takes either.
+	let indexingTimeout: ReturnType<typeof setTimeout> | undefined;
 	let autoIndexingInterval: number = 4;
 
 	// Serializes reconfiguration (updateIndexer/updateProcessor) so that overlapping calls
@@ -470,8 +627,18 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		stopAutoIndexing,
 		reset,
 		dispose,
+		/**
+		 * Swap the processor in place, in either kind's terms.
+		 *
+		 * It takes the same union the hook does, in the same shape, so a live-reload
+		 * that rebuilds an entity processor does not have to unwrap it by hand. What
+		 * happens below is what happened before: the core is handed the
+		 * `EventProcessor`, and it decides whether the state survives by comparing
+		 * version hashes. Nothing here re-seeds the state store, exactly as nothing
+		 * did before; the next `load` does that through `onStateUpdated`.
+		 */
 		updateProcessor(
-			newProcessor: EventProcessorWithInitialState<ABI, ProcessResultType, ProcessorConfig>,
+			newProcessor: IndexerStateProcessor<ABI, ProcessResultType, ProcessorConfig>,
 			options?: {force?: boolean},
 		) {
 			if (!indexer) {
@@ -490,7 +657,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					stopAutoIndexing();
 				}
 				try {
-					await indexer.updateProcessor(newProcessor, options);
+					await indexer.updateProcessor(taggedProcessor(newProcessor).processor, options);
 					// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
 					// Must run before resuming auto-indexing so the resumed loop does not early-return
 					// on the stale lastSync.
