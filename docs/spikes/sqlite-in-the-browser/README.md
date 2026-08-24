@@ -2,7 +2,9 @@
 
 Evidence for [`work/notes/findings/sqlite-in-the-browser.md`](../../../work/notes/findings/sqlite-in-the-browser.md), which is where the conclusions live. This folder holds the harness, the fixtures and the raw output, so every number in that finding can be re-run rather than believed.
 
-Task: `work/tasks/backlog/spike-sqlite-in-the-browser.md`. Spec whose open questions this answers: `work/specs/proposed/one-processor-everywhere.md`.
+Task: `work/tasks/done/spike-sqlite-in-the-browser.md`. Spec whose open questions this answers: `work/specs/tasked/one-processor-everywhere.md`.
+
+> **Two of these folders were PROMOTED and no longer live here.** `promote-stratagems-conformance-workload` moved the captured streams, the golden states and the vendored oracle into **[`packages/conformance-workload-stratagems`](../../../packages/conformance-workload-stratagems)**, where they are production test material rather than evidence, and rewrote the port onto the idiomatic model (children keyed by their parent, read through the bounded id-prefix listing: three entities instead of six, no CSV index, no hand-maintained count) while still landing on the byte-identical golden state. The scripts below read them from their new home; `src/port/` STAYS here, unchanged, because it is the exhibit the finding's contortion list describes.
 
 ## What is here
 
@@ -10,14 +12,18 @@ Task: `work/tasks/backlog/spike-sqlite-in-the-browser.md`. Spec whose open quest
 
 ```
 capture/     the ONE script that talks to a node, run once per deployment
-fixtures/    the captured Base streams, the golden states, the golden traces
-vendor/      stratagems source, copied verbatim, GPL-3.0 (see vendor/stratagems/README.md)
 src/port/    the stratagems processor ported to MutationContext, and the projection back
+             (the PRE-listing port: what the contortion list is about. The promoted,
+             rewritten one is in packages/conformance-workload-stratagems/src/)
 src/store/   the candidates behind one seam: memory, IndexedDB, whole-blob, versioned SQL
 src/workload/ the deterministic generator that makes the sweep sizes
 run/         node-side: equality, trace shapes, store agreement, patch replay, summary
 browser/     the Playwright cuts and the spec, on playwright-browser-harness
 results/     raw JSON per engine, plus results/summary.md
+
+... and, since the promotion, in packages/conformance-workload-stratagems/:
+fixtures/    the captured Base streams, the golden states, the golden traces
+vendor/      stratagems source, copied verbatim, GPL-3.0 (see its vendor/stratagems/README.md)
 ```
 
 ## Re-running it
@@ -48,7 +54,7 @@ node capture/capture-stratagems-base.mjs --full             # keep `data`/`topic
 
 The committed fixture omits each log's `data` and `topics`, which are the encoded form of the `args` it already carries decoded: keeping both took the file from 20.5 MB to 32.5 MB, and the provenance records exactly which contracts and blocks to re-fetch if they are ever wanted. The omission is recorded inside the fixture itself, as `provenance.omittedFields`.
 
-The launched game's fixture is stored **gzipped** (`.json.gz`, 0.6 MB against 20.5 MB of JSON; git stores both at about 0.6 MB, so the compressed form costs nothing in the repository and saves 20 MB in every working tree). `@etherfold/fs`'s `loadStreamFixture` gunzips by extension, and the browser side does it with the native `DecompressionStream` (`src/workload/load-fixture.ts`). The abandoned deployment's fixture stays plain JSON because it is small enough to read. The derived `*.trace.json` files are gitignored: `run/verify-port.ts` regenerates them, identically, in about three seconds. The golden `*.state.json` IS committed, because it is the oracle and a diff on it means the processor changed meaning.
+The launched game's fixture is stored **gzipped** (`.json.gz`, 0.6 MB against 20.5 MB of JSON; git stores both at about 0.6 MB, so the compressed form costs nothing in the repository and saves 20 MB in every working tree). `@etherfold/fs`'s `loadStreamFixture` gunzips by extension, and the browser side does it with the native `DecompressionStream` (`src/workload/load-fixture.ts`). The abandoned deployment's fixture stays plain JSON because it is small enough to read. The derived `*.trace.json` files are gitignored: `run/verify-port.ts` regenerates them, identically, in about three seconds. The golden `*.state.json` IS committed, because it is the oracle and a diff on it means the processor changed meaning. All of them now live in `packages/conformance-workload-stratagems/fixtures/`, which carries their labels and provenance in its own README.
 
 The full Chromium sweep takes about 15 minutes; `sweep` and `large` are the slow ones, and they are the two that matter.
 
@@ -61,6 +67,8 @@ The full Chromium sweep takes about 15 minutes; `sweep` and `large` are the slow
 - **A candidate that cannot start is a result, not a broken test.** WebKit has no OPFS under Playwright, so the SQLite route fails there, and the run records what it said rather than going red.
 
 ## What is real and what is generated
+
+(Paths below are relative to `packages/conformance-workload-stratagems/`, where they were promoted.)
 
 | | Real | Generated |
 | --- | --- | --- |

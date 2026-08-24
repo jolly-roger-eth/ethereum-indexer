@@ -22,7 +22,7 @@ import {blocksOf, bnReplacer} from '../../../../packages/core/dist/index.js';
 import {loadStreamFixture} from '../../../../packages/fs/dist/index.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
 import {applyPatches} from '../../../../packages/js-processor/dist/processor/immer.js';
-import {StratagemsIndexerProcessor, type Data} from '../vendor/stratagems/js-processor.js';
+import {StratagemsIndexerProcessor, type Data} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 import {generateEventStream, WORKLOAD_SIZES, type WorkloadSize} from '../src/workload/generate.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -72,7 +72,7 @@ const measurements: Measured[] = [];
 for (const size of ['real', 'small', 'medium'] as (WorkloadSize | 'real')[]) {
 	const blocks =
 		size === 'real'
-			? (blocksOf(loadStreamFixture(path.join(HERE, '../fixtures/stratagems-alpha1.stream.json.gz'))) as any[])
+			? (blocksOf(loadStreamFixture(path.join(HERE, '../../../../packages/conformance-workload-stratagems/fixtures/stratagems-alpha1.stream.json.gz'))) as any[])
 			: generateEventStream({...WORKLOAD_SIZES[size], seed: 42, includeRewards: true, includeForceCells: true});
 
 	const oracle = fromJSProcessor(() => StratagemsIndexerProcessor as any)();

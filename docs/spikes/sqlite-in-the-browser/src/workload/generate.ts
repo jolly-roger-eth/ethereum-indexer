@@ -56,7 +56,7 @@ export type WorkloadSpec = {
 	movesPerPlayer: number;
 	/** Live cells are bounded by the grid, so this is what really sets dataset size. */
 	gridSize: number;
-	/** Emit the three reward events. They do not exist on Base; see vendor/stratagems/README.md. */
+	/** Emit the three reward events. They do not exist on Base; see packages/conformance-workload-stratagems/vendor/stratagems/README.md. */
 	includeRewards?: boolean;
 	/** Emit `ForceSimpleCells`, which the Base deployment never emitted either. */
 	includeForceCells?: boolean;

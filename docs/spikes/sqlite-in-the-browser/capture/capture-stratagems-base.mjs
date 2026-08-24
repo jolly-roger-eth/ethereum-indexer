@@ -2,7 +2,7 @@
  * Capture the stratagems-on-Base log stream ONCE, as a replayable fixture.
  *
  * This is the only script in the spike that talks to a node. Everything else
- * replays `fixtures/stratagems-base.stream.json` offline, so that every
+ * replays `packages/conformance-workload-stratagems/fixtures/stratagems-base.stream.json` offline, so that every
  * candidate sees the same bytes and no measurement is at the mercy of a
  * rate limiter.
  *
@@ -37,7 +37,7 @@ const DEPLOYMENTS = path.join(STRATAGEMS, 'contracts/deployments', DEPLOYMENT);
 // deployment, which is small enough to stay readable and diffable.
 const OUT = path.join(
 	HERE,
-	`../fixtures/stratagems-${DEPLOYMENT}.stream.json${DEPLOYMENT === 'base' ? '' : '.gz'}`,
+	`../../../../packages/conformance-workload-stratagems/fixtures/stratagems-${DEPLOYMENT}.stream.json${DEPLOYMENT === 'base' ? '' : '.gz'}`,
 );
 
 /**

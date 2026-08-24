@@ -45,7 +45,7 @@ const {passed, failures} = await runStateStoreConformance(factory);
 - [`@etherfold/state-store`](../state-store)'s `MemoryStateStore`, under three retention claims (here, because that package cannot depend on this one).
 - [`@etherfold/state-store-sqlite`](../state-store-sqlite)'s `VersionedStateStore`, on a real libSQL database, under the same three.
 
-The workload is deliberately small and hand-written. The heavy subject, the captured stratagems stream and the port that reproduced its state byte-identically, is a second subject for this same suite (`promote-stratagems-conformance-workload`) and not a replacement: a case that fails on 31,332 real events is a bug report nobody can read.
+The workload here is deliberately small and hand-written. The heavy one, [`@etherfold/conformance-workload-stratagems`](../conformance-workload-stratagems), replays 31,332 real logs from a launched game on Base through the same backends and compares against the state that game's ORIGINAL processor computed. It is a second SUBJECT for the same backends and not a replacement: a case that fails on 31,332 real events is a bug report nobody can read, so these small cases go first and that one asks the question they are too small to ask.
 
 ## Tests
 

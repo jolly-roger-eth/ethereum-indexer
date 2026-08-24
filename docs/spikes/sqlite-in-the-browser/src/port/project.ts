@@ -8,7 +8,7 @@
  * entities plus a hand-maintained index to do it.
  */
 import type {MemoryBlockStore} from '../store/memory.js';
-import type {Data} from '../../vendor/stratagems/js-processor.js';
+import type {Data} from '../../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 import {SINGLETON} from './entities.js';
 
 type Rows = Map<string, Map<string, Record<string, unknown>>>;

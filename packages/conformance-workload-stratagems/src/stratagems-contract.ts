@@ -2,7 +2,7 @@
  * `StratagemsContract`, ported to `MutationContext`.
  *
  * DERIVED WORK of github.com/wighawag/stratagems `common/src/stratagems.ts`
- * @ 3d5a0b3f (GPL-3.0); see `packages/conformance-workload-stratagems/vendor/stratagems/README.md`.
+ * @ 3d5a0b3f (GPL-3.0); see `../vendor/stratagems/README.md`.
  *
  * The port is deliberately mechanical, so that what it costs is visible:
  *
@@ -19,10 +19,10 @@
  * Nothing about the ALGORITHM changed. Line for line it is the same traversal,
  * which is what makes the equality check meaningful.
  */
-import type {MutationContext} from '../../../../../packages/processor-sqlite/dist/index.js';
-import {EVIL_OWNER_ADDRESS} from '../../../../../packages/conformance-workload-stratagems/vendor/stratagems/constants.js';
-import {Color} from '../../../../../packages/conformance-workload-stratagems/vendor/stratagems/types.js';
-import type {ContractCell, ContractMove, ContractSimpleCell} from '../../../../../packages/conformance-workload-stratagems/vendor/stratagems/types.js';
+import type {MutationContext} from '@etherfold/processor-entities';
+import {EVIL_OWNER_ADDRESS} from '../vendor/stratagems/constants.js';
+import {Color} from '../vendor/stratagems/types.js';
+import type {ContractCell, ContractMove, ContractSimpleCell} from '../vendor/stratagems/types.js';
 
 const zeroAddress = '0x0000000000000000000000000000000000000000' as const;
 
@@ -403,10 +403,7 @@ export class StratagemsContractOnEntities {
 		}
 
 		if (move.color == Color.None) {
-			if (
-				currentState.life != MAX_LIFE ||
-				(await this.ownerOf(move.position)).toLowerCase() != player.toLowerCase()
-			) {
+			if (currentState.life != MAX_LIFE || (await this.ownerOf(move.position)).toLowerCase() != player.toLowerCase()) {
 				return;
 			}
 		} else if (currentState.epochWhenTokenIsAdded == epoch) {
@@ -547,11 +544,7 @@ export class StratagemsContractOnEntities {
 		}
 	}
 
-	async updateNeighbosrDelta(
-		center: bigint,
-		color: Color,
-		epoch: number,
-	): Promise<{delta: number; enemyMap: number}> {
+	async updateNeighbosrDelta(center: bigint, color: Color, epoch: number): Promise<{delta: number; enemyMap: number}> {
 		const {x, y} = bigIntIDToXY(center);
 		const data = {delta: 0, enemyMap: 0};
 
