@@ -25,6 +25,7 @@ import {
 	type RetentionSetting,
 	type StateStore,
 	type StateStoreCapabilities,
+	type CursorWrite,
 } from '@etherfold/state-store';
 import {ROWID, migrationStatements} from './ddl.js';
 import {assertStorableEntityNames, quoted} from './identifiers.js';
@@ -35,6 +36,7 @@ import {
 	blockAtOrBeforeStatement,
 	blockByHashStatement,
 	blockByNumberStatement,
+	clearCursorStatement,
 	dropVersionsStatement,
 	idPredicate,
 	idValues,
@@ -42,7 +44,9 @@ import {
 	listAsOfStatement,
 	listCurrentStatement,
 	prunableVersionsStatement,
+	readCursorStatement,
 	revertToStatements,
+	writeCursorStatement,
 } from './statements.js';
 import type {
 	BlockPointer,
@@ -199,9 +203,15 @@ export class VersionedStateStore implements StateStore {
 	 * cannot make that call, since it sees mutations and not logs, and inferring
 	 * it from a non-empty mutation list would make exactly those pinnable hashes
 	 * unresolvable. Pinned by `test/batch.test.ts` and `test/block-addressing.test.ts`.
+	 *
+	 * The optional `cursor` rides in that same batch, which is what makes a
+	 * processor's "I have got this far" atomic with the block it is about. It used
+	 * to be a second `batch` issued by the processor afterwards, and a crash inside
+	 * that window left state ahead of the cursor, which is a wedge and not a retry:
+	 * see `cursor.ts` at the seam.
 	 */
-	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = []): Promise<void> {
-		const statements = applyBlockStatements(this.entities, block, mutations);
+	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = [], cursor?: CursorWrite): Promise<void> {
+		const statements = applyBlockStatements(this.entities, block, mutations, cursor);
 		if (statements.length > this.bounds.maxStatementsPerBatch) {
 			logger.warn(
 				`block ${block.number} needs ${statements.length} statements, above the configured bound of ` +
@@ -209,6 +219,22 @@ export class VersionedStateStore implements StateStore {
 			);
 		}
 		await this.db.batch(this.prepare(statements));
+	}
+
+	/** The opaque string last written under `key`, or `undefined`. See `cursor.ts`. */
+	async readCursor(key: string): Promise<string | undefined> {
+		const rows = await this.select<{value: string}>(readCursorStatement(key));
+		return rows[0]?.value;
+	}
+
+	/** Move a cursor with no block behind it. See `StateStore.writeCursor`. */
+	async writeCursor(key: string, value: string): Promise<void> {
+		await this.db.batch(this.prepare([writeCursorStatement(key, value)]));
+	}
+
+	/** Forget it. A `DELETE` matching nothing is the no-op the contract asks for. */
+	async clearCursor(key: string): Promise<void> {
+		await this.db.batch(this.prepare([clearCursorStatement(key)]));
 	}
 
 	/**
@@ -236,6 +262,9 @@ export class VersionedStateStore implements StateStore {
 	 * `revertToStatements`.
 	 */
 	async revertTo(keepUpTo: number): Promise<void> {
+		// `_cursor` is deliberately not in `revertToStatements`: how far the CALLER
+		// got is not entity state, and the caller moves it when it applies the
+		// canonical branch. See `cursor.ts`.
 		logger.info(`reverting state above block ${keepUpTo}`);
 		const statements = revertToStatements(this.entities, keepUpTo);
 		// one batch: a partially reverted store would violate the one-live-version

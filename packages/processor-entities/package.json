@@ -25,11 +25,13 @@
 		"named-logs": "^0.4.1"
 	},
 	"devDependencies": {
+		"@etherfold/state-store-indexeddb": "workspace:*",
 		"@etherfold/state-store-patch": "workspace:*",
 		"@etherfold/state-store-sqlite": "workspace:*",
 		"@libsql/client": "^0.17.3",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
+		"fake-indexeddb": "^6.2.2",
 		"remote-sql": "^0.0.7",
 		"remote-sql-libsql": "^0.0.7",
 		"tsx": "^4.21.0",

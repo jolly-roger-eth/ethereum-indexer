@@ -1,4 +1,5 @@
 import type {StateStoreCapabilities} from './capabilities.js';
+import type {CursorWrite} from './cursor.js';
 import type {EntityIdPrefix, Listing} from './listing.js';
 import type {PruneOptions, PruneReport} from './retention.js';
 import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.js';
@@ -6,7 +7,7 @@ import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.j
 /**
  * The seam: what a store must do for a processor to run on it.
  *
- * Eight verbs and one report, chosen because they are the whole of what
+ * Eleven verbs and one report, chosen because they are the whole of what
  * processing a chain needs and because each of them is cheaply implementable on
  * every substrate we have measured (versioned SQL rows, an object store, an
  * in-memory map, a patch log). Anything a particular backend can do BETTER stays
@@ -30,9 +31,16 @@ import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.j
  *   NUMBER, so the seam owes nothing to a block table. Resolving a hash or a
  *   timestamp to a number, and refusing an address that resolves to nothing
  *   (`NoSuchBlockError`, ADR-0015), is the read layer above.
- * - **The sync cursor.** Where a processor keeps `LastSync` is the processor
- *   package's business (ADR-0016), and putting it here would make every backend
- *   implement it to serve one caller.
+ *
+ * Present, and it USED to be on that list: **the sync cursor**. It was left out
+ * on the grounds that where a processor keeps `LastSync` is the processor
+ * package's business (ADR-0016), which is true of the MEANING and turned out to
+ * be the wrong conclusion about the STORAGE. A cursor kept outside the store is
+ * a second round trip after the block it describes, and a crash in that window
+ * wedges the indexer for good. Only the store holds the transaction, so only the
+ * store can close it -- and the cost is a handful of lines per backend over one
+ * key and one opaque string, which is what keeps ADR-0016 intact: the store
+ * still does not know what a `LastSync` is. See `cursor.ts`.
  */
 export interface StateStore {
 	/** What this store keeps and what it can answer. Readable before `migrate`. */
@@ -54,8 +62,46 @@ export interface StateStore {
 	 * over is recorded, including one that carried no mutation, and nothing else
 	 * is. A block that carries a log of ours which changes nothing is still a
 	 * block a consumer can legitimately pin.
+	 *
+	 * `cursor` joins that unit. It is how a processor's "I have got this far"
+	 * stops being a separate round trip: the block and the cursor that describes
+	 * it move together or neither moves, so a crash can never leave state ahead of
+	 * the cursor (a wedge, since the replay re-applies a block the store holds) nor
+	 * a cursor ahead of the state (silent loss, since the replay skips a block
+	 * nothing applied). A backend with no transaction to join must still not write
+	 * the cursor when the block fails. See `cursor.ts`.
 	 */
-	applyBlock(block: BlockPointer, mutations?: readonly Mutation[]): Promise<void>;
+	applyBlock(block: BlockPointer, mutations?: readonly Mutation[], cursor?: CursorWrite): Promise<void>;
+
+	/**
+	 * The cursor stored under `key`, or `undefined` if nothing was ever written
+	 * there.
+	 *
+	 * Opaque: whatever string the caller last wrote, byte for byte.
+	 */
+	readCursor(key: string): Promise<string | undefined>;
+
+	/**
+	 * Move a cursor on its own, with no block.
+	 *
+	 * Needed because progress is not only blocks. A processor that scanned a range
+	 * carrying none of its logs has advanced and written nothing, and it must be
+	 * able to say so or it re-scans that range on every restart forever. It is
+	 * also how a BOOTSTRAP installs a cursor that belongs to rows it did not
+	 * compute.
+	 *
+	 * It is NOT the way to record progress that a block DID cause: pass the cursor
+	 * to `applyBlock` instead, which is the whole point of it being here.
+	 */
+	writeCursor(key: string, value: string): Promise<void>;
+
+	/**
+	 * Forget a cursor. A no-op where none was written.
+	 *
+	 * Paired with wiping the state it points at, never on its own: a cursor
+	 * without its state would have a caller resume into an empty store.
+	 */
+	clearCursor(key: string): Promise<void>;
 
 	/**
 	 * Delete the versions the declared retention no longer covers, and report what

@@ -5,6 +5,7 @@ import {portableDeclarationCases} from './cases/portable-declarations.js';
 import {readYourWritesCases} from './cases/read-your-writes.js';
 import {reorgRevertCases} from './cases/reorg-revert.js';
 import {retentionPruningCases} from './cases/retention-pruning.js';
+import {syncCursorCases} from './cases/sync-cursor.js';
 import {versionedReadCases} from './cases/versioned-reads.js';
 import {CONFORMANCE_ENTITIES} from './fixtures.js';
 import type {ConformanceCase, ConformanceFailure, ConformanceResult, StateStoreFactory} from './types.js';
@@ -24,9 +25,11 @@ import type {ConformanceCase, ConformanceFailure, ConformanceResult, StateStoreF
  * Everything else is asked of everyone: versioned reads, the reorg revert with
  * its counter that must go back DOWN, read-your-writes inside a block, the
  * bounded id-prefix listing a one-to-many is derived through, a block applying
- * as one unit, what a prune must never delete (the same claim-driven selection:
- * what a store may drop is what it stopped promising to answer), and that a
- * DECLARATION means the same thing here as it does on every other backend.
+ * as one unit (with the sync cursor that describes it, which is the half a
+ * caller cannot make atomic from outside), what a prune must never delete (the
+ * same claim-driven selection: what a store may drop is what it stopped
+ * promising to answer), and that a DECLARATION means the same thing here as it
+ * does on every other backend.
  */
 export async function stateStoreConformanceCases(factory: StateStoreFactory): Promise<ConformanceCase[]> {
 	const probe = await factory(CONFORMANCE_ENTITIES);
@@ -40,6 +43,7 @@ export async function stateStoreConformanceCases(factory: StateStoreFactory): Pr
 		...readYourWritesCases(factory, capabilities),
 		...boundedListingCases(factory, capabilities),
 		...blockAtomicityCases(factory),
+		...syncCursorCases(factory),
 		...portableDeclarationCases(factory),
 	];
 }

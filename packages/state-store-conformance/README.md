@@ -21,6 +21,7 @@ External behaviour only: what a read returns after a write, after a revert, as o
 - **Read-your-writes within a block.** Two events in one block that touch one counter compose; `update` carries a field it does not mention and `set` clears it; and a LISTING made later in the block sees exactly the children the block has written and not the one it deleted, which is the part a listing cannot get by falling through to the store.
 - **The bounded id-prefix listing.** The children of a prefix, ascending in the declared id's own order, never more than the limit, and `truncated` when the limit cut the answer off (a set that exactly fills the limit must NOT claim it). A prefix that is not a leading run of the id columns is refused, an as-of listing answers about the block it was asked about, and a revert un-derives the collection. This is what a one-to-many is modelled on, so a backend that gets it subtly wrong makes an idiomatic model quietly incorrect rather than obviously broken.
 - **A block is one atomic unit.** A block whose mutations include a rejected one applies none of them and does not take its height; applying one block twice raises.
+- **The sync cursor, and that it is never AHEAD of the last applied block.** The round trip and the clear are the easy half (an opaque string under a key, byte for byte); the case that matters is atomicity, because a caller cannot get it from outside. A block handed a cursor moves both or neither, so a REFUSED block leaves the cursor exactly where it was — a cursor describing a block the store does not hold sends the next run silently past it, and one left behind wedges the run instead, since the replay hands `applyBlock` a block it already holds. Installing rows and a cursor together is the same verb, which is what a snapshot bootstrap needs (ADR-0027).
 
 What is NOT here: any access path. That a listing is one indexed range scan rather than a scan-and-sort is a property of a particular backend, and it is pinned in that backend's own tests (`state-store-sqlite/test/listing.test.ts` reads it back out of `EXPLAIN QUERY PLAN`).
 
@@ -28,7 +29,7 @@ What is NOT here: any access path. That a listing is one indexed range scan rath
 
 Testing a backend against a capability it never claimed fails honest backends. Testing it against LESS than it claimed is what lets a claim become fiction. So the suite reads `store.capabilities` once, from a probe store, and asks each backend exactly what it said it could do.
 
-That the capability cases are real is itself a test: `test/the-suite-catches.test.ts` runs the suite against backends with one lie each (claiming a window it does not honour, answering an as-of read from the tip, accepting a revert without undoing it) and asserts which cases go red. Without that, the capability tests would be decoration.
+That the capability cases are real is itself a test: `test/the-suite-catches.test.ts` runs the suite against backends with one lie each (claiming a window it does not honour, answering an as-of read from the tip, accepting a revert without undoing it, moving the sync cursor before the block instead of with it) and asserts which cases go red. Without that, the capability tests would be decoration.
 
 ## Running the cases directly
 

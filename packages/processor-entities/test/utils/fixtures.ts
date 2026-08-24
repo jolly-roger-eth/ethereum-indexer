@@ -1,4 +1,4 @@
-import type {Abi, LogEvent} from '@etherfold/core';
+import type {Abi, LastSync, LogEvent} from '@etherfold/core';
 import type {EntityProcessor} from '../../src/index.js';
 
 /**
@@ -43,6 +43,27 @@ export const processor: EntityProcessor<TestABI> = {
 export function timestampOf(blockNumber: number): number {
 	return 1_700_000_000 + blockNumber * 12;
 }
+
+/** The identity the core validates when it decides whether to adopt stored state. */
+export const CONTEXT = {source: [{startBlock: 0, hash: 'h'}], config: 'cfg', processor: 'proc'};
+
+export function lastSync(over: Partial<LastSync<TestABI>> = {}): LastSync<TestABI> {
+	return {
+		context: CONTEXT,
+		latestBlock: 0,
+		lastFromBlock: 0,
+		lastToBlock: 0,
+		unconfirmedBlocks: [],
+		...over,
+	};
+}
+
+export const finality = 12;
+
+export const SOURCE = {
+	chainId: '1',
+	contracts: [{abi, address: '0x0000000000000000000000000000000000000000'}],
+} as any;
 
 let logCounter = 0;
 

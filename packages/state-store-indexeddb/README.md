@@ -35,17 +35,19 @@ Measured, not preferred. On the real workload (the launched stratagems game on B
 
 ## The layout
 
-Three object stores, and the entity name lives in the KEY:
+Four object stores, and the entity name lives in the KEY:
 
 ```
 current   [entity, ...id]         -> {lower, values}          the tip read, one `get`
 versions  [entity, ...id, lower]  -> {lower, upper, values}   the history, for as-of and for revert
 blocks    number                  -> {number, hash, timestamp}
+cursors   key                     -> the opaque string a caller wrote (the sync cursor)
 ```
 
 - **A version is a complete row** with a half-open block-validity range (`lower` inclusive, `upper` exclusive, `null` meaning live), which is what `@etherfold/state-store-sqlite` keeps as columns. A `set` writes a whole row, so a declared field the write did not list becomes NULL; a `delete` closes the live version without opening a new one.
-- **A store per entity was rejected.** Creating an object store needs a version change, and an upgrade transaction can be BLOCKED by another open tab, so a store per entity would make "the processor declares one more entity" a migration a second tab can stall. The schema is fixed at version 1; every access path a table would have given is still a key range.
-- **One block is one transaction.** A block applies whole or not at all, and two tabs writing one database serialise instead of interleaving.
+- **A store per entity was rejected.** Creating an object store needs a version change, and an upgrade transaction can be BLOCKED by another open tab, so a store per entity would make "the processor declares one more entity" a migration a second tab can stall. The schema version is this PACKAGE's and never a processor's: declaring another entity is not a migration, and every access path a table would have given is still a key range. (It moved to 2 once, when `cursors` was added; the upgrade is additive, so an existing database keeps every row.)
+- **One block is one transaction**, and the SYNC CURSOR is in it. A block applies whole or not at all, two tabs writing one database serialise instead of interleaving, and the cursor that says "I have reached this block" commits with the block or not at all (ADR-0027). A cursor kept outside the store would be a second write, and a crash between them wedges an indexer.
+- **`revertTo` does not touch `cursors`.** How far the CALLER got is not entity state; the caller moves it when it applies the canonical branch.
 
 ### The access paths, which are the reason for the seam's shapes
 
@@ -56,6 +58,7 @@ blocks    number                  -> {number, hash, timestamp}
 | `listCurrent` / `listAsOf` | one cursor over `IDBKeyRange.bound([entity, ...prefix], [entity, ...prefix, []])` |
 | `revertTo` | two index range scans: drop what the fork opened (`lower`), reopen what it closed (`upper`) |
 | `prune` | one range scan of the `upper` index, oldest close first |
+| `readCursor` / `writeCursor` / `clearCursor` | one `get` / `put` / `delete` on `cursors`; a cursor handed to `applyBlock` rides the block's own transaction |
 
 The listing bound is the interesting one: `[]` sorts after every string in IndexedDB's key order, so `bound([prefix], [prefix, []])` is exactly "the prefix and its descendants". That is why the handler seam's only set read is an id PREFIX plus a REQUIRED limit and never a predicate or a caller-supplied ordering (ADR-0021) — it has to be one indexed range scan on a substrate with no query planner. `test/listing-access-path.test.ts` asserts the range and the number of records walked, because a scan-and-filter would return the same rows.
 

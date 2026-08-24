@@ -13,6 +13,7 @@ import {
  * current   [entity, ...id]         -> {lower, values}        the tip read and the tip listing
  * versions  [entity, ...id, lower]  -> {lower, upper, values} the history, for as-of and for revert
  * blocks    number                  -> {number, hash, timestamp}
+ * cursors   key                     -> the opaque string the caller wrote
  * ```
  *
  * **The entity name is part of the KEY rather than the name of a store**, which
@@ -25,6 +26,14 @@ import {
  * given is still a key range, because a key range on `[entity, ...]` is exactly
  * "that entity's rows".
  *
+ * **The schema version is this PACKAGE's, not a processor's**, and the
+ * distinction is the whole reason for the layout above. A processor declaring
+ * one more entity is still not a migration and still cannot be blocked by a
+ * second open tab; what moved the version to 2 is this package growing an object
+ * store of its own, once, for the sync cursor at the seam. `upgrade` creates
+ * whatever is missing, so an existing database gains `cursors` and keeps every
+ * row it had.
+ *
  * `values` is the COMPLETE row (id columns and every declared field, unlisted
  * ones NULL), so a version means the same thing here as everywhere else. It is
  * duplicated between `current` and `versions` for the live version, which is the
@@ -33,10 +42,20 @@ import {
  * 1,246 for the wasm-SQLite candidate) and a tip listing that never reads a
  * superseded version, and it costs one extra copy of the live set.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const CURRENT = 'current';
 export const VERSIONS = 'versions';
 export const BLOCKS = 'blocks';
+/**
+ * The sync cursors: one opaque string per caller-chosen key.
+ *
+ * It is here, in the store, rather than beside it because a cursor has to be
+ * written in the SAME transaction as the block it describes and only the store
+ * opens that transaction. The reasoning is at the seam, in
+ * `@etherfold/state-store`'s `cursor.ts`. Nothing in this package knows what the
+ * string means.
+ */
+export const CURSORS = 'cursors';
 
 /** Unique: a hash identifies one block, and a second claim on it is a caller bug. */
 export const HASH_INDEX = 'hash';

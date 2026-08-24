@@ -42,7 +42,7 @@ It does not revert as far as it can. A partly-undone reorg is the same class of 
 
 ## Memory-only
 
-State and patches both live in the process and go with it. **A reload is an empty store**, and `capabilities.durability` says `memory-only` so a caller learns that at startup rather than from a blank tab.
+State and patches both live in the process and go with it. **A reload is an empty store**, and `capabilities.durability` says `memory-only` so a caller learns that at startup rather than from a blank tab. The sync cursor the seam keeps (`readCursor` / `writeCursor` / `clearCursor`) is in that bargain too, and honestly so: it goes with the process exactly as the state does, so a reload is a store with no cursor rather than a cursor pointing at state that is gone.
 
 That is a decision, not an omission. Serialising the whole state on every save is the incumbent `keepStateOnIndexedDB` strategy, which belongs to the `KeepState` seam ABOVE this one (and is measured as the fastest writer at today's sizes precisely because it does no history at all); row-level persistence with its own bounded cold start is `indexeddb-row-backend-browser-default`'s job. Choosing either here would fork a persistence strategy inside a store whose whole claim is that it is the cheap one. Hosts that need state to survive a reload should use a persisted backend or hydrate from a snapshot; hosts that re-index from a cached stream on load are what this store is for. Again ADR-0023.
 
@@ -61,7 +61,7 @@ Two things pruning here does NOT touch:
 
 ## One implementation of the seam
 
-This is a `StateStore` ([`@etherfold/state-store`](../state-store)): `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` / `revertTo` / `prune`, plus the capabilities it declares. A processor written against `@etherfold/processor-entities` hands this store exactly what it would hand any other backend, and `packages/processor-entities/test/patch-backend.test.ts` asserts that one processor produces identical state here and on `@etherfold/state-store-sqlite`.
+This is a `StateStore` ([`@etherfold/state-store`](../state-store)): `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` / `revertTo` / `prune` / `readCursor` / `writeCursor` / `clearCursor`, plus the capabilities it declares. A processor written against `@etherfold/processor-entities` hands this store exactly what it would hand any other backend, and `packages/processor-entities/test/patch-backend.test.ts` asserts that one processor produces identical state here and on `@etherfold/state-store-sqlite`.
 
 The bounded id-prefix listing is a **sorted walk** over the entity's own bucket here, rather than an indexed range scan — the answer is what the seam specifies (ascending in the declared id's order, bounded by the required limit, `truncated` reported as a fact), and the access path is this backend's own business.
 

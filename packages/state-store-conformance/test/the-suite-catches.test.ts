@@ -1,6 +1,7 @@
 import {
 	MemoryStateStore,
 	type BlockPointer,
+	type CursorWrite,
 	type EntityId,
 	type EntityIdPrefix,
 	type Listing,
@@ -33,6 +34,11 @@ import {runStateStoreConformance, type StateStoreFactory} from '../src/index.js'
  *   (`work/notes/findings/sqlite-in-the-browser.md` records the real instance: a
  *   `computedPoints` of 12 going back to 6 on revert), and it is why the reorg
  *   case runs on every backend rather than once.
+ * - `PrematureCursorStore` writes the sync cursor and THEN applies the block,
+ *   which is a store that leaves the cursor ahead of its own state whenever a
+ *   block is refused. It is the shape every backend would drift into by writing
+ *   the two halves in the convenient order, and its cost is silent: the next run
+ *   resumes past a block nothing ever applied.
  *
  * Each lie is written as a DECORATOR over the honest store rather than as a
  * subclass overriding one method, because the honest store's refusal is not a
@@ -69,8 +75,20 @@ class Decorated implements StateStore {
 		return this.inner.migrate();
 	}
 
-	applyBlock(block: BlockPointer, mutations?: readonly Mutation[]): Promise<void> {
-		return this.inner.applyBlock(block, mutations);
+	applyBlock(block: BlockPointer, mutations?: readonly Mutation[], cursor?: CursorWrite): Promise<void> {
+		return this.inner.applyBlock(block, mutations, cursor);
+	}
+
+	readCursor(key: string): Promise<string | undefined> {
+		return this.inner.readCursor(key);
+	}
+
+	writeCursor(key: string, value: string): Promise<void> {
+		return this.inner.writeCursor(key, value);
+	}
+
+	clearCursor(key: string): Promise<void> {
+		return this.inner.clearCursor(key);
 	}
 
 	prune(options?: PruneOptions): Promise<PruneReport> {
@@ -133,6 +151,17 @@ class StickyCounterStore extends Decorated {
 	override async revertTo(): Promise<void> {}
 }
 
+/**
+ * Moves the cursor FIRST and applies the block after: honest while everything
+ * works, and ahead of its own state the moment a block is refused.
+ */
+class PrematureCursorStore extends Decorated {
+	override async applyBlock(block: BlockPointer, mutations?: readonly Mutation[], cursor?: CursorWrite): Promise<void> {
+		if (cursor) await this.inner.writeCursor(cursor.key, cursor.value);
+		await this.inner.applyBlock(block, mutations);
+	}
+}
+
 describe('the conformance suite', () => {
 	it('passes an honest backend, so a failure below means something', async () => {
 		expect(await failedCases(honest)).toEqual([]);
@@ -156,6 +185,12 @@ describe('the conformance suite', () => {
 		const failures = await failedCases((declarations) => new StickyCounterStore(new MemoryStateStore(declarations)));
 
 		expect(failures.join('\n')).toMatch(/DOWN/);
+	});
+
+	it('fails a backend whose cursor can end up ahead of the block it describes', async () => {
+		const failures = await failedCases((declarations) => new PrematureCursorStore(new MemoryStateStore(declarations)));
+
+		expect(failures.join('\n')).toMatch(/never ahead of the last applied block/);
 	});
 
 	it('reports WHY a case failed, and not merely that it did', async () => {

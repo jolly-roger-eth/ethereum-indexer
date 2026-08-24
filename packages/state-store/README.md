@@ -17,6 +17,10 @@ await store.getAsOf('token', {id: '1'}, 99); // as of a block number: undefined,
 await store.listCurrent('placement', {epoch: 7}, 8); // the children of a key, bounded: {rows, truncated}
 await store.revertTo(99); // a reorg: the write above is undone, counters go back DOWN
 await store.prune(); // enforce the declared retention against storage; a no-op when there is none
+
+// how far the caller has got, as an opaque string, written WITH the block it describes
+await store.applyBlock(block, mutations(), {key: 'lastSync', value: cursor});
+await store.readCursor('lastSync');
 ```
 
 ## Reading it back, typed off the same declarations
@@ -57,6 +61,7 @@ No table name, no column string, no hand-written row type. Rename `owner` in the
 - **retention** — how far back superseded versions are kept, in BLOCK NUMBERS. Never in updates (on the real measured stream event-bearing blocks are median 429 apart, so a 64-block window holds one of them), never in time (that prunes on wall-clock rather than chain progress).
 - **prune** — the enforcement of retention against STORAGE, as opposed to against answers. A window bounds what a read may ask about from the moment it is configured; `prune` is what drops the versions it no longer covers. It is an explicit call the host schedules, never a side effect of a write, because it costs time proportional to what it drops and a store is the wrong place to pick a maintenance cadence (ADR-0022). The LIVE version of an entity survives it however old it is: that row is the current state.
 - **capabilities** — what a store declares about itself, readable before `migrate` and before any read, so a caller discovers a missing capability at startup instead of from a wrong answer.
+- **sync cursor** — how far the CALLER has got, as an OPAQUE STRING under a key it chooses (`readCursor` / `writeCursor` / `clearCursor`, and `applyBlock`'s third argument). The store persists a string and never learns what it means: a typed cursor would be a `@etherfold/core` type and would drag viem into a storage primitive. It is here, rather than in something the deployment wires beside the store, because only the store holds the transaction the block write happens in, and a cursor written in a second round trip can be left behind the state by a crash — which is not a retry, because the replay hands `applyBlock` a block it already holds and is rightly refused. It is NOT versioned, NOT reverted and NOT pruned: how far the caller got is not entity state. See ADR-0027.
 
 ## Why the seam is here and not lower
 
@@ -66,7 +71,7 @@ A processor could have been written against raw SQL, forcing wasm SQLite into ev
 
 - **Any richer read.** The listing above is the whole of the set-read surface, and the generated read surface offers exactly the same four reads. A predicate, a sort or a page belongs to a backend that has a query planner under it (`queryCurrent` / `queryAsOf` in `@etherfold/state-store-sqlite`), because a handler runs once per event on every backend including the ones that have none. See ADR-0021.
 - **Block addressing by hash or time**, and the refusal for an address that resolves to nothing. `getAsOf` takes a resolved block NUMBER; addressing is the read layer above (`@etherfold/state-store-sqlite`, ADR-0015). The generated surface does not add one either: it takes whatever address ITS store takes.
-- **The sync cursor.** Where a processor keeps `LastSync` is the processor package's business (ADR-0016).
+- **What the sync cursor MEANS.** The port above stores a string; the codec that makes it a `LastSync`, and the one fixed key an indexer writes it under, are `@etherfold/processor-entities`. ADR-0016's direction is intact — the store still cannot tell an indexer from any other caller — and ADR-0027 records why the STORAGE nonetheless had to come here.
 - **Anything ABI-shaped.** The `on<EventName>` handler map is `@etherfold/processor-entities`, which depends on this package and on `@etherfold/core`. Keeping it out is what lets a storage backend depend on this package without inheriting the whole indexer. See ADR-0018.
 
 ## Implementations

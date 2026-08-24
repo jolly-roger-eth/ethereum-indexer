@@ -21,6 +21,27 @@ await applyEventStream(store, processor, eventStream, undefined);
 
 Nothing in that object names a backend, which is the whole point: where the state physically lives is a deployment choice the processor neither sees nor encodes. `test/two-backends.test.ts` runs this exact processor against `@etherfold/state-store-sqlite` and against `MemoryStateStore` and asserts the resulting state is the same.
 
+## Running it as an indexer
+
+`applyEventStream` is the engine. `EntityEventProcessor` is the `EventProcessor` the core actually drives, and it takes the store, so choosing a backend is choosing the argument:
+
+```ts
+import {EntityEventProcessor} from '@etherfold/processor-entities';
+
+const store = await createBrowserStateStore(processor.entities); // a tab, on IndexedDB
+const store = new VersionedStateStore(db, processor.entities); //    a server, on SQLite
+
+const indexed = new EntityEventProcessor(store, processor);
+const view = await indexed.process(eventStream, lastSync);
+await view.getCurrent('token', {id: '1'});
+```
+
+It owns the whole lifecycle the core expects (`load` / `process` / `reset` / `clear`, the version hash, the code fingerprint) and `prune`, which a host schedules between `process` calls. `test/entity-event-processor.test.ts` runs one processor definition through it against all four shipped backends and asserts the same state, a reorg that takes a counter back DOWN, and a sync cursor that survives a restart on each of them.
+
+**The sync cursor lives in the store**, as an opaque string written in the same transaction as the block it describes (ADR-0027). That is what makes a restart safe on every backend rather than only on the one with a SQL table to write into; `serializeLastSync` / `deserializeLastSync` are here, and the store never learns what the string means.
+
+**The handle `process` returns is the seam tier.** `EntityStateView` has `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` and the capability report, and deliberately no `queryCurrent` / `queryAsOf`: those take caller-supplied SQL, so asking a backend-neutral handle for them is a compile error rather than a runtime throw in a tab. Choose [`@etherfold/processor-sqlite`](../processor-sqlite) for that tier.
+
 ## What you get, and what it costs
 
 - **`set` writes a WHOLE row.** A version is a complete row, not a delta, so a declared field `set` does not list becomes `NULL`. `update(entity, id, partial)` is sugar over get-then-spread-then-set for the counter case; it is spelled as sugar so the storage model stays visible.
@@ -58,8 +79,9 @@ The same four reads the seam has (`getCurrent` / `getAsOf` / `listCurrent` / `li
 | --- | --- |
 | `EntityProcessor`, `EventHandlers` | here: the ABI-typed authoring surface |
 | `applyEventStream`, `runBlockHandlers`, `forkPoint`, `groupByBlock` | here: revert-then-apply, once, for every backend |
-| `MutationContext`, `EntityDeclaration`, `StateStore`, capabilities | [`@etherfold/state-store`](../state-store): what a store must understand |
-| `EventProcessor`, the sync cursor, a read view | a backend's processor package, e.g. [`@etherfold/processor-sqlite`](../processor-sqlite) |
+| `EntityEventProcessor`, `EntityStateView`, the `LastSync` codec | here: the `EventProcessor` shell, once, for every backend |
+| `MutationContext`, `EntityDeclaration`, `StateStore`, capabilities, the cursor port | [`@etherfold/state-store`](../state-store): what a store must understand |
+| a `RemoteSQL`-flavoured wrapper and the SQL read tier | [`@etherfold/processor-sqlite`](../processor-sqlite) |
 
 ADR-0018 records why this is a separate package from `@etherfold/state-store` rather than one: a storage backend must be able to depend on the seam without inheriting `@etherfold/core`.
 

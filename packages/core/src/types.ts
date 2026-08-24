@@ -92,7 +92,7 @@ export type ContextIdentifier = {
 	 * It rides inside `ContextIdentifier` rather than beside it because
 	 * `lastSync` is the one thing EVERY persistence path round-trips whole (the
 	 * fs / localStorage / IndexedDB keepers, the CLI snapshot envelope, and the
-	 * `_sync` row in `@etherfold/processor-sqlite`). It is NOT part of
+	 * sync cursor a `StateStore` keeps behind the storage seam). It is NOT part of
 	 * `indexerMatches`, which decides whether to discard state.
 	 */
 	processorFingerprint?: string;

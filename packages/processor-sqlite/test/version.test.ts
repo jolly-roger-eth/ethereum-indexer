@@ -133,7 +133,7 @@ describe('the code fingerprint', () => {
 	});
 });
 
-describe('the fingerprint survives the _sync codec', () => {
+describe('the fingerprint survives the cursor codec', () => {
 	it('round-trips through serialize/deserialize unchanged', () => {
 		// The cursor is NOT plain JSON: BigInts are tagged on the way out and rebuilt
 		// on the way in. A fingerprint is a plain string and should be untouched by
@@ -172,9 +172,12 @@ describe('the fingerprint survives the _sync codec', () => {
 		const restarted = new VersionedStateEventProcessor(db, processor);
 		const loaded = await restarted.load(SOURCE, {finality, alwaysFetchTimestamps: true});
 		expect(loaded!.lastSync.context.processorFingerprint).toBe(p.getCodeFingerprint());
-		// and it really is in the row, not only in some in-memory copy
-		const [row] = await rows<{lastSync: string}>(db, `SELECT lastSync FROM _sync`);
-		expect(row.lastSync).toContain(p.getCodeFingerprint()!);
+		// and it really is in the row, not only in some in-memory copy. The cursor is
+		// the store's `_cursor` table now (an opaque string under a key), not this
+		// package's `_sync`, because it has to be written in the same transaction as
+		// the block it describes; see `src/sync.ts`.
+		const [row] = await rows<{value: string}>(db, `SELECT "value" FROM _cursor`);
+		expect(row.value).toContain(p.getCodeFingerprint()!);
 	});
 
 	it('reads a cursor written BEFORE fingerprints existed as absent, not as empty', async () => {
@@ -256,10 +259,10 @@ describe('drift, end to end', () => {
 		const db = createTestDB();
 		await indexOneBlock(new VersionedStateEventProcessor(db, processor));
 		// strip the field from the stored row, as an upgraded deployment's would be
-		const [row] = await rows<{lastSync: string}>(db, `SELECT lastSync FROM _sync`);
-		const stripped = JSON.parse(row.lastSync);
+		const [row] = await rows<{value: string}>(db, `SELECT "value" FROM _cursor`);
+		const stripped = JSON.parse(row.value);
 		delete stripped.context.processorFingerprint;
-		await db.prepare(`UPDATE _sync SET lastSync = ?`).bind(JSON.stringify(stripped)).all();
+		await db.prepare(`UPDATE _cursor SET "value" = ?`).bind(JSON.stringify(stripped)).all();
 
 		const {reports, load} = await loadWith(new VersionedStateEventProcessor(db, editedSameVersion));
 		await load();
