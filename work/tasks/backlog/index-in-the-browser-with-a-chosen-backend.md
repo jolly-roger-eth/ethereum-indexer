@@ -24,7 +24,11 @@ Both halves exist and they are not joined. `createBrowserStateStore` (`packages/
 
 **Note what this does NOT include.** No HTTP query endpoint: the spec puts the GraphQL frontend out of scope and says the example ships hand-written routes, and `createReadSurface` is the in-process typed surface an app reads through. No server-side ingestion endpoint: `ingest-wire-receiving-side` (spec `historical-state-database`) owns that and is already eligible.
 
-**A runnable demo is worth considering and is not required.** The four `examples/event-processor-*` lost their run path when `ethereum-indexer-server` was archived, so nothing in the repository currently demonstrates indexing end to end, old path or new. If giving one example a browser entry point is cheap once the wiring exists, it is the clearest possible proof this works; if it drags in build tooling or a dev server, do NOT grow this task around it — say so and leave it for a follow-up.
+**A runnable example is REQUIRED, and it is the point of the task rather than a garnish.** The four `examples/event-processor-*` lost their run path when `ethereum-indexer-server` was archived, so nothing in this repository currently demonstrates indexing end to end, on any path, old or new. A test proving the wiring works is necessary and not sufficient: the claim being made is that an application developer can do this, and the only honest evidence for that is an application that does it.
+
+So pick ONE example, give it a browser entry point, and make it genuinely run in a tab against a real chain, storing to the IndexedDB default. It must start from a documented single command, and its README must say what to run and what a reader should see happen.
+
+If the build tooling for this turns out to dwarf the wiring it demonstrates, that is a REPORTABLE finding and a reason to route to needs-attention saying so, NOT a reason to quietly downgrade this to a test and call the task done.
 
 ## Acceptance criteria
 
@@ -34,7 +38,8 @@ Both halves exist and they are not joined. `createBrowserStateStore` (`packages/
 - [ ] `keepStateOnIndexedDB` and `createBrowserStateStore` both still work and cannot be confused for one another at the type level.
 - [ ] Reload continuity: an interrupted browser index resumes from its cursor rather than re-indexing from the start block, tested on the persistent backend. On the memory-only patch store the start-over behaviour is explicit and documented rather than incidental.
 - [ ] Reorg works through the browser path, including a counter that decreases.
-- [ ] Whether an example gained a runnable browser entry point is stated either way, with the reason.
+- [ ] One `examples/event-processor-*` indexes in a browser tab against a real chain, storing to the IndexedDB default, started by ONE documented command, with a README saying what to run and what to expect.
+- [ ] Switching that example to the patch store is a one-line change that touches no processor code, shown in the example or its README.
 - [ ] Tests in the package's `test/`, plus a changeset for any published package whose surface changed.
 
 ## Blocked by
@@ -57,7 +62,7 @@ Both halves exist and they are not joined. `createBrowserStateStore` (`packages/
 >
 > Out of scope, deliberately: no HTTP query endpoint (the spec puts GraphQL out of scope and `createReadSurface` is the in-process surface), and no server-side ingestion (`ingest-wire-receiving-side` owns it).
 >
-> If giving one `examples/event-processor-*` a browser entry point is cheap, it is the best possible proof this works and nothing in the repo currently demonstrates indexing end to end. If it drags in build tooling, leave it and say so.
+> A runnable example is REQUIRED here, not optional. Nothing in this repository currently demonstrates indexing end to end on any path, and a passing test is not evidence that an application developer can do this — an application doing it is. Pick one `examples/event-processor-*`, give it a browser entry point, one documented start command, and a README saying what to expect. If the build tooling for that dwarfs the wiring it demonstrates, route to needs-attention and say so; do not silently downgrade it to a test.
 >
 > Done means: an application developer writes one processor, picks IndexedDB or the light store with one line, and indexes in a tab — with the same processor a server runs.
 >
