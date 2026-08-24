@@ -41,11 +41,11 @@ describe('the sync cursor', () => {
 	});
 
 	it('is returned even when the stored context does not match, so the core can clear', async () => {
-		// This is the reason the cursor is ONE row rather than one row per context.
+		// This is the reason the cursor is ONE key rather than one key per context.
 		// The core's discard-and-clear branch lives inside `if (loaded)`; a
 		// context-keyed table would answer "no row" after a processor upgrade,
 		// `load` would return undefined, and the previous processor's entity rows
-		// would silently survive into the new run. See src/sync.ts.
+		// would silently survive into the new run. See `SYNC_CURSOR_KEY`.
 		const db = createTestDB();
 		const {p} = await freshProcessor(db);
 		await p.process(
@@ -97,7 +97,10 @@ describe('the sync cursor', () => {
 		const {db, p} = await freshProcessor();
 		await p.process([], lastSync({latestBlock: 100, lastToBlock: 100}));
 		await p.process([], lastSync({latestBlock: 101, lastToBlock: 101}));
-		const stored = await rows<{id: string}>(db, `SELECT id FROM _sync`);
+		// `_cursor` is the STORE's table (an opaque string under a key), not this
+		// package's old `_sync`: the cursor moved behind the seam so it could be
+		// written in the same transaction as the block it describes. See `src/sync.ts`.
+		const stored = await rows<{key: string}>(db, `SELECT "key" FROM _cursor`);
 		expect(stored).toHaveLength(1);
 	});
 });
@@ -143,7 +146,7 @@ describe('reset and clear', () => {
 		expect(await rows(db, `SELECT * FROM token`)).toEqual([]);
 		expect(await rows(db, `SELECT * FROM counter`)).toEqual([]);
 		expect(await rows(db, `SELECT * FROM _blocks`)).toEqual([]);
-		expect(await rows(db, `SELECT * FROM _sync`)).toEqual([]);
+		expect(await rows(db, `SELECT * FROM _cursor`)).toEqual([]);
 		// no history is left behind either: a wiped store cannot time-travel
 		expect(await p.state.getAsOf('token', {id: '1'}, 100)).toBeUndefined();
 	});

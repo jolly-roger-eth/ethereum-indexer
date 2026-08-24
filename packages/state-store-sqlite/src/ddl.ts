@@ -54,6 +54,26 @@ export const ROWID = '_rowid';
 export const BLOCKS_TABLE = '_blocks';
 
 /**
+ * The sync-cursor table: the other fixed one.
+ *
+ * Two columns, both opaque to this package: a caller-chosen `key` and whatever
+ * string it last wrote there. It is a table in THIS store rather than a table in
+ * the processor package (where it used to be, as `_sync`) because the cursor has
+ * to be written in the same batch -- the same transaction -- as the block it
+ * describes, and only the store issues that batch. The reasoning is at the seam,
+ * in `@etherfold/state-store`'s `cursor.ts`.
+ *
+ * It stays neutral in its NAMES as well as its dependencies. There is no
+ * `lastSync` column here: this store knows it is keeping a string for someone,
+ * and nothing about `LastSync`, `unconfirmedBlocks` or what an indexer is.
+ */
+export const CURSOR_TABLE = '_cursor';
+
+/** Its two columns, QUOTED at every use: both are ordinary English words SQL has opinions about. */
+export const CURSOR_KEY = '"key"';
+export const CURSOR_VALUE = '"value"';
+
+/**
  * Rows exist here only for blocks that carry our logs, not for every chain
  * block: state only changes where our events occur.
  *
@@ -75,6 +95,10 @@ export const FIXED_SCHEMA_DDL: string[] = [
 	timestamp INTEGER NOT NULL
 )`,
 	`CREATE INDEX IF NOT EXISTS ${BLOCKS_TABLE}_timestamp ON ${BLOCKS_TABLE} (timestamp)`,
+	`CREATE TABLE IF NOT EXISTS ${CURSOR_TABLE} (
+	${CURSOR_KEY} TEXT PRIMARY KEY,
+	${CURSOR_VALUE} TEXT NOT NULL
+)`,
 ];
 
 function sqlType(type: FieldType): string {

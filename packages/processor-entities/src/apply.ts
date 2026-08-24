@@ -1,6 +1,7 @@
-import type {Abi, LogEvent} from '@etherfold/core';
+import type {Abi, LastSync, LogEvent} from '@etherfold/core';
 import {createMutationContext, type Mutation, type StateStore} from '@etherfold/state-store';
 import {logs} from 'named-logs';
+import {serializeLastSync, syncedThrough} from './cursor.js';
 import {blockPointer, forkPoint, groupByBlock} from './stream.js';
 import type {EntityProcessor} from './types.js';
 
@@ -68,12 +69,22 @@ export async function runBlockHandlers<ABI extends Abi, ProcessorConfig>(
  *
  * One block is exactly one `applyBlock`, which is one atomic unit, which is why
  * a handler never has to reason about more than the block it is in.
+ *
+ * 4. **The cursor rides WITH the block**, when one is given. `cursor` is the
+ *    `LastSync` this stream ends at, and each block is applied together with the
+ *    cursor that describes THAT block (`syncedThrough`), in the store's own
+ *    transaction. That is why the cursor lives behind the storage seam: nothing
+ *    above the store can make the two atomic, and the gap between them is not
+ *    self-healing in either direction (see `cursor.ts`). A caller that omits it
+ *    -- a test, or the conformance workload -- gets the old behaviour and owns
+ *    its own cursor.
  */
 export async function applyEventStream<ABI extends Abi, ProcessorConfig>(
 	store: StateStore,
 	processor: EntityProcessor<ABI, ProcessorConfig>,
 	eventStream: readonly LogEvent<ABI>[],
 	config: ProcessorConfig,
+	cursor?: {key: string; lastSync: LastSync<ABI>},
 ): Promise<void> {
 	const fork = forkPoint(eventStream);
 	if (fork !== undefined) {
@@ -81,8 +92,25 @@ export async function applyEventStream<ABI extends Abi, ProcessorConfig>(
 		await store.revertTo(fork);
 	}
 
-	for (const block of groupByBlock(eventStream)) {
+	const blocks = groupByBlock(eventStream);
+	for (const [index, block] of blocks.entries()) {
 		const mutations = await runBlockHandlers(store, processor, block.events, config);
-		await store.applyBlock(blockPointer(block), mutations);
+		// The LAST block carries the stream's own cursor rather than a truncated one:
+		// the stream covered every block up to `lastToBlock`, so the heights above it
+		// carry none of our logs and there is nothing left to apply between them.
+		const write =
+			cursor &&
+			(index === blocks.length - 1
+				? {key: cursor.key, value: serializeLastSync(cursor.lastSync)}
+				: {key: cursor.key, value: serializeLastSync(syncedThrough(cursor.lastSync, block.number))});
+		await store.applyBlock(blockPointer(block), mutations, write);
+	}
+
+	// A stream with no blocks in it is still progress: a range that carried none of
+	// our logs was scanned, and a cursor that did not record it would have every
+	// restart re-scan it forever. There is no block to be atomic WITH, and none is
+	// needed: nothing was applied, so a crash here costs a re-scan and not a wedge.
+	if (cursor && blocks.length === 0) {
+		await store.writeCursor(cursor.key, serializeLastSync(cursor.lastSync));
 	}
 }

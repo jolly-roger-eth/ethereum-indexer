@@ -23,6 +23,7 @@ import {
 	type RetentionSetting,
 	type StateStore,
 	type StateStoreCapabilities,
+	type CursorWrite,
 } from '@etherfold/state-store';
 import {committed, openDatabase, request, walk} from './idb.js';
 import {
@@ -30,6 +31,7 @@ import {
 	asOfRange,
 	BLOCKS,
 	CURRENT,
+	CURSORS,
 	HASH_INDEX,
 	listingRange,
 	LOWER_INDEX,
@@ -197,8 +199,12 @@ export class IndexedDBStateStore implements StateStore {
 	 * return, so the two backends answer identically; they differ only in what they
 	 * store. `MutationContext` coalesces per business key anyway, so this is only
 	 * reachable by calling `applyBlock` directly.
+	 *
+	 * The optional `cursor` is written inside that same transaction, which is the
+	 * point of the cursor living behind the seam at all: the block and the record
+	 * of having reached it commit together or neither does. See `cursor.ts`.
 	 */
-	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = []): Promise<void> {
+	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = [], cursor?: CursorWrite): Promise<void> {
 		const hash = normalizeBlockHash(block.hash);
 		const planned = mutations.map((mutation) => {
 			const entity = mustGet(this.entities, mutation.entity);
@@ -206,7 +212,7 @@ export class IndexedDBStateStore implements StateStore {
 		});
 
 		const db = await this.database();
-		const tx = db.transaction([CURRENT, VERSIONS, BLOCKS], 'readwrite');
+		const tx = db.transaction([CURRENT, VERSIONS, BLOCKS, CURSORS], 'readwrite');
 		const current = tx.objectStore(CURRENT);
 		const versions = tx.objectStore(VERSIONS);
 		const blocks = tx.objectStore(BLOCKS);
@@ -248,6 +254,32 @@ export class IndexedDBStateStore implements StateStore {
 		}
 
 		blocks.put({number: block.number, hash, timestamp: block.timestamp} satisfies BlockRecord);
+		if (cursor) tx.objectStore(CURSORS).put(cursor.value, cursor.key);
+		await settled;
+	}
+
+	/** The opaque string last written under `key`, or `undefined`. See `cursor.ts`. */
+	async readCursor(key: string): Promise<string | undefined> {
+		const db = await this.database();
+		const store = db.transaction(CURSORS, 'readonly').objectStore(CURSORS);
+		return (await request(store.get(key))) as string | undefined;
+	}
+
+	/** Move a cursor with no block behind it. See `StateStore.writeCursor`. */
+	async writeCursor(key: string, value: string): Promise<void> {
+		const db = await this.database();
+		const tx = db.transaction(CURSORS, 'readwrite');
+		const settled = committed(tx);
+		tx.objectStore(CURSORS).put(value, key);
+		await settled;
+	}
+
+	/** Forget it. Deleting a key that is not there is the no-op the contract asks for. */
+	async clearCursor(key: string): Promise<void> {
+		const db = await this.database();
+		const tx = db.transaction(CURSORS, 'readwrite');
+		const settled = committed(tx);
+		tx.objectStore(CURSORS).delete(key);
 		await settled;
 	}
 
@@ -372,6 +404,9 @@ export class IndexedDBStateStore implements StateStore {
 	 * grows with every mutation ever applied.
 	 */
 	async revertTo(keepUpTo: number): Promise<void> {
+		// `CURSORS` is deliberately not in this transaction: how far the CALLER got is
+		// not entity state, and the caller moves it when it applies the canonical
+		// branch. See `cursor.ts`.
 		const db = await this.database();
 		const tx = db.transaction([CURRENT, VERSIONS, BLOCKS], 'readwrite');
 		const current = tx.objectStore(CURRENT);
@@ -516,13 +551,18 @@ export class IndexedDBStateStore implements StateStore {
 }
 
 /**
- * Create the fixed schema. Runs once per database, ever.
+ * Create the fixed schema, and add whatever a newer version of this package
+ * introduced.
  *
- * Everything here is version 1 and stays version 1: the object stores do not
+ * The version is this PACKAGE's and never a processor's: the object stores do not
  * depend on the declarations (`keys.ts` says why), so a processor gaining an
- * entity never needs an upgrade transaction that an open tab could block.
+ * entity never needs an upgrade transaction that an open tab could block. It
+ * moved to 2 once, when the cursor came behind the seam, and every step is
+ * `contains`-guarded so an existing database gains the missing store and keeps
+ * every row it had.
  */
 function upgrade(db: IDBDatabase): void {
+	if (!db.objectStoreNames.contains(CURSORS)) db.createObjectStore(CURSORS);
 	if (!db.objectStoreNames.contains(CURRENT)) db.createObjectStore(CURRENT);
 	if (!db.objectStoreNames.contains(VERSIONS)) {
 		const versions = db.createObjectStore(VERSIONS);

@@ -1,5 +1,6 @@
 import {normalizeBlockHash} from './blocks.js';
 import type {Retention, StateStoreCapabilities} from './capabilities.js';
+import type {CursorWrite} from './cursor.js';
 import {entityKey, idValues, mustGet, normalizeEntities} from './entities.js';
 import {
 	assertListingLimit,
@@ -73,6 +74,8 @@ export class MemoryStateStore implements StateStore {
 	private readonly rows = new Map<string, Row>();
 	private readonly blocks = new Map<number, BlockPointer>();
 	private readonly hashes = new Map<string, number>();
+	/** The sync cursors, opaque strings under caller-chosen keys. See `cursor.ts`. */
+	private readonly cursors = new Map<string, string>();
 	private readonly provided: Retention;
 	private readonly finalityDepth: number | undefined;
 	private tip: number | undefined;
@@ -112,8 +115,14 @@ export class MemoryStateStore implements StateStore {
 	 * written, so a mutation naming an entity that was never declared leaves the
 	 * store exactly as it found it. That mirrors the SQL store, where one block
 	 * is one batch and therefore one transaction.
+	 *
+	 * The `cursor` is part of that unit and is written LAST, after the point where
+	 * anything can still refuse: there is no transaction to join here, so "all or
+	 * nothing" is ordering instead, and the ordering has to be the safe one. A
+	 * cursor written before the block could survive a rejected block and send the
+	 * next run past state nothing ever applied.
 	 */
-	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = []): Promise<void> {
+	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = [], cursor?: CursorWrite): Promise<void> {
 		const hash = normalizeBlockHash(block.hash);
 		if (this.blocks.has(block.number)) {
 			throw new Error(
@@ -156,6 +165,23 @@ export class MemoryStateStore implements StateStore {
 				versions.push({values, lower: block.number, upper: null});
 			}
 		}
+
+		if (cursor) this.cursors.set(cursor.key, cursor.value);
+	}
+
+	/** The opaque string last written under `key`, or `undefined`. */
+	async readCursor(key: string): Promise<string | undefined> {
+		return this.cursors.get(key);
+	}
+
+	/** Move a cursor with no block behind it. See `StateStore.writeCursor`. */
+	async writeCursor(key: string, value: string): Promise<void> {
+		this.cursors.set(key, value);
+	}
+
+	/** Forget it. A no-op where none was written. */
+	async clearCursor(key: string): Promise<void> {
+		this.cursors.delete(key);
 	}
 
 	async getCurrent<T = Record<string, unknown>>(entity: string, id: EntityId): Promise<T | undefined> {
@@ -210,6 +236,8 @@ export class MemoryStateStore implements StateStore {
 	 * one business key would be open at once.
 	 */
 	async revertTo(keepUpTo: number): Promise<void> {
+		// the cursors are deliberately untouched: how far the CALLER got is not
+		// entity state, and the caller moves it when it applies the canonical branch.
 		for (const [key, row] of this.rows) {
 			const kept = row.versions.filter((version) => version.lower <= keepUpTo);
 			for (const version of kept) {

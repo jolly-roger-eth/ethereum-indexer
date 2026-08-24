@@ -22,6 +22,7 @@ import {
 	type NormalizedEntity,
 	type PruneOptions,
 	type PruneReport,
+	type CursorWrite,
 	type Retention,
 	type StateStore,
 	type StateStoreCapabilities,
@@ -142,6 +143,8 @@ export class PatchStateStore implements StateStore {
 	private readonly hashes = new Map<string, number>();
 	/** Block number -> the patches that UNDO that block, in the order immer produced them. */
 	private readonly reversals = new Map<number, Patch[]>();
+	/** The sync cursors, opaque strings under caller-chosen keys. See `cursor.ts`. */
+	private readonly cursors = new Map<string, string>();
 	private state: LightState;
 	private tip: number | undefined;
 
@@ -190,8 +193,15 @@ export class PatchStateStore implements StateStore {
 	 * they are what undoes the change, they are bounded by the finality depth
 	 * when the host prunes, and they need no snapshot of the state as of an
 	 * earlier block -- which is exactly what a light path does not have.
+	 *
+	 * The `cursor` is written LAST, after the point where anything can still
+	 * refuse: there is no transaction to join here, so "all or nothing" is
+	 * ordering, and the ordering has to be the safe one. Note what this store's
+	 * `durability: 'memory-only'` already says about the result -- the cursor goes
+	 * with the process, exactly as the state does, so a reload is an empty store
+	 * with no cursor rather than a cursor pointing at state that is gone.
 	 */
-	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = []): Promise<void> {
+	async applyBlock(block: BlockPointer, mutations: readonly Mutation[] = [], cursor?: CursorWrite): Promise<void> {
 		const hash = normalizeBlockHash(block.hash);
 		if (this.blocks.has(block.number)) {
 			throw new Error(
@@ -227,6 +237,23 @@ export class PatchStateStore implements StateStore {
 		this.blocks.set(block.number, {...block, hash});
 		this.hashes.set(hash, block.number);
 		if (this.tip === undefined || block.number > this.tip) this.tip = block.number;
+
+		if (cursor) this.cursors.set(cursor.key, cursor.value);
+	}
+
+	/** The opaque string last written under `key`, or `undefined`. See `cursor.ts`. */
+	async readCursor(key: string): Promise<string | undefined> {
+		return this.cursors.get(key);
+	}
+
+	/** Move a cursor with no block behind it. See `StateStore.writeCursor`. */
+	async writeCursor(key: string, value: string): Promise<void> {
+		this.cursors.set(key, value);
+	}
+
+	/** Forget it. A no-op where none was written. */
+	async clearCursor(key: string): Promise<void> {
+		this.cursors.delete(key);
 	}
 
 	/** One entity as it stands at the tip. */
@@ -304,6 +331,8 @@ export class PatchStateStore implements StateStore {
 	 * design refuses to produce (`RevertBeyondPatchHistoryError`).
 	 */
 	async revertTo(keepUpTo: number): Promise<void> {
+		// the cursors are deliberately untouched: how far the CALLER got is not entity
+		// state, and the caller moves it when it applies the canonical branch.
 		const above = [...this.blocks.keys()].filter((number) => number > keepUpTo).sort((a, b) => b - a);
 		if (above.length === 0) return;
 

@@ -7,7 +7,7 @@ import {
 	prefixValues,
 	type EntityIdPrefix,
 } from '@etherfold/state-store';
-import {BLOCKS_TABLE, LOWER, ROWID, UPPER} from './ddl.js';
+import {BLOCKS_TABLE, CURSOR_KEY, CURSOR_TABLE, CURSOR_VALUE, LOWER, ROWID, UPPER} from './ddl.js';
 import {quoted, quotedList} from './identifiers.js';
 import type {BlockPointer, EntityDeclaration, Mutation, NormalizedEntity, Statement} from './types.js';
 
@@ -148,10 +148,40 @@ export function listAsOfStatement(
  * block twice is a bug in the caller, and a primary-key violation says so
  * immediately instead of silently double-writing versions.
  */
+/** Read one cursor. `undefined` (no row) is "never written", not an error. */
+export function readCursorStatement(key: string): Statement {
+	return {
+		sql: `SELECT ${CURSOR_VALUE} AS value FROM ${CURSOR_TABLE} WHERE ${CURSOR_KEY} = ? LIMIT 1`,
+		args: [key],
+	};
+}
+
+/**
+ * Write one cursor.
+ *
+ * Upserted, unlike a block row, and the asymmetry is deliberate: applying the
+ * same block twice is a caller bug the store makes a primary-key violation on
+ * purpose, whereas a cursor exists precisely to be overwritten.
+ */
+export function writeCursorStatement(key: string, value: string): Statement {
+	return {
+		sql:
+			`INSERT INTO ${CURSOR_TABLE} (${CURSOR_KEY}, ${CURSOR_VALUE}) VALUES (?, ?) ` +
+			`ON CONFLICT(${CURSOR_KEY}) DO UPDATE SET ${CURSOR_VALUE} = excluded.${CURSOR_VALUE}`,
+		args: [key, value],
+	};
+}
+
+/** Forget one cursor. Deleting a row that is not there is a no-op, which is the contract. */
+export function clearCursorStatement(key: string): Statement {
+	return {sql: `DELETE FROM ${CURSOR_TABLE} WHERE ${CURSOR_KEY} = ?`, args: [key]};
+}
+
 export function applyBlockStatements(
 	declarations: Iterable<EntityDeclaration> | ReadonlyMap<string, NormalizedEntity>,
 	block: BlockPointer,
 	mutations: readonly Mutation[],
+	cursor?: {key: string; value: string},
 ): Statement[] {
 	const entities = asEntityMap(declarations);
 	const statements: Statement[] = [
@@ -184,6 +214,11 @@ export function applyBlockStatements(
 			});
 		}
 	}
+
+	// LAST, and in the SAME list, which is the same `batch([...])` and therefore
+	// the same transaction: the cursor and the block it describes move together or
+	// neither moves. See `cursor.ts` at the seam for what the gap used to cost.
+	if (cursor) statements.push(writeCursorStatement(cursor.key, cursor.value));
 
 	return statements;
 }

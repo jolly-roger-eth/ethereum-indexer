@@ -5,6 +5,7 @@ export * from './read-surface.js';
 export * from './listing.js';
 export * from './blocks.js';
 export * from './capabilities.js';
+export * from './cursor.js';
 export * from './retention.js';
 export * from './errors.js';
 export * from './store.js';

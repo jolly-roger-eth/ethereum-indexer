@@ -1,6 +1,9 @@
 export * from './types.js';
 export * from './stream.js';
 export * from './apply.js';
+export * from './cursor.js';
+export * from './view.js';
+export * from './EntityEventProcessor.js';
 
 /**
  * Re-exported so a processor author imports the whole authoring surface from one
@@ -8,14 +11,18 @@ export * from './apply.js';
  * store must understand, not what a processor invents.
  */
 export type {
+	CursorWrite,
 	EntityDeclaration,
 	EntityId,
 	FieldType,
 	MutationContext,
 	Mutation,
+	PruneOptions,
+	PruneReport,
 	StateStore,
 	StateStoreCapabilities,
 	Retention,
+	RetentionSetting,
 } from '@etherfold/state-store';
 
 /**
