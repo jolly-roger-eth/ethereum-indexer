@@ -9,15 +9,21 @@
   "license": "MIT",
   "dependencies": {
     "dotenv": "^17.4.2",
+    "@etherfold/browser": "workspace:*",
     "@etherfold/js-processor": "workspace:*",
+    "@etherfold/processor-entities": "workspace:*",
     "named-logs": "^0.4.1"
   },
   "devDependencies": {
+    "@etherfold/state-store-patch": "workspace:*",
     "as-soon": "^0.1.5",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
   },
   "scripts": {
     "build": "tsc && node scripts/version.mjs",
-    "watch": "as-soon -w src pnpm build"
+    "watch": "as-soon -w src pnpm build",
+    "browser": "vite",
+    "browser:build": "vite build"
   }
 }

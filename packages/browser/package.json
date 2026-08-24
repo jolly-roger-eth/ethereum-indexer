@@ -18,9 +18,13 @@
 		"entryPoint": "src/index.ts"
 	},
 	"devDependencies": {
+		"@etherfold/processor-entities": "workspace:*",
 		"@etherfold/state-store-patch": "workspace:*",
+		"@playwright/test": "^1.62.1",
 		"as-soon": "^0.1.5",
+		"esbuild": "^0.28.0",
 		"fake-indexeddb": "^6.2.5",
+		"playwright-browser-harness": "^0.3.0",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"
@@ -41,6 +45,7 @@
 		"typecheck": "tsc -p tsconfig.typecheck.json",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"test:browser": "playwright test"
 	}
 }

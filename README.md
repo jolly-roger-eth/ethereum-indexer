@@ -8,6 +8,14 @@ You can find some demoes in the <a href="https://jolly-roger-eth.github.io/ether
 
 And here is the [Documentation Website](https://jolly-roger-eth.github.io/ethereum-indexer/)
 
+## See it index, in one command
+
+```sh
+pnpm --filter event-processor-nfts browser
+```
+
+Opens a tab that indexes an ERC-721 collection off a real chain, with no server and no database to provision: one processor, its state in IndexedDB, and a reload that CONTINUES from its cursor instead of starting again. [`examples/event-processor-nfts`](examples/event-processor-nfts/README.md) says what to expect and how to swap the storage backend in one line.
+
 ## Main features:
 
 - written in typescript, run both in a browser context and node
