@@ -4,6 +4,7 @@ slug: promote-stratagems-conformance-workload
 spec: one-processor-everywhere
 blockedBy: [state-store-conformance-suite, bounded-id-prefix-listing]
 covers: [13]
+needsAnswers: true
 ---
 
 ## What to build
