@@ -13,10 +13,10 @@ import {fileURLToPath} from 'node:url';
 import {blocksOf} from '../../../../packages/core/dist/index.js';
 import {loadStreamFixture} from '../../../../packages/fs/dist/index.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
-import {StratagemsIndexerProcessor} from '../vendor/stratagems/js-processor.js';
+import {StratagemsIndexerProcessor} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const blocks = blocksOf(loadStreamFixture(path.join(HERE, '../fixtures/stratagems-alpha1.stream.json.gz'))) as any[];
+const blocks = blocksOf(loadStreamFixture(path.join(HERE, '../../../../packages/conformance-workload-stratagems/fixtures/stratagems-alpha1.stream.json.gz'))) as any[];
 const mode = process.argv[2] ?? 'tip';
 
 const processor = fromJSProcessor(() => StratagemsIndexerProcessor as any)();

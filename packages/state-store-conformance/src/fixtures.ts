@@ -12,10 +12,10 @@ import type {ConformanceCase, StateStoreFactory} from './types.js';
  * The declarations every case is written against.
  *
  * Deliberately small and hand-written. The heavy subject -- the captured
- * stratagems stream and the port that reproduced its state byte-identically --
- * is a separate task (`promote-stratagems-conformance-workload`) and a second
- * subject for this same suite, not a replacement for these: a case that fails on
- * 31,332 real events is a bug report nobody can read.
+ * stratagems stream and the port that reproduces its state byte-identically --
+ * is `@etherfold/conformance-workload-stratagems`, a second subject for the same
+ * backends rather than a replacement for these: a case that fails on 31,332 real
+ * events is a bug report nobody can read.
  *
  * Five entities, each earning its place: `token` is the ordinary
  * overwrite-and-delete subject, `player` carries the ACCUMULATED counter the

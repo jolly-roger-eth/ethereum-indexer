@@ -17,10 +17,11 @@
  * compared. An expected value we wrote ourselves would prove nothing; this one
  * was computed by the code that has been running on Base.
  *
- * Outputs (all committed, they are the conformance workload):
- *   fixtures/stratagems-base.state.json  the golden state
- *   fixtures/stratagems-base.trace.json  the golden per-block mutations
- *   results/port-equality.json           what this run found
+ * Outputs (the first two are the PROMOTED conformance workload, and live in
+ * `packages/conformance-workload-stratagems/fixtures/` since this spike closed):
+ *   stratagems-<deployment>.state.json  the golden state
+ *   stratagems-<deployment>.trace.json  the golden per-block mutations
+ *   results/port-equality-<deployment>.json  what this run found
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -28,7 +29,7 @@ import {fileURLToPath} from 'node:url';
 import {blocksOf, bnReplacer} from '../../../../packages/core/dist/index.js';
 import {loadStreamFixture} from '../../../../packages/fs/dist/index.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
-import {StratagemsIndexerProcessor, type Data} from '../vendor/stratagems/js-processor.js';
+import {StratagemsIndexerProcessor, type Data} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 import {MemoryBlockStore} from '../src/store/memory.js';
 import {projectToData} from '../src/port/project.js';
 import {runPortOverBlocks} from '../src/port/run-port.js';
@@ -37,10 +38,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEPLOYMENT = process.argv[2] ?? 'alpha1';
 const FIXTURE = path.join(
 	HERE,
-	`../fixtures/stratagems-${DEPLOYMENT}.stream.json${DEPLOYMENT === 'base' ? '' : '.gz'}`,
+	`../../../../packages/conformance-workload-stratagems/fixtures/stratagems-${DEPLOYMENT}.stream.json${DEPLOYMENT === 'base' ? '' : '.gz'}`,
 );
-const STATE_OUT = path.join(HERE, `../fixtures/stratagems-${DEPLOYMENT}.state.json`);
-const TRACE_OUT = path.join(HERE, `../fixtures/stratagems-${DEPLOYMENT}.trace.json`);
+const STATE_OUT = path.join(HERE, `../../../../packages/conformance-workload-stratagems/fixtures/stratagems-${DEPLOYMENT}.state.json`);
+const TRACE_OUT = path.join(HERE, `../../../../packages/conformance-workload-stratagems/fixtures/stratagems-${DEPLOYMENT}.trace.json`);
 const RESULT_OUT = path.join(HERE, `../results/port-equality-${DEPLOYMENT}.json`);
 
 /** Key-sorted JSON, so two objects that differ only in key ORDER compare equal. */
@@ -117,7 +118,7 @@ for (const update of run.trace) {
 const result = {
 	equal,
 	fixture: {
-		path: `fixtures/stratagems-${DEPLOYMENT}.stream.json`,
+		path: `packages/conformance-workload-stratagems/fixtures/stratagems-${DEPLOYMENT}.stream.json`,
 		events: fixture.eventStream.length,
 		blocks: blocks.length,
 		provenance: fixture.provenance,

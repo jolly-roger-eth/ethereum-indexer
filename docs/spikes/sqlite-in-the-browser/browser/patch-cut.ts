@@ -14,7 +14,7 @@ import type {CodeUnderTest, Timing} from 'playwright-browser-harness/contract';
 import {captureEnv} from 'playwright-browser-harness/contract';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
 import {applyPatches} from '../../../../packages/js-processor/dist/processor/immer.js';
-import {StratagemsIndexerProcessor} from '../vendor/stratagems/js-processor.js';
+import {StratagemsIndexerProcessor} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 import {generateEventStream, WORKLOAD_SIZES, type WorkloadSize} from '../src/workload/generate.js';
 
 const FINALITY = 64;

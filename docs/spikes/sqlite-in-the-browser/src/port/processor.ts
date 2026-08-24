@@ -2,17 +2,17 @@
  * The stratagems processor, ported to the spec's `MutationContext` API.
  *
  * DERIVED WORK of github.com/wighawag/stratagems `indexer/src/index.ts`
- * @ 3d5a0b3f (GPL-3.0); see `../../vendor/stratagems/README.md`. The oracle it
+ * @ 3d5a0b3f (GPL-3.0); see `packages/conformance-workload-stratagems/vendor/stratagems/README.md`. The oracle it
  * is checked against is that file, vendored verbatim.
  *
- * Read this next to `../../vendor/stratagems/js-processor.ts`. Handlers that
+ * Read this next to `packages/conformance-workload-stratagems/vendor/stratagems/js-processor.ts`. Handlers that
  * touch flat keyed maps (`onCommitmentMade`, the reward handlers, the pokes)
  * port across almost unchanged. `onCommitmentRevealed` does not, and the
  * distance between the two versions of THAT handler is the answer to the spec's
  * third open question.
  */
 import type {SQLProcessor, MutationContext} from '../../../../../packages/processor-sqlite/dist/index.js';
-import type {StratagemsABI} from '../../vendor/stratagems/abi.js';
+import type {StratagemsABI} from '../../../../../packages/conformance-workload-stratagems/vendor/stratagems/abi.js';
 import {SINGLETON, stratagemsEntities} from './entities.js';
 import {StratagemsContractOnEntities} from './stratagems-contract.js';
 

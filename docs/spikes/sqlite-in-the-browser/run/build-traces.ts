@@ -19,7 +19,7 @@ import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {bnReplacer} from '../../../../packages/core/dist/index.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
-import {StratagemsIndexerProcessor, type Data} from '../vendor/stratagems/js-processor.js';
+import {StratagemsIndexerProcessor, type Data} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 import {MemoryBlockStore} from '../src/store/memory.js';
 import {projectToData} from '../src/port/project.js';
 import {runPortOverBlocks} from '../src/port/run-port.js';

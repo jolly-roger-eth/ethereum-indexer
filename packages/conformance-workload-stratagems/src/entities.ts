@@ -1,0 +1,253 @@
+/**
+ * The stratagems state, declared as entities, on the IDIOMATIC model.
+ *
+ * This is a REWRITE of the port measured in `work/notes/findings/sqlite-in-the-browser.md`,
+ * not a copy of it. That port was written before `MutationContext` had a
+ * listing, so its ordered bounded array cost three entities plus a
+ * hand-maintained CSV of positions, a `playerCount` per cell and a singleton
+ * holding the arrival order (contortions 1 and 2 of the finding). With the
+ * bounded id-prefix listing (ADR-0021) all four of those disappear, and the
+ * proof that the rewrite did not change MEANING is that it still lands on the
+ * byte-identical golden state the ORIGINAL `JSProcessor` computed on Base.
+ *
+ * What that fix is made of, in two modelling rules:
+ *
+ * 1. **Children are their own entity keyed by their parent, and the collection
+ *    is DERIVED WHEN READ** -- the shape The Graph's `@derivedFrom` describes.
+ *    Nothing is maintained at write time, so appending costs one row.
+ * 2. **Ordered children are keyed by something naturally unique, never by a
+ *    dense array position.** Here that key is ARRIVAL: `(blockNumber, logIndex)`
+ *    of the event, fixed-width so the id's own lexicographic order IS the
+ *    numeric one. The old port's hand-maintained count existed only because the
+ *    child's id ended in an array index.
+ *
+ * Two contortions in the finding do NOT disappear, and they are documented on
+ * the declarations below rather than smoothed over: `cellOwner` (a scalar map
+ * needs its own entity, because `set` writes a WHOLE row) and the u256 fields
+ * (there is no column type for them, so they are decimal TEXT read back through
+ * `BigInt()`).
+ */
+import {declareEntities} from '@etherfold/processor-entities';
+
+/** The one row of a singleton entity. See `globalRate`. */
+export const SINGLETON = {id: 'singleton'} as const;
+
+/**
+ * The parent of the placement window's children: a singleton needs an invented
+ * id, which is what the subgraph model does too.
+ */
+export const WINDOW = 'global';
+
+/** The bound `state.placements` keeps. Verbatim from the original's `> 7`. */
+export const PLACEMENT_WINDOW = 7;
+
+/**
+ * How many rows a cascade delete walks per round trip.
+ *
+ * It is a PAGE size and not a bound on the answer: `dropPlacement` keeps listing
+ * until the prefix is empty, because a listing that came back `truncated` and
+ * was treated as the whole collection is exactly how a cascade leaves orphans.
+ * On the real stream the largest arrival has far fewer children than this, so
+ * the loop runs once; the loop is there so that it does not have to.
+ */
+export const CASCADE_PAGE = 256;
+
+/**
+ * Fixed-width decimal, so the id's own ascending order is the numeric one.
+ *
+ * A listing is ordered lexicographically over the STRINGIFIED id (that is the
+ * order a key-prefix range scan gives for free on every backend), so `'10'`
+ * sorts before `'9'` unless the key is padded. 12 digits covers any block number
+ * or log index a chain will produce; the values here are block numbers on Base,
+ * currently ten digits.
+ */
+export function wide(value: number | bigint): string {
+	return String(value).padStart(12, '0');
+}
+
+/**
+ * The arrival ordinal of an event: unique across the stream, ordered by arrival.
+ *
+ * This is the key that replaces the old port's singleton-holding-a-CSV. Arrival
+ * order is NOT recoverable by sorting on `epoch` -- the original unshifts a new
+ * epoch at the front and reuses an existing one in place, so the window's order
+ * is the order epochs were first SEEN and epochs neither increase nor stay
+ * distinct across it -- which is precisely why the old port had to write the
+ * order down.
+ */
+export function arrivalOrdinal(event: {blockNumber: number; logIndex: number}): string {
+	return `${wide(event.blockNumber)}:${wide(event.logIndex)}`;
+}
+
+/**
+ * The arrival ordinal of ONE MOVE inside a revealed commitment.
+ *
+ * A single `CommitmentRevealed` carries several moves, and two of them can land
+ * on the same cell, so the move index is part of what makes the key unique. The
+ * original pushes into `cell.players[]`, and push order is arrival order, so
+ * ordering by this key reproduces it exactly.
+ */
+export function moveOrdinal(event: {blockNumber: number; logIndex: number}, moveIndex: number): string {
+	return `${arrivalOrdinal(event)}:${wide(moveIndex)}`;
+}
+
+export const stratagemsEntities = declareEntities([
+	/**
+	 * `state.cells[position]`. A keyed map of flat numeric records, which is the
+	 * case the model was designed for: it maps across with nothing lost.
+	 */
+	{
+		name: 'cell',
+		id: 'position',
+		fields: {
+			lastEpochUpdate: 'integer',
+			epochWhenTokenIsAdded: 'integer',
+			color: 'integer',
+			life: 'integer',
+			delta: 'integer',
+			enemyMap: 'integer',
+			distribution: 'integer',
+			stake: 'integer',
+			producingEpochs: 'integer',
+		},
+	},
+
+	/**
+	 * `state.owners[position]`.
+	 *
+	 * CONTORTION THAT STAYS (finding, contortion 4): a map of position to a
+	 * single scalar becomes a whole entity, because the model has no "scalar
+	 * keyed by id" shape. Folding `owner` into `cell` looks obvious and is
+	 * WRONG: the processor writes `owners[p]` at points where it does not write
+	 * `cells[p]`, and `set` writes a WHOLE ROW, so the fold would silently clear
+	 * the nine cell fields. That is `set` doing exactly what it promises; the
+	 * cost lands as an extra entity plus a second read on every `ownerOf`.
+	 */
+	{
+		name: 'cellOwner',
+		id: 'position',
+		fields: {owner: 'text'},
+	},
+
+	/** `state.commitments[account]`. Deleted on reveal/cancel/void, which `delete` covers. */
+	{
+		name: 'commitment',
+		id: 'account',
+		fields: {epoch: 'integer', hash: 'text'},
+	},
+
+	/**
+	 * `state.placements[]`, an ORDERED, BOUNDED array (unshift, pop past 7).
+	 *
+	 * The child of a window, keyed by the ARRIVAL of the event that first
+	 * introduced its epoch. `{window: 'global'}` is the prefix, so the whole
+	 * collection is one bounded listing and there is no stored array, no CSV of
+	 * positions and no singleton remembering the order. Eviction reads the
+	 * window one row wider than it keeps and drops `rows[0]`, which is the
+	 * oldest arrival: the ordering IS the key.
+	 *
+	 * `epoch` is a FIELD rather than the id, because the original's identity for
+	 * a placement is "the entry that was unshifted when this epoch was first
+	 * seen", and an epoch can leave the window and come back later as a NEW,
+	 * later arrival.
+	 */
+	{
+		name: 'placement',
+		id: ['window', 'ordinal'],
+		fields: {epoch: 'integer'},
+	},
+
+	/**
+	 * `state.placements[i].cells[position].players[]`.
+	 *
+	 * Keyed by `(arrival of the placement, position, arrival of the move)`, which
+	 * makes every question the projection and the cascade ask a prefix listing:
+	 * every player of an arrival is `{ordinal}`, every player of one cell is
+	 * `{ordinal, position}`, and both come back in push order.
+	 *
+	 * There is deliberately NO `placementCell` entity. In the original a cell is
+	 * created only in order to push a player into it, so it never exists empty,
+	 * so the set of cells of a placement is exactly the set of positions among
+	 * its players: derived, not stored. The old port's `playerCount` on that
+	 * entity was contortion 2, and it existed only because the child's id ended
+	 * in a dense array index.
+	 */
+	{
+		name: 'placementPlayer',
+		id: ['ordinal', 'position', 'moveOrdinal'],
+		fields: {color: 'integer', address: 'text'},
+	},
+
+	/**
+	 * `state.points.global`, a SINGLETON.
+	 *
+	 * CONTORTION THAT STAYS (finding, contortion 5): `totalRewardPerPointAtLastUpdate`
+	 * and `totalPoints` are `uint256`. The declarable column types are
+	 * text/integer/real/blob and SQLite's INTEGER is 64-bit, so a u256 has to be
+	 * TEXT and every read has to `BigInt()` it back. Equality then depends on the
+	 * encoding being CANONICAL (decimal, no leading zeros, never hex), which is a
+	 * rule nothing in the model states or enforces. That is not academic on this
+	 * workload: 16,046 of the 31,332 real events write nothing but u256 fields,
+	 * so a non-canonical encoding is an equality bug waiting to happen rather
+	 * than a theoretical one. `u256` below is the single place the encoding is
+	 * chosen, so that it is one decision instead of nine call sites.
+	 *
+	 * The invented `'singleton'` id is a minor contortion of its own (contortion
+	 * 6), and it is what the subgraph model does too.
+	 */
+	{
+		name: 'globalRate',
+		id: 'id',
+		fields: {
+			lastUpdateTime: 'integer',
+			totalRewardPerPointAtLastUpdate: 'text',
+			totalPoints: 'text',
+		},
+	},
+
+	/** `state.points.fixed[account]`. `toWithdraw` is a u256, so TEXT (see above). */
+	{
+		name: 'fixedRate',
+		id: 'account',
+		fields: {toWithdraw: 'text', lastTime: 'integer'},
+	},
+
+	/** `state.points.shared[account]`. Three u256s, so three TEXT columns. */
+	{
+		name: 'sharedRate',
+		id: 'account',
+		fields: {
+			points: 'text',
+			totalRewardPerPointAccounted: 'text',
+			rewardsToWithdraw: 'text',
+		},
+	},
+
+	/**
+	 * `state.computedPoints[player]`, a DERIVED accumulator, and the counter the
+	 * reorg case exists for.
+	 *
+	 * No contortion, and worth saying so: read-then-add-then-write needs no
+	 * aggregation support, and two `addPoints` calls in one block compose purely
+	 * from read-your-writes. Reverting the block that raised it must make it go
+	 * back DOWN, which on this stream it really does: see the named revert case in
+	 * `test/alpha1.test.ts`.
+	 */
+	{
+		name: 'computedPoints',
+		id: 'owner',
+		fields: {points: 'integer'},
+	},
+]);
+
+/**
+ * The ONE place a `uint256` is turned into a column value.
+ *
+ * Decimal, from `BigInt.prototype.toString()`, which has no leading zeros and no
+ * `0x` form and no separators. Every u256 field in this processor goes through
+ * here and every read comes back through `BigInt()`, so the canonical encoding
+ * the model does not enforce is enforced HERE, once, where a reader can find it.
+ */
+export function u256(value: bigint | number | string): string {
+	return BigInt(value).toString();
+}

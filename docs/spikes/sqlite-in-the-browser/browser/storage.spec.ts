@@ -26,8 +26,8 @@ const SQLITE_DIST = path.join(HERE, '../node_modules/@sqlite.org/sqlite-wasm/dis
 const SIZES = (process.env.SPIKE_SIZES ?? 'real,tiny,small,medium,large').split(',');
 /** The captured stream, served next to the bundle so a `real` run can replay it in-page. */
 const FIXTURE_ASSETS = [
-	path.join(HERE, '../fixtures/stratagems-alpha1.stream.json.gz'),
-	path.join(HERE, '../fixtures/stratagems-alpha1.state.json'),
+	path.join(HERE, '../../../../packages/conformance-workload-stratagems/fixtures/stratagems-alpha1.stream.json.gz'),
+	path.join(HERE, '../../../../packages/conformance-workload-stratagems/fixtures/stratagems-alpha1.state.json'),
 ];
 const IDB_BACKENDS = ['memory', 'idb-versioned', 'idb-versioned-cached', 'blob-structured-clone', 'blob-json'];
 const SQLITE_BACKENDS = ['sqlite-opfs', 'sqlite-opfs-sahpool'];

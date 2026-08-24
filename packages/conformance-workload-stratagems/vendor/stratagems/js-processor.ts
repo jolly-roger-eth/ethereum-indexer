@@ -13,10 +13,13 @@
  *     vendored `stratagemsABI`, so `ContractsABI` is a literal type here.
  *   - imports point at the vendored files and at `@etherfold/js-processor`
  *     (the package `ethereum-indexer-js-processor` was renamed).
+ *   - the `version` string keeps the spike's spelling, because CHANGING it would
+ *     change nothing about what this computes and would break the link between
+ *     the committed golden states and the run that produced them.
  *   - `version` is a literal rather than the `__VERSION_HASH__` placeholder
  *     that stratagems' build substitutes.
  */
-import type {JSProcessor} from '../../../../../packages/js-processor/dist/index.js';
+import type {JSProcessor} from '@etherfold/js-processor';
 import {StratagemsContract, bigIntIDToXY} from './stratagems.js';
 import {Color} from './types.js';
 import type {ContractCell} from './types.js';

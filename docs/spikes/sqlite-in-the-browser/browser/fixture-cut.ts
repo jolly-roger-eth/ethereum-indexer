@@ -6,7 +6,7 @@
  * replay", made true rather than asserted: the file is fetched over HTTP,
  * parsed by `@etherfold/core`'s own `parseStreamFixture` (the same function the
  * node side uses), replayed through the same ported processor, and the state is
- * compared byte for byte against `fixtures/stratagems-base.state.json`, which
+ * compared byte for byte against `packages/conformance-workload-stratagems/fixtures/stratagems-base.state.json`, which
  * the ORACLE produced in node.
  *
  * Two runtimes, one input, one output. If that ever stops holding, the fixture

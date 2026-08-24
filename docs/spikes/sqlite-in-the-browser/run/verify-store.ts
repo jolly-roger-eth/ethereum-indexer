@@ -33,7 +33,7 @@ const RESULTS = path.join(HERE, '../results');
 const useSynthetic = process.argv[2] === 'synthetic';
 const blocks = useSynthetic
 	? generateEventStream({...WORKLOAD_SIZES.small, seed: 42, includeRewards: true, includeForceCells: true})
-	: (blocksOf(loadStreamFixture(path.join(HERE, '../fixtures/stratagems-alpha1.stream.json.gz'))) as any[]);
+	: (blocksOf(loadStreamFixture(path.join(HERE, '../../../../packages/conformance-workload-stratagems/fixtures/stratagems-alpha1.stream.json.gz'))) as any[]);
 
 // The trace, recorded once by the port against the in-memory reference.
 const reference = new MemoryBlockStore({kind: 'unbounded'});
