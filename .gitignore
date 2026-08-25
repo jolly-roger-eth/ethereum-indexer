@@ -56,3 +56,6 @@ prompts
 # Playwright (browser tests in packages/state-store-indexeddb)
 test-results/
 playwright-report/
+
+# Agent tooling scratch (subagent run artifacts)
+.pi-subagents/
