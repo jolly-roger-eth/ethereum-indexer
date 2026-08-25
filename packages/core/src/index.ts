@@ -1,6 +1,9 @@
 export * from './types.js';
+export * from './errors.js';
 export * from './indexer.js';
+export * from './streamBuilder.js';
 export * from './utils/index.js';
+export type {ReorgCause, ReorgDetection} from './internal/engine/utils.js';
 export * from './stream/fixture.js';
 export * from './stream/capture.js';
 

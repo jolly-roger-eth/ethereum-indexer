@@ -122,6 +122,65 @@ export type LastSync<ABI extends Abi> = {
 	unconfirmedBlocks: EventBlock<ABI>[];
 };
 
+/**
+ * WHICH indexer a batch of logs is for, as the sender can assert it.
+ *
+ * Two of `ContextIdentifier`'s three identities and deliberately not the third:
+ * a log-fetcher has no idea which processor version runs on the receiving side,
+ * so `processor` is the receiver's own business (ADR-0004). The two that ARE
+ * here are the ones both halves compute from the same declarations, which is
+ * what makes comparing them a real check rather than an echo.
+ */
+export type WireContext = {
+	source: {startBlock: number; hash: string}[];
+	config: string;
+};
+
+/**
+ * What crosses the wire from a log-fetcher to an indexer-server: a contiguous
+ * block range and every log in it.
+ *
+ * ## `logs` are DECODED events, not the JSON-RPC shape
+ *
+ * ADR-0004 calls them "raw logs", and that means raw as opposed to the
+ * reorg-annotated emission stream a processor consumes: no `removed` markers,
+ * no retractions, nothing the receiver has to derive. It does NOT mean the
+ * undecoded `eth_getLogs` result. The sender decodes (`captureStream` is exactly
+ * that job) and ships `LogEvent`s, for two reasons: the receiver's primitive
+ * (`generateStreamToAppend`) takes decoded events, and the sender already holds
+ * the ABI it needs, since a source IS its contracts. The cost is a larger
+ * payload, because `args` restates what `data` and `topics` already encode;
+ * `data` and `topics` are still carried, so the receiver can re-derive or store
+ * the original bytes (ADR-0006 needs them).
+ *
+ * This is the whole envelope of ADR-0004 and it is deliberately small. What is
+ * NOT here is as load-bearing as what is:
+ *
+ * - no `complete` flag, because completeness is an invariant (see
+ *   `InvalidBatchError`);
+ * - no `removed` markers and no `unconfirmedBlocks`, because the receiver
+ *   derives every reorg itself, so that logic exists in exactly one place;
+ * - no cursor from the sender, because the receiver owns the cursor.
+ */
+export type WireBatch<ABI extends Abi> = {
+	context: WireContext;
+	fromBlock: number;
+	toBlock: number;
+	/** The chain tip the sender observed, which is what bounds the unconfirmed window. */
+	latestBlock: number;
+	logs: LogEvent<ABI>[];
+};
+
+/**
+ * The same envelope, for a host that transports it without decoding it.
+ *
+ * An HTTP route reads a body, hands it to the receiver and writes a status code;
+ * it never looks inside a log. Typing it against this instead of `WireBatch<ABI>`
+ * is what keeps a server package from having to be generic over the ABI of the
+ * processor it happens to host, which it has no way to know and no use for.
+ */
+export type UntypedWireBatch = Omit<WireBatch<Abi>, 'logs'> & {logs: unknown[]};
+
 export type ContractData<ABI extends Abi> = {
 	readonly abi: ABI;
 	readonly address: `0x${string}`;

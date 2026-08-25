@@ -44,3 +44,48 @@ export function bnReplacer(key: string, value: any): any {
 export function bnReviver(key: string, value: any): any {
 	return isBigIntLiteral(value) ? BigInt(value.slice(0, -1)) : value;
 }
+
+/**
+ * The TAG the sound convention uses, and the one to reach for when the strings
+ * being encoded are not ours.
+ *
+ * The `"123n"` pair above cannot tell a real BigInt from a string a contract
+ * emitted that happens to read like one, so reviving with it silently rewrites
+ * event data. That is tolerable for a `LastSync` full of digests we produced and
+ * intolerable for a decoded log, whose `args` are whatever the chain said. So
+ * anything carrying EVENT DATA -- the sync cursor a store persists
+ * (`@etherfold/processor-entities`), and the wire batches a log-fetcher pushes
+ * (`serializeWireBatch`) -- tags instead, and an object with this single key
+ * cannot be produced by accident.
+ *
+ * Both conventions exist on purpose and neither is a migration of the other: the
+ * suffix one describes data ALREADY PERSISTED by this repo's storage adapters
+ * and cannot be changed without rewriting it.
+ */
+const BIGINT_TAG = '__bigint__';
+
+/**
+ * `JSON.stringify` replacer: BigInt out as `{__bigint__: "123"}`.
+ *
+ * Reads the RAW value off `this` rather than trusting the `value` argument,
+ * which `JSON.stringify` has already passed through any `toJSON` on the way in.
+ * Without that, a BigInt nested under an object with a `toJSON` is invisible
+ * here and throws inside the stringify instead.
+ */
+export function taggedBnReplacer(this: unknown, key: string, value: any): any {
+	const raw = (this as Record<string, unknown>)?.[key];
+	if (typeof raw === 'bigint') return {[BIGINT_TAG]: raw.toString()};
+	return value;
+}
+
+/** `JSON.parse` reviver: `{__bigint__: "123"}` back to a BigInt, and nothing else touched. */
+export function taggedBnReviver(key: string, value: any): any {
+	if (value && typeof value === 'object' && !Array.isArray(value)) {
+		const keys = Object.keys(value);
+		if (keys.length === 1 && keys[0] === BIGINT_TAG) {
+			const text = (value as Record<string, unknown>)[BIGINT_TAG];
+			if (typeof text === 'string') return BigInt(text);
+		}
+	}
+	return value;
+}

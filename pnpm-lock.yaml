@@ -704,6 +704,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../core
       hono:
         specifier: ^4.13.3
         version: 4.13.3
@@ -714,6 +717,9 @@ importers:
         specifier: ^0.0.7
         version: 0.0.7
     devDependencies:
+      '@etherfold/processor-sqlite':
+        specifier: workspace:*
+        version: link:../processor-sqlite
       '@libsql/client':
         specifier: ^0.17.3
         version: 0.17.4

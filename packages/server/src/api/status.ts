@@ -4,6 +4,7 @@ import type {ServerOptions} from '../types.js';
 import type {Env} from '../env.js';
 import {setup} from '../setup.js';
 import {applySchema, readSchemaState, SCHEMA_VERSION} from '../schema.js';
+import {readReorgCounters, type ReorgCounters} from '../reorgs.js';
 
 const logger = logs('@etherfold/server');
 
@@ -56,10 +57,21 @@ export function getStatusAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			// else's migration is in charge of tables this build reads.
 			const healthy = reachable && schema.applied && schema.matches;
 
+			// Reported here rather than on their own route because this is the page an
+			// operator already watches, and the number that matters is a RATE: a rising
+			// count of ABSENCE-driven reverts means a truncated log fetch or a wrong
+			// filter, not chain activity (ADR-0004). It does NOT affect `healthy`: an
+			// absence-driven revert is a signal to investigate, not a broken server, and
+			// a server that reported itself unhealthy for one would be restarted by an
+			// orchestrator instead of looked at.
+			const reorgs: ReorgCounters | undefined =
+				reachable && schema.applied ? await readReorgCounters(db).catch(() => undefined) : undefined;
+
 			return c.json(
 				{
 					healthy,
 					database: {reachable, error: reachabilityError},
+					reorgs,
 					schema: schema.applied
 						? {applied: true, version: schema.version, expected: schema.expected, matches: schema.matches}
 						: {applied: false, expected: SCHEMA_VERSION, reason: schema.reason},
