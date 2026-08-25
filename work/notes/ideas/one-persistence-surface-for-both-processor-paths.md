@@ -20,3 +20,27 @@ Reasons this is an idea and not a task, yet:
 - It is worth nothing until the entity path is actually wired end to end. The shape of the right answer will be much clearer once `backend-neutral-entity-event-processor` and `index-in-the-browser-with-a-chosen-backend` have landed and one deployment has really used both.
 
 The trigger to revisit: an application that runs both processor kinds in one deployment, or the first time someone has to explain to a newcomer why there are two unrelated ways to persist an indexer's progress.
+
+## The BigInt convention rides on this same fault line
+
+Added 2026-08-25, after `tagged-bigint-codec-across-storage-adapters` landed (ADR-0029), because the two questions turn out to be the same question and should not be rediscovered separately.
+
+There are three ways a persisted BigInt can survive a text boundary, not two:
+
+1. **A suffix** (`"123n"`) — infer the type from the SHAPE of the value. Irreducibly ambiguous, because `"123n"` is both what `123n` serializes to and a legal string a contract can emit. Removed by ADR-0029, and it should stay removed.
+2. **A tag** (`{"__bigint__": "123"}`) — the VALUE declares itself. What ships today. It is unambiguous for anything this repository realistically persists, though not absolutely so: viem decodes a tuple into an object with named components, so a single-component tuple named `__bigint__` would revive as a BigInt. Exotic, and worth knowing the guarantee is "no plausible value collides" rather than "none can".
+3. **Schema-driven** — no in-band marker at all. The reader knows from the ABI that `args.tokenId` is a `uint256` and converts that field, so nothing needs to be self-describing. `tagged-bigint-codec`'s own migration script did exactly this, and refused to convert any value whose declared type was not an integer, which is evidence it works.
+
+**Option 3 is strictly better where a declaration exists, and impossible where one does not — which is precisely the split this note is about.** Checked against what the keepers actually write:
+
+| persisted | schema | schema-driven? |
+| --- | --- | --- |
+| `LastSync.unconfirmedBlocks[].events[].args` | the ABI | yes |
+| entity rows | declared fields and types | yes |
+| `AllData.state` (`ProcessResultType`) | **none, by construction** | no |
+
+Every other number in `LastSync` is a plain `number`, so for the cursor the ABI reaches every BigInt there is. What it cannot reach is the free-form path's state, which is an arbitrary object where a BigInt may sit anywhere — and that is not an oversight in that path, it is what the path IS.
+
+So the tag is not a permanent answer, it is the answer for as long as an untyped blob is persisted. **If the free-form path ever moves onto a store-shaped substrate — the thing this note proposes — the last consumer of a self-describing tag goes with it**, and the encoding can become schema-driven everywhere: no wrapper objects, smaller payloads, and one less convention to explain. Snapshot size is already a measured concern (45.6 KB of current rows against 304.6 KB with history, `docs/spikes/bootstrap-an-entity-store-from-a-snapshot/`), so that is a real gain rather than a tidiness one.
+
+Not a task, and deliberately not one now: the tag landed with a proof that no state moved, and swapping conventions again would pay that cost twice for a benefit that only arrives with the persistence-surface change above. Recorded so the direction is known, and so that nobody re-proposes the suffix on the grounds that the tag is verbose.
