@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
-import {EthereumIndexer, simple_hash} from '@etherfold/core';
+import {EthereumIndexer, simple_hash, taggedBnReplacer, taggedBnReviver} from '@etherfold/core';
 import type {AllData, IndexingSource, KeepState, LastSync, LogEvent, ProcessorDriftReport} from '@etherfold/core';
 import {fromJSProcessor, type JSProcessor} from '../src/processor/utils.js';
 import {JSObjectEventProcessor} from '../src/processor/JSObjectEventProcessor.js';
@@ -214,23 +214,12 @@ function memoryKeeper(): KeepState<typeof abi, State, {history: HistoryJSObject}
 	const keeper: any = {
 		fetch: async () => keeper.stored,
 		save: async (_context: unknown, all: AllData<typeof abi, State, {history: HistoryJSObject}>) => {
-			// Round-tripped through JSON with the SAME BigInt convention the real keepers
-			// use (`etherfold`'s bnReplacer/bnReviver, keepStateOnLocalStorage),
-			// reviver included: that reviver is what a bare hash fingerprint could trip
-			// over, so the fixture has to run it rather than stop at the replacer.
-			keeper.stored = JSON.parse(
-				JSON.stringify(all, (_, v) => (typeof v === 'bigint' ? `${v}n` : v)),
-				(_, v) => {
-					if (
-						typeof v === 'string' &&
-						(v.startsWith('-') ? !isNaN(parseInt(v.charAt(1))) : !isNaN(parseInt(v.charAt(0)))) &&
-						v.charAt(v.length - 1) === 'n'
-					) {
-						return BigInt(v.slice(0, -1));
-					}
-					return v;
-				},
-			);
+			// Round-tripped through JSON with the SAME BigInt codec the real keepers use
+			// (the core's tagged pair, which `keepStateOnLocalStorage` and the CLI's
+			// snapshot both go through), REVIVER included: the reviver is what a
+			// fingerprint travelling inside `lastSync` has to survive, so the fixture
+			// has to run it rather than stop at the replacer.
+			keeper.stored = JSON.parse(JSON.stringify(all, taggedBnReplacer), taggedBnReviver);
 		},
 		clear: async () => {
 			keeper.stored = undefined;

@@ -54,7 +54,17 @@ import {replayIntoStore} from '../../../packages/conformance-workload-stratagems
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RESULTS = path.join(HERE, 'results');
 
-/** The `"123n"` convention every storage adapter in this repo already writes. */
+/**
+ * The `"123n"` convention the storage adapters wrote WHEN THIS RAN, kept as it
+ * was so the committed numbers stay reproducible.
+ *
+ * The adapters have since moved to the tagged form (`{__bigint__: "123"}`,
+ * `docs/spikes/tagged-bigint-codec-across-storage-adapters/`), which is more
+ * verbose, so a re-measurement today would come out LARGER. That matters to
+ * anyone quoting these bytes as current rather than as of the measurement;
+ * `work/notes/observations/snapshot-size-measured-under-the-retired-bigint-encoding.md`
+ * carries the signal.
+ */
 function bnReplacer(_key: string, value: unknown): unknown {
 	return typeof value === 'bigint' ? `${value}n` : value;
 }

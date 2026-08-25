@@ -143,15 +143,20 @@ describe('processorCodeFingerprint', () => {
 		expect(processorCodeFingerprint(partial)).not.toBe(processorCodeFingerprint(changed));
 	});
 
-	it('cannot be mistaken for a BigInt by the revivers that persist it', () => {
-		// It travels inside `LastSync`, and two persistence paths in this repo revive
-		// BigInts from the `"123n"` string convention. `etherfold`'s
-		// `bnReviver` (copied below) accepts anything that starts with a digit and
-		// ends with `n`, then calls BigInt() UNGUARDED, and a bare base36 hash has
-		// that shape roughly 1.25% of the time (`1x9tbhn`). The throw happens inside
-		// `JSON.parse`, so the CLI reads a perfectly good snapshot as corrupt and cold
-		// starts. The `fp-` prefix makes that unreachable rather than unlikely, which
-		// is why this asserts the SHAPE and not just one value.
+	it('cannot be mistaken for a BigInt by a reviver of the old suffix convention', () => {
+		// HISTORY, kept as a shape pin. It travels inside `LastSync`, and every
+		// persistence path in this repo used to revive BigInts from the `"123n"`
+		// string convention. That reviver (copied below, and no longer in the source:
+		// the adapters tag their BigInts now) accepted anything that started with a
+		// digit and ended with `n`, then called BigInt() UNGUARDED, and a bare base36
+		// hash has that shape roughly 1.25% of the time (`1x9tbhn`). The throw
+		// happened inside `JSON.parse`, so the CLI read a perfectly good snapshot as
+		// corrupt and cold started.
+		//
+		// The assertion outlives the bug it was written for: the `fp-` prefix is what
+		// keeps a fingerprint off the ambiguous shape ENTIRELY, which still matters to
+		// any reader outside this repo that kept the old convention, and it is a
+		// property of the fingerprint rather than of any one decoder.
 		const bnReviver = (v: string): unknown => {
 			if (
 				typeof v === 'string' &&

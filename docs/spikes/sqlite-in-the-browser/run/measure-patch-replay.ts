@@ -18,7 +18,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {blocksOf, bnReplacer} from '../../../../packages/core/dist/index.js';
+import {blocksOf, taggedBnReplacer} from '../../../../packages/core/dist/index.js';
 import {loadStreamFixture} from '../../../../packages/fs/dist/index.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
 import {applyPatches} from '../../../../packages/js-processor/dist/processor/immer.js';
@@ -42,7 +42,7 @@ function sortKeys(value: unknown): unknown {
 	}
 	return value;
 }
-const canonical = (value: unknown) => JSON.stringify(sortKeys(value), bnReplacer);
+const canonical = (value: unknown) => JSON.stringify(sortKeys(value), taggedBnReplacer);
 
 type Measured = {
 	size: string;
@@ -101,7 +101,7 @@ for (const size of ['real', 'small', 'medium'] as (WorkloadSize | 'real')[]) {
 	};
 
 	const tipIndex = blocks.length - 1;
-	const patchLogBytes = JSON.stringify(history.reversals, bnReplacer).length;
+	const patchLogBytes = JSON.stringify(history.reversals, taggedBnReplacer).length;
 	const patchCount = Object.values(history.reversals).reduce(
 		(sum, lists) => sum + lists.reduce((inner, list) => inner + list.length, 0),
 		0,

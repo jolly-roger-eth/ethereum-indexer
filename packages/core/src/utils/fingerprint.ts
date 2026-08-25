@@ -37,10 +37,11 @@ import {simple_hash} from './hash.js';
  *
  * So that a value found in a stored cursor says what it is. The structural
  * protection it used to provide (a fingerprint must never read as a `"123n"`
- * BigInt to the storage adapters that revive them) now lives one level down, in
+ * BigInt to the storage adapters that revived them) moved one level down, into
  * `simple_hash`, which prefixes every digest for that reason and so protects
- * `context.processor` and `context.config` too. See `utils/bigint.ts` for the
- * bug that motivated both.
+ * `context.processor` and `context.config` too -- and is now belt and braces on
+ * top of that, since no adapter revives the suffix form at all. See
+ * `utils/bigint.ts` for the bug that motivated all three.
  *
  * ## Comments
  *

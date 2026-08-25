@@ -38,21 +38,29 @@ function normalizeAsArray(obj: object): any {
  *
  * BigInt values are stringified with an `n` suffix on the way in, because
  * `JSON.stringify` throws on them outright and a processor config holding a
- * `uint256` is ordinary.
+ * `uint256` is ordinary. That is the ONE surviving use of the `"123n"` form in
+ * this repo and it is not the convention that was removed: these bytes exist to
+ * be hashed and are never parsed back, so there is nothing here to guess at.
+ * (Note that changing it would change every digest ever computed, and digests
+ * are persisted.)
  *
  * Note the size: 32 bits, rendered base36. It is a change DETECTOR, not a
  * cryptographic commitment, and it is compared against exactly one other value
  * at a time.
  *
- * The leading `h` is not decoration. A digest is persisted inside `LastSync`
- * (as `context.processor`, `context.config`, `context.source[].hash`) and this
- * repo's storage adapters revive BigInts from the `"123n"` string convention.
+ * The leading `h` is not decoration, and it is kept even though what it guarded
+ * against is gone. A digest is persisted inside `LastSync` (as
+ * `context.processor`, `context.config`, `context.source[].hash`), and the
+ * storage adapters used to revive BigInts from the `"123n"` string convention.
  * A bare base36 digest of all digits ending in `n` (`8918n`) IS that shape, so
  * it came back from storage as a BigInt rather than a string, and
  * `processorHash === context.processor` then compared a string to a BigInt and
- * discarded good state. No guard in the reviver can fix that one, because at
- * that point the two are genuinely indistinguishable; only the digest can, by
- * never having the shape.
+ * discarded good state. No guard in the reviver could fix that one, because at
+ * that point the two were genuinely indistinguishable; only the digest could, by
+ * never having the shape. The adapters now tag their BigInts (`utils/bigint.ts`)
+ * so no digest is at risk whatever it looks like, but the prefix stays: dropping
+ * it would change every digest, and the shape is still ambiguous to any reader
+ * outside this repo that kept the old convention.
  */
 export function simple_hash(obj: any): string {
 	const str =

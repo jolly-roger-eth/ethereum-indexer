@@ -1,11 +1,11 @@
 import {createClient} from '@libsql/client';
 import {
-	bnReplacer,
-	bnReviver,
 	captureStream,
 	EthereumIndexer,
 	parseStreamFixture,
+	parseWireBatch,
 	serializeStreamFixture,
+	serializeWireBatch,
 	simple_hash,
 	type ContextIdentifier,
 	type EventProcessor,
@@ -325,9 +325,14 @@ async function fetchBatch(
 	};
 }
 
-/** The crossing itself: nothing reaches the receiver that is not JSON. */
+/**
+ * The crossing itself: nothing reaches the receiver that is not JSON.
+ *
+ * Through the REAL wire codec, so this exercises what a deployed log-fetcher and
+ * receiver actually put on and take off the wire, tag and all.
+ */
 function cross(batch: WireBatch): WireBatch {
-	return JSON.parse(JSON.stringify(batch, bnReplacer), bnReviver) as WireBatch;
+	return parseWireBatch(serializeWireBatch(batch)) as WireBatch;
 }
 
 /**
@@ -617,7 +622,7 @@ describe('the split seam is still open', () => {
 			expect(Object.keys(batch.context).sort()).toEqual(['config', 'source']);
 			// no reorg information crosses: the receiver derives all of it
 			expect(batch.logs.some((log) => log.removed)).toBe(false);
-			expect(JSON.stringify(batch, bnReplacer)).not.toContain('unconfirmedBlocks');
+			expect(serializeWireBatch(batch)).not.toContain('unconfirmedBlocks');
 		}
 	});
 

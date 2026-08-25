@@ -17,7 +17,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {bnReplacer} from '../../../../packages/core/dist/index.js';
+import {taggedBnReplacer} from '../../../../packages/core/dist/index.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
 import {StratagemsIndexerProcessor, type Data} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 import {MemoryBlockStore} from '../src/store/memory.js';
@@ -38,7 +38,7 @@ function sortKeys(value: unknown): unknown {
 	}
 	return value;
 }
-const canonical = (value: unknown) => JSON.stringify(sortKeys(value), bnReplacer, 2);
+const canonical = (value: unknown) => JSON.stringify(sortKeys(value), taggedBnReplacer, 2);
 
 async function oracleState(blocks: any[]): Promise<Data> {
 	const oracle = fromJSProcessor(() => StratagemsIndexerProcessor as any)();
@@ -118,10 +118,10 @@ for (const size of Object.keys(WORKLOAD_SIZES) as WorkloadSize[]) {
 }
 
 fs.mkdirSync(RESULTS, {recursive: true});
-fs.writeFileSync(path.join(RESULTS, 'trace-shapes.json'), JSON.stringify({shapes, ranAt: new Date().toISOString()}, bnReplacer, 2));
+fs.writeFileSync(path.join(RESULTS, 'trace-shapes.json'), JSON.stringify({shapes, ranAt: new Date().toISOString()}, taggedBnReplacer, 2));
 fs.writeFileSync(
 	path.join(RESULTS, 'port-equality-synthetic.json'),
-	JSON.stringify({equality, ranAt: new Date().toISOString()}, bnReplacer, 2),
+	JSON.stringify({equality, ranAt: new Date().toISOString()}, taggedBnReplacer, 2),
 );
 
 const failed = Object.values(equality).some((entry) => !(entry as {equal: boolean}).equal);

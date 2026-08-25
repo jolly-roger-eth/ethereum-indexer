@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "provenance": {
     "capturedAt": "2026-08-22T19:24:45.446Z",
     "chainId": "8453",
@@ -2771,7 +2771,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0xab1346cf31B343dDFbE03EfFeE19baB88C410514",
-        "value": "1000000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -2808,8 +2810,12 @@
       "blockTimestamp": 1710153221,
       "args": {
         "game": "0xb99D938a722Df8984722Ab38732533130B4f3Ec4",
-        "weight": "1000000000000000000n",
-        "timestamp": "1710153221n"
+        "weight": {
+          "__bigint__": "1000000000000000000"
+        },
+        "timestamp": {
+          "__bigint__": "1710153221"
+        }
       },
       "eventName": "GameEnabled"
     },
@@ -2840,8 +2846,12 @@
       "blockTimestamp": 1710154141,
       "args": {
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "amountDeposited": "6000000000000000000n",
-        "newAmount": "6000000000000000000n"
+        "amountDeposited": {
+          "__bigint__": "6000000000000000000"
+        },
+        "newAmount": {
+          "__bigint__": "6000000000000000000"
+        }
       },
       "eventName": "ReserveDeposited"
     },
@@ -2904,8 +2914,12 @@
       "blockTimestamp": 1710160643,
       "args": {
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "amountDeposited": "4000000000000000000n",
-        "newAmount": "10000000000000000000n"
+        "amountDeposited": {
+          "__bigint__": "4000000000000000000"
+        },
+        "newAmount": {
+          "__bigint__": "10000000000000000000"
+        }
       },
       "eventName": "ReserveDeposited"
     },
@@ -2919,7 +2933,9 @@
       "logIndex": 20,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "1n",
+        "position": {
+          "__bigint__": "1"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -2938,7 +2954,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -2954,7 +2972,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "1n"
+        "tokenID": {
+          "__bigint__": "1"
+        }
       },
       "eventName": "Transfer"
     },
@@ -2968,7 +2988,9 @@
       "logIndex": 23,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "4294967297n",
+        "position": {
+          "__bigint__": "4294967297"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -2987,7 +3009,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3003,7 +3027,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "4294967297n"
+        "tokenID": {
+          "__bigint__": "4294967297"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3017,7 +3043,9 @@
       "logIndex": 26,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "4294967296n",
+        "position": {
+          "__bigint__": "4294967296"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3036,7 +3064,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3052,7 +3082,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "4294967296n"
+        "tokenID": {
+          "__bigint__": "4294967296"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3066,7 +3098,9 @@
       "logIndex": 29,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "8589934591n",
+        "position": {
+          "__bigint__": "8589934591"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3085,7 +3119,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3101,7 +3137,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "8589934591n"
+        "tokenID": {
+          "__bigint__": "8589934591"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3115,7 +3153,9 @@
       "logIndex": 32,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "4294967295n",
+        "position": {
+          "__bigint__": "4294967295"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3134,7 +3174,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3150,7 +3192,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "4294967295n"
+        "tokenID": {
+          "__bigint__": "4294967295"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3164,7 +3208,9 @@
       "logIndex": 35,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "0n",
+        "position": {
+          "__bigint__": "0"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3183,7 +3229,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3199,7 +3247,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "0n"
+        "tokenID": {
+          "__bigint__": "0"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3213,7 +3263,9 @@
       "logIndex": 38,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "4294967294n",
+        "position": {
+          "__bigint__": "4294967294"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3232,7 +3284,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3248,7 +3302,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "4294967294n"
+        "tokenID": {
+          "__bigint__": "4294967294"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3262,7 +3318,9 @@
       "logIndex": 41,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "8589934590n",
+        "position": {
+          "__bigint__": "8589934590"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3281,7 +3339,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3297,7 +3357,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "8589934590n"
+        "tokenID": {
+          "__bigint__": "8589934590"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3311,7 +3373,9 @@
       "logIndex": 44,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "4294967293n",
+        "position": {
+          "__bigint__": "4294967293"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3330,7 +3394,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3346,7 +3412,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "4294967293n"
+        "tokenID": {
+          "__bigint__": "4294967293"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3360,7 +3428,9 @@
       "logIndex": 47,
       "blockTimestamp": 1710198061,
       "args": {
-        "position": "8589934589n",
+        "position": {
+          "__bigint__": "8589934589"
+        },
         "player": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
         "oldColor": 0,
         "newColor": 1
@@ -3379,7 +3449,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "value": "1000000000000000000n"
+        "value": {
+          "__bigint__": "1000000000000000000"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3395,7 +3467,9 @@
       "args": {
         "from": "0x0000000000000000000000000000000000000000",
         "to": "0x7fCe02BB66c0D9396fb9bC60a80d45462E60fdfF",
-        "tokenID": "8589934589n"
+        "tokenID": {
+          "__bigint__": "8589934589"
+        }
       },
       "eventName": "Transfer"
     },
@@ -3414,48 +3488,70 @@
         "commitmentHash": "0xba57e645426d688a96c1fd3e38b437c26ce09e322b5a69c6",
         "moves": [
           {
-            "position": "1n",
+            "position": {
+              "__bigint__": "1"
+            },
             "color": 1
           },
           {
-            "position": "4294967297n",
+            "position": {
+              "__bigint__": "4294967297"
+            },
             "color": 1
           },
           {
-            "position": "4294967296n",
+            "position": {
+              "__bigint__": "4294967296"
+            },
             "color": 1
           },
           {
-            "position": "8589934591n",
+            "position": {
+              "__bigint__": "8589934591"
+            },
             "color": 1
           },
           {
-            "position": "4294967295n",
+            "position": {
+              "__bigint__": "4294967295"
+            },
             "color": 1
           },
           {
-            "position": "0n",
+            "position": {
+              "__bigint__": "0"
+            },
             "color": 1
           },
           {
-            "position": "4294967294n",
+            "position": {
+              "__bigint__": "4294967294"
+            },
             "color": 1
           },
           {
-            "position": "8589934590n",
+            "position": {
+              "__bigint__": "8589934590"
+            },
             "color": 1
           },
           {
-            "position": "4294967293n",
+            "position": {
+              "__bigint__": "4294967293"
+            },
             "color": 1
           },
           {
-            "position": "8589934589n",
+            "position": {
+              "__bigint__": "8589934589"
+            },
             "color": 1
           }
         ],
         "furtherMoves": "0x000000000000000000000000000000000000000000000000",
-        "newReserveAmount": "0n"
+        "newReserveAmount": {
+          "__bigint__": "0"
+        }
       },
       "eventName": "CommitmentRevealed"
     }

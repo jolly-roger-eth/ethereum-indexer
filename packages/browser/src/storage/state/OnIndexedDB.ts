@@ -1,4 +1,4 @@
-import {Abi, AllData, isBigIntLiteral, simple_hash, LastSync, ProcessorContext} from '@etherfold/core';
+import {Abi, AllData, simple_hash, LastSync, ProcessorContext, taggedBnReviver} from '@etherfold/core';
 // the subpath, not the barrel: the barrel re-exports the CLI-side modules, whose
 // top-level `node:fs` / `node:path` / `node:module` imports make this package
 // unbundleable for a browser. See the note at the top of `utils/src/indexer.ts`.
@@ -31,10 +31,34 @@ function getURL(remote: IndexedStateLocation | string, context: ProcessorContext
 	return url;
 }
 
-export function bnReviver(k: string, v: any): any {
-	return isBigIntLiteral(v) ? BigInt(v.slice(0, -1)) : v;
-}
-
+/**
+ * State kept in IndexedDB, optionally hydrated from a published snapshot.
+ *
+ * ## Which half of this needs a BigInt convention
+ *
+ * Not the local one. `idb-keyval` hands the whole object to IndexedDB, whose
+ * structured clone stores a BigInt AS a BigInt, so nothing is encoded there. It
+ * is the REMOTE snapshots -- JSON over HTTP, written by `@etherfold/cli`'s
+ * keeper -- that cross a text boundary, and every `JSON.parse` below therefore
+ * goes through `taggedBnReviver`, the core's one codec.
+ *
+ * That codec TAGS a BigInt as `{__bigint__: "123"}`. The reads here used to
+ * suffix it with `n` and revive anything that read that way, which cannot be
+ * made correct: `"123n"` is both what `123n` serializes to and a legal string
+ * for a contract to emit, so the decoder guessed, and a snapshot carries decoded
+ * event args and `context` digests in one document.
+ *
+ * A snapshot published by an older build is not translated: it comes back with
+ * its BigInts as the `"123n"` strings they now are. Note the gap that leaves,
+ * because it is KNOWN rather than overlooked: a published state file DOES carry
+ * a format number (`SNAPSHOT_FORMAT`, which the CLI's keeper bumped to 2 for
+ * exactly this) and nothing here reads it, so a legacy remote snapshot is
+ * installed as state rather than refused the way the CLI refuses it locally.
+ * Closing that means the number has to live somewhere both packages can see it,
+ * which is a seam decision rather than a line of code, and a bare remote
+ * `lastSync` file has no format to check at all. Re-publish rather than
+ * translate.
+ */
 export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, ProcessorConfig>(
 	name: string,
 	remote?: IndexedStateLocation | string | IndexedStateLocation[],
@@ -57,7 +81,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 								const json: {
 									state: ProcessResultType;
 									lastSync: LastSync<Abi>;
-								} = JSON.parse(text, bnReviver);
+								} = JSON.parse(text, taggedBnReviver);
 
 								if (
 									!latest ||
@@ -77,7 +101,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 							try {
 								const response = await fetch(urlOfLastSync);
 								const text = await response.text();
-								const json: LastSync<Abi> = JSON.parse(text, bnReviver);
+								const json: LastSync<Abi> = JSON.parse(text, taggedBnReviver);
 								if (!latest || !latest.lastSync || json.lastToBlock > latest.lastSync.lastToBlock) {
 									latest = {
 										index: i,
@@ -114,7 +138,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 					try {
 						const response = await fetch(url);
 						const text = await response.text();
-						const json = JSON.parse(text, bnReviver);
+						const json = JSON.parse(text, taggedBnReviver);
 						remoteState = json;
 					} catch (err) {
 						console.error(`failed to fetch remote-state, try second`, err);
@@ -123,7 +147,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 						try {
 							const response = await fetch(url);
 							const text = await response.text();
-							const json = JSON.parse(text, bnReviver);
+							const json = JSON.parse(text, taggedBnReviver);
 							remoteState = json;
 						} catch (err) {
 							console.error(`failed to fetch second remote-state`, err);
@@ -136,7 +160,7 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 					try {
 						const response = await fetch(url);
 						const text = await response.text();
-						const json = JSON.parse(text, bnReviver);
+						const json = JSON.parse(text, taggedBnReviver);
 						remoteState = json;
 					} catch (err) {
 						console.error(`failed to fetch remote-state`, err);

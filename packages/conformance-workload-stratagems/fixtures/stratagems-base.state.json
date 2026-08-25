@@ -218,8 +218,12 @@
     "fixed": {},
     "global": {
       "lastUpdateTime": 0,
-      "totalPoints": "0n",
-      "totalRewardPerPointAtLastUpdate": "0n"
+      "totalPoints": {
+        "__bigint__": "0"
+      },
+      "totalRewardPerPointAtLastUpdate": {
+        "__bigint__": "0"
+      }
     },
     "shared": {}
   }

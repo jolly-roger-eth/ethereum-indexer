@@ -22,11 +22,17 @@
  *   stratagems-<deployment>.state.json  the golden state
  *   stratagems-<deployment>.trace.json  the golden per-block mutations
  *   results/port-equality-<deployment>.json  what this run found
+ *
+ * One thing here is NOT frozen with the rest of the spike: the BigInt encoding.
+ * This wrote `"123n"` when the spike closed, and it WRITES the committed golden
+ * state, so leaving it would silently un-migrate that file the next time anyone
+ * ran it. It uses the repo's one codec (`taggedBnReplacer`) like everything
+ * else; see `docs/spikes/tagged-bigint-codec-across-storage-adapters/`.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {blocksOf, bnReplacer} from '../../../../packages/core/dist/index.js';
+import {blocksOf, taggedBnReplacer} from '../../../../packages/core/dist/index.js';
 import {loadStreamFixture} from '../../../../packages/fs/dist/index.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
 import {StratagemsIndexerProcessor, type Data} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
@@ -46,7 +52,7 @@ const RESULT_OUT = path.join(HERE, `../results/port-equality-${DEPLOYMENT}.json`
 
 /** Key-sorted JSON, so two objects that differ only in key ORDER compare equal. */
 function canonical(value: unknown): string {
-	return JSON.stringify(sortKeys(value), bnReplacer, 2);
+	return JSON.stringify(sortKeys(value), taggedBnReplacer, 2);
 }
 
 function sortKeys(value: unknown): unknown {
@@ -138,9 +144,9 @@ const result = {
 };
 
 fs.mkdirSync(path.dirname(RESULT_OUT), {recursive: true});
-fs.writeFileSync(RESULT_OUT, JSON.stringify(result, bnReplacer, 2));
+fs.writeFileSync(RESULT_OUT, JSON.stringify(result, taggedBnReplacer, 2));
 fs.writeFileSync(STATE_OUT, canonical(oracleState));
-fs.writeFileSync(TRACE_OUT, JSON.stringify({trace: run.trace}, bnReplacer, 2));
+fs.writeFileSync(TRACE_OUT, JSON.stringify({trace: run.trace}, taggedBnReplacer, 2));
 
 console.log(`handlers fired: ${JSON.stringify(run.handlerCalls)}`);
 console.log(`events with no handler: ${JSON.stringify(run.unhandledEvents)}`);
