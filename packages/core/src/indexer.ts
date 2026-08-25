@@ -16,7 +16,6 @@ import type {
 	ProvidedIndexerConfig,
 	UsedIndexerConfig,
 	LastSync,
-	AllContractData,
 	ContextIdentifier,
 	ProcessorDriftReport,
 	ProvidedStreamConfig,
@@ -25,7 +24,14 @@ import type {
 } from './types.js';
 import {LogEventFetcher} from './internal/decoding/LogEventFetcher.js';
 import type {Abi} from 'abitype';
-import {generateStreamToAppend, getFromBlock, groupStreamPerBlock, wait} from './internal/engine/utils.js';
+import {
+	defaultFromBlockOf,
+	generateStreamToAppend,
+	getFromBlock,
+	groupStreamPerBlock,
+	indexerMatches,
+	wait,
+} from './internal/engine/utils.js';
 import {CancelOperations, createAction} from './internal/utils/promises.js';
 import {simple_hash} from './utils/index.js';
 
@@ -160,21 +166,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		this.logEventFetcher = new LogEventFetcher(this.provider, source.contracts, config?.fetch, config.stream?.parse);
 
-		let fromBlockFromContracts: undefined | number;
-		if (Array.isArray(this.source.contracts)) {
-			for (const contractData of this.source.contracts) {
-				if (contractData.startBlock) {
-					if (fromBlockFromContracts === undefined || contractData.startBlock < fromBlockFromContracts) {
-						fromBlockFromContracts = contractData.startBlock;
-					}
-				} else {
-					fromBlockFromContracts = 0;
-				}
-			}
-		} else {
-			fromBlockFromContracts = (this.source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
-		}
-		(this.defaultFromBlock as any) = fromBlockFromContracts || 0;
+		(this.defaultFromBlock as any) = defaultFromBlockOf(this.source);
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -933,34 +925,4 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 		}
 	}
-}
-
-function indexerMatches(
-	// this is the indexer settings to be applied
-	indexerSourceHashes: {startBlock: number; hash: string}[],
-	indexerConfigHash: string,
-	// this is the stream loaded
-	lastToBlock: number,
-	context: ContextIdentifier,
-	// if they do not match the indexer will take over and restart from zero
-): boolean {
-	if (context.config !== indexerConfigHash) {
-		return false;
-	}
-
-	for (let i = 0; i < indexerSourceHashes.length; i++) {
-		const indexerSourceItem = indexerSourceHashes[i];
-		const fetchedSourceItem = context.source[i];
-		if (fetchedSourceItem) {
-			if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
-				return false;
-			}
-		} else {
-			if (indexerSourceItem.startBlock <= lastToBlock) {
-				return false;
-			}
-		}
-	}
-	// no mismatch found
-	return true;
 }

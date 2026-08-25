@@ -5,11 +5,14 @@ import {HTTPException} from 'hono/http-exception';
 import type {ServerOptions} from './types.js';
 import type {Env} from './env.js';
 import {getStatusAPI, recordError} from './api/status.js';
+import {getIngestAPI} from './api/ingest.js';
 
 export type {Env, ServerOptions};
 export {SCHEMA_VERSION, applySchema, readSchemaState} from './schema.js';
 export type {SchemaState} from './schema.js';
 export type {Config} from './setup.js';
+export {readReorgCounters, recordReorg} from './reorgs.js';
+export type {ReorgCounters} from './reorgs.js';
 
 const corsSetup = cors({
 	origin: '*',
@@ -34,6 +37,7 @@ export function createServer<CustomEnv extends Env>(options: ServerOptions<Custo
 	return app
 		.use('/*', corsSetup)
 		.route('/', getStatusAPI(options))
+		.route('/', getIngestAPI(options))
 		.onError((err, c) => {
 			const env = c.get('config')?.env || {};
 			recordError(err);

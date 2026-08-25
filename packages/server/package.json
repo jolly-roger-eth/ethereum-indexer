@@ -20,11 +20,13 @@
 	},
 	"license": "MIT",
 	"dependencies": {
+		"@etherfold/core": "workspace:*",
 		"hono": "^4.13.3",
 		"named-logs": "^0.4.1",
 		"remote-sql": "^0.0.7"
 	},
 	"devDependencies": {
+		"@etherfold/processor-sqlite": "workspace:*",
 		"@libsql/client": "^0.17.3",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",

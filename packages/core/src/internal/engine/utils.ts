@@ -1,6 +1,7 @@
 import type {Abi} from 'abitype';
 import {logs} from 'named-logs';
-import type {EventBlock, LastSync, LogEvent} from '../../types.js';
+import {UnexpectedFromBlockError} from '../../errors.js';
+import type {AllContractData, ContextIdentifier, EventBlock, IndexingSource, LastSync, LogEvent} from '../../types.js';
 
 const namedLogger = logs('@etherfold/core');
 
@@ -96,13 +97,12 @@ export function generateStreamToAppend<ABI extends Abi>(
 	const expectedFromBlock = getFromBlock(lastSync, defaultFromBlock, finality);
 
 	if (newLastFromBlock !== expectedFromBlock) {
-		let message = `fromBlock (${newLastFromBlock}) not as expected (${expectedFromBlock}).`;
-		if (newLastFromBlock > expectedFromBlock) {
-			message += `\nThis is too far back, we could trim it automatically, but this is probably an error to send that, so we throw here`;
-		} else {
-			message += `\nThe fromBlock do not consider the potential of reorg, the only safe fromBlock is ${expectedFromBlock}`;
-		}
-		throw new Error(message);
+		// Typed, because this refusal IS the resumption protocol of ADR-0004: the
+		// receiving side answers with the block the sender must re-send from, and a
+		// caller that had to parse that number out of the message would break the
+		// next time the message was reworded. Thrown from HERE, before a single
+		// event is shaped, so a refused batch applies nothing by construction.
+		throw new UnexpectedFromBlockError(expectedFromBlock, newLastFromBlock);
 	}
 
 	const logEventsGroupedPerBlock = groupLogsPerBlock(newEvents);
@@ -248,4 +248,74 @@ export function getFromBlock<ABI extends Abi>(
 	return lastSync.latestBlock === 0
 		? defaultFromBlock
 		: Math.max(Math.min(lastSync.lastToBlock + 1, lastSync.latestBlock - finality), 0);
+}
+
+/**
+ * The earliest block a source can have anything to say about: the lowest
+ * `startBlock` among its contracts, or 0 when any of them declares none.
+ *
+ * Extracted so the two things that need it -- the single-process
+ * `EthereumIndexer` and the receive-only `StreamBuilder` -- read the same
+ * answer. It is the floor `getFromBlock` returns before anything has been
+ * indexed, so two implementations of it would put the two deployment shapes on
+ * two different first batches.
+ */
+export function defaultFromBlockOf<ABI extends Abi>(source: IndexingSource<ABI>): number {
+	let fromBlockFromContracts: undefined | number;
+	if (Array.isArray(source.contracts)) {
+		for (const contractData of source.contracts) {
+			if (contractData.startBlock) {
+				if (fromBlockFromContracts === undefined || contractData.startBlock < fromBlockFromContracts) {
+					fromBlockFromContracts = contractData.startBlock;
+				}
+			} else {
+				fromBlockFromContracts = 0;
+			}
+		}
+	} else {
+		fromBlockFromContracts = (source.contracts as unknown as AllContractData<ABI>).startBlock || 0;
+	}
+	return fromBlockFromContracts || 0;
+}
+
+/**
+ * Whether a persisted `lastSync` describes the source and stream config we are
+ * running now.
+ *
+ * It answers about the first two identities only; `context.processor` is
+ * compared separately by the caller, because the two mismatches mean different
+ * things (a processor upgrade is expected and routine, a source change is not).
+ *
+ * A source entry the stored context does not have is only a mismatch if it could
+ * have contributed: a contract whose `startBlock` is above what was indexed had
+ * nothing to say yet, so adding it does not invalidate what came before.
+ */
+export function indexerMatches(
+	// this is the indexer settings to be applied
+	indexerSourceHashes: {startBlock: number; hash: string}[],
+	indexerConfigHash: string,
+	// this is the stream loaded
+	lastToBlock: number,
+	context: ContextIdentifier,
+	// if they do not match the indexer will take over and restart from zero
+): boolean {
+	if (context.config !== indexerConfigHash) {
+		return false;
+	}
+
+	for (let i = 0; i < indexerSourceHashes.length; i++) {
+		const indexerSourceItem = indexerSourceHashes[i];
+		const fetchedSourceItem = context.source[i];
+		if (fetchedSourceItem) {
+			if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
+				return false;
+			}
+		} else {
+			if (indexerSourceItem.startBlock <= lastToBlock) {
+				return false;
+			}
+		}
+	}
+	// no mismatch found
+	return true;
 }

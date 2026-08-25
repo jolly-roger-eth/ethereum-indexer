@@ -15,7 +15,7 @@ describe('the worker host serves the same app as the node host', () => {
 		const body = (await (await fetchWorker('/status')).json()) as Record<string, unknown>;
 		// identical contract across hosts: the adapters differ in wiring only
 		expect(Object.keys(body).sort()).toEqual(
-			['database', 'healthy', 'lastError', 'schema'].filter((k) => k in body).sort(),
+			['database', 'healthy', 'lastError', 'reorgs', 'schema'].filter((k) => k in body).sort(),
 		);
 		expect(body).toHaveProperty('schema.expected');
 	});

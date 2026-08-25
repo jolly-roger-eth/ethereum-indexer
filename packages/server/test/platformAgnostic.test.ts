@@ -48,6 +48,12 @@ describe('the server package names no runtime', () => {
 		const pkg = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf-8'));
 		// devDependencies MAY name a backend: the tests need one to run against.
 		// Runtime dependencies may not, because those are what a consumer installs.
-		expect(Object.keys(pkg.dependencies).sort()).toEqual(['hono', 'named-logs', 'remote-sql']);
+		//
+		// `@etherfold/core` is on the list and is not a host: it is the engine whose
+		// stream-builder this app routes HTTP to, and it names no runtime either
+		// (nothing in it imports a Node built-in or a driver). The list is exhaustive
+		// rather than a deny-list so that ADDING a dependency is a decision somebody
+		// makes here, in the file that explains why the property matters.
+		expect(Object.keys(pkg.dependencies).sort()).toEqual(['@etherfold/core', 'hono', 'named-logs', 'remote-sql']);
 	});
 });

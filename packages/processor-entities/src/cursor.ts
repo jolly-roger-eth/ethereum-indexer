@@ -1,4 +1,4 @@
-import type {Abi, LastSync} from '@etherfold/core';
+import {taggedBnReplacer, taggedBnReviver, type Abi, type LastSync} from '@etherfold/core';
 
 /**
  * ## The sync cursor: what it MEANS, given that the store keeps it
@@ -28,8 +28,13 @@ import type {Abi, LastSync} from '@etherfold/core';
  * convention, because a suffix convention has to guess: it cannot tell a real
  * BigInt from a string a contract emitted that happens to end in `n`, and
  * guessing wrong silently rewrites event data.
+ *
+ * The codec itself is `taggedBnReplacer` / `taggedBnReviver` in
+ * `@etherfold/core`, because the wire batches a log-fetcher pushes carry the
+ * same decoded events and must be encoded the same way. Two copies of a codec
+ * whose failure mode is silently rewriting event data is exactly the drift worth
+ * paying an import to avoid.
  */
-const BIGINT_TAG = '__bigint__';
 
 /**
  * The key the neutral processor keeps its cursor under, on every backend.
@@ -59,32 +64,14 @@ const BIGINT_TAG = '__bigint__';
  */
 export const SYNC_CURSOR_KEY = 'lastSync';
 
-function replacer(this: unknown, key: string, value: unknown): unknown {
-	// `value` is already post-`toJSON`, so read the raw one to still see a BigInt
-	const raw = (this as Record<string, unknown>)?.[key];
-	if (typeof raw === 'bigint') return {[BIGINT_TAG]: raw.toString()};
-	return value;
-}
-
-function reviver(_key: string, value: unknown): unknown {
-	if (value && typeof value === 'object' && !Array.isArray(value)) {
-		const keys = Object.keys(value);
-		if (keys.length === 1 && keys[0] === BIGINT_TAG) {
-			const text = (value as Record<string, unknown>)[BIGINT_TAG];
-			if (typeof text === 'string') return BigInt(text);
-		}
-	}
-	return value;
-}
-
 /** Serialize a cursor, BigInts included. Exported so the round-trip can be tested directly. */
 export function serializeLastSync<ABI extends Abi>(lastSync: LastSync<ABI>): string {
-	return JSON.stringify(lastSync, replacer);
+	return JSON.stringify(lastSync, taggedBnReplacer);
 }
 
 /** The inverse of `serializeLastSync`. */
 export function deserializeLastSync<ABI extends Abi>(text: string): LastSync<ABI> {
-	return JSON.parse(text, reviver) as LastSync<ABI>;
+	return JSON.parse(text, taggedBnReviver) as LastSync<ABI>;
 }
 
 /**
