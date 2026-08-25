@@ -33,29 +33,34 @@
 		</style>
 	</head>
 	<body>
-		<h1>Indexing an ERC-721 in this tab</h1>
+		<h1>Indexing an account's NFTs in this tab</h1>
 		<p>
-			No server. This page fetches logs from a JSON-RPC node, runs one
+			No server. This page reads logs through your own wallet's node, runs one
 			<code>EntityProcessor</code> over them, and keeps the resulting rows in a storage backend it chose in one line.
 			Close the tab and open it again: it continues from where it stopped.
 		</p>
 
 		<div id="error"></div>
+		<div id="picker"></div>
 
 		<dl>
 			<dt>Indexing</dt>
 			<dd id="what">…</dd>
+			<dt>Reading through</dt>
+			<dd id="via">…</dd>
 			<dt>State lives in</dt>
 			<dd id="where">…</dd>
 			<dt>Progress</dt>
 			<dd id="progress">…</dd>
 			<dt>Transfers seen</dt>
 			<dd id="transfers">0</dd>
+			<dt>Same-signature ERC-20 logs</dt>
+			<dd id="undecodable">…</dd>
 			<dt>This page load</dt>
 			<dd id="resume">…</dd>
 		</dl>
 
-		<h2>Current owners <small id="truncated"></small></h2>
+		<h2>Tokens owned <small id="truncated"></small></h2>
 		<ul id="tokens"></ul>
 
 		<script type="module" src="./main.ts"></script>
