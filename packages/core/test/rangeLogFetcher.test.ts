@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {getNewToBlockFromError} from '../src/internal/engine/LogFetcher.js';
+import {getNewToBlockFromError} from '../src/internal/engine/RangeLogFetcher.js';
 
 // Helper to build a JSON-RPC-style error object.
 function rpcError(code: number, message?: string, data?: any) {

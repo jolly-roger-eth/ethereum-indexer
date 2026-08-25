@@ -3,7 +3,7 @@ import type {EIP1193DATA, EIP1193Log, EIP1193QUANTITY} from 'eip-1193';
 import type {DecodeEventLogReturnType} from 'viem';
 import type {NumberifiedLog} from './internal/decoding/LogEventFetcher.js';
 import type {LogTransactionData} from './internal/engine/ethereum.js';
-import type {LogFetcherConfig} from './internal/engine/LogFetcher.js';
+import type {LogFetcherConfig} from './internal/engine/RangeLogFetcher.js';
 import type {JSONObject} from './internal/types.js';
 
 export type EventBlock<ABI extends Abi> = {

@@ -1,6 +1,6 @@
 import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {ExtraFilters} from '../engine/ethereum.js';
-import {LogFetcher, LogFetcherConfig} from '../engine/LogFetcher.js';
+import {RangeLogFetcher, LogFetcherConfig} from '../engine/RangeLogFetcher.js';
 import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
 import {decodeEventLog, encodeEventTopics} from 'viem';
@@ -95,7 +95,7 @@ export type ParsedLogsPromise<ABI extends Abi> = Promise<ParsedLogsResult<ABI>> 
 type OneABI<ABI extends Abi> = {readonly abi: ABI};
 type ContractList<ABI extends Abi> = readonly {readonly address: `0x${string}`; readonly abi: ABI}[];
 
-export class LogEventFetcher<ABI extends Abi> extends LogFetcher {
+export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 	private abiEventPerTopic: Map<`0x${string}`, AbiEvent>;
 	private abiPerAddress: Map<`0x${string}`, AbiEvent[]>;
 	private allABIEvents: AbiEvent[];

@@ -2,6 +2,12 @@ import {createClient} from '@libsql/client';
 import {
 	captureStream,
 	EthereumIndexer,
+	LogFetcher,
+	UnexpectedFromBlockError,
+	WireContextMismatchError,
+	type IngestionResponse,
+	type IngestionTarget,
+	type WireBatch as PublishedWireBatch,
 	parseStreamFixture,
 	parseWireBatch,
 	serializeStreamFixture,
@@ -43,6 +49,14 @@ import {abi, processor, timestampOf, type TestABI} from './utils/fixtures.js';
 //                   stream-builder and the processor, derives every reorg
 //                   itself (ADR-0004: no reorg information crosses the wire),
 //                   and never touches a chain.
+//
+// The sending half below is the SHIPPED `LogFetcher` (`@etherfold/core`), not a
+// stand-in written here: a simulated sender can only ever prove that the
+// simulation and the receiver agree. The receiving half is deliberately the
+// engine's own `feed` behind a provider that refuses every call, because that is
+// what arms check 1 below; the real receiving stack (`StreamBuilder`, the HTTP
+// routes, a real database) is driven end to end in
+// `packages/server/test/fetcherRoundTrip.test.ts`.
 //
 // ## Why a test and not an assurance
 //
@@ -275,18 +289,12 @@ function rawLogOf(event: LogEvent<TestABI>): RawLog {
 /**
  * What the log-fetcher pushes: a contiguous block range and the logs in it.
  *
- * ADR-0004's envelope, kept local to this test on purpose. The HTTP shape of the
- * ingestion endpoint is `ingest-wire-receiving-side`'s to settle; what is
- * asserted here is the property that endpoint will have to preserve, which is
- * that this is ALL that crosses.
+ * ADR-0004's envelope. This was a local structural copy while the endpoint was
+ * still `ingest-wire-receiving-side`'s to settle; it landed, so this is now the
+ * published type and the assertions below are about the REAL envelope rather
+ * than about a look-alike that could drift from it.
  */
-type WireBatch = {
-	context: {source: {startBlock: number; hash: string}[]; config: string};
-	fromBlock: number;
-	toBlock: number;
-	latestBlock: number;
-	logs: LogEvent<TestABI>[];
-};
+type WireBatch = PublishedWireBatch<TestABI>;
 
 /**
  * The `{source, config}` identity both halves compute from the SAME declarations.
@@ -303,26 +311,65 @@ const WIRE_CONTEXT: WireBatch['context'] = {
 };
 
 /**
- * The log-fetcher: stateless, chain calls only, no cursor of its own.
+ * The log-fetcher: the SHIPPED one, not a stand-in for it.
  *
- * `captureStream` is exactly that component's job (fetch a contiguous range,
- * decode it, hold nothing), so the fetcher half is built out of it rather than
- * out of a second copy of the same loop.
+ * This used to be a local loop built out of `captureStream`, written when the
+ * component did not exist. It does now (`LogFetcher`, `@etherfold/core`), and a
+ * test that simulated the sending half could only ever prove that the
+ * SIMULATION and the receiver agree. What is wired up below is the real object:
+ * it asks this target where to start, holds no cursor, and gets its batches
+ * refused by the same rule a deployed one would.
+ *
+ * The RECEIVING half is deliberately still the engine's own `feed` behind a
+ * provider that refuses every call, because that is what arms this file's
+ * boundary check: `StreamBuilder` takes no provider at all, so pointing this at
+ * it would make "the indexer-server has no chain" structurally true and
+ * therefore untestable HERE. The real receiving stack (`StreamBuilder`, the HTTP
+ * routes, a real database) is driven end to end by the fetcher in
+ * `packages/server/test/fetcherRoundTrip.test.ts`.
  */
-async function fetchBatch(
-	provider: {request(args: {method: string; params?: any}): Promise<any>},
-	fromBlock: number,
-): Promise<WireBatch | undefined> {
-	const latestBlock = parseInt((await provider.request({method: 'eth_blockNumber'})).slice(2), 16);
-	if (fromBlock > latestBlock) return undefined;
-	const captured = await captureStream<TestABI>(provider as any, SOURCE, {fromBlock, toBlock: latestBlock});
+function ingestionInto(indexer: EthereumIndexer<TestABI, any>, wire: WireBatch[]): IngestionTarget {
 	return {
-		context: WIRE_CONTEXT,
-		fromBlock,
-		toBlock: latestBlock,
-		latestBlock,
-		logs: captured.eventStream,
+		async expectedFromBlock() {
+			// the RECEIVER's number, which is the whole of ADR-0004
+			return {expectedFromBlock: indexer.expectedFromBlock, context: WIRE_CONTEXT};
+		},
+		async send(batch): Promise<IngestionResponse> {
+			const received = cross(batch as unknown as WireBatch);
+			// recorded BEFORE the outcome is known: a refused batch crossed the wire too,
+			// and the envelope assertions below are about what crossed, not what was kept
+			wire.push(received);
+			try {
+				await receive(indexer, received);
+			} catch (err) {
+				if (err instanceof UnexpectedFromBlockError) {
+					// the one resumable refusal, handed back as data rather than thrown
+					return {accepted: false, expectedFromBlock: err.expectedFromBlock};
+				}
+				throw err;
+			}
+			return {
+				accepted: true,
+				expectedFromBlock: indexer.expectedFromBlock,
+				// `feed` reports no counts, and the sender steers by none of them: only
+				// `expectedFromBlock` is load-bearing here
+				applied: received.logs.length,
+				retracted: 0,
+			};
+		},
 	};
+}
+
+function fetcherOn(
+	provider: {request(args: {method: string; params?: any}): Promise<any>},
+	target: IngestionTarget,
+): LogFetcher<TestABI> {
+	return new LogFetcher<TestABI>(provider as any, SOURCE, target, {
+		stream: STREAM_CONFIG,
+		// no sleeping in a test: what is asserted is where batches start, not how long
+		// a host waits between attempts
+		retry: {wait: async () => {}},
+	});
 }
 
 /**
@@ -344,7 +391,9 @@ function cross(batch: WireBatch): WireBatch {
  */
 async function receive(indexer: EthereumIndexer<TestABI, any>, batch: WireBatch): Promise<void> {
 	if (simple_hash(batch.context) !== simple_hash(WIRE_CONTEXT)) {
-		throw new Error(`batch is for another {source, config}`);
+		// the core's own refusal type, so a SENDER classifies it the way it would
+		// classify the real receiver's `400`: fatal, and never retried
+		throw new WireContextMismatchError(WIRE_CONTEXT, batch.context);
 	}
 	const context: ContextIdentifier = {...batch.context, processor: ''};
 	await indexer.feed(batch.logs, {
@@ -498,19 +547,21 @@ const shapes: Shape[] = [
 				stream: STREAM_CONFIG,
 			});
 			const wire: WireBatch[] = [];
+			// one fetcher across every advance, so the runs also exercise what it does
+			// and does not carry between cycles
+			const fetcher = fetcherOn(chain.provider, ingestionInto(indexer, wire));
 			return {
 				async advanceTo(fixture) {
 					const branch = chainOf(fixture);
 					chain.serve(branch.logs, branch.tip);
-					for (;;) {
-						// the RECEIVER says where the next range must start (ADR-0004)
-						const batch = await fetchBatch(chain.provider, indexer.expectedFromBlock);
-						if (!batch) break;
-						const received = cross(batch);
-						wire.push(received);
-						await receive(indexer, received);
-						if (batch.toBlock >= batch.latestBlock) break;
+					for (let cycle = 0; cycle < 10; cycle++) {
+						// where the next range starts is asked of the RECEIVER, inside the
+						// fetcher, and never decided here (ADR-0004)
+						const outcome = await fetcher.fetchAndPush();
+						if (outcome.status === 'up-to-date') return;
+						if (outcome.status === 'pushed' && outcome.toBlock >= outcome.latestBlock) return;
 					}
+					throw new Error(`the fetcher did not reach the tip of ${fixture.provenance.toBlock} in 10 cycles`);
 				},
 				state: () => snapshotOf(read),
 				processingSideChainCalls: server.calls,
@@ -645,10 +696,15 @@ describe('the split seam is still open', () => {
 			stream: STREAM_CONFIG,
 		});
 
+		const sent: WireBatch[] = [];
+		const fetcher = fetcherOn(chain.provider, ingestionInto(indexer, sent));
+
 		expect(indexer.expectedFromBlock).toBe(100);
-		const good = (await fetchBatch(chain.provider, indexer.expectedFromBlock)) as WireBatch;
-		await receive(indexer, cross(good));
+		await fetcher.fetchAndPush();
 		expect(indexer.expectedFromBlock).toBe(102);
+		// the batch a REAL fetcher sent, kept so the re-send below is the genuine
+		// lost-acknowledgement case rather than one built for the occasion
+		const good = sent[0];
 
 		// a sender that decided for itself where to resume is refused, and nothing is
 		// applied: the cursor IS the idempotency key, so the same batch re-sent after

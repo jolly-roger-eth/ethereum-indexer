@@ -54,7 +54,22 @@ export function getNewToBlockFromError(error: any): number | undefined {
 	return undefined;
 }
 
-export class LogFetcher {
+/**
+ * `eth_getLogs` over a block range, adapting the range to what the node will
+ * actually answer.
+ *
+ * Named for what it is (ONE range, fetched adaptively) rather than for the
+ * component: the **log-fetcher** of ADR-0003 is the public `LogFetcher`, which
+ * is a deployable that asks a receiver where to start, fetches and pushes. This
+ * is the primitive underneath it, shared with the single-process
+ * `EthereumIndexer`.
+ *
+ * The property both of them are built on is `toBlockUsed`: when a node caps a
+ * result set, the range SHRINKS and the answer says how far it really got. A
+ * caller that ignored it would treat a short answer as a complete one, which on
+ * the wire means a receiver reading missing logs as a reorg and deleting state.
+ */
+export class RangeLogFetcher {
 	protected readonly config: InternalLogFetcherConfig;
 	protected numBlocksToFetch: number;
 	protected foundNumBlockToHigh: number | undefined;

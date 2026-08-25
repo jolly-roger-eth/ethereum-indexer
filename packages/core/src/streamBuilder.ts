@@ -6,6 +6,9 @@ import {
 	generateStreamToAppend,
 	getFromBlock,
 	indexerMatches,
+	resolveStreamConfig,
+	sameWireContext,
+	wireContextOf,
 	type ReorgDetection,
 } from './internal/engine/utils.js';
 import type {
@@ -18,7 +21,6 @@ import type {
 	WireBatch,
 	WireContext,
 } from './types.js';
-import {simple_hash} from './utils/hash.js';
 import {taggedBnReplacer, taggedBnReviver} from './utils/bigint.js';
 
 const namedLogger = logs('@etherfold/core');
@@ -117,17 +119,15 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 		private readonly source: IndexingSource<ABI>,
 		config: Pick<ProvidedIndexerConfig<ABI>, 'stream'> = {},
 	) {
-		// The defaults MUST match `EthereumIndexer`'s, because the hash of the
-		// resolved config is half the wire identity: a receiver that defaulted
-		// `finality` differently would refuse every batch a fetcher sent, naming a
-		// config hash neither side can see.
-		this.streamConfig = {finality: 17, ...(config.stream || {})};
+		// The defaults MUST match `EthereumIndexer`'s and the sending `LogFetcher`'s,
+		// because the hash of the resolved config is half the wire identity: a
+		// receiver that defaulted `finality` differently would refuse every batch a
+		// fetcher sent, naming a config hash neither side can see. Hence the one
+		// shared resolver rather than three copies of the same object literal.
+		this.streamConfig = resolveStreamConfig(config.stream);
 		this.finality = this.streamConfig.finality;
 		this.defaultFromBlock = defaultFromBlockOf(source);
-		this.context = {
-			source: [{startBlock: 0, hash: simple_hash(source)}],
-			config: simple_hash(this.streamConfig),
-		};
+		this.context = wireContextOf(source, this.streamConfig);
 	}
 
 	/**
@@ -185,13 +185,8 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 	// -- internals -----------------------------------------------------------
 
 	private assertContext(received: WireContext | undefined): void {
-		const expected = this.context;
-		const sameSource =
-			Array.isArray(received?.source) &&
-			received.source.length === expected.source.length &&
-			expected.source.every((entry, i) => received.source[i]?.hash === entry.hash);
-		if (!sameSource || received?.config !== expected.config) {
-			throw new WireContextMismatchError(expected, received as WireContext);
+		if (!sameWireContext(this.context, received)) {
+			throw new WireContextMismatchError(this.context, received as WireContext);
 		}
 	}
 

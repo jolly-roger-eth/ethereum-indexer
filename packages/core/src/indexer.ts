@@ -1,13 +1,12 @@
+import {getBlockNumber, LogTransactionData} from './internal/engine/ethereum.js';
 import {
-	getBlockData,
-	getBlockNumber,
-	getBlockDataFromMultipleHashes,
-	getTransactionData,
-	getTransactionDataFromMultipleHashes,
-	LogTransactionData,
-} from './internal/engine/ethereum.js';
+	blockFetcherFor,
+	enrichEvents,
+	transactionFetcherFor,
+	type BlockTimestampCache,
+} from './internal/engine/enrich.js';
 
-import {EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
+import {EIP1193ProviderWithoutEvents} from 'eip-1193';
 
 import {logs} from 'named-logs';
 import type {
@@ -30,6 +29,7 @@ import {
 	getFromBlock,
 	groupStreamPerBlock,
 	indexerMatches,
+	resolveStreamConfig,
 	wait,
 } from './internal/engine/utils.js';
 import {CancelOperations, createAction} from './internal/utils/promises.js';
@@ -122,7 +122,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	 * wrong across exactly the reorgs the re-scan exists to detect, since the same
 	 * height would return the dead branch's timestamp.
 	 */
-	protected blockTimestampCache = new Map<string, {number: number; timestamp: number}>();
+	protected blockTimestampCache: BlockTimestampCache = new Map();
 
 	// ------------------------------------------------------------------------------------------------------------------
 	// ACTIONS
@@ -158,7 +158,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// TODO handle history (in reverse order)
 		this.sourceHashes = [{startBlock: 0, hash: simple_hash(this.source)}];
 
-		const streamConfig: UsedStreamConfig = {finality: 17, ...(config.stream || {})};
+		const streamConfig: UsedStreamConfig = resolveStreamConfig(config.stream);
 		this.config = {feedBatchSize: 300, ...config, stream: streamConfig};
 
 		this.streamConfigHash = simple_hash(this.config.stream || 'undefined');
@@ -681,100 +681,22 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		);
 		toBlock = newToBlock;
 
-		const blockTimestamps: {[hash: string]: number} = {};
-		const transactions: {[hash: string]: LogTransactionData} = {};
-		let anyTransactionFetched = false;
-		let anyTimestampResolved = false;
-
-		// needed to prune the timestamp cache, which is keyed by hash but bounded by height
-		const blockNumberPerHash = new Map<string, number>();
-		const blockHashes: string[] = [];
-		const transactionHashes: string[] = [];
-		// We deduplicate by hash (not by block number / position) so that every distinct
-		// block or transaction gets fetched exactly once, even when two different block
-		// hashes share the same block number (e.g. after a reorg within the unconfirmed
-		// window, or when logs from multiple filters are merged out of strict order).
-		const seenBlockHashes = new Set<string>();
-		const seenTransactionHashes = new Set<string>();
-		for (const event of eventsFetched) {
-			if (this.config.stream.alwaysFetchTransactions) {
-				if (!seenTransactionHashes.has(event.transactionHash)) {
-					seenTransactionHashes.add(event.transactionHash);
-					transactionHashes.push(event.transactionHash);
-				}
-			}
-
-			// The log itself carries `blockTimestamp` on any node implementing
-			// execution-apis#639 (geth >= 1.16.0, reth, besu, erigon, anvil), so only
-			// the blocks whose logs did NOT carry one cost a round-trip. Hardhat's EDR
-			// does not emit it as of 3.14.0, which is why the fallback still exists;
-			// ADR-0002 makes that saving matter, since the in-browser path is primary
-			// and cannot even batch these calls.
-			if (this.config.stream.alwaysFetchTimestamps && event.blockTimestamp === undefined) {
-				blockNumberPerHash.set(event.blockHash, event.blockNumber);
-				const cached = this.blockTimestampCache.get(event.blockHash);
-				if (cached) {
-					// already paid for on an earlier round: the re-scan window overlaps
-					blockTimestamps[event.blockHash] = cached.timestamp;
-					anyTimestampResolved = true;
-				} else if (!seenBlockHashes.has(event.blockHash)) {
-					seenBlockHashes.add(event.blockHash);
-					blockHashes.push(event.blockHash);
-				}
-			}
-		}
-		if (blockHashes.length > 0) {
-			namedLogger.info(`fetching a batch of  ${blockHashes.length} blocks (no blockTimestamp on their logs)...`);
-			const blocks = await this.getBlocks(blockHashes, unlessCancelled);
-
-			namedLogger.info(`...got  ${blocks.length} blocks back`);
-
-			for (let i = 0; i < blockHashes.length; i++) {
-				const hash = blockHashes[i];
-				const timestamp = blocks[i].timestamp;
-				blockTimestamps[hash] = timestamp;
-				const number = blockNumberPerHash.get(hash);
-				if (number !== undefined) {
-					this.blockTimestampCache.set(hash, {number, timestamp});
-				}
-			}
-			anyTimestampResolved = true;
-		}
-
-		// Bounded by the reorg window, not by the length of the chain. `getFromBlock`
-		// never re-scans below `latestBlock - finality`, so an entry below it can
-		// never be needed again. This is also what evicts reorged-out hashes, which
-		// nothing else would ever ask for.
-		for (const [hash, block] of this.blockTimestampCache) {
-			if (latestBlock - block.number > this.finality) {
-				this.blockTimestampCache.delete(hash);
-			}
-		}
-
-		if (transactionHashes.length > 0) {
-			namedLogger.info(`fetching a batch of ${transactionHashes.length} transactions...`);
-			const transactionReceipts = await this.getTransactions(transactionHashes, unlessCancelled);
-
-			namedLogger.info(`...got ${transactionReceipts.length} transactions back`);
-
-			for (let i = 0; i < transactionHashes.length; i++) {
-				transactions[transactionHashes[i]] = transactionReceipts[i];
-			}
-			anyTransactionFetched = true;
-		}
-
-		if (anyTransactionFetched || anyTimestampResolved) {
-			for (const event of eventsFetched) {
-				if (this.config.stream.alwaysFetchTransactions) {
-					event.transaction = transactions[event.transactionHash];
-				}
-				// a timestamp the node already put on the log always wins: it needed no
-				// fetch and it came from the same response as the log itself
-				if (event.blockTimestamp === undefined) {
-					event.blockTimestamp = blockTimestamps[event.blockHash];
-				}
-			}
-		}
+		// the timestamps and transactions the logs themselves did not carry. Shared
+		// with the split shape's `LogFetcher`, which is the only other thing allowed
+		// to make these calls (ADR-0003): the receiving half makes none at all.
+		// `getBlocks` / `getTransactions` are passed as bound methods rather than
+		// built inside, so a subclass overriding either still overrides it.
+		await enrichEvents(
+			eventsFetched as LogEvent<ABI>[],
+			{
+				streamConfig: this.config.stream,
+				latestBlock,
+				cache: this.blockTimestampCache,
+				getBlocks: (hashes, uc) => this.getBlocks(hashes, uc),
+				getTransactions: (hashes, uc) => this.getTransactions(hashes, uc),
+			},
+			unlessCancelled,
+		);
 
 		// ----------------------------------------------------------------------------------------
 		// PROCESS THE STREAM FOR REORG
@@ -800,35 +722,17 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		blockHashes: string[],
 		unlessCancelled: <T>(p: Promise<T>) => Promise<T>,
 	): Promise<{timestamp: number}[]> {
-		if (this.config.providerSupportsETHBatch) {
-			return getBlockDataFromMultipleHashes(this.provider, blockHashes);
-		} else {
-			const result = [];
-			for (const blockHash of blockHashes) {
-				namedLogger.info(`getting block ${blockHash}...`);
-				const actualBlock = await unlessCancelled(getBlockData(this.provider, blockHash as EIP1193DATA));
-				result.push(actualBlock);
-			}
-			return result;
-		}
+		return blockFetcherFor(this.provider, this.config.providerSupportsETHBatch)(blockHashes, unlessCancelled);
 	}
 
 	protected async getTransactions(
 		transactionHashes: string[],
 		unlessCancelled: <T>(p: Promise<T>) => Promise<T>,
 	): Promise<LogTransactionData[]> {
-		if (this.config.providerSupportsETHBatch) {
-			return getTransactionDataFromMultipleHashes(this.provider, transactionHashes);
-		} else {
-			const result = [];
-			for (const transactionHash of transactionHashes) {
-				namedLogger.info(`getting block ${transactionHash}...`);
-				const tx = await unlessCancelled(getTransactionData(this.provider, transactionHash as EIP1193DATA));
-
-				result.push(tx);
-			}
-			return result;
-		}
+		return transactionFetcherFor(this.provider, this.config.providerSupportsETHBatch)(
+			transactionHashes,
+			unlessCancelled,
+		);
 	}
 
 	protected indexerMatches(lastToBlock: number, context: ContextIdentifier): boolean {

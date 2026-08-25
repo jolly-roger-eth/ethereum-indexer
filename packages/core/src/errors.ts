@@ -1,6 +1,26 @@
 import type {WireContext} from './types.js';
 
 /**
+ * Whether waiting could turn this failure into a success.
+ *
+ * It is a property of the ERROR and not a list kept somewhere else, because the
+ * two are the same fact and a list drifts: adding a refusal type to this file
+ * while the list lives in another one gets the new refusal RETRIED, silently and
+ * forever, which is the exact failure ADR-0004's two refusal codes exist to make
+ * impossible.
+ *
+ * Read STRUCTURALLY (`err.retryable === false`) rather than with `instanceof`,
+ * so that an error crossing a package boundary from a second copy of this module
+ * still classifies correctly.
+ *
+ * An error that does NOT carry it is treated as retryable, deliberately: those
+ * are the ones this package did not throw -- a node's JSON-RPC error, a dropped
+ * socket, a `fetch` rejection -- and transience is the honest default for them.
+ * Everything thrown from HERE says so explicitly.
+ */
+export type RetryableError = Error & {readonly retryable: boolean};
+
+/**
  * A batch that did not start where the receiver said it must.
  *
  * ## Why this is a TYPE and not a message
@@ -28,6 +48,8 @@ import type {WireContext} from './types.js';
  */
 export class UnexpectedFromBlockError extends Error {
 	readonly name = 'UnexpectedFromBlockError';
+	/** Re-sending the SAME batch never works; the sender re-sends from `expectedFromBlock` instead. */
+	readonly retryable = false;
 
 	constructor(
 		/** Where the next batch must start. The sender re-sends from here. */
@@ -66,6 +88,7 @@ export class UnexpectedFromBlockError extends Error {
  */
 export class WireContextMismatchError extends Error {
 	readonly name = 'WireContextMismatchError';
+	readonly retryable = false;
 
 	constructor(
 		/** The `{source, config}` this receiver indexes. */
@@ -102,8 +125,159 @@ export class WireContextMismatchError extends Error {
  */
 export class InvalidBatchError extends Error {
 	readonly name = 'InvalidBatchError';
+	readonly retryable = false;
 
 	constructor(message: string) {
+		super(message);
+	}
+}
+
+/**
+ * A result set that MIGHT be everything in the range, and might be all the node
+ * felt like returning.
+ *
+ * The dangerous case this exists for is a provider that caps `eth_getLogs`
+ * SILENTLY: no error, no marker, just exactly N logs back. That is
+ * indistinguishable from a range that genuinely holds N, and the difference
+ * matters more here than anywhere else in the system, because a short payload
+ * delivered as a complete range is read by the receiver as an ABSENCE, and an
+ * absence is a reorg, and a reorg DELETES state (ADR-0004; the same inference
+ * produced the bug fixed in `d24872f`).
+ *
+ * So a fetch landing exactly on the cap is treated as suspect and the range is
+ * halved until the answer comes back under it. This is thrown only when there is
+ * nothing left to halve: a SINGLE block that still returns exactly the cap. At
+ * that point there is no honest answer available, and refusing to push is the
+ * only safe move -- delivering could destroy state, and lowering `toBlock`
+ * further is not possible.
+ *
+ * The operator's fix is to raise the fetcher's `maxEventsPerFetch` above the
+ * node's real cap (so a full answer no longer LOOKS like a capped one) or to use
+ * a node that does not cap silently.
+ */
+export class SuspectedTruncationError extends Error {
+	readonly name = 'SuspectedTruncationError';
+	/** The same block will return the same count next time. Waiting changes nothing. */
+	readonly retryable = false;
+
+	constructor(
+		readonly blockNumber: number,
+		readonly logCount: number,
+	) {
+		super(
+			`block ${blockNumber} alone returned exactly ${logCount} logs, which is the count this fetcher was configured ` +
+				`to treat as suspect (suspectResultCount). A capped answer cannot be told apart from a complete one, and ` +
+				`delivering a short range as a complete one makes the receiver read the missing logs as a reorg and DELETE ` +
+				`state. The range cannot be lowered any further, so nothing is pushed. Either this block genuinely holds ` +
+				`${logCount} logs, in which case set suspectResultCount to the node's REAL cap (do not raise ` +
+				`maxEventsPerFetch to get there: that also widens the span each fetch asks for, which makes truncation more ` +
+				`likely, not less), or the node is capping and this source needs one that reports truncation instead of ` +
+				`applying it silently.`,
+		);
+	}
+}
+
+/**
+ * A range fetch that reported covering less than the block it started at.
+ *
+ * Should be unreachable: `RangeLogFetcher` either answers for `[fromBlock, N]`
+ * with `N >= fromBlock` or throws. It is typed rather than left as a bare
+ * `Error` because this module's policy is that the TYPE tells a host what to do,
+ * and an untyped throw defaults to "transient" -- so a node answering nonsense
+ * would be asked four more times, on a delay, before anybody was told.
+ */
+export class NoFetchProgressError extends Error {
+	readonly name = 'NoFetchProgressError';
+	readonly retryable = false;
+
+	constructor(
+		readonly fromBlock: number,
+		readonly reportedToBlock: number,
+	) {
+		super(
+			`the range fetcher made no progress at block ${fromBlock}: it reported covering up to ${reportedToBlock}, ` +
+				`which is below where it was asked to start. Nothing is pushed.`,
+		);
+	}
+}
+
+/**
+ * A provider that is not serving the chain the source names.
+ *
+ * Checked by the log-fetcher before it fetches and again before it pushes,
+ * because it is the one corruption the receiving half cannot possibly catch: the
+ * receiver makes no chain calls at all (ADR-0003), so logs from the wrong chain
+ * arrive carrying a perfectly valid `{source, config}` and are indexed as if
+ * they were ours. An endpoint behind a load balancer, or a wallet provider the
+ * user switched networks on, is enough to produce it.
+ */
+export class UnexpectedChainError extends Error {
+	readonly name = 'UnexpectedChainError';
+	/** A provider does not wander back onto the right chain while a sender waits. */
+	readonly retryable = false;
+
+	constructor(
+		readonly expectedChainId: string,
+		readonly actualChainId: string,
+		when: 'before' | 'after',
+	) {
+		super(
+			`the provider is on chain ${actualChainId} but this source indexes chain ${expectedChainId} ` +
+				`(checked ${when} fetching). Nothing is pushed: the receiver makes no chain calls, so it could not catch this.`,
+		);
+	}
+}
+
+/**
+ * A refusal from the receiver that no re-send will fix.
+ *
+ * The counterpart of `UnexpectedFromBlockError`, and the distinction is the
+ * whole of a sender's retry policy. A cursor refusal is RESUMABLE: it carries
+ * the block to re-send from and recovery is automatic. Everything else -- a
+ * foreign `{source, config}`, a malformed envelope, a payload that is not the
+ * range it claims, a bad token, a server hosting no processor -- is a
+ * MISCONFIGURATION. Retrying it changes nothing, and retrying it forever is the
+ * failure mode this type exists to make impossible to write by accident.
+ *
+ * It carries the transport's own status so an operator sees which wall was hit,
+ * and never the credential that was presented.
+ */
+export class IngestionRefusedError extends Error {
+	readonly name = 'IngestionRefusedError';
+	/** The whole point of the type: no block number, and no amount of waiting, makes this right. */
+	readonly retryable = false;
+
+	constructor(
+		/** The transport's status, e.g. an HTTP `400`, `401` or `501`. */
+		readonly status: number,
+		/** The receiver's own error code, e.g. `context-mismatch`, `invalid-batch`, `unauthorized`. */
+		readonly code: string,
+		message: string,
+	) {
+		super(`the receiver refused this batch and no block number fixes it (${status} ${code}): ${message}`);
+	}
+}
+
+/**
+ * A receiver that could not be reached or could not answer right now.
+ *
+ * Kept apart from `IngestionRefusedError` because the correct response is the
+ * opposite one: this is retried with backoff, that one is surfaced immediately.
+ * A `5xx`, a dropped connection and a timeout are all this: the batch may or may
+ * not have been applied, and the sender does not need to know, because the
+ * cursor decides on the next attempt (a batch applied before the acknowledgement
+ * was lost earns a `409`, which is a correction and not a duplicate).
+ */
+export class IngestionUnavailableError extends Error {
+	readonly name = 'IngestionUnavailableError';
+	/** The one thrown by this package that IS worth another attempt. */
+	readonly retryable = true;
+
+	constructor(
+		message: string,
+		/** The transport's status when there was one; absent for a network-level failure. */
+		readonly status?: number,
+	) {
 		super(message);
 	}
 }

@@ -1,7 +1,18 @@
 import type {Abi} from 'abitype';
 import {logs} from 'named-logs';
 import {UnexpectedFromBlockError} from '../../errors.js';
-import type {AllContractData, ContextIdentifier, EventBlock, IndexingSource, LastSync, LogEvent} from '../../types.js';
+import type {
+	AllContractData,
+	ContextIdentifier,
+	EventBlock,
+	IndexingSource,
+	LastSync,
+	LogEvent,
+	ProvidedStreamConfig,
+	UsedStreamConfig,
+	WireContext,
+} from '../../types.js';
+import {simple_hash} from '../../utils/hash.js';
 
 const namedLogger = logs('@etherfold/core');
 
@@ -318,4 +329,48 @@ export function indexerMatches(
 	}
 	// no mismatch found
 	return true;
+}
+
+/**
+ * The stream config as it is actually USED, defaults filled in.
+ *
+ * One implementation, because the resolved object is HASHED into the wire
+ * identity: `EthereumIndexer`, the receiving `StreamBuilder` and the sending
+ * `LogFetcher` must all reach the same `finality` from the same input, or two
+ * halves of one deployment would compute different `config` hashes and every
+ * batch would be refused with a digest neither side can read.
+ */
+export function resolveStreamConfig(stream: ProvidedStreamConfig | undefined): UsedStreamConfig {
+	return {finality: 17, ...(stream || {})};
+}
+
+/**
+ * The `{source, config}` identity a sender asserts and a receiver checks.
+ *
+ * Derived here rather than at each end, for the same reason `getFromBlock` is:
+ * the two halves of the wire must compute the SAME digest from the same
+ * declarations, and a second implementation of it is a mismatch waiting to
+ * happen. `context.processor` is deliberately absent -- a log-fetcher has no way
+ * to know which processor version runs on the other side (ADR-0004).
+ */
+export function wireContextOf<ABI extends Abi>(
+	source: IndexingSource<ABI>,
+	streamConfig: UsedStreamConfig,
+): WireContext {
+	return {
+		source: [{startBlock: 0, hash: simple_hash(source)}],
+		config: simple_hash(streamConfig),
+	};
+}
+
+/** Whether two wire identities name the same indexer. */
+export function sameWireContext(a: WireContext | undefined, b: WireContext | undefined): boolean {
+	if (!a || !b || !Array.isArray(a.source) || !Array.isArray(b.source)) {
+		return false;
+	}
+	return (
+		a.config === b.config &&
+		a.source.length === b.source.length &&
+		a.source.every((entry, i) => b.source[i]?.hash === entry.hash)
+	);
 }
