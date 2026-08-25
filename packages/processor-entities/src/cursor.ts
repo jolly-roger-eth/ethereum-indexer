@@ -30,8 +30,9 @@ import {taggedBnReplacer, taggedBnReviver, type Abi, type LastSync} from '@ether
  * guessing wrong silently rewrites event data.
  *
  * The codec itself is `taggedBnReplacer` / `taggedBnReviver` in
- * `@etherfold/core`, because the wire batches a log-fetcher pushes carry the
- * same decoded events and must be encoded the same way. Two copies of a codec
+ * `@etherfold/core`, and it is now the repo's ONLY BigInt convention: the wire
+ * batches a log-fetcher pushes carry the same decoded events, and every storage
+ * adapter that used to suffix moved onto it (ADR-0029). Two copies of a codec
  * whose failure mode is silently rewriting event data is exactly the drift worth
  * paying an import to avoid.
  */

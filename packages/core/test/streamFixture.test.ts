@@ -127,7 +127,72 @@ describe('a serialized fixture', () => {
 		expect(parsed.lastSync).toEqual(fixture.lastSync);
 
 		expect(() => parseStreamFixture('{"format":99}')).toThrow(/unsupported stream fixture format/);
-		expect(() => parseStreamFixture('{"format":1}')).toThrow(/missing source/);
+		expect(() => parseStreamFixture(`{"format":${STREAM_FIXTURE_FORMAT}}`)).toThrow(/missing source/);
+	});
+
+	it('keeps a real BigInt and a look-alike string apart, in ONE fixture', () => {
+		// The pairing the `"123n"` convention could not survive: `unconfirmedBlocks`
+		// carries decoded events whose args hold real BigInts, and the SAME document
+		// carries `context` digests and whatever strings the contract emitted. The
+		// assertions are on the TYPE, because the old convention passed on value.
+		const fixture = {
+			format: STREAM_FIXTURE_FORMAT,
+			provenance: {capturedAt: '2026-08-25T00:00:00.000Z', chainId: '8453', fromBlock: 1, toBlock: 2},
+			source: SOURCE,
+			lastSync: {
+				context: {source: [{startBlock: 0, hash: 'h1x9tbhn'}], config: '123n', processor: 'h8918n'},
+				latestBlock: 2,
+				lastFromBlock: 1,
+				lastToBlock: 2,
+				unconfirmedBlocks: [],
+			},
+			eventStream: [
+				{
+					blockNumber: 1,
+					blockHash: '0xaa',
+					transactionIndex: 0,
+					removed: false,
+					address: TOKEN,
+					data: '0x',
+					topics: [],
+					transactionHash: '0xbb',
+					logIndex: 0,
+					extra: undefined,
+					eventName: 'Transfer',
+					args: {value: 123n, memo: '123n', zero: 0n, zeroish: '0n', negative: -5n, negativeish: '-5n'},
+				},
+			],
+		} as unknown as StreamFixture<typeof ERC20_ABI>;
+
+		const args = (parseStreamFixture<typeof ERC20_ABI>(serializeStreamFixture(fixture, 2)).eventStream[0] as any).args;
+		expect(args.value).toBe(123n);
+		expect(typeof args.value).toBe('bigint');
+		expect(args.memo).toBe('123n');
+		expect(typeof args.memo).toBe('string');
+		expect(args.zero).toBe(0n);
+		expect(typeof args.zeroish).toBe('string');
+		expect(args.negative).toBe(-5n);
+		expect(typeof args.negativeish).toBe('string');
+		expect(typeof parseStreamFixture(serializeStreamFixture(fixture)).lastSync.context.config).toBe('string');
+	});
+
+	it('refuses a format-1 fixture rather than half-decoding it', () => {
+		// Format 1 wrote `"123n"`. This reader does not interpret that, so accepting
+		// the file would hand back a fixture whose every uint256 had become a string.
+		const legacy = JSON.stringify({
+			format: 1,
+			provenance: {capturedAt: 'x', chainId: '8453', fromBlock: 1, toBlock: 1},
+			source: SOURCE,
+			lastSync: {
+				context: {source: [], config: 'c', processor: 'p'},
+				latestBlock: 1,
+				lastFromBlock: 1,
+				lastToBlock: 1,
+				unconfirmedBlocks: [],
+			},
+			eventStream: [{args: {value: '123n'}}],
+		});
+		expect(() => parseStreamFixture(legacy)).toThrow(/unsupported stream fixture format: 1 \(this build reads 2\)/);
 	});
 });
 

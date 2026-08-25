@@ -14,7 +14,7 @@
  */
 import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {bnReplacer, type StreamFixture} from '@etherfold/core';
+import {taggedBnReplacer, type StreamFixture} from '@etherfold/core';
 import {loadStreamFixture} from '@etherfold/fs';
 import type {StratagemsABI} from '../vendor/stratagems/abi.js';
 
@@ -85,13 +85,20 @@ export function loadStream(fixture: WorkloadFixture): StreamFixture<StratagemsAB
 /**
  * Key-sorted JSON, so two states that differ only in key ORDER compare equal.
  *
- * BigInts go out through `bnReplacer` (the `"123n"` convention every storage
- * adapter in this repo uses), which is also what wrote the committed golden
- * files, so a comparison is a string comparison of two identically-produced
- * renderings and a failure is a readable diff rather than a deep-equal report.
+ * BigInts go out TAGGED (`taggedBnReplacer`, the core's one codec), which is
+ * also what wrote the committed golden files, so a comparison is a string
+ * comparison of two identically-produced renderings and a failure is a readable
+ * diff rather than a deep-equal report.
+ *
+ * The tag matters HERE and not only on a read path. This used to render BigInts
+ * with the `"123n"` suffix, under which `123n` and the string `"123n"` produce
+ * the SAME text: two states that genuinely differ would compare equal, and the
+ * oracle would report agreement it had not established. The goldens were
+ * re-rendered when the tag landed; the states behind them did not change, which
+ * is what `docs/spikes/tagged-bigint-codec-across-storage-adapters/` proves.
  */
 export function canonical(value: unknown): string {
-	return JSON.stringify(sortKeys(value), bnReplacer, 2);
+	return JSON.stringify(sortKeys(value), taggedBnReplacer, 2);
 }
 
 function sortKeys(value: unknown): unknown {

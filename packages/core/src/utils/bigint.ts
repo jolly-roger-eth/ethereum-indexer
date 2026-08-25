@@ -1,66 +1,53 @@
 /**
- * ## The `"123n"` convention, and the one test it kept getting wrong
+ * ## One BigInt convention, and why it is a TAG rather than a suffix
  *
- * Several storage adapters persist BigInts by suffixing them with `n` and revive
- * them by spotting that suffix. Every copy of that check (there were six, in the
- * CLI, both browser adapters, the fs adapter, `db-utils` and a dead one in the
- * js-processor) tested the FIRST and LAST character and then called `BigInt()`
- * on everything in between:
+ * `JSON.stringify` throws outright on a BigInt, and a decoded log's `args` hold
+ * one for every `uint256` the ABI declares, so anything in this repo that
+ * persists or ships a `LastSync` needs a convention. There is exactly one, and
+ * it is here: a BigInt goes out as `{__bigint__: "123"}` and comes back from
+ * that shape and no other.
  *
- * ```ts
- * v.startsWith('-') ? !isNaN(parseInt(v.charAt(1))) : !isNaN(parseInt(v.charAt(0))) && v.endsWith('n')
- * ```
+ * ### What it replaced, and why the replacement was not optional
  *
- * That admits `1x9tbhn`, which is not a BigInt literal, it is an ordinary base36
- * `simple_hash` digest, and a persisted `LastSync` is largely made of those
- * (`context.processor`, `context.config`, `context.source[].hash`).
- * `BigInt('1x9tbh')` throws, and it throws inside `JSON.parse`, so a caller with
- * a `try/catch` around the parse (the CLI has one) reads a perfectly good
- * snapshot as corrupt and cold starts, permanently, blaming the file. About
- * 1.25% of digests have that shape, so it was a permanent failure for an unlucky
- * config rather than an intermittent one. The copies WITHOUT a `try/catch`
- * simply threw.
+ * Every storage adapter used to suffix a BigInt's decimal form with `n` and
+ * revive anything that read that way. That convention is IRREDUCIBLY AMBIGUOUS:
+ * `"123n"` is what `123n` serializes to AND a perfectly legal string for a
+ * contract to emit, so the decoder could not tell them apart and silently
+ * changed the type of whichever it got wrong. It was silent in both directions
+ * -- a real BigInt read back as a string breaks arithmetic downstream, a string
+ * read back as a BigInt breaks comparisons (including `===` against a hash) and
+ * JSON round-trips -- and a persisted `LastSync` genuinely carries both kinds at
+ * once, since `unconfirmedBlocks` holds real decoded events while `context`
+ * holds digests.
  *
- * The check is therefore the whole value, and it lives here so there is one of
- * it. This does not make the convention sound: it still cannot tell a real
- * BigInt from a string a contract emitted that happens to read like one, which
- * is why `@etherfold/processor-sqlite` tags its BigInts instead of
- * suffixing them. It only stops the guess from throwing on values that were
- * never numbers.
+ * Two containment fixes came before this and neither could reach the guess
+ * itself: `535ccc1` stopped the six copies of the decoder THROWING on values
+ * that were never numbers (an ordinary base36 `simple_hash` digest such as
+ * `1x9tbhn` threw from inside `JSON.parse`, so the CLI read a good snapshot as
+ * corrupt), and gave `simple_hash` a leading `h` so its digests can no longer
+ * land on the ambiguous shape. Both narrowed the blast radius. Only the tag
+ * removes the guess.
+ *
+ * ### The legacy form is not read
+ *
+ * A `"123n"` string is now just a string, everywhere, forever. Translating it
+ * would be the same guess under a new name, so it is not translated; and it is
+ * not refused value-by-value either, because refusing every string of digits
+ * ending in `n` would refuse legitimate event data. Where a persisted artifact
+ * carries a FORMAT number the number was bumped instead, so a file written under
+ * the old convention is refused AS A FILE by its own reader rather than
+ * half-decoded here: `STREAM_FIXTURE_FORMAT` (`stream/fixture.ts`) and the CLI's
+ * `SNAPSHOT_FORMAT` (`@etherfold/cli`, `keepState.ts`) both went to 2.
+ *
+ * The one place `"123n"` still appears is INSIDE `simple_hash`, which renders a
+ * BigInt that way purely to have bytes to hash. Nothing ever decodes that, so
+ * there is no guess to make; see the note there for why the digest keeps its
+ * prefix regardless.
  */
-const BIGINT_LITERAL = /^-?\d+n$/;
-
-/** Whether a value is the string form this repo's storage adapters write BigInts as. */
-export function isBigIntLiteral(value: unknown): value is string {
-	return typeof value === 'string' && BIGINT_LITERAL.test(value);
-}
-
-/** `JSON.stringify` replacer: BigInt out as `"123n"`. */
-export function bnReplacer(key: string, value: any): any {
-	return typeof value === 'bigint' ? `${value}n` : value;
-}
-
-/** `JSON.parse` reviver: `"123n"` back to a BigInt, and nothing else touched. */
-export function bnReviver(key: string, value: any): any {
-	return isBigIntLiteral(value) ? BigInt(value.slice(0, -1)) : value;
-}
 
 /**
- * The TAG the sound convention uses, and the one to reach for when the strings
- * being encoded are not ours.
- *
- * The `"123n"` pair above cannot tell a real BigInt from a string a contract
- * emitted that happens to read like one, so reviving with it silently rewrites
- * event data. That is tolerable for a `LastSync` full of digests we produced and
- * intolerable for a decoded log, whose `args` are whatever the chain said. So
- * anything carrying EVENT DATA -- the sync cursor a store persists
- * (`@etherfold/processor-entities`), and the wire batches a log-fetcher pushes
- * (`serializeWireBatch`) -- tags instead, and an object with this single key
- * cannot be produced by accident.
- *
- * Both conventions exist on purpose and neither is a migration of the other: the
- * suffix one describes data ALREADY PERSISTED by this repo's storage adapters
- * and cannot be changed without rewriting it.
+ * The single reserved key. An object with this key and nothing else is a BigInt;
+ * anything else, including an object that merely CONTAINS the key, is data.
  */
 const BIGINT_TAG = '__bigint__';
 
@@ -69,8 +56,8 @@ const BIGINT_TAG = '__bigint__';
  *
  * Reads the RAW value off `this` rather than trusting the `value` argument,
  * which `JSON.stringify` has already passed through any `toJSON` on the way in.
- * Without that, a BigInt nested under an object with a `toJSON` is invisible
- * here and throws inside the stringify instead.
+ * Without that, a BigInt reached through a `toJSON` (some libraries install one
+ * on `BigInt.prototype`) is invisible here and the stringify throws instead.
  */
 export function taggedBnReplacer(this: unknown, key: string, value: any): any {
 	const raw = (this as Record<string, unknown>)?.[key];

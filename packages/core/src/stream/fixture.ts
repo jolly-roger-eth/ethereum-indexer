@@ -1,6 +1,6 @@
 import type {Abi} from 'abitype';
 import type {EventProcessor, ExistingStream, IndexingSource, LastSync, LogEvent, UsedStreamConfig} from '../types.js';
-import {bnReplacer, bnReviver} from '../utils/bigint.js';
+import {taggedBnReplacer, taggedBnReviver} from '../utils/bigint.js';
 
 /**
  * The on-disk format version of a captured stream.
@@ -8,8 +8,18 @@ import {bnReplacer, bnReviver} from '../utils/bigint.js';
  * A fixture is a SNAPSHOT, so it is read long after it was written, by code that
  * has moved on. The version is what lets a reader refuse a shape it does not
  * understand instead of half-parsing it.
+ *
+ * ## Why it is 2
+ *
+ * Format 1 wrote BigInts as `"123n"`, which is also a legal string for a
+ * contract to emit, so a reader could not tell a `uint256` argument from a
+ * string argument that read like one. Format 2 tags them (`utils/bigint.ts`).
+ * The bump is what makes that change SAFE: a format-1 file parsed by this reader
+ * would come back with every BigInt silently turned into a string, and it is
+ * refused below instead. The two fixtures committed in this repo were
+ * re-encoded; see `docs/spikes/tagged-bigint-codec-across-storage-adapters/`.
  */
-export const STREAM_FIXTURE_FORMAT = 1;
+export const STREAM_FIXTURE_FORMAT = 2;
 
 /**
  * Where a fixture came from, in enough detail that a reader can judge it.
@@ -60,12 +70,13 @@ export type FixtureBlock<ABI extends Abi> = {
 /**
  * A fixture as text.
  *
- * BigInts go out through `bnReplacer` (the `"123n"` convention every storage
- * adapter in this repo already uses), because decoded `uint256` arguments are
- * ordinary and `JSON.stringify` throws on them.
+ * BigInts go out TAGGED (`taggedBnReplacer`, the one convention this repo has),
+ * because decoded `uint256` arguments are ordinary, `JSON.stringify` throws on
+ * them, and a fixture of a real chain is exactly where a string argument that
+ * reads like a BigInt turns up beside a real one.
  */
 export function serializeStreamFixture<ABI extends Abi>(fixture: StreamFixture<ABI>, indent = 0): string {
-	return JSON.stringify(fixture, bnReplacer, indent);
+	return JSON.stringify(fixture, taggedBnReplacer, indent);
 }
 
 /**
@@ -75,9 +86,16 @@ export function serializeStreamFixture<ABI extends Abi>(fixture: StreamFixture<A
  * newer-format file or an unrelated JSON document fails HERE, with a message
  * naming the fixture, rather than three layers down as `undefined is not
  * iterable` inside a processor.
+ *
+ * An OLDER format is refused for a different reason and the refusal is the whole
+ * point of it: a format-1 file encoded its BigInts as `"123n"`, which this
+ * reader does not interpret, so accepting it would hand back a fixture whose
+ * every `uint256` argument had quietly become a string. There is no in-between:
+ * either the file is re-encoded (a one-off, see `STREAM_FIXTURE_FORMAT`) or it
+ * is not read.
  */
 export function parseStreamFixture<ABI extends Abi>(text: string): StreamFixture<ABI> {
-	const parsed = JSON.parse(text, bnReviver) as Partial<StreamFixture<ABI>>;
+	const parsed = JSON.parse(text, taggedBnReviver) as Partial<StreamFixture<ABI>>;
 	if (!parsed || typeof parsed !== 'object') {
 		throw new Error(`not a stream fixture: expected an object`);
 	}

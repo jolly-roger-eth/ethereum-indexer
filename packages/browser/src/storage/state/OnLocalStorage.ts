@@ -1,4 +1,4 @@
-import {Abi, isBigIntLiteral, simple_hash, LastSync, ProcessorContext} from '@etherfold/core';
+import {Abi, simple_hash, LastSync, ProcessorContext, taggedBnReplacer, taggedBnReviver} from '@etherfold/core';
 
 function getStorageID<ProcessorConfig = undefined>(name: string, chainId: string, config: ProcessorConfig) {
 	const configHash = config ? simple_hash(config) : undefined;
@@ -13,15 +13,17 @@ export function keepStateOnLocalStorage<ABI extends Abi, ProcessResultType, Proc
 			if (!fromStorage) {
 				return undefined;
 			} else {
-				// The test is the WHOLE value. `value.endsWith('n')` also matched every
-				// ordinary string ending in n, and the `try` only hid the damage: a
-				// digits-then-n string that was never a BigInt (a base36 hash such as
-				// `123n`, and the sync context is full of hashes) came back as a BigInt,
-				// silently changing its type and so its comparisons.
-				const parsed = JSON.parse(fromStorage, (_, value) =>
-					isBigIntLiteral(value) ? BigInt(value.slice(0, -1)) : value,
-				);
-				return parsed;
+				// BigInts are TAGGED (`{__bigint__: "123"}`), through the core's one
+				// codec. This used to suffix them with `n` and revive anything that read
+				// that way, which is a guess it cannot win: `"123n"` is both what `123n`
+				// serializes to and a legal string for a contract to emit, and a stored
+				// blob carries decoded event args and `context` digests side by side.
+				//
+				// A blob written by an older build is NOT translated: its BigInts come
+				// back as the `"123n"` strings they now are. localStorage carries no
+				// format number to refuse on, and it is a cache whose recovery is a
+				// re-index; `clear()` is the way out.
+				return JSON.parse(fromStorage, taggedBnReviver);
 			}
 		},
 		save: async (
@@ -32,12 +34,7 @@ export function keepStateOnLocalStorage<ABI extends Abi, ProcessResultType, Proc
 			},
 		) => {
 			const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);
-			localStorage.setItem(
-				storageID,
-				JSON.stringify({...all, __VERSION__: context.version}, (_, value) =>
-					typeof value === 'bigint' ? value.toString() + 'n' : value,
-				),
-			);
+			localStorage.setItem(storageID, JSON.stringify({...all, __VERSION__: context.version}, taggedBnReplacer));
 		},
 		clear: async (context: ProcessorContext<ABI, ProcessorConfig>) => {
 			const storageID = getStorageID(name, context.source.chainId, 'config' in context ? context.config : undefined);

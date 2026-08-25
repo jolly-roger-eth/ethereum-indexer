@@ -98,15 +98,77 @@ describe('createFileKeepState — snapshot envelope (HIGH-2)', () => {
 		expect(fetched.state).toEqual(all.state);
 	});
 
-	it('still reads a legacy bare snapshot (no envelope)', async () => {
+	it('REFUSES a snapshot written under an older format, rather than half-decoding it', async () => {
+		// Format 1 (and the bare pre-envelope form) wrote BigInts as `"123n"`, which
+		// this reader does not interpret. Accepting such a file would resume from a
+		// state whose every `uint256` had quietly become a string, which is worse than
+		// not resuming: the recovery from an unreadable snapshot is a cold start, and
+		// that is what an unrecognised format gets.
 		const {stateFile} = filepaths(folder, CONTEXT);
 		fs.mkdirSync(folder, {recursive: true});
-		// legacy format: bare {lastSync, state, history}, no `format` field
-		fs.writeFileSync(stateFile, JSON.stringify({lastSync: {lastToBlock: 1}, state: {count: 9}, history: {h: 2}}));
 		const ks = createFileKeepState(folder);
-		const fetched = await ks.fetch(CONTEXT);
-		expect(fetched.state).toEqual({count: 9});
-		expect(fetched.history).toEqual({h: 2});
+
+		for (const legacy of [
+			// the bare pre-envelope form: no `format` at all
+			{lastSync: {lastToBlock: 1}, state: {count: 9, big: '123n'}, history: {h: 2}},
+			// the enveloped format-1 form
+			{format: 1, lastSync: {lastToBlock: 1}, state: {count: 9, big: '123n'}, history: {h: 2}},
+		]) {
+			fs.writeFileSync(stateFile, JSON.stringify(legacy));
+			expect(await ks.fetch(CONTEXT)).toBeUndefined();
+		}
+	});
+
+	it('round-trips real BigInts and look-alike strings in ONE snapshot, types intact', async () => {
+		// The pairing the `"123n"` convention could not survive: `unconfirmedBlocks`
+		// carries decoded events whose args hold a BigInt per `uint256`, and the SAME
+		// document carries `context` digests and whatever strings the contract
+		// emitted. Every assertion here is on the TYPE, because the old convention
+		// passed on value while swapping one kind for the other.
+		const ks = createFileKeepState(folder);
+		const all = {
+			lastSync: {
+				lastToBlock: 10,
+				latestBlock: 10,
+				lastFromBlock: 0,
+				context: {source: [{startBlock: 0, hash: 'h1x9tbhn'}], config: '123n', processor: 'h8918n'},
+				unconfirmedBlocks: [
+					{
+						number: 10,
+						hash: '0xaa',
+						events: [{args: {value: 123n, memo: '123n', zero: 0n, zeroish: '0n', neg: -5n, negish: '-5n'}}],
+					},
+				],
+			},
+			state: {total: 2n ** 200n, label: '0n'},
+			history: {h: 1},
+		};
+		await ks.save(CONTEXT, all as any);
+
+		const fetched: any = await ks.fetch(CONTEXT);
+		const args = fetched.lastSync.unconfirmedBlocks[0].events[0].args;
+		expect(args.value).toBe(123n);
+		expect(typeof args.value).toBe('bigint');
+		expect(args.memo).toBe('123n');
+		expect(typeof args.memo).toBe('string');
+		expect(args.zero).toBe(0n);
+		expect(typeof args.zeroish).toBe('string');
+		expect(args.neg).toBe(-5n);
+		expect(typeof args.negish).toBe('string');
+		expect(fetched.state.total).toBe(2n ** 200n);
+		expect(typeof fetched.state.label).toBe('string');
+		expect(fetched.lastSync.context.config).toBe('123n');
+		expect(typeof fetched.lastSync.context.config).toBe('string');
+
+		// and the bytes on disk say WHICH is which, rather than rendering both the
+		// same way and leaving the reader to guess
+		const {stateFile, lastSyncFile} = filepaths(folder, CONTEXT);
+		for (const file of [stateFile, lastSyncFile]) {
+			const raw = fs.readFileSync(file, 'utf-8').replace(/\s+/g, '');
+			expect(raw).toContain('"value":{"__bigint__":"123"}');
+			expect(raw).toContain('"memo":"123n"');
+			expect(raw).not.toContain('"value":"123n"');
+		}
 	});
 
 	it('returns undefined (does not throw) for a present-but-corrupt snapshot', async () => {

@@ -23752,316 +23752,592 @@
     "fixed": {
       "0x066A2EDcC0b7278A2CF5Bf2a040b4a54a41A9550": {
         "lastTime": 1730329273,
-        "toWithdraw": "11852364440000000000n"
+        "toWithdraw": {
+          "__bigint__": "11852364440000000000"
+        }
       },
       "0x143f8cFB7e91b7836D90A06Fe0e2cF8728D61FB0": {
         "lastTime": 1715986847,
-        "toWithdraw": "736258840000000000n"
+        "toWithdraw": {
+          "__bigint__": "736258840000000000"
+        }
       },
       "0x202869f3c82B65d367c58aD3875C6b51Fd0648a8": {
         "lastTime": 1715209291,
-        "toWithdraw": "259065980000000000n"
+        "toWithdraw": {
+          "__bigint__": "259065980000000000"
+        }
       },
       "0x24AB6cE22A719e7930ddb81Ae30460b850187eCe": {
         "lastTime": 1715468475,
-        "toWithdraw": "272164500000000000n"
+        "toWithdraw": {
+          "__bigint__": "272164500000000000"
+        }
       },
       "0x2981000A489dD625479Bf612A29910F7De8556B4": {
         "lastTime": 1729119625,
-        "toWithdraw": "8672703840000000000n"
+        "toWithdraw": {
+          "__bigint__": "8672703840000000000"
+        }
       },
       "0x4d5c9afcb508fA0e755a7F5BcA71Fc8518e51CdE": {
         "lastTime": 1724713261,
-        "toWithdraw": "4675988420000000000n"
+        "toWithdraw": {
+          "__bigint__": "4675988420000000000"
+        }
       },
       "0x5371d2E73edf765752121426b842063fbd84f713": {
         "lastTime": 1715468475,
-        "toWithdraw": "302399840000000000n"
+        "toWithdraw": {
+          "__bigint__": "302399840000000000"
+        }
       },
       "0x545f0db5cA91C02BD24616Ed2436C03A1F49945c": {
         "lastTime": 1713740429,
-        "toWithdraw": "3455820000000000n"
+        "toWithdraw": {
+          "__bigint__": "3455820000000000"
+        }
       },
       "0x603E4BA9Bc76103051eCA273Cb57641F16Ff743b": {
         "lastTime": 1711580431,
-        "toWithdraw": "0n"
+        "toWithdraw": {
+          "__bigint__": "0"
+        }
       },
       "0x6bAFF8A3449cc2E196F4b873f49e03E09345B1E1": {
         "lastTime": 1714950023,
-        "toWithdraw": "550089440000000000n"
+        "toWithdraw": {
+          "__bigint__": "550089440000000000"
+        }
       },
       "0x88040444bc5F834Fcc209CF7C17E8B67E3F1C3f3": {
         "lastTime": 1713999629,
-        "toWithdraw": "29375500000000000n"
+        "toWithdraw": {
+          "__bigint__": "29375500000000000"
+        }
       },
       "0x949B1fE8B1860E51fa550131EB0F21729cA68A1A": {
         "lastTime": 1713394853,
-        "toWithdraw": "4319920000000000n"
+        "toWithdraw": {
+          "__bigint__": "4319920000000000"
+        }
       },
       "0x9D3AD31C3362b87355589A8c537fdD570A1650fd": {
         "lastTime": 1713826869,
-        "toWithdraw": "0n"
+        "toWithdraw": {
+          "__bigint__": "0"
+        }
       },
       "0x9d35cE15c448B5a4f8afC170214F3031878396A3": {
         "lastTime": 1716246023,
-        "toWithdraw": "1605368720000000000n"
+        "toWithdraw": {
+          "__bigint__": "1605368720000000000"
+        }
       },
       "0x9dab5A6393eEf78eB36cd84bB9Bbb055189429A5": {
         "lastTime": 1716073277,
-        "toWithdraw": "2929361480000000000n"
+        "toWithdraw": {
+          "__bigint__": "2929361480000000000"
+        }
       },
       "0xA6534C8bf255F859D309125202ab27e436384fE6": {
         "lastTime": 1714518043,
-        "toWithdraw": "105404920000000000n"
+        "toWithdraw": {
+          "__bigint__": "105404920000000000"
+        }
       },
       "0xAcDb105133b8598A308995FD1EeBAaB155f1a3bf": {
         "lastTime": 1714431673,
-        "toWithdraw": "738165360000000000n"
+        "toWithdraw": {
+          "__bigint__": "738165360000000000"
+        }
       },
       "0xB006c644258e01b437eFF06e16E56e938a239712": {
         "lastTime": 1730329273,
-        "toWithdraw": "27178186180000000000n"
+        "toWithdraw": {
+          "__bigint__": "27178186180000000000"
+        }
       },
       "0xC47903Ab2Cf85C45097d4f300f19C13e1E409168": {
         "lastTime": 1713999625,
-        "toWithdraw": "25917000000000000n"
+        "toWithdraw": {
+          "__bigint__": "25917000000000000"
+        }
       },
       "0xC6cCd3c2d63bc8De8fcF43EdE80D135666b7aceE": {
         "lastTime": 1727391637,
-        "toWithdraw": "26886417600000000000n"
+        "toWithdraw": {
+          "__bigint__": "26886417600000000000"
+        }
       },
       "0xD1edDfcc4596CC8bD0bd7495beaB9B979fc50336": {
         "lastTime": 1722294031,
-        "toWithdraw": "1306802420000000000n"
+        "toWithdraw": {
+          "__bigint__": "1306802420000000000"
+        }
       },
       "0xE2682E3484F545f43cbBbD1188ef1bfcFc7c749E": {
         "lastTime": 1711926193,
-        "toWithdraw": "6921400000000000n"
+        "toWithdraw": {
+          "__bigint__": "6921400000000000"
+        }
       },
       "0xF8b109aF18cfA614Bef1C2899e522d77b3C64c14": {
         "lastTime": 1729724443,
-        "toWithdraw": "31982734700000000000n"
+        "toWithdraw": {
+          "__bigint__": "31982734700000000000"
+        }
       },
       "0xFE35e15bE885750D9b2363cbB6aBDd57AC9C4c40": {
         "lastTime": 1729119625,
-        "toWithdraw": "229457940000000000n"
+        "toWithdraw": {
+          "__bigint__": "229457940000000000"
+        }
       },
       "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF": {
         "lastTime": 1716073255,
-        "toWithdraw": "907964180000000000n"
+        "toWithdraw": {
+          "__bigint__": "907964180000000000"
+        }
       },
       "0xFa398d672936Dcf428116F687244034961545D91": {
         "lastTime": 1713913257,
-        "toWithdraw": "25046880000000000n"
+        "toWithdraw": {
+          "__bigint__": "25046880000000000"
+        }
       },
       "0xa1D50E107110b293AC0CE32d648A6Bf5AC3f3612": {
         "lastTime": 1713913267,
-        "toWithdraw": "239777480000000000n"
+        "toWithdraw": {
+          "__bigint__": "239777480000000000"
+        }
       },
       "0xa62D214750455C043C25DEA89FECc8724f61e45b": {
         "lastTime": 1716073277,
-        "toWithdraw": "2386043320000000000n"
+        "toWithdraw": {
+          "__bigint__": "2386043320000000000"
+        }
       },
       "0xac5b774D7a700AcDb528048B6052bc1549cd73B9": {
         "lastTime": 1713481283,
-        "toWithdraw": "64086700000000000n"
+        "toWithdraw": {
+          "__bigint__": "64086700000000000"
+        }
       },
       "0xc061c969510710c4B9C5c275ad5c2E6341dCE08B": {
         "lastTime": 1715468465,
-        "toWithdraw": "195263700000000000n"
+        "toWithdraw": {
+          "__bigint__": "195263700000000000"
+        }
       },
       "0xc6A55a0d7e2a7403fFEADf08A0203AF93bAD7D6e": {
         "lastTime": 1712927149,
-        "toWithdraw": "8283040000000000n"
+        "toWithdraw": {
+          "__bigint__": "8283040000000000"
+        }
       },
       "0xc6a4FCe15Bd4c14f8D6ECf3Ad4e20E39021897E8": {
         "lastTime": 1715209287,
-        "toWithdraw": "223421900000000000n"
+        "toWithdraw": {
+          "__bigint__": "223421900000000000"
+        }
       },
       "0xdE258ee5430E4F2b79B1af269bBedc3FFf89011a": {
         "lastTime": 1714777239,
-        "toWithdraw": "863780000000000n"
+        "toWithdraw": {
+          "__bigint__": "863780000000000"
+        }
       },
       "0xf943EBFA33d63376123335ad2096AEe6d3aC1374": {
         "lastTime": 1716505259,
-        "toWithdraw": "51846000000000000n"
+        "toWithdraw": {
+          "__bigint__": "51846000000000000"
+        }
       }
     },
     "global": {
       "lastUpdateTime": 1730329273,
-      "totalPoints": "1133000000000000000000n",
-      "totalRewardPerPointAtLastUpdate": "1398425579258n"
+      "totalPoints": {
+        "__bigint__": "1133000000000000000000"
+      },
+      "totalRewardPerPointAtLastUpdate": {
+        "__bigint__": "1398425579258"
+      }
     },
     "shared": {
       "0x066A2EDcC0b7278A2CF5Bf2a040b4a54a41A9550": {
-        "points": "82000000000000000000n",
-        "rewardsToWithdraw": "101215255948084000000n",
-        "totalRewardPerPointAccounted": "1398425579258n"
+        "points": {
+          "__bigint__": "82000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "101215255948084000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "1398425579258"
+        }
       },
       "0x143f8cFB7e91b7836D90A06Fe0e2cF8728D61FB0": {
-        "points": "2000000000000000000n",
-        "rewardsToWithdraw": "1087810387660000000n",
-        "totalRewardPerPointAccounted": "183286974120n"
+        "points": {
+          "__bigint__": "2000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "1087810387660000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "183286974120"
+        }
       },
       "0x202869f3c82B65d367c58aD3875C6b51Fd0648a8": {
-        "points": "0n",
-        "rewardsToWithdraw": "165386230606000000n",
-        "totalRewardPerPointAccounted": "103855853012n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "165386230606000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "103855853012"
+        }
       },
       "0x24AB6cE22A719e7930ddb81Ae30460b850187eCe": {
-        "points": "5000000000000000000n",
-        "rewardsToWithdraw": "1189475165160000000n",
-        "totalRewardPerPointAccounted": "132163907240n"
+        "points": {
+          "__bigint__": "5000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "1189475165160000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "132163907240"
+        }
       },
       "0x2981000A489dD625479Bf612A29910F7De8556B4": {
-        "points": "49000000000000000000n",
-        "rewardsToWithdraw": "65685833922831000000n",
-        "totalRewardPerPointAccounted": "1292176118073n"
+        "points": {
+          "__bigint__": "49000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "65685833922831000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "1292176118073"
+        }
       },
       "0x4d5c9afcb508fA0e755a7F5BcA71Fc8518e51CdE": {
-        "points": "26000000000000000000n",
-        "rewardsToWithdraw": "36668125843806000000n",
-        "totalRewardPerPointAccounted": "910692276036n"
+        "points": {
+          "__bigint__": "26000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "36668125843806000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "910692276036"
+        }
       },
       "0x5371d2E73edf765752121426b842063fbd84f713": {
-        "points": "0n",
-        "rewardsToWithdraw": "515798769296000000n",
-        "totalRewardPerPointAccounted": "132163907240n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "515798769296000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "132163907240"
+        }
       },
       "0x545f0db5cA91C02BD24616Ed2436C03A1F49945c": {
-        "points": "0n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0x603E4BA9Bc76103051eCA273Cb57641F16Ff743b": {
-        "points": "6000000000000000000n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "6000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0x6bAFF8A3449cc2E196F4b873f49e03E09345B1E1": {
-        "points": "12000000000000000000n",
-        "rewardsToWithdraw": "949868324509000000n",
-        "totalRewardPerPointAccounted": "73066794193n"
+        "points": {
+          "__bigint__": "12000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "949868324509000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "73066794193"
+        }
       },
       "0x88040444bc5F834Fcc209CF7C17E8B67E3F1C3f3": {
-        "points": "0n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0x949B1fE8B1860E51fa550131EB0F21729cA68A1A": {
-        "points": "2000000000000000000n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "2000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0x9D3AD31C3362b87355589A8c537fdD570A1650fd": {
-        "points": "1000000000000000000n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "1000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0x9d35cE15c448B5a4f8afC170214F3031878396A3": {
-        "points": "79000000000000000000n",
-        "rewardsToWithdraw": "8083846602242000000n",
-        "totalRewardPerPointAccounted": "205355486059n"
+        "points": {
+          "__bigint__": "79000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "8083846602242000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "205355486059"
+        }
       },
       "0x9dab5A6393eEf78eB36cd84bB9Bbb055189429A5": {
-        "points": "158000000000000000000n",
-        "rewardsToWithdraw": "19871184289422000000n",
-        "totalRewardPerPointAccounted": "190928868479n"
+        "points": {
+          "__bigint__": "158000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "19871184289422000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "190928868479"
+        }
       },
       "0xA6534C8bf255F859D309125202ab27e436384fE6": {
-        "points": "0n",
-        "rewardsToWithdraw": "57812436648000000n",
-        "totalRewardPerPointAccounted": "19270812216n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "57812436648000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "19270812216"
+        }
       },
       "0xAcDb105133b8598A308995FD1EeBAaB155f1a3bf": {
-        "points": "43000000000000000000n",
-        "rewardsToWithdraw": "147806133147000000n",
-        "totalRewardPerPointAccounted": "7390507305n"
+        "points": {
+          "__bigint__": "43000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "147806133147000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "7390507305"
+        }
       },
       "0xB006c644258e01b437eFF06e16E56e938a239712": {
-        "points": "144000000000000000000n",
-        "rewardsToWithdraw": "225171401656083000000n",
-        "totalRewardPerPointAccounted": "1398425579258n"
+        "points": {
+          "__bigint__": "144000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "225171401656083000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "1398425579258"
+        }
       },
       "0xC47903Ab2Cf85C45097d4f300f19C13e1E409168": {
-        "points": "0n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0xC6cCd3c2d63bc8De8fcF43EdE80D135666b7aceE": {
-        "points": "188000000000000000000n",
-        "rewardsToWithdraw": "220803518804093000000n",
-        "totalRewardPerPointAccounted": "1141490118639n"
+        "points": {
+          "__bigint__": "188000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "220803518804093000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "1141490118639"
+        }
       },
       "0xD1edDfcc4596CC8bD0bd7495beaB9B979fc50336": {
-        "points": "10000000000000000000n",
-        "rewardsToWithdraw": "7751281763082000000n",
-        "totalRewardPerPointAccounted": "704661978462n"
+        "points": {
+          "__bigint__": "10000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "7751281763082000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "704661978462"
+        }
       },
       "0xE2682E3484F545f43cbBbD1188ef1bfcFc7c749E": {
-        "points": "18000000000000000000n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "18000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0xF8b109aF18cfA614Bef1C2899e522d77b3C64c14": {
-        "points": "197000000000000000000n",
-        "rewardsToWithdraw": "263250572900635000000n",
-        "totalRewardPerPointAccounted": "1345230328599n"
+        "points": {
+          "__bigint__": "197000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "263250572900635000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "1345230328599"
+        }
       },
       "0xFE35e15bE885750D9b2363cbB6aBDd57AC9C4c40": {
-        "points": "0n",
-        "rewardsToWithdraw": "1450803599133000000n",
-        "totalRewardPerPointAccounted": "1292176118073n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "1450803599133000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "1292176118073"
+        }
       },
       "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF": {
-        "points": "12000000000000000000n",
-        "rewardsToWithdraw": "1694337538909000000n",
-        "totalRewardPerPointAccounted": "190926953867n"
+        "points": {
+          "__bigint__": "12000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "1694337538909000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "190926953867"
+        }
       },
       "0xFa398d672936Dcf428116F687244034961545D91": {
-        "points": "0n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0xa1D50E107110b293AC0CE32d648A6Bf5AC3f3612": {
-        "points": "0n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0xa62D214750455C043C25DEA89FECc8724f61e45b": {
-        "points": "65000000000000000000n",
-        "rewardsToWithdraw": "11629267645148000000n",
-        "totalRewardPerPointAccounted": "190928868479n"
+        "points": {
+          "__bigint__": "65000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "11629267645148000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "190928868479"
+        }
       },
       "0xac5b774D7a700AcDb528048B6052bc1549cd73B9": {
-        "points": "1000000000000000000n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "1000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0xc061c969510710c4B9C5c275ad5c2E6341dCE08B": {
-        "points": "2000000000000000000n",
-        "rewardsToWithdraw": "440083712429000000n",
-        "totalRewardPerPointAccounted": "132162838865n"
+        "points": {
+          "__bigint__": "2000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "440083712429000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "132162838865"
+        }
       },
       "0xc6A55a0d7e2a7403fFEADf08A0203AF93bAD7D6e": {
-        "points": "0n",
-        "rewardsToWithdraw": "0n",
-        "totalRewardPerPointAccounted": "0n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "0"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "0"
+        }
       },
       "0xc6a4FCe15Bd4c14f8D6ECf3Ad4e20E39021897E8": {
-        "points": "5000000000000000000n",
-        "rewardsToWithdraw": "623132436510000000n",
-        "totalRewardPerPointAccounted": "103855406085n"
+        "points": {
+          "__bigint__": "5000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "623132436510000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "103855406085"
+        }
       },
       "0xdE258ee5430E4F2b79B1af269bBedc3FFf89011a": {
-        "points": "0n",
-        "rewardsToWithdraw": "10650796674000000n",
-        "totalRewardPerPointAccounted": "52533041929n"
+        "points": {
+          "__bigint__": "0"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "10650796674000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "52533041929"
+        }
       },
       "0xf943EBFA33d63376123335ad2096AEe6d3aC1374": {
-        "points": "27000000000000000000n",
-        "rewardsToWithdraw": "421055970840000000n",
-        "totalRewardPerPointAccounted": "226408780468n"
+        "points": {
+          "__bigint__": "27000000000000000000"
+        },
+        "rewardsToWithdraw": {
+          "__bigint__": "421055970840000000"
+        },
+        "totalRewardPerPointAccounted": {
+          "__bigint__": "226408780468"
+        }
       }
     }
   }
