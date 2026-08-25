@@ -94,8 +94,22 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			 * to remember. It covers the read as well as the write, because this whole
 			 * surface is the fetcher's private API, and one rule for all of it is one
 			 * rule to get wrong.
+			 *
+			 * BOTH patterns are registered on purpose. Hono matches `/ingest` exactly,
+			 * so it does NOT cover `/ingest/expected-from-block`, and the wildcard alone
+			 * does not cover the bare path. Registering one of the two would leave half
+			 * this surface open while looking guarded -- which is the failure mode the
+			 * path-level guard exists to remove. `test/ingest.test.ts` asserts a 401 on
+			 * each of them.
 			 */
 			.use('/ingest', async (c, next) => {
+				const auth = authorized(c as never);
+				if (!auth.ok) {
+					return c.json({success: false, error: 'unauthorized', message: auth.message} as const, 401);
+				}
+				return next();
+			})
+			.use('/ingest/*', async (c, next) => {
 				const auth = authorized(c as never);
 				if (!auth.ok) {
 					return c.json({success: false, error: 'unauthorized', message: auth.message} as const, 401);
@@ -107,8 +121,23 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			 *
 			 * A stateless log-fetcher holds no cursor, so before its FIRST fetch it has
 			 * nothing to be corrected from and must ask.
+			 *
+			 * ## Why this is a POST for a question
+			 *
+			 * Answering it can WRITE. Reading the cursor reconciles one belonging to a
+			 * different source, config or processor version by calling
+			 * `processor.clear()`, exactly as `load()` does in the single-process shape --
+			 * the alternative being to answer from state the next batch is about to wipe,
+			 * so the read and the write disagree.
+			 *
+			 * A `GET` that writes is a trap whatever its justification: proxies, browser
+			 * prefetch, link scanners and retry-happy clients all assume a `GET` is safe,
+			 * and HTTP says it is. Rather than keep the side effect and document it, the
+			 * method matches what it does. The cost is one un-RESTful-looking POST for a
+			 * question; the alternative was an endpoint whose safety depended on nobody
+			 * ever pointing a crawler at it.
 			 */
-			.get('/ingest', async (c) => {
+			.post('/ingest/expected-from-block', async (c) => {
 				const ingestion = options.getIngestion?.(c as never);
 				if (!ingestion) return notConfigured(c as never);
 

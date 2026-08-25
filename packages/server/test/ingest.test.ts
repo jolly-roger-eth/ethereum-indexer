@@ -124,6 +124,21 @@ async function post(deployment: Deployment, batch: unknown, headers: Record<stri
 	});
 }
 
+/**
+ * Ask where the next batch must start.
+ *
+ * A POST for a question, deliberately: answering it can call `processor.clear()`
+ * to reconcile a cursor from another source, config or processor version, and a
+ * `GET` that writes is a trap for proxies, prefetchers and retrying clients
+ * whatever the justification. See the route.
+ */
+async function expectedFromBlock(deployment: Deployment): Promise<Response> {
+	return deployment.app.request('/ingest/expected-from-block', {
+		method: 'POST',
+		headers: {Authorization: `Bearer ${TOKEN}`},
+	});
+}
+
 function batchOf(
 	deployment: Deployment,
 	fromBlock: number,
@@ -157,7 +172,7 @@ describe('the full ingestion sequence: apply, re-send, gap, mismatch, reorg', ()
 	});
 
 	it('tells a sender where to start before anything has been indexed', async () => {
-		const res = await deployment.app.request('/ingest', {headers: {Authorization: `Bearer ${TOKEN}`}});
+		const res = await expectedFromBlock(deployment);
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({
 			success: true,
@@ -282,7 +297,7 @@ describe('the full ingestion sequence: apply, re-send, gap, mismatch, reorg', ()
 	});
 
 	it('ends with the cursor the last accepted batch left, and no other', async () => {
-		const res = await deployment.app.request('/ingest', {headers: {Authorization: `Bearer ${TOKEN}`}});
+		const res = await expectedFromBlock(deployment);
 		expect((await res.json()).expectedFromBlock).toBe(105);
 	});
 });
@@ -325,7 +340,7 @@ describe('the endpoint requires authentication', () => {
 
 	it('guards the cursor READ as well, since it is the fetcher-facing surface', async () => {
 		const deployment = await deploy();
-		expect((await deployment.app.request('/ingest')).status).toBe(401);
+		expect((await deployment.app.request('/ingest/expected-from-block', {method: 'POST'})).status).toBe(401);
 	});
 });
 
@@ -333,7 +348,7 @@ describe('a server hosting no processor', () => {
 	it('says so instead of pretending to have a cursor', async () => {
 		const deployment = await deploy({INGEST_TOKEN: TOKEN}, false);
 
-		const get = await deployment.app.request('/ingest', {headers: {Authorization: `Bearer ${TOKEN}`}});
+		const get = await expectedFromBlock(deployment);
 		expect(get.status).toBe(501);
 		expect((await get.json()).error).toBe('ingestion-not-configured');
 
@@ -343,7 +358,7 @@ describe('a server hosting no processor', () => {
 
 	it('still refuses an unauthenticated caller first, so the absence is not a probe', async () => {
 		const deployment = await deploy({INGEST_TOKEN: TOKEN}, false);
-		expect((await deployment.app.request('/ingest')).status).toBe(401);
+		expect((await deployment.app.request('/ingest/expected-from-block', {method: 'POST'})).status).toBe(401);
 	});
 });
 
