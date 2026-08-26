@@ -8,8 +8,10 @@ import type {
 	KeepState,
 	ProvidedStreamConfig,
 	ProvidedIndexerConfig,
+	TxInclusionQuery,
+	TxInclusionVerdict,
 } from '@etherfold/core';
-import {EthereumIndexer} from '@etherfold/core';
+import {checkTxInclusion as checkTxInclusionAgainst, EthereumIndexer} from '@etherfold/core';
 import {createRootStore, createStore} from './utils/stores.js';
 import {ReactHooks, useStores} from 'use-stores';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
@@ -581,6 +583,29 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		setStatus({state: 'Idle'});
 	}
 
+	/**
+	 * Does the state in `$state` already account for these transactions?
+	 *
+	 * The reconciliation an app needs before it lays an optimistic update over
+	 * indexed state: applied twice, a non-idempotent update (a counter, a balance,
+	 * an append) is wrong. See `checkTxInclusion` in `@etherfold/core` for what the
+	 * verdicts mean, why the caller's own receipt cannot answer this, and what it
+	 * cannot tell you.
+	 *
+	 * Answered against the CURRENT cursor and the indexer's own configured finality
+	 * depth, so a caller never has to keep a second copy of either. The pairing with
+	 * `$state` is close but not transactional: the core writes the state through the
+	 * processor BEFORE it publishes the cursor, and this hook then sets `syncing`
+	 * before `state`, so within one synchronous update the cursor can be one
+	 * statement ahead of the `state` store and never behind. That direction is the
+	 * safe one -- an overlay dropped a moment early flickers, one dropped late is
+	 * counted twice -- and a subscriber that reads both after the update sees them
+	 * agree.
+	 */
+	function checkTxInclusion(queries: readonly TxInclusionQuery[]): Record<string, TxInclusionVerdict> {
+		return checkTxInclusionAgainst($syncing.lastSync, queries, indexer ? indexer.finalityDepth : 0);
+	}
+
 	async function _auto_index() {
 		setSyncing({autoIndexing: true});
 		try {
@@ -619,6 +644,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				return readableStatus.$state;
 			},
 		},
+		checkTxInclusion,
 		init: init as InitFunction<ABI, ProcessorConfig>,
 		indexToLatest,
 		indexMore,

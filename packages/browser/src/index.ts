@@ -34,4 +34,8 @@ export type {
 	StateSaver,
 	ProcessorContext,
 	ExistingStream,
+	TxInclusionQuery,
+	TxInclusionStatus,
+	TxInclusionBasis,
+	TxInclusionVerdict,
 } from '@etherfold/core';

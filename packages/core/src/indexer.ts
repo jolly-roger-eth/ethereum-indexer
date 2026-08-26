@@ -190,6 +190,19 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	 *
 	 * Before anything has been indexed it is the source's earliest `startBlock`.
 	 */
+	/**
+	 * The finality depth this indexer actually runs with, defaults applied.
+	 *
+	 * Exposed because it is not derivable from the config a caller PASSED (that
+	 * one may leave `stream.finality` unset, and `resolveStreamConfig` fills it),
+	 * and because it is what bounds the unconfirmed window: a consumer reasoning
+	 * about that window (`checkTxInclusion`) needs the same number this indexer
+	 * used, not a second copy of the default.
+	 */
+	get finalityDepth(): number {
+		return this.finality;
+	}
+
 	get expectedFromBlock(): number {
 		if (!this.lastSync) {
 			return this.defaultFromBlock;
