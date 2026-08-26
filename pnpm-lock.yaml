@@ -51,10 +51,10 @@ importers:
   examples/basic:
     dependencies:
       '@etherfold/browser':
-        specifier: workspace:^0.7.0
+        specifier: workspace:^0.8.0
         version: link:../../packages/browser
       '@etherfold/js-processor':
-        specifier: workspace:^0.7.0
+        specifier: workspace:^0.8.0
         version: link:../../packages/js-processor
       react:
         specifier: ^19.2.6
