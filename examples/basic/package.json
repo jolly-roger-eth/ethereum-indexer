@@ -8,8 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@etherfold/browser": "workspace:^0.7.0",
-    "@etherfold/js-processor": "workspace:^0.7.0",
+    "@etherfold/browser": "workspace:^0.8.0",
+    "@etherfold/js-processor": "workspace:^0.8.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

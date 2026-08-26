@@ -1,7 +1,0 @@
----
-'@etherfold/core': patch
----
-
-Fix a reorg that silently kept dead-branch events in the state. `generateStreamToAppend` detected reorgs by walking the **incoming** block list and comparing it position-by-position against `unconfirmedBlocks`. When a reorg removed a block's logs without replacing them at another block-with-logs (for example the transaction went back to the mempool and was not re-mined yet), the re-fetch legitimately returned a **shorter** list, so the vanished block was never compared with anything: no `removed: true` marker was emitted, the processor kept the state derived from a block that no longer existed, and the block lingered in `unconfirmedBlocks` until it fell outside the finality window and was pruned without ever being retracted, making the corruption permanent. It self-healed only if another block with logs happened to land in the unconfirmed window first, so low-traffic sources were the most exposed.
-
-Reorg detection is now driven by `unconfirmedBlocks` and matches incoming blocks by block **number**: a missing entry (the block no longer carries any of our logs) and a differing hash (the block was replaced) are both treated as a reorg at that block. Blocks outside the re-fetched `[fromBlock, toBlock]` range are skipped rather than judged missing, since the re-fetch proves nothing about them. Behaviour for the already-covered case (same height, new hash) is unchanged.

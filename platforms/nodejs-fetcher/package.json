@@ -1,6 +1,6 @@
 {
 	"name": "@etherfold/platform-nodejs-fetcher",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Node host adapter for the etherfold log-fetcher: a long-running process driving fetch cycles on an interval, with backoff. Configuration and scheduling only.",
 	"publishConfig": {
 		"access": "public"
