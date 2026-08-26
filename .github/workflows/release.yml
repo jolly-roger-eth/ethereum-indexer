@@ -1,0 +1,90 @@
+name: release
+
+# Changesets release flow (the "approve" flow):
+#   1. Land PRs that include a changeset (`.changeset/*.md`) on main.
+#   2. This workflow opens/updates a "Version Packages" PR that bumps versions
+#      and writes changelogs from the pending changesets.
+#   3. Merging that PR (which deletes the changesets) makes this workflow run
+#      `release:ci`, which gates on the repo's own acceptance gate and then runs
+#      `changeset publish`.
+#
+# Auth is npm Trusted Publishing (OIDC): NO NPM_TOKEN secret. npm trusts this
+# repo + this workflow FILENAME once it is registered as a trusted publisher on
+# each package. The handshake needs `id-token: write`, Node >= 22 and a pnpm
+# that speaks OIDC; publishes are stamped with provenance automatically.
+#
+# THREE THINGS THIS WORKFLOW CANNOT DO FOR YOU, and each one fails as a
+# misleading `E404` on publish rather than as itself:
+#
+#   1. A package must ALREADY EXIST on npm before a trusted publisher can be
+#      registered for it. Every `@etherfold/*` package is unpublished, so the
+#      FIRST publish of each has to come from a human (`pnpm release` at the
+#      root, which is the same gate plus a local `changeset publish`). Only then
+#      does this workflow have anything to authenticate against.
+#   2. Each package needs a `repository` field in its package.json, pointing at
+#      THIS repository. Trusted publishing generates provenance automatically,
+#      and provenance is rejected when the declared repository does not match the
+#      repository the workflow runs in.
+#   3. The trusted publisher is registered against the workflow FILENAME
+#      (`release.yml`, not `.github/workflows/release.yml`) and against
+#      `owner/repo`. Renaming this file, or moving the repository, invalidates
+#      every registration until they are updated.
+#
+# The Version PR also needs "Allow GitHub Actions to create and approve pull
+# requests" enabled in Settings -> Actions -> General.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialize release runs, and NEVER cancel one in flight: `changeset publish`
+# may be mid-publish across ~18 packages, and cancelling it would leave the set
+# half-published. Publishing is idempotent (a version already on npm is skipped),
+# so letting every queued run finish is always safe.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write # npm OIDC trusted publishing + provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # pnpm 10, the same pin as ci.yml and docs.yml: the lockfile is v9, and
+      # pnpm 11 fails the install until every ignored build script is resolved in
+      # pnpm-workspace.yaml. It matters twice over here, because `changeset
+      # publish` shells out to `pnpm publish` in a pnpm workspace, and pnpm 11.0
+      # regressed OIDC publishing to a 404 (pnpm/pnpm#11513).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24 # >= 22 required for npm OIDC trusted publishing
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Version PR or publish
+        uses: changesets/action@v1
+        with:
+          # `release:ci` re-runs the acceptance gate and then publishes. The
+          # action itself makes the git commit and the tags, so nothing here
+          # pushes. No NPM_TOKEN: npm detects the OIDC environment and
+          # authenticates as the registered trusted publisher.
+          publish: pnpm release:ci
+          version: pnpm changeset version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

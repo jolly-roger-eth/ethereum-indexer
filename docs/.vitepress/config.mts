@@ -109,11 +109,16 @@ export default defineConfig({
 			},
 		],
 
-		socialLinks: [{icon: 'github', link: 'https://github.com/jolly-roger-eth/ethereum-indexer/#readme'}],
+		socialLinks: [{icon: 'github', link: 'https://github.com/wighawag/etherfold/#readme'}],
 
 		search: {
 			provider: 'local',
 		},
 	},
-	base: '/ethereum-indexer'
+	// The GitHub Pages project path, which is the REPO name and not the package
+	// name: the site is served from `wighawag.github.io/etherfold/`. Pages is not
+	// redirected across a repository move (git and web URLs are), so this had to
+	// move with the repo. Drop it to `/` only once `etherfold.dev` is a real custom
+	// domain, which `docs/web-config.json` already claims as the canonical URL.
+	base: '/etherfold'
 });

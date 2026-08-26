@@ -5,6 +5,11 @@
 	"description": "Cloudflare Worker host for @etherfold/server: supplies a D1-backed RemoteSQL and the worker env. A deployable, not a library.",
 	"type": "module",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/wighawag/etherfold.git",
+		"directory": "platforms/cf-worker"
+	},
 	"dependencies": {
 		"@etherfold/server": "workspace:*",
 		"named-logs": "^0.4.1",

@@ -59,3 +59,11 @@ playwright-report/
 
 # Agent tooling scratch (subagent run artifacts)
 .pi-subagents/
+
+# Copied in at pack/publish time by each package's `prepack`, because npm reads
+# a README and a LICENSE only from the package DIRECTORY, never from the repo
+# root. Generated, so not source: committed, they would be 19 copies free to
+# drift from the single file they mirror.
+/packages/cli/README.md
+/packages/*/LICENSE
+/platforms/*/LICENSE

@@ -1,12 +1,12 @@
-![Indexing Anywhere](/preview-grey.png)
+![Indexing Anywhere](https://raw.githubusercontent.com/wighawag/etherfold/main/preview-grey.png)
 
 A modular indexer system for [ethereum](https://ethereum.org) and other blockchain following the same [RPC standard](https://ethereum.org/en/developers/docs/apis/json-rpc/).
 
-Git Repo: https://github.com/jolly-roger-eth/ethereum-indexer
+Git Repo: https://github.com/wighawag/etherfold
 
-You can find some demoes in the <a href="https://jolly-roger-eth.github.io/ethereum-indexer/examples/#home" target="_blank">examples folder</a>
+You can find some demoes in the <a href="https://wighawag.github.io/etherfold/examples/#home" target="_blank">examples folder</a>
 
-And here is the [Documentation Website](https://jolly-roger-eth.github.io/ethereum-indexer/)
+And here is the [Documentation Website](https://wighawag.github.io/etherfold/)
 
 ## See it index, in one command
 
@@ -14,7 +14,7 @@ And here is the [Documentation Website](https://jolly-roger-eth.github.io/ethere
 pnpm --filter event-processor-nfts browser
 ```
 
-Opens a tab that indexes an ERC-721 collection off a real chain, with no server and no database to provision: one processor, its state in IndexedDB, and a reload that CONTINUES from its cursor instead of starting again. [`examples/event-processor-nfts`](examples/event-processor-nfts/README.md) says what to expect and how to swap the storage backend in one line.
+Opens a tab that indexes an ERC-721 collection off a real chain, with no server and no database to provision: one processor, its state in IndexedDB, and a reload that CONTINUES from its cursor instead of starting again. [`examples/event-processor-nfts`](https://github.com/wighawag/etherfold/blob/main/examples/event-processor-nfts/README.md) says what to expect and how to swap the storage backend in one line.
 
 ## Main features:
 
@@ -56,7 +56,7 @@ install `@etherfold/browser` and `@etherfold/js-processor`
 npm i @etherfold/browser @etherfold/js-processor
 ```
 
-If you use react, here is a mostly self-contained example from [App.tsx](https://github.com/jolly-roger-eth/ethereum-indexer/blob/main/examples/basic/src/App.tsx)
+If you use react, here is a mostly self-contained example from [App.tsx](https://github.com/wighawag/etherfold/blob/main/examples/basic/src/App.tsx)
 
 ```tsx
 import './App.css';

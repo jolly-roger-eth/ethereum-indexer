@@ -19,6 +19,11 @@
 		"entryPoint": "src/index.ts"
 	},
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/wighawag/etherfold.git",
+		"directory": "packages/server"
+	},
 	"dependencies": {
 		"@etherfold/core": "workspace:*",
 		"hono": "^4.13.3",
@@ -37,6 +42,7 @@
 	"scripts": {
 		"sql2ts": "node sql2ts.cjs ./src/schema/sql",
 		"build": "rm -rf dist && pnpm sql2ts && tsc",
+		"prepack": "cp ../../LICENSE LICENSE",
 		"typecheck": "tsc -p tsconfig.typecheck.json",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",

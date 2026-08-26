@@ -5,6 +5,11 @@
 	"description": "The heavy conformance workload: a real launched processor, its real captured event stream, and the state the ORIGINAL processor computed from it, replayed through every state-store backend.",
 	"type": "module",
 	"license": "GPL-3.0-only",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/wighawag/etherfold.git",
+		"directory": "packages/conformance-workload-stratagems"
+	},
 	"devDependencies": {
 		"@etherfold/core": "workspace:*",
 		"@etherfold/fs": "workspace:*",

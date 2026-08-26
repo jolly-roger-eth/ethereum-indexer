@@ -23,6 +23,8 @@
     "---------------------- PUBLISH --------------------": "",
     "prepublishOnly": "pnpm format:check && pnpm build",
     "release": "pnpm prepublishOnly && git push --all && pnpm changeset publish && git push --tags",
+    "release:ci": "pnpm format:check && pnpm build && pnpm typecheck && pnpm test && pnpm changeset publish",
+    "reserve-npm-names": "node scripts/reserve-npm-names.mjs",
     "---------------------- FORMAT ----------------------": "",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

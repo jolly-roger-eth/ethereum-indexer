@@ -1,6 +1,12 @@
 {
 	"name": "@etherfold/browser",
 	"version": "0.7.7",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/wighawag/etherfold.git",
+		"directory": "packages/browser"
+	},
 	"publishConfig": {
 		"access": "public"
 	},
@@ -42,6 +48,7 @@
 	},
 	"scripts": {
 		"build": "rm -rf dist && tsc",
+		"prepack": "cp ../../LICENSE LICENSE",
 		"typecheck": "tsc -p tsconfig.typecheck.json",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",
