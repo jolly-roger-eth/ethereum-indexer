@@ -33,12 +33,14 @@ jobs:
         with:
           fetch-depth: 0 # Not needed if lastUpdated is not enabled
 
-      # pnpm 10: the lockfile is v9, and pnpm 11 fails the install until every
-      # ignored build script is resolved in pnpm-workspace.yaml
+      # No `version:` here ON PURPOSE: it comes from `packageManager` in the root
+      # package.json. Specifying both is an ERROR in pnpm/action-setup ("Multiple
+      # versions of pnpm specified"), not a precedence rule. It resolves to pnpm
+      # 10, which is what this repo needs: the lockfile is v9, and pnpm 11 fails
+      # the install until every ignored build script is resolved in
+      # pnpm-workspace.yaml.
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v7

@@ -57,15 +57,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # pnpm 10, the same pin as ci.yml and docs.yml: the lockfile is v9, and
-      # pnpm 11 fails the install until every ignored build script is resolved in
-      # pnpm-workspace.yaml. It matters twice over here, because `changeset
-      # publish` shells out to `pnpm publish` in a pnpm workspace, and pnpm 11.0
-      # regressed OIDC publishing to a 404 (pnpm/pnpm#11513).
+      # No `version:` here ON PURPOSE: the version comes from `packageManager` in
+      # the root package.json, which pins it exactly and with an integrity hash.
+      # Specifying both is an ERROR in pnpm/action-setup ("Multiple versions of
+      # pnpm specified"), not a precedence rule, so the pin lives in exactly one
+      # place. That it resolves to pnpm 10 matters twice over: the lockfile is v9
+      # and pnpm 11 fails the install until every ignored build script is resolved
+      # in pnpm-workspace.yaml, and `changeset publish` shells out to `pnpm
+      # publish` in a pnpm workspace, where pnpm 11.0 regressed OIDC publishing to
+      # a 404 (pnpm/pnpm#11513).
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
