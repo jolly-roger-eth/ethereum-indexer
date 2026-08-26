@@ -734,6 +734,7 @@ describe('the sending side names no host and keeps no state', () => {
 	const sources = [
 		'../src/logFetcher.ts',
 		'../src/ingestClient.ts',
+		'../src/directIngestion.ts',
 		'../src/internal/utils/retry.ts',
 		'../src/internal/engine/enrich.ts',
 		'../src/internal/engine/RangeLogFetcher.ts',

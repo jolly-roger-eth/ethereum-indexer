@@ -4,6 +4,7 @@ export * from './indexer.js';
 export * from './streamBuilder.js';
 export * from './logFetcher.js';
 export * from './ingestClient.js';
+export * from './directIngestion.js';
 export type {RetryPolicy} from './internal/utils/retry.js';
 export * from './utils/index.js';
 export type {ReorgCause, ReorgDetection} from './internal/engine/utils.js';
