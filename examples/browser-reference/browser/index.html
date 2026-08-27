@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>etherfold &mdash; the browser reference wiring</title>
+		<style>
+			body {
+				font-family: system-ui, sans-serif;
+				max-width: 48rem;
+				margin: 2rem auto;
+				padding: 0 1rem;
+				line-height: 1.5;
+			}
+			dt {
+				font-weight: 600;
+			}
+			dd {
+				margin: 0 0 0.75rem 0;
+				white-space: pre-wrap;
+			}
+			#error:not(:empty) {
+				color: #b00;
+				border: 1px solid #b00;
+				padding: 0.5rem;
+				margin: 1rem 0;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>The browser reference wiring</h1>
+		<p>
+			One contract, indexed in this tab over EIP-1193, kept in IndexedDB, read as stores. Read
+			<code>browser/main.ts</code>; it is the whole example.
+		</p>
+		<div id="error"></div>
+		<dl>
+			<dt>Progress</dt>
+			<dd id="progress">starting...</dd>
+			<dt>Transfers indexed</dt>
+			<dd id="transfers">0</dd>
+			<dt>Pending transactions</dt>
+			<dd id="pending">none</dd>
+			<dt>Last reload event</dt>
+			<dd id="reload">none yet</dd>
+		</dl>
+		<script type="module" src="./main.ts"></script>
+	</body>
+</html>

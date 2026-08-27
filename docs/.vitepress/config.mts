@@ -92,6 +92,7 @@ export default defineConfig({
 		nav: [
 			{text: 'Home', link: '/'},
 			{text: 'Getting Started', link: '/guide/getting-started/'},
+			{text: 'Browser apps', link: '/guide/indexing-in-a-browser-app/'},
 			{text: 'API', link: '/api/'},
 		],
 
@@ -100,7 +101,10 @@ export default defineConfig({
 		sidebar: [
 			{
 				text: 'Guide',
-				items: [{text: 'Getting Started', link: '/guide/getting-started/'}],
+				items: [
+					{text: 'Getting Started', link: '/guide/getting-started/'},
+					{text: 'Indexing in a browser app', link: '/guide/indexing-in-a-browser-app/'},
+				],
 			},
 			{
 				text: 'API',

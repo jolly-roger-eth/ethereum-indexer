@@ -1,0 +1,23 @@
+{
+	"name": "browser-reference",
+	"private": true,
+	"type": "module",
+	"license": "AGPL-3.0-only",
+	"description": "The minimal reference wiring for indexing one contract in a browser tab: EIP-1193 from the user's wallet, IndexedDB, results as stores, and both hot-reload axes.",
+	"dependencies": {
+		"@etherfold/browser": "workspace:*",
+		"@etherfold/processor-entities": "workspace:*",
+		"@etherplay/connect": "0.9.0"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.62.1",
+		"typescript": "^6.0.3",
+		"vite": "^8.0.16"
+	},
+	"scripts": {
+		"typecheck": "tsc -p tsconfig.typecheck.json",
+		"browser": "vite",
+		"browser:build": "vite build",
+		"verify:browser": "playwright test"
+	}
+}

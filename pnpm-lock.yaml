@@ -82,6 +82,28 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0)
 
+  examples/browser-reference:
+    dependencies:
+      '@etherfold/browser':
+        specifier: workspace:*
+        version: link:../../packages/browser
+      '@etherfold/processor-entities':
+        specifier: workspace:*
+        version: link:../../packages/processor-entities
+      '@etherplay/connect':
+        specifier: 0.9.0
+        version: 0.9.0
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.62.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0)
+
   examples/event-processor-bleeps:
     dependencies:
       '@etherfold/js-processor':
