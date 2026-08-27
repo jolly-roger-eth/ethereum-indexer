@@ -39,6 +39,39 @@ const namedLogger = logs('@etherfold/core');
 
 export type LoadingState = 'Loading' | 'FetchingEventStream' | 'ProcessingEventStream' | 'Loaded';
 
+/**
+ * What a reconfigure DID, for the caller that has to react to it.
+ *
+ * `updateProcessor`, `updateIndexer` and `reset` all end in one of two very
+ * different places: the state that existed is still the state, or it was thrown
+ * away and is being recomputed. Which one happened is decided HERE, from the
+ * version hash and the source hashes, and it used to be decided here and told to
+ * nobody.
+ *
+ * That silence was a live defect for any caller holding a COPY of the state --
+ * which is every UI, because a store, a signal or a hook is exactly that copy.
+ * `onStateUpdated` fires when a state is adopted or produced, and a discard is
+ * neither: the processor's fresh, empty state is not published by anything, so
+ * a subscriber kept rendering the state the core had just discarded until the
+ * next event happened to arrive. When the reconfigure was a contract redeploy,
+ * the next event could be a long way off, or never (a freshly redeployed
+ * implementation has emitted nothing yet), and "never" means the old contract's
+ * state on screen for the rest of the session.
+ *
+ * Reported rather than inferred, because the alternative is every caller
+ * re-deriving the version-hash rule -- including `force`, including the
+ * source-hash comparison -- and a caller that gets that derivation wrong fails
+ * in exactly the silent direction the report exists to close.
+ */
+export type ReconfigureOutcome = {
+	/**
+	 * True when the previously computed state is GONE and a fresh one is being
+	 * built. A caller holding a copy must replace it; see
+	 * `createIndexerState`'s `state` store for what that looks like.
+	 */
+	stateDiscarded: boolean;
+};
+
 // PROPOSAL FOR STATE ANCHORS
 // we can have state anchor that get provided by the processor
 // these set the minimum block to start fetching from
@@ -272,7 +305,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		provider?: EIP1193ProviderWithoutEvents;
 		source?: IndexingSource<ABI>;
 		streamConfig?: ProvidedStreamConfig;
-	}) {
+	}): Promise<ReconfigureOutcome> {
 		this.disableProcessing();
 		const newConfigHash = update.streamConfig ? simple_hash(update.streamConfig) : this.streamConfigHash;
 
@@ -333,9 +366,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		} else {
 			this.reenableProcessing();
 		}
+		return {stateDiscarded: resetNeeded};
 	}
 
-	async updateProcessor(newProcessor: EventProcessor<ABI, ProcessResultType>, options?: {force?: boolean}) {
+	async updateProcessor(
+		newProcessor: EventProcessor<ABI, ProcessResultType>,
+		options?: {force?: boolean},
+	): Promise<ReconfigureOutcome> {
 		// Align with updateIndexer: disable processing first so a racing index/feed tick cannot
 		// interleave with the swap, then decide, then re-enable.
 		this.disableProcessing();
@@ -356,6 +393,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			} finally {
 				this.reenableProcessing();
 			}
+			return {stateDiscarded: true};
 		} else {
 			// Same version hash and not forced: nothing to reset/reload, so we keep the running
 			// processor instance. Warn in case the developer changed the processor but forgot to bump
@@ -367,10 +405,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					`updateProcessor(newProcessor, {force: true}).`,
 			);
 			this.reenableProcessing();
+			return {stateDiscarded: false};
 		}
 	}
 
-	async reset() {
+	async reset(): Promise<ReconfigureOutcome> {
 		if (this._index.executing) {
 			this._index.cancel();
 		}
@@ -381,6 +420,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		await this.config.keepStream?.clear(this.source);
 		await this.processor.clear().then(() => this.load());
+		// Unconditional, and the only one of the three that is: `reset` IS the discard.
+		return {stateDiscarded: true};
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------

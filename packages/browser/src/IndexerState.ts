@@ -218,7 +218,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		) => EthereumIndexer<ABI, ProcessResultType>;
 	},
 ) {
-	const selected = taggedProcessor(givenProcessor);
+	// `let`, because `updateProcessor` replaces it. It used to be `const`, and the
+	// hook consequently went on describing the processor it no longer drove.
+	let selected = taggedProcessor(givenProcessor);
 	const processor = selected.processor;
 	const {
 		$state: $syncing,
@@ -248,11 +250,23 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		}
 		(processor as any).keepState(options.keepState);
 	}
-	// The free-form path CREATES its initial state; the entity path READS its store
-	// through a handle that already exists. Selected by the tag, so a processor of
-	// one kind can never be asked for the other kind's entry point.
-	const initialState =
-		selected.kind === 'entities' ? selected.processor.state : selected.processor.createInitialState();
+	/**
+	 * The state to publish when there is nothing computed yet.
+	 *
+	 * The free-form path CREATES its initial state; the entity path READS its store
+	 * through a handle that already exists. Selected by the tag, so a processor of
+	 * one kind can never be asked for the other kind's entry point.
+	 *
+	 * Called at construction and again after a reconfigure that DISCARDED the
+	 * state, which are the same situation: a processor that has processed nothing.
+	 * One expression for both, so the value a subscriber sees before the first
+	 * event cannot depend on which of the two paths it arrived by.
+	 */
+	function emptyStateOf(current: TaggedProcessor<ABI, ProcessResultType, ProcessorConfig>): ProcessResultType {
+		return current.kind === 'entities' ? current.processor.state : current.processor.createInitialState();
+	}
+
+	const initialState = emptyStateOf(selected);
 
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
 	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(initialState);
@@ -536,11 +550,24 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		}
 	}
 
-	function reset() {
+	/**
+	 * Throw the computed state away and rebuild it from the start block.
+	 *
+	 * The re-seed is the whole reason this is not a one-line delegation: `reset` IS
+	 * a discard, so the copy this hook publishes has to go at the same moment the
+	 * processor's does. Without it a subscriber keeps rendering the state that was
+	 * just reset until the next event arrives to overwrite it -- and on a chain
+	 * with nothing left to replay, that is never.
+	 */
+	async function reset() {
 		if (!indexer) {
 			throw new Error(`no indexer`);
 		}
-		return indexer.reset();
+		const outcome = await indexer.reset();
+		if (outcome.stateDiscarded) {
+			setState(emptyStateOf(selected));
+		}
+		return outcome;
 	}
 
 	// Tear down the indexer-state so it can be safely dropped (e.g. SPA navigation / component
@@ -657,11 +684,18 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		 * Swap the processor in place, in either kind's terms.
 		 *
 		 * It takes the same union the hook does, in the same shape, so a live-reload
-		 * that rebuilds an entity processor does not have to unwrap it by hand. What
-		 * happens below is what happened before: the core is handed the
-		 * `EventProcessor`, and it decides whether the state survives by comparing
-		 * version hashes. Nothing here re-seeds the state store, exactly as nothing
-		 * did before; the next `load` does that through `onStateUpdated`.
+		 * that rebuilds an entity processor does not have to unwrap it by hand. The
+		 * core is handed the `EventProcessor` and decides whether the state survives
+		 * by comparing VERSION HASHES -- which are author-declared, so an edited
+		 * handler under an unchanged `version` is not a change the core can see, and
+		 * the swap is SKIPPED rather than applied. Bump the processor's `version`, or
+		 * pass `{force: true}`, to make an edit take effect.
+		 *
+		 * When the core does discard, so does this hook: `$state` is re-seeded from the
+		 * new processor at that moment rather than being left holding the old value
+		 * until the next event overwrites it. That wait used to be unbounded -- a
+		 * processor swapped in against a freshly redeployed contract has nothing to
+		 * replay, so nothing ever arrived to correct the display.
 		 */
 		updateProcessor(
 			newProcessor: IndexerStateProcessor<ABI, ProcessResultType, ProcessorConfig>,
@@ -683,11 +717,24 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					stopAutoIndexing();
 				}
 				try {
-					await indexer.updateProcessor(taggedProcessor(newProcessor).processor, options);
+					const next = taggedProcessor(newProcessor);
+					const outcome = await indexer.updateProcessor(next.processor, options);
+					if (outcome.stateDiscarded) {
+						// The core took the new processor, so this is now the processor the hook
+						// describes. Recorded BEFORE the re-seed, because the empty state to publish
+						// is the NEW processor's (on the entity path it is a handle onto the new
+						// store, which is a different store whenever the declarations changed).
+						selected = next;
+						setState(emptyStateOf(selected));
+					}
 					// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
 					// Must run before resuming auto-indexing so the resumed loop does not early-return
 					// on the stale lastSync.
 					clearSyncingStateForReconfigure();
+					// Forwarded, not swallowed: whether the state survived is the caller's
+					// decision to act on too (a hot-reload handler choosing between carrying on
+					// and telling the user its data is being rebuilt).
+					return outcome;
 				} catch (err) {
 					setSyncing({error: {message: 'Failed to update processor', id: 'FAILED_TO_UPDATE_PROCESSOR'}});
 					throw err;
@@ -719,11 +766,18 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					stopAutoIndexing();
 				}
 				try {
-					await indexer.updateIndexer(update);
+					const outcome = await indexer.updateIndexer(update);
+					if (outcome.stateDiscarded) {
+						// A new source at the same address is the redeploy case, and it is the one
+						// where the stale copy was most dangerous: the state on screen was computed
+						// from the events of the implementation that is no longer deployed.
+						setState(emptyStateOf(selected));
+					}
 					// On success only (option b): clear stale syncing state so setupIndexing() re-runs
 					// cleanly for the new source/config instead of early-returning with old progress.
 					// Must run before resuming auto-indexing.
 					clearSyncingStateForReconfigure();
+					return outcome;
 				} catch (err) {
 					setSyncing({error: {message: 'Failed to update indexer', id: 'FAILED_TO_UPDATE_INDEXER'}});
 					throw err;

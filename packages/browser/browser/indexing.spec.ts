@@ -75,6 +75,75 @@ test('runs the same processor on whichever backend the application chose', async
 	}
 });
 
+/**
+ * AXIS ONE, in an engine: an edited reducer swapped into a running tab.
+ *
+ * Hot Contract Replacement's sibling, and the one with a trap in it. The core
+ * decides whether the state survives by comparing VERSION HASHES, and a version
+ * hash is author-declared: it contains the `version` string, the entity
+ * declarations and the config, and nothing derived from handler code. So the
+ * same edit is a no-op or a full rebuild depending only on whether a human
+ * remembered to change a string.
+ */
+test('an edited processor takes effect only when its version says so', async ({page}) => {
+	const harness = await harnessFor(page);
+	try {
+		const run = await harness.run({phase: 'once', params: {case: 'hot-processor', tag: tag('hot-processor')}});
+
+		expect(run.errors).toEqual([]);
+		expect(run.results.before).toEqual(EXPECTED_A);
+
+		// the edit with `version` untouched: not a change the core can see, so the
+		// swap is SKIPPED and the old handler keeps running. The counter stays at the
+		// old logic's 5 rather than becoming the edited logic's 50.
+		expect(run.results.unbumpedDiscarded).toBe(false);
+		expect(run.results.afterUnbumped).toEqual(EXPECTED_A);
+
+		// the same edit with the version bumped: the state is discarded and every
+		// block is replayed through the NEW handler.
+		expect(run.results.bumpedDiscarded).toBe(true);
+		expect((run.results.afterBumped as {transfers: number}).transfers).toBe(EXPECTED_A.transfers * 10);
+	} finally {
+		await harness.dispose();
+	}
+});
+
+/**
+ * AXIS TWO, in an engine: a redeploy behind a proxy, at an address that already
+ * has indexed history.
+ *
+ * The address does not move, so the only thing the indexer can notice is the
+ * regenerated ABI -- which IS hashed into the source, so a changed ABI discards
+ * and re-indexes. The second half is the one that used to be silently wrong:
+ * when the redeployed implementation has emitted nothing yet, there is no next
+ * event to overwrite the display, so whatever the hook published at the moment
+ * of the discard is what the tab shows for the rest of the session.
+ */
+test('a redeploy at the same address re-indexes, and never shows the old contract\u2019s state', async ({page}) => {
+	const harness = await harnessFor(page);
+	try {
+		const run = await harness.run({phase: 'once', params: {case: 'hot-contract', tag: tag('hot-contract')}});
+
+		expect(run.errors).toEqual([]);
+		expect(run.results.before).toEqual(EXPECTED_A);
+
+		// the ABI moved, so the source hash moved, so the state went
+		expect(run.results.stateDiscarded).toBe(true);
+		expect(run.results.reindexedFrom).toBe(run.results.startBlock);
+		expect(run.results.after).toEqual(EXPECTED_A);
+
+		// and with nothing left to replay, the tab shows EMPTY rather than the state
+		// the previous implementation produced
+		expect(run.results.beforeRedeploy).toEqual(EXPECTED_A);
+		expect(run.results.afterEmptyRedeploy).toEqual({
+			owners: {'1': undefined, '2': undefined, '3': undefined, '4': undefined},
+			transfers: 0,
+		});
+	} finally {
+		await harness.dispose();
+	}
+});
+
 test('resumes from its cursor after a real page reload, instead of re-indexing', async ({page}) => {
 	const harness = await harnessFor(page);
 	const params = {tag: tag('reload')};

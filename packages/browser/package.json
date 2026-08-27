@@ -24,6 +24,7 @@
 		"entryPoint": "src/index.ts"
 	},
 	"devDependencies": {
+		"@etherfold/js-processor": "workspace:*",
 		"@etherfold/processor-entities": "workspace:*",
 		"@etherfold/state-store-patch": "workspace:*",
 		"@playwright/test": "^1.62.1",

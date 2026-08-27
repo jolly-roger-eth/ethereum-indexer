@@ -58,6 +58,38 @@ export const processor: EntityProcessor<TestABI> = {
 };
 
 /**
+ * The same processor with its LOGIC changed, and its `version` under the
+ * caller's control.
+ *
+ * This is the hot-reload subject: what Vite hands a running tab after the
+ * developer edited a reducer is a new module whose handlers behave differently.
+ * `countBy` is that edit, made observable -- the counter is the one value in
+ * this fixture whose number is decided purely by handler code, so a run under
+ * the edited logic is distinguishable from a run under the old logic by reading
+ * it, with no instrumentation.
+ *
+ * `version` is separate because it is the thing the author must remember to
+ * change and the thing the core actually compares. Holding them apart is what
+ * lets a test drive the two combinations that matter: edited logic with a bumped
+ * version, and edited logic WITHOUT one.
+ */
+export function processorVariant(options: {version?: string; countBy?: number} = {}): EntityProcessor<TestABI> {
+	const countBy = options.countBy ?? 1;
+	return {
+		version: options.version ?? '1.0.0',
+		entities: [
+			{name: 'token', id: ['id'], fields: {owner: 'text'}},
+			{name: 'counter', id: ['name'], fields: {value: 'integer'}},
+		],
+		async onTransfer(state, event) {
+			state.set('token', {id: event.args.id.toString()}, {owner: event.args.to});
+			const counter = await state.get<{value: number}>('counter', {name: 'transfers'});
+			state.set('counter', {name: 'transfers'}, {value: (counter?.value ?? 0) + countBy});
+		},
+	};
+}
+
+/**
  * Digits-only addresses, deliberately.
  *
  * The decoder hands a handler an EIP-55 checksummed address, so an address with
@@ -78,6 +110,50 @@ export const START_BLOCK = 100;
 export const SOURCE: IndexingSource<TestABI> = {
 	chainId: '1',
 	contracts: [{abi, address: CONTRACT, startBlock: START_BLOCK}],
+};
+
+/**
+ * The SAME contract address, with the ABI a redeployed implementation generates.
+ *
+ * This is the second reload axis, in the shape these apps actually deploy in.
+ * A local redeploy goes through a PROXY, so the address does not move: what
+ * moves is the implementation behind it and therefore the generated ABI. The
+ * added event stands for that regeneration -- an upgraded implementation that
+ * emits something the old one did not is the ordinary case, and it is the one
+ * that changes the ABI without changing anything the indexer can see about the
+ * blocks it has already indexed.
+ */
+export const abiV2 = [
+	...abi,
+	{
+		type: 'event',
+		name: 'Approval',
+		anonymous: false,
+		inputs: [
+			{indexed: true, name: 'owner', type: 'address'},
+			{indexed: true, name: 'approved', type: 'address'},
+			{indexed: true, name: 'id', type: 'uint256'},
+		],
+	},
+] as const satisfies Abi;
+
+/** The redeployed implementation, at the address the proxy keeps constant. */
+export const SOURCE_V2: IndexingSource<typeof abiV2> = {
+	chainId: '1',
+	contracts: [{abi: abiV2, address: CONTRACT, startBlock: START_BLOCK}],
+};
+
+/**
+ * A DIFFERENT source object carrying the SAME ABI, address and start block.
+ *
+ * The case a redeploy produces when the implementation changed but its events
+ * did not: the module is new, the object is new, and every byte the indexer
+ * hashes is the same. Kept as its own export because the interesting assertion
+ * is that this is indistinguishable from no change at all.
+ */
+export const SOURCE_REDEPLOYED_SAME_ABI: IndexingSource<TestABI> = {
+	chainId: '1',
+	contracts: [{abi: [...abi] as unknown as TestABI, address: CONTRACT, startBlock: START_BLOCK}],
 };
 
 /** Small on purpose: the reorg below has to fall INSIDE the unconfirmed window. */
@@ -152,6 +228,19 @@ export const BRANCH_A: readonly RawLog[] = [
 	transferLog(104, '0xa104', {from: BOB, to: ERIN, id: 2n}, 1),
 ];
 export const BRANCH_A_TIP = 105;
+
+/**
+ * Branch A with one more block on top: no reorg, just the chain moving on.
+ *
+ * The reconfigure tests need events that arrive AFTER a swap, because "did the
+ * new logic take effect" is a question about what happens to the next event and
+ * not only about what happened to the stored rows. Block 106 is that next event.
+ */
+export const BRANCH_A_EXTENDED: readonly RawLog[] = [
+	...BRANCH_A,
+	transferLog(106, '0xa106', {from: ERIN, to: CAROL, id: 2n}),
+];
+export const BRANCH_A_EXTENDED_TIP = 107;
 
 /**
  * The same chain after a reorg at 104: same 100 and 102, a DIFFERENT 104.
@@ -248,10 +337,34 @@ export async function readState(view: EntityStateView): Promise<{
  * handing over rather than the hook guessing from the fields it finds.
  */
 export function indexerFor(store: StateStore) {
+	return indexerForProcessor(store, processor);
+}
+
+/**
+ * The same wiring, with the processor DEFINITION passed in.
+ *
+ * What a hot reload replaces is the author's object, not the store and not the
+ * hook, so the reconfigure tests need to build a second `EntityEventProcessor`
+ * over the same store from a second definition. That is exactly this call, and
+ * `indexerFor` is now it with the fixture's own processor.
+ */
+export function indexerForProcessor(store: StateStore, definition: EntityProcessor<TestABI>) {
 	return createIndexerState<TestABI, EntityStateView>({
 		kind: 'entities',
-		processor: new EntityEventProcessor<TestABI>(store, processor),
+		processor: entityProcessorOver(store, definition),
 	});
+}
+
+/**
+ * The `EventProcessor` the core drives, built from an author's definition over a
+ * store.
+ *
+ * A hot reload rebuilds exactly this and hands it to `updateProcessor`: the
+ * store is the same object (the tab's IndexedDB connection did not go anywhere),
+ * and only the definition is new.
+ */
+export function entityProcessorOver(store: StateStore, definition: EntityProcessor<TestABI>) {
+	return new EntityEventProcessor<TestABI>(store, definition);
 }
 
 type IndexerState = ReturnType<typeof indexerFor>;

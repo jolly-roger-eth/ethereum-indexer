@@ -124,3 +124,70 @@ describe('EthereumIndexer.updateProcessor (core #5: align with updateIndexer)', 
 		expect(cleared).toBe(true);
 	});
 });
+
+/**
+ * What a reconfigure REPORTS, which is the half a caller holding a copy of the
+ * state has to act on.
+ *
+ * The three verbs all end in one of two very different places -- the state
+ * survives, or it is gone and being recomputed -- and used to say nothing about
+ * which. `@etherfold/browser` needs the answer to re-seed the store it
+ * publishes; anything else with its own copy needs it for the same reason. It is
+ * REPORTED rather than inferred because the alternative is every caller
+ * re-deriving this rule (the version hash, `force`, and the source hashes), and
+ * a caller that derives it wrong fails silently.
+ */
+describe('EthereumIndexer reconfigure outcomes', () => {
+	it('reports a discard when the processor version changed', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		expect(await indexer.updateProcessor(makeProcessor('v2'))).toEqual({stateDiscarded: true});
+	});
+
+	it('reports NO discard when the version hash did not move, because the swap was skipped', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		// the "author edited a handler and forgot to bump `version`" case: the core
+		// cannot see the edit, so it keeps the running processor
+		expect(await indexer.updateProcessor(makeProcessor('v1'))).toEqual({stateDiscarded: false});
+	});
+
+	it('reports a discard when force is passed against an unchanged version', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		expect(await indexer.updateProcessor(makeProcessor('v1'), {force: true})).toEqual({stateDiscarded: true});
+	});
+
+	it('reports a discard when the source changed, and none when it hashes the same', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		// a DIFFERENT object carrying the same contents: the hash is over the
+		// contents, so this is indistinguishable from no change at all
+		const same: IndexingSource<Abi> = {
+			chainId: '1',
+			contracts: [{abi: [] as unknown as Abi, address: '0x0000000000000000000000000000000000000001', startBlock: 0}],
+		};
+		expect(await indexer.updateIndexer({source: same})).toEqual({stateDiscarded: false});
+
+		// a second contract: a different source, so the stored state cannot stand
+		const changed: IndexingSource<Abi> = {
+			chainId: '1',
+			contracts: [
+				{abi: [] as unknown as Abi, address: '0x0000000000000000000000000000000000000001', startBlock: 0},
+				{abi: [] as unknown as Abi, address: '0x0000000000000000000000000000000000000002', startBlock: 0},
+			],
+		};
+		expect(await indexer.updateIndexer({source: changed})).toEqual({stateDiscarded: true});
+	});
+
+	it('always reports a discard from reset, because reset IS the discard', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		expect(await indexer.reset()).toEqual({stateDiscarded: true});
+	});
+});
