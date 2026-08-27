@@ -251,6 +251,19 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		(processor as any).keepState(options.keepState);
 	}
 	/**
+	 * How many times the core has published a state.
+	 *
+	 * Read ONLY as a comparison across a reconfigure, to answer "did the core
+	 * produce a state while that call was running?". A reconfigure that discards
+	 * does not always end with nothing: when a kept STREAM is still valid (a
+	 * processor swap leaves the cached events untouched, since `indexerMatches`
+	 * compares the source and the config and not the processor), `load` replays it
+	 * and publishes the REBUILT state before the call returns. Re-seeding after
+	 * that would throw away the very thing the rebuild produced.
+	 */
+	let statePublications = 0;
+
+	/**
 	 * The state to publish when there is nothing computed yet.
 	 *
 	 * The free-form path CREATES its initial state; the entity path READS its store
@@ -429,6 +442,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			setCatchup(lastSync);
 		};
 		indexer.onStateUpdated = (state) => {
+			statePublications++;
 			setState(state);
 		};
 
@@ -563,8 +577,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		if (!indexer) {
 			throw new Error(`no indexer`);
 		}
+		const publishedBefore = statePublications;
 		const outcome = await indexer.reset();
-		if (outcome.stateDiscarded) {
+		if (outcome.stateDiscarded && statePublications === publishedBefore) {
 			setState(emptyStateOf(selected));
 		}
 		return outcome;
@@ -718,14 +733,21 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				}
 				try {
 					const next = taggedProcessor(newProcessor);
+					const publishedBefore = statePublications;
 					const outcome = await indexer.updateProcessor(next.processor, options);
 					if (outcome.stateDiscarded) {
 						// The core took the new processor, so this is now the processor the hook
-						// describes. Recorded BEFORE the re-seed, because the empty state to publish
-						// is the NEW processor's (on the entity path it is a handle onto the new
-						// store, which is a different store whenever the declarations changed).
+						// describes. Recorded unconditionally, and BEFORE any re-seed, because the
+						// empty state to publish is the NEW processor's (on the entity path it is a
+						// handle onto the new store, which is a different store whenever the
+						// declarations changed).
 						selected = next;
-						setState(emptyStateOf(selected));
+						// ...but only when the discard really did leave nothing. If a kept stream
+						// was replayed during `load`, the rebuilt state is already published and is
+						// the truth; blanking it here would undo the rebuild.
+						if (statePublications === publishedBefore) {
+							setState(emptyStateOf(selected));
+						}
 					}
 					// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
 					// Must run before resuming auto-indexing so the resumed loop does not early-return
@@ -766,8 +788,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					stopAutoIndexing();
 				}
 				try {
+					const publishedBefore = statePublications;
 					const outcome = await indexer.updateIndexer(update);
-					if (outcome.stateDiscarded) {
+					if (outcome.stateDiscarded && statePublications === publishedBefore) {
 						// A new source at the same address is the redeploy case, and it is the one
 						// where the stale copy was most dangerous: the state on screen was computed
 						// from the events of the implementation that is no longer deployed.

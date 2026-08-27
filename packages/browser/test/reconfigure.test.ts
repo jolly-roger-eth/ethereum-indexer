@@ -2,7 +2,12 @@ import 'fake-indexeddb/auto';
 import {describe, expect, it} from 'vitest';
 import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
 import type {EntityProcessor} from '@etherfold/processor-entities';
-import {createBrowserStateStore, createIndexerState} from '../src/index.js';
+import {
+	createBrowserStateStore,
+	createIndexerState,
+	keepStateOnIndexedDB,
+	keepStreamOnIndexedDB,
+} from '../src/index.js';
 import {
 	BRANCH_A_EXTENDED,
 	BRANCH_A_EXTENDED_TIP,
@@ -381,6 +386,45 @@ describe('the state a subscriber is holding, after a discard', () => {
 		// a source that hashes the same: no reset, so no discard
 		await indexer.updateIndexer({source: SOURCE_REDEPLOYED_SAME_ABI});
 		expect(indexer.state.$state.transfers).toBe(5);
+
+		indexer.dispose();
+	});
+
+	/**
+	 * A discard does NOT always leave nothing, and the hook must not assume it does.
+	 *
+	 * With a kept STREAM the rebuild happens INSIDE the reconfigure: a processor
+	 * swap leaves the cached events valid (`indexerMatches` compares the source and
+	 * the config, not the processor), so `load` replays them and publishes the
+	 * rebuilt state before `updateProcessor` even returns. This is the whole point
+	 * of caching the stream -- re-index without re-fetching -- and it is the case a
+	 * blanket "discarded, therefore empty" re-seed silently destroys.
+	 *
+	 * The first version of the re-seed did exactly that: the core published
+	 * `{transfers: 50}` from the replayed stream and the hook then overwrote it with
+	 * `{transfers: 0}`, so a correct rebuild was reported to every subscriber as an
+	 * empty state. The cursor had already advanced, so nothing came back for it.
+	 */
+	it('keeps the state the rebuild produced when a cached stream was replayed', async () => {
+		const tag = `stream-${counter++}`;
+		const chain = fakeChain();
+		const indexer = createIndexerState<TestABI, NFTState>(fromJSProcessor(jsProcessor('1.0.0', 1))(), {
+			keepState: keepStateOnIndexedDB(tag) as never,
+			keepStream: keepStreamOnIndexedDB(tag) as never,
+		});
+		await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
+		await indexToTip(indexer as never);
+		expect(indexer.state.$state.transfers).toBe(5);
+		const fetchesBefore = chain.ranges.length;
+
+		// the edited processor, version bumped: the state goes, the stream stays
+		const outcome = await indexer.updateProcessor(fromJSProcessor(jsProcessor('2.0.0', 10))());
+		expect(outcome.stateDiscarded).toBe(true);
+
+		// rebuilt under the NEW logic, from the cache, before the call returned
+		expect(indexer.state.$state.transfers).toBe(50);
+		// and without going back to the node for the history it already had
+		expect(chain.ranges.length).toBe(fetchesBefore);
 
 		indexer.dispose();
 	});
