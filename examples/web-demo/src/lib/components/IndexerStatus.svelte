@@ -1,8 +1,9 @@
-<script lang="ts">
-	import type {Abi, StatusState, SyncingState} from '@etherfold/browser';
+<script lang="ts" generics="ABI extends Abi">
+	import type {StatusState, SyncingState} from '@etherfold/browser';
+	import type {Abi} from '@etherfold/core';
 
 	export let status: Readable<StatusState>;
-	export let syncing: Readable<SyncingState<Abi>>;
+	export let syncing: Readable<SyncingState<ABI>>;
 
 	import type {Readable} from 'svelte/store';
 </script>

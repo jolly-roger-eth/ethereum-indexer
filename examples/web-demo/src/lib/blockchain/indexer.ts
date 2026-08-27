@@ -1,8 +1,8 @@
 import type {EIP1193Provider} from 'eip-1193';
 
+import type {Abi} from '@etherfold/core';
 import {
 	createIndexerState,
-	type Abi,
 	type AllContractData,
 	type ContractData,
 	type LogParseConfig,
@@ -42,7 +42,9 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 			console.log(`TIMEOUT for newHeads, fallback on timer...`);
 
 			try {
-				await provider.request({method: 'eth_unsubscribe', params: [currentSubscriptionId]});
+				if (currentSubscriptionId) {
+					await provider.request({method: 'eth_unsubscribe', params: [currentSubscriptionId]});
+				}
 			} catch (err) {
 				console.error(`failed to unsubscribe`);
 			}
@@ -66,13 +68,16 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 			resetNewHeadsTimeout();
 		}
 
-		if (provider.on) {
+		if (typeof provider.on === 'function') {
 			provider
 				.request({method: 'eth_subscribe', params: ['newHeads']})
-				.then((subscriptionId: `0x${string}`) => {
-					provider.on('message', onNewHeads);
-					provider.on('chainChanged', triggerIndexing);
-					listenTo(subscriptionId);
+				.then((subscriptionId: string) => {
+					// `on` is typed one event at a time; this provider handle is the untyped
+					// EIP-1193 event emitter, which predates that split.
+					const emitter = provider as unknown as {on(event: string, handler: (payload: any) => void): void};
+					emitter.on('message', onNewHeads);
+					emitter.on('chainChanged', triggerIndexing);
+					listenTo(subscriptionId as `0x${string}`);
 				})
 				.catch((err) => {
 					console.error(
@@ -105,7 +110,7 @@ export function createIndexeInitializer<ABI extends Abi, ProcessResultType, Proc
 				},
 				config: config?.parseConfig ? {stream: {parse: config.parseConfig}} : undefined,
 			},
-			config?.processorConfig,
+			config?.processorConfig as ProcessorConfig,
 		).then(() => {
 			indexToLatest().then(() => {});
 			indexContinuously(connection.ethereum);

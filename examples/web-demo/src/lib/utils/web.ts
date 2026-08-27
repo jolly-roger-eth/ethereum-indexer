@@ -137,12 +137,12 @@ export function isPrivateWindow(): Promise<boolean | null> {
 						(window as any).openDatabase(null, null, null, null);
 						window.localStorage.setItem('test', '1');
 						resolve(false);
+						// the probe succeeded, so take the key back out again
+						window.localStorage.removeItem('test');
 					} catch (err) {
 						e = true;
 						resolve(true);
 					}
-					// eslint-disable-next-line no-unused-expressions, no-void
-					void !e && ((e = !1), window.localStorage.removeItem('test'));
 				}
 			} else if (navigator.userAgent.includes('Firefox')) {
 				// Firefox

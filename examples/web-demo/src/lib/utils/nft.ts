@@ -95,13 +95,14 @@ export async function fetchTokenURI(tokenURI: string) {
 	try {
 		metadataResponse = await fetch(tokenURI);
 	} catch (err) {
-		if (tokenURI.startsWith('http') && err.response === undefined) {
+		const failure = err as {response?: unknown; message?: string};
+		if (tokenURI.startsWith('http') && failure.response === undefined) {
 			throw new Error(
 				`Could not fetch token's metadata. This could be a CORS issue or a dropped internet connection. It is not possible for us to know. (Please check in your browser console). If it is a CORS issue, please contact the persons responsible for the project and tell them to allow CORS. We are building a decentralised world after all.`,
 				{cause: {type: 'CORS?'}},
 			);
 		} else {
-			throw new Error(`Could not fetch token's metadata. ${err.message || err}`, {cause: {type: 'CORS?'}});
+			throw new Error(`Could not fetch token's metadata. ${failure.message || err}`, {cause: {type: 'CORS?'}});
 		}
 	}
 	return metadataResponse.json();

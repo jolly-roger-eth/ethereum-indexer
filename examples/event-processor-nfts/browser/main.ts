@@ -1,4 +1,4 @@
-import {createBrowserStateStore, createIndexerState} from '@etherfold/browser';
+import {createBrowserStateStore, createIndexerState, type LogParseConfig} from '@etherfold/browser';
 import {fromEntityProcessor} from '@etherfold/processor-entities';
 import {createConnection} from '@etherplay/connect';
 // Uncomment together with the ONE LINE marked below to run on the light store.
@@ -104,7 +104,18 @@ async function start() {
 	 * is the one case where a missing wallet is a dead end, and it says so.
 	 */
 	const needsWallet = !ACCOUNT || VIA === 'wallet';
-	let state: {account?: `0x${string}`; walletName?: string} = {};
+	/**
+	 * Typed FROM `waitForWallet` rather than restated here.
+	 *
+	 * The hand-written annotation used to be `{account?, walletName?}`, which is
+	 * narrower than what `waitForWallet` actually resolves to, and the field it left
+	 * out was `walletChainId` -- the one the chain-mismatch refusal below reads. The
+	 * refusal still worked (the object really does carry it), but the compiler had
+	 * been told the property does not exist, so nothing in the editor or in a build
+	 * could tell that check from a typo. Deriving the type means the annotation can
+	 * no longer disagree with the function.
+	 */
+	let state: Awaited<ReturnType<typeof waitForWallet>> = {};
 
 	if (needsWallet) {
 		if (ACCOUNT) {
@@ -125,8 +136,12 @@ async function start() {
 		}
 	}
 
-	const account = ACCOUNT ?? state.account;
+	const account: `0x${string}` | undefined = ACCOUNT ?? state.account;
 	if (!account) return; // a picker is showing; its handler re-enters
+	// Re-bound so the narrowing above survives into the closures below: TypeScript
+	// does not carry a narrowed type into a function body, and every read of the
+	// account happens inside one.
+	const owner: `0x${string}` = account;
 
 	/**
 	 * The provider, from the connection rather than from `window.ethereum`.
@@ -223,8 +238,17 @@ async function start() {
 				parse: {
 					parseAllEventsIrrespectiveOfAddresses: true,
 					// two filter sets, OR'd: transfers OUT of the account and transfers
-					// INTO it. `null` matches any `from`.
-					filters: {Transfer: [[asTopic(account)], [null, asTopic(account)]]},
+					// INTO it. `null` matches any `from`, which is what `eth_getLogs` means
+					// by a null topic and what the fetcher passes straight through.
+					//
+					// The cast is not decoration: `LogParseConfig['filters']` is typed
+					// `(0x${string} | 0x${string}[])[][]`, with no `null` in it, so the
+					// wildcard the JSON-RPC method defines cannot be written without one.
+					// Left as a cast rather than widened in the package, deliberately --
+					// see work/notes/findings/topic-filters-cannot-express-the-null-wildcard.md.
+					filters: {Transfer: [[asTopic(account)], [null, asTopic(account)]]} as unknown as NonNullable<
+						LogParseConfig['filters']
+					>,
 				},
 			},
 		},
@@ -284,7 +308,7 @@ async function start() {
 		const view = indexer.state.$state;
 		const transfers = (await view.getCurrent<{value: number}>('counter', {name: 'transfers'}))?.value ?? 0;
 		const undecodable = (await view.getCurrent<{value: number}>('counter', {name: 'undecodable'}))?.value ?? 0;
-		const listing = await view.listCurrent<{tokenAddress: string; tokenID: string}>('ownership', {owner: account}, 25);
+		const listing = await view.listCurrent<{tokenAddress: string; tokenID: string}>('ownership', {owner}, 25);
 
 		el('transfers').textContent = String(transfers);
 		el('undecodable').textContent = undecodable

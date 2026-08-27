@@ -6,12 +6,12 @@ import {queuedProvider} from './utils';
 
 function getConfigFromChainId(chainId: string): Chain {
 	const chainIdAsNumber = parseInt(chainId);
-	for (const key of Object.keys(chains)) {
-		const chain = chains[key];
+	for (const chain of Object.values(chains) as Chain[]) {
 		if (chain.id === chainIdAsNumber) {
 			return chain;
 		}
 	}
+	throw new Error(`no viem chain definition for chainId ${chainId}`);
 }
 
 export type Web3Connection = {state: 'Idle' | 'Loading' | 'SwithingChain' | 'Ready'; error?: string};
@@ -57,7 +57,7 @@ async function start(
 									{
 										chainId: expectedChainIdAsHex,
 										rpcUrls: chainConfig.rpcUrls.default.http as any, // TODO readonly for request (eip-1993)
-										blockExplorerUrls: [chainConfig.blockExplorers.default.url],
+										blockExplorerUrls: chainConfig.blockExplorers ? [chainConfig.blockExplorers.default.url] : [],
 										chainName: chainConfig.name,
 										nativeCurrency: chainConfig.nativeCurrency,
 									},
@@ -80,7 +80,7 @@ async function start(
 				console.log({chainId});
 			}
 
-			let accounts = [];
+			let accounts: `0x${string}`[] = [];
 			if (accountsToUse) {
 				if (typeof accountsToUse === 'string') {
 					accounts = [accountsToUse];
@@ -102,8 +102,10 @@ async function start(
 		}
 		setError('no web3 wallet found');
 	} catch (err) {
-		setError(err);
+		setError(err instanceof Error ? err.message : String(err));
 	}
+	// `setError` always throws; this is here because the compiler cannot know that.
+	throw new Error('unreachable');
 }
 
 export const web3 = {

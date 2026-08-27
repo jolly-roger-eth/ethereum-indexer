@@ -11,7 +11,10 @@
 	const {status, state, syncing, initialize} = createIndexeInitializer(
 		'conquest',
 		processor,
-		contractsDataPerChain[chainId],
+		// The published contract data widens its ABI to `{name: string; type: string; ...}[]`,
+		// while the generic is inferred from the sibling contract's `as const` ABI, so the
+		// two disagree on a tuple of 70 elements. A demo-side cast; the runtime shape is right.
+		contractsDataPerChain[chainId] as never,
 		chainId,
 	);
 </script>

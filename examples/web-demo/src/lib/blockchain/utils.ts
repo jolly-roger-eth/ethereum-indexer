@@ -1,8 +1,8 @@
-import type {EIP1193Provider, EIP1193Request} from 'eip-1193';
+import type {EIP1193GenericRequest, EIP1193Provider} from 'eip-1193';
 
 export function queuedProvider(ethereum: EIP1193Provider) {
 	const callQueue: {
-		args: EIP1193Request;
+		args: EIP1193GenericRequest;
 		resolve: (result: any) => void;
 		reject: (error: any) => void;
 		pending: boolean;
@@ -13,7 +13,7 @@ export function queuedProvider(ethereum: EIP1193Provider) {
 			const request = callQueue[0];
 			if (!request.pending) {
 				request.pending = true;
-				ethereum
+				(ethereum as unknown as {request(args: EIP1193GenericRequest): Promise<unknown>})
 					.request(request.args)
 					.then((v) => {
 						request.resolve(v);
@@ -34,7 +34,7 @@ export function queuedProvider(ethereum: EIP1193Provider) {
 				return (args: {method: string; params?: readonly unknown[]}) => {
 					if (args.method === 'eth_call') {
 						const promise = new Promise((resolve, reject) => {
-							callQueue.push({args: args as EIP1193Request, resolve, reject, pending: false});
+							callQueue.push({args: args as EIP1193GenericRequest, resolve, reject, pending: false});
 						});
 						process();
 						return promise;

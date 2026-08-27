@@ -1,7 +1,9 @@
 ---
 title: 'Example code outside `src/` is typechecked by nothing, and two real bugs shipped through the gap'
 slug: example-browser-code-is-typechecked-by-nothing
+status: discharged
 observed: 2026-08-25
+discharged: 2026-08-27
 source: 'found while building the browser verification harness for examples/event-processor-nfts (task:index-in-the-browser-with-a-chosen-backend follow-up). The two bugs are OBSERVED -- both were caught by running a real browser and both are fixed in 392dc90; the coverage gap is read from the scripts and tsconfigs named below.'
 ---
 
@@ -27,6 +29,22 @@ Every example, not just this one. No example defines a `typecheck` script; `mud`
 
 `examples/event-processor-nfts/verify/verify.mjs` now drives the built app in a real browser over six scenarios and is what caught both bugs. It is deliberately NOT in the acceptance gate, for the same reason `@etherfold/browser`'s playwright run is not: it needs a browser binary and a live RPC endpoint.
 
-## Not acted on
+## Discharged 2026-08-27
+
+Both halves answered, and the answer recorded once in **ADR-0030** so it stops being re-litigated per example, which is what this note asked for.
+
+- **`examples/` is now in the acceptance gate**, via a third `--filter './examples/*'` on the root `typecheck` plus a `tsconfig.typecheck.json` per example whose include is the WHOLE package (the convention the packages already use). Both stacked exclusions are gone.
+- **Browser execution stays out of the gate**, deliberately and now explicitly, on the ground this note already identified: it needs binaries a clean checkout does not have, and a gate that cannot run on a clean checkout is a gate that gets skipped.
+
+The note's own prediction held exactly: turning `tsc` on **would not have caught either of the two bugs**, and that is stated in the ADR rather than left implicit. What it did catch, on the first run, was worth having anyway:
+
+- three type errors in `event-processor-nfts/browser/main.ts`, including the chain-mismatch check reading `walletChainId` off a hand-written annotation that did not declare it (correct at run time, invisible to the compiler);
+- the `null` topic wildcard the package's own type cannot express, in TWO independent examples, now `work/notes/findings/topic-filters-cannot-express-the-null-wildcard.md`;
+- 24 more across the two Svelte demos, all fixed;
+- `examples/mud/src/config.ts` importing `./lib/utils/web`, **a module that has never existed**, in an example that `vite build` reports as green because nothing imports the file. Recorded as `work/notes/observations/mud-example-config-is-orphaned.md`.
+
+The browser-execution half got a second instance too, and it is the best evidence in the pile: while writing `examples/browser-reference/browser/main.ts` -- the file whose JOB is to warn about the synchronous-subscription hazard -- the hazard was reintroduced, typechecked clean, and killed the page on load. `verify/reference.spec.ts` caught it in Chromium.
+
+## Original note: not acted on
 
 Recorded rather than fixed, because the useful answer is not obvious and is worth deciding rather than defaulting. Adding `browser/**` to the example's tsconfig is a one-line change that would type-check the file but would have caught NEITHER bug. Putting the browser verification in the gate would have caught both, and costs a browser binary plus a live network dependency in CI — the trade `typecheck-tests-in-the-acceptance-gate` already weighed once for tests, and ADR-0024 weighed again for the IndexedDB browser run, both times landing on "not in the gate". A third instance of the same question suggests the answer wants stating once, somewhere, rather than re-litigated per example.

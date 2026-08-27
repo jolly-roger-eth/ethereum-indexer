@@ -9,6 +9,7 @@
 	import IndexerProgress from '../lib/components/IndexerProgress.svelte';
 	import NftGallery from '../lib/components/NFTGallery.svelte';
 	import {getAddress} from 'viem';
+	import type {LogParseConfig} from '@etherfold/browser';
 
 	let accountsToUse: `0x${string}` | boolean = true;
 	onMount(() => {
@@ -69,9 +70,14 @@
 		const accountAs32Bytes = `0x000000000000000000000000${connection.accounts[0].slice(2)}` as const;
 		return initialize(connection, {
 			parseConfig: {
+				// `null` is the `eth_getLogs` wildcard for "any value in this topic", and
+				// `LogParseConfig['filters']` cannot express it: its element type is
+				// `(0x${string} | 0x${string}[])[][]`, with no null. The cast is the only
+				// way to write a filter on the SECOND indexed argument. See
+				// work/notes/findings/topic-filters-cannot-express-the-null-wildcard.md.
 				filters: {
 					Transfer: [[accountAs32Bytes], [null, accountAs32Bytes]],
-				},
+				} as unknown as NonNullable<LogParseConfig['filters']>,
 			},
 			// getAddress to ensure we get a checksum address that the processor use for string comparison
 			processorConfig: {account: getAddress(connection.accounts[0])},
