@@ -3,7 +3,7 @@ title: 'An ABI event is live over block ranges, so an upgrade appends an entry i
 slug: abi-versions-are-block-ranged
 spec: an-upgraded-contract-is-indexable-from-its-first-block
 blockedBy: [an-event-is-never-silently-dropped-from-the-fetch-filter]
-covers: [1, 2, 3, 4, 5, 6, 7, 10]
+covers: [1, 2, 3, 4, 5, 6, 7]
 ---
 
 > **RE-SCOPED 2026-08-28, and the spec is STALE on this point.** The first version of this
@@ -71,6 +71,13 @@ B.firstBlock - 1`), that hole is a span where the event is requested by nobody, 
 silent loss. Refuse it at construction, naming the event and the hole. Overlap is fine;
 a gap never is.
 
+> **SPLIT 2026-08-28.** The fetch narrowing that used to be part four of this task is now its own
+> task, `a-range-requests-only-the-events-it-can-contain`, BLOCKED BY this one. It was always
+> "last, because it needs the ranges to exist first", and separating it keeps this diff reviewable.
+> This task therefore declares the ranges and uses them for INVALIDATION only. It does NOT change
+> what the fetcher requests: until the follow-up lands every range still carries every topic, which
+> is wasteful but correct, and no existing behaviour regresses.
+
 **3. Invalidation computed on the NORMALISED form.**
 
 The decision rule already exists in `indexerMatches`: an entry the stored context lacks
@@ -96,26 +103,6 @@ A generator that cannot recognise a rollback must not cost the user their whole 
 Note `indexerMatches` gates the STREAM cache too (`promiseToLoad`'s `keepStream` branch), so
 getting this right means an append above the cursor re-fetches nothing, not merely that it
 re-derives nothing. That is the headline benefit and it should be the headline test.
-
-**4. Fetch narrowing.**
-
-A range requests only the events live over it. Below `B.firstBlock`, B's topic0 is absent;
-above `A.lastBlock`, A's is. An event with NO `lastBlock` is never dropped at any height above
-its `firstBlock`.
-
-This saves twice. **Request count**, measured here: `generateLogRequestForTopicsAndFiltersCombinations`
-puts every topic in ONE request when no argument filters are configured, but emits one request
-per (event topic × filter), run sequentially, when they are. The browser shape uses filters.
-**And the node's own work**, which applies even in the single-request case: a topic that cannot
-match still costs the node, because block screening is done against the header `logsBloom` and
-topics are OR'd at position 0, so each extra topic widens the set of blocks that pass the screen
-and so the set whose receipts are loaded and scanned, plus its own bloom false positives. That
-second mechanism is how nodes implement the method and is **not measured in this repository**.
-Do not cite it as one of ours; if you want a number, measure it against a real node and record
-a finding.
-
-A fetch range crossing a boundary may simply use the union for that range; splitting is cheap
-because boundaries are rare.
 
 > **FORWARD-POINTER: keep the DECISION separable from the ACTION.** This task keeps the simple
 > all-or-nothing rule (append at or below the cursor discards everything and re-indexes from the
@@ -147,8 +134,6 @@ because boundaries are rare.
 - [ ] Appending above the cursor re-fetches NOTHING, asserted on the ranges the node was asked for, since state alone cannot distinguish a resume from a re-index.
 - [ ] Appending AT or BELOW the cursor discards and re-indexes from the start block.
 - [ ] Editing an entry already below the cursor discards, even though the list length did not change.
-- [ ] A range below `B.firstBlock` does not carry B's topic: with argument filters configured it issues no request for it, and without filters it is absent from the single request's topic set.
-- [ ] An event with no `lastBlock` is present in the requested topics at every height above its `firstBlock`.
 - [ ] A GAP between consecutive ranges for one event is refused at construction, naming the event and the uncovered span.
 - [ ] A source declaring no ranges behaves exactly as today.
 - [ ] `defaultFromBlock` is unaffected by any range and still derives from contract `startBlock` alone.
@@ -216,11 +201,10 @@ because boundaries are rare.
 > migration or a tolerant read. And a source declaring no ranges must behave exactly as it does
 > today.
 >
-> Do the fetch narrowing LAST, because it needs the ranges to exist first. It saves in request
-> COUNT where argument filters are configured, and in the NODE's own work in every case, since a
-> topic that cannot match still widens the `logsBloom` screen. That second mechanism is NOT
-> measured in this repository; do not present it as one of our measurements, and if you want a
-> number, measure it against a real node and record a finding.
+> Do NOT narrow the fetch filter here. That is `a-range-requests-only-the-events-it-can-contain`,
+> a separate task blocked by this one. Declaring the ranges and using them for invalidation is the
+> whole of this task; every range still carrying every topic is wasteful but correct, and the
+> follow-up is what makes it cheap.
 >
 > Add a changeset for the source type change. Record any non-obvious in-scope decision in a
 > `## Decisions` block in your final report, and do not commit without confirmation.
