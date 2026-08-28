@@ -1,9 +1,9 @@
 import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {ExtraFilters} from '../engine/ethereum.js';
 import {RangeLogFetcher, LogFetcherConfig} from '../engine/RangeLogFetcher.js';
-import type {Abi, AbiEvent, ExtractAbiEventNames} from 'abitype';
+import type {Abi, AbiEvent} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
-import {decodeEventLog, encodeEventTopics} from 'viem';
+import {decodeEventLog, toEventSelector, toEventSignature} from 'viem';
 import {deepEqual} from '../utils/compare.js';
 import type {
 	IncludedEIP1193Log,
@@ -15,24 +15,93 @@ import type {
 import {normalizeAddress} from '../utils/address.js';
 import {UnlessCancelledFunction} from '../utils/promises.js';
 
-function deleteDuplicateEvents(events: AbiEvent[], failOnIdenticalNameButDifferentInputs: boolean) {
-	const map = new Map();
+/**
+ * The `topic0` an event's logs carry, or `undefined` for an ANONYMOUS event,
+ * which carries none.
+ *
+ * Computed per EVENT and never by name, which is the whole point:
+ * `encodeEventTopics` selects an ABI item by NAME, so two events sharing a name
+ * resolve to whichever one it found first, and the other's topic0 could never
+ * enter the fetch filter.
+ */
+function topic0Of(event: AbiEvent): `0x${string}` | undefined {
+	return event.anonymous ? undefined : toEventSelector(event);
+}
+
+/** An event as an operator would recognise it in the ABI, for a refusal message. */
+function describeEventDeclaration(event: AbiEvent): string {
+	const inputs = event.inputs
+		.map((input) => `${input.type}${input.indexed ? ' indexed' : ''}${input.name ? ` ${input.name}` : ''}`)
+		.join(', ');
+	return `${event.anonymous ? 'anonymous ' : ''}event ${event.name}(${inputs})`;
+}
+
+/**
+ * What decoding a log against this event actually READS.
+ *
+ * Deliberately NOT `internalType`, which is a Solidity-side annotation that two
+ * compilations of the same event routinely disagree about (`address` vs
+ * `contract IERC20`). Refusing on it would reject an ABI that is genuinely the
+ * same event, and this refusal stops the indexer starting, so it has to be
+ * about the wire and nothing else. A missing parameter name reads as `''` for
+ * the same reason.
+ */
+function decodingShapeOf(event: AbiEvent): unknown {
+	const shapeOfParameter = (parameter: any): unknown => ({
+		name: parameter.name ?? '',
+		type: parameter.type,
+		indexed: !!parameter.indexed,
+		components: parameter.components ? parameter.components.map(shapeOfParameter) : undefined,
+	});
+	return {anonymous: !!event.anonymous, inputs: event.inputs.map(shapeOfParameter)};
+}
+
+/**
+ * Collapse the events that ARE the same event, and refuse the ones nothing can
+ * tell apart. ONE rule, applied identically wherever an ABI list is built.
+ *
+ * Keyed on the canonical SIGNATURE -- so on `topic0`, which is its hash --
+ * because that is what a log carries. Keying on the NAME made two versions of
+ * one event across an upgrade, and two contracts declaring same-named events,
+ * look like a clash they are not: `Transfer(address,address,uint256)` and
+ * `Transfer(address,address,uint256,bytes)` have different topic0s and are
+ * trivially told apart on the wire, so both are kept and both are requested.
+ *
+ * A shared topic0 with a different DEFINITION is the genuine ambiguity, and it
+ * is refused here, at construction, naming both declarations. No block boundary
+ * resolves it either: an upgrade transaction sits mid-block, so both meanings
+ * share a block.
+ *
+ * What this must never do again is DROP one silently. A spliced event's topic0
+ * never entered the fetch filter, so its logs were never asked for, and
+ * afterwards nothing distinguished "the chain had none" from "we never asked"
+ * -- an absence inferred from a request that was never made, the same failure
+ * class as `absence` vs `contradiction` in the reorg model.
+ */
+function deleteDuplicateEvents(events: AbiEvent[]) {
+	const declaredPerSignature = new Map<string, AbiEvent>();
 	for (let i = 0; i < events.length; i++) {
 		const event = events[i];
-		const namedEvent = map.get(event.name);
-		if (!namedEvent) {
-			map.set(event.name, event);
-		} else {
-			if (failOnIdenticalNameButDifferentInputs) {
-				if (!deepEqual(event.inputs, namedEvent.inputs)) {
-					// {a: event, b: namedEvent}
-					throw new Error(`two events with same name but different inputs`);
-				}
-			}
-			// delete
-			events.splice(i, 1);
-			i--;
+		const signature = toEventSignature(event);
+		const declared = declaredPerSignature.get(signature);
+		if (!declared) {
+			declaredPerSignature.set(signature, event);
+			continue;
 		}
+		if (!deepEqual(decodingShapeOf(event), decodingShapeOf(declared))) {
+			const topic0 = topic0Of(event);
+			throw new Error(
+				`ambiguous ABI: "${signature}" is declared more than once with different definitions, ` +
+					(topic0
+						? `so both arrive under topic0 ${topic0} and nothing on the wire tells them apart. `
+						: `and being anonymous they carry no topic0 to tell them apart. `) +
+					`Declared as \`${describeEventDeclaration(declared)}\` and as \`${describeEventDeclaration(event)}\`. ` +
+					`Make the two declarations identical, or index only one of them.`,
+			);
+		}
+		// the same event, declared twice: collapse it, which is not a loss
+		events.splice(i, 1);
+		i--;
 	}
 }
 
@@ -107,7 +176,10 @@ export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 		private readonly parseConfig?: LogParseConfig,
 	) {
 		const _abiEventPerTopic: Map<`0x${string}`, AbiEvent> = new Map();
-		const _nameToTopic: Map<string, `0x${string}`> = new Map();
+		// a NAME can cover several topic0s (two versions of one event, or two
+		// contracts declaring the same name differently), and the filter config is
+		// keyed by name, so this is a list and not a single topic
+		const _topicsPerEventName: Map<string, `0x${string}`[]> = new Map();
 		const _abiPerAddress: Map<`0x${string}`, AbiEvent[]> = new Map();
 		const _eventNameToContractAddresses: Map<string, `0x${string}`[]> = new Map();
 		const _allABIEvents: AbiEvent[] = [];
@@ -123,7 +195,6 @@ export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 					contractAddresses.push(contractAddress);
 				} else {
 					abiAtThatAddress.push(...contractEventsABI);
-					deleteDuplicateEvents(abiAtThatAddress, true);
 				}
 				_allABIEvents.push(...contractEventsABI);
 
@@ -142,29 +213,34 @@ export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 			_allABIEvents.push(...(allContractsData.abi.filter((item) => item.type === 'event') as AbiEvent[]));
 		}
 
-		deleteDuplicateEvents(_allABIEvents, false);
+		// the SAME rule on every list, so which events exist can never depend on
+		// `parseAllEventsIrrespectiveOfAddresses` -- a parse-config flag deciding
+		// that was the defect
+		for (const abiAtAddress of _abiPerAddress.values()) {
+			deleteDuplicateEvents(abiAtAddress);
+		}
+		deleteDuplicateEvents(_allABIEvents);
 
 		const eventNameTopics: EIP1193DATA[] = [];
 		for (const item of _allABIEvents) {
-			const topics = encodeEventTopics({
-				abi: _allABIEvents,
-				eventName: item.name as ExtractAbiEventNames<ABI>,
-			} as any); // TODO types ?
-			// encodeEventTopics returns (Hex | Hex[] | null)[]; when called with only an
-			// eventName (no args), the signature topic is always a single Hex string.
-			if (topics.length > 0 && typeof topics[0] === 'string') {
-				_nameToTopic.set(item.name, topics[0]);
+			const topic0 = topic0Of(item);
+			if (!topic0) {
+				// an anonymous event carries no topic0, so there is nothing to put in
+				// the filter and nothing to key a filter list by
+				continue;
 			}
-			for (const v of topics) {
-				if (typeof v !== 'string') {
-					continue;
-				}
-				if (!_abiEventPerTopic.get(v)) {
-					_abiEventPerTopic.set(v, item);
-					eventNameTopics.push(v);
-				} else {
-					throw new Error(`duplicate topics found`);
-				}
+			if (_abiEventPerTopic.get(topic0)) {
+				// unreachable: `deleteDuplicateEvents` already collapsed or refused
+				// every shared topic0. Kept because the map below decodes by it.
+				throw new Error(`duplicate topics found for \`${describeEventDeclaration(item)}\``);
+			}
+			_abiEventPerTopic.set(topic0, item);
+			eventNameTopics.push(topic0);
+			const topicsForThatName = _topicsPerEventName.get(item.name);
+			if (topicsForThatName) {
+				topicsForThatName.push(topic0);
+			} else {
+				_topicsPerEventName.set(item.name, [topic0]);
 			}
 		}
 
@@ -172,8 +248,11 @@ export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 			const filters: ExtraFilters = {};
 			for (const eventName of Object.keys(parseConfig.filters)) {
 				const filterList = parseConfig.filters[eventName];
-				const signatureTopic = _nameToTopic.get(eventName);
-				if (signatureTopic) {
+				// a filter is configured by NAME, so it applies to EVERY topic0 that
+				// name covers. Applying it to one of them would leave the others in
+				// the shared, unfiltered request -- the same argument filter meaning
+				// two different things for two versions of one event
+				for (const signatureTopic of _topicsPerEventName.get(eventName) || []) {
 					filters[signatureTopic] = {
 						list: filterList,
 						contractAddresses: _eventNameToContractAddresses.get(eventName),
