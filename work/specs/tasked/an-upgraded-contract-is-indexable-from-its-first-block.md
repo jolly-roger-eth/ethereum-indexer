@@ -3,6 +3,17 @@ title: 'An upgraded contract is indexable from its first block'
 slug: an-upgraded-contract-is-indexable-from-its-first-block
 ---
 
+> **SUPERSEDED ON ITS CENTRAL MECHANISM, 2026-08-28.** This spec argues for per-range ABI
+> BUCKETS with a block axis in `parse()`, so that a log decodes with "the ABI live at its
+> block". That model was rejected in design review. The boundary block is unknowable in
+> advance, so a live indexer can never fill it in, and it is not block-granular anyway,
+> because the upgrade transaction sits mid-block and logs on either side of it share a block.
+> Decoding stays by topic0 with NO block axis; block ranges survive only as a FETCH-FILTER
+> and invalidation concern. The current design lives in
+> `work/tasks/ready/abi-versions-are-block-ranged.md` (see its re-scope note) and
+> `work/tasks/ready/an-event-is-never-silently-dropped-from-the-fetch-filter.md`, which now
+> BLOCKS it. Where this spec and those tasks disagree, the TASKS win; read this for background.
+
 > Launch snapshot — records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 >
 > **Rewritten** after the first cut. That version treated block-ranged ABIs as an optional optimisation bolted onto a merged-union decoder, and split the work accordingly. It was wrong: the ranged model is the PRIMARY mechanism, and the union was a way of avoiding it that costs a full re-index every time and cannot express a changed signature at all.

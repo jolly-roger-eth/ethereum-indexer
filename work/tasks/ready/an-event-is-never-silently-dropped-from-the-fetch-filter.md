@@ -21,7 +21,25 @@ The silent branch is the dangerous one: the dropped event's topic0 never enters 
 
 Make the two paths reach the SAME verdict on the same ABI, and make sure no event that survives construction is missing from what the fetcher requests. A genuinely ambiguous ABI must be refused loudly on both paths; an unambiguous one must be accepted on both.
 
-Note the relationship to the sibling tasks, and do not overreach into them. Under `abi-versions-are-block-ranged`, two versions of one event are never in the same bucket, so version conflicts stop arriving here at all. What remains for this task is the case that has nothing to do with upgrades: **two different contracts in one source declaring an event of the same name with different inputs**, within the same range. That is legal, distinguishable on the wire by topic0, and currently either throws or is silently truncated depending on a flag.
+> **RE-SCOPED 2026-08-28: this task GREW, and it now UNBLOCKS its sibling.** An earlier version
+> said that `abi-versions-are-block-ranged` would keep two versions of one event in separate
+> per-range buckets, so upgrade conflicts would never reach this code, leaving only the
+> multi-contract case here. That is no longer true. The ranged model was rejected for decoding:
+> there are no buckets and no block axis in `parse()`, so two versions of one event now land in
+> the SAME ABI list and are told apart by topic0. This task is therefore what makes an upgrade
+> possible at all, and `abi-versions-are-block-ranged` is now BLOCKED BY it rather than narrowing it.
+
+Two cases now arrive here, and one rule must cover both:
+
+- **Two versions of ONE contract's event across an upgrade.** `Transfer(address,address,uint256)`
+  and `Transfer(address,address,uint256,bytes)` in one source. Different topic0s, trivially
+  distinguishable on the wire, and at the upgrade block BOTH can legitimately occur, because the
+  upgrade transaction sits mid-block and a transaction before it still fires the old event.
+- **Two DIFFERENT contracts in one source declaring an event of the same name with different
+  inputs**, the case that has nothing to do with upgrades.
+
+Both are legal, both are distinguishable by topic0, and both currently either throw or are
+silently truncated depending on a flag.
 
 ## Acceptance criteria
 
@@ -30,12 +48,17 @@ Note the relationship to the sibling tasks, and do not overreach into them. Unde
 - [ ] Two contracts declaring same-named events with different inputs are handled by one rule, and whichever it is (accept both, or refuse) it is the same on both paths and it is loud.
 - [ ] A genuinely ambiguous ABI is refused at construction with a message naming the events involved, rather than truncated.
 - [ ] The existing legitimate case still works: two contracts sharing an IDENTICAL event are de-duplicated without error.
+- [ ] Two VERSIONS of one contract's event (same name, different inputs, different topic0) are both kept, and both topic0s appear in what the fetcher requests. This is what `abi-versions-are-block-ranged` needs in order to exist.
+- [ ] At a single block both versions can be requested together, since an upgrade transaction sits mid-block and a transaction before it still fires the old event.
 - [ ] Tests cover the new behaviour in the repo's vitest style, including a regression test for the silent-drop path specifically.
 - [ ] A changeset covers the behaviour change.
 
 ## Blocked by
 
-- None — can start immediately. Independent of the other two tasks; if `abi-versions-are-block-ranged` lands first, this task's scope narrows to the multi-contract case but does not disappear.
+- None — can start immediately, and it should go FIRST of the remaining work.
+  `abi-versions-are-block-ranged` is blocked by it: with no per-range buckets, a source carrying
+  two versions of one event cannot even be constructed until `deleteDuplicateEvents` stops keying
+  on NAME, so that task cannot be built until this one lands.
 
 ## Prompt
 
@@ -47,6 +70,14 @@ Note the relationship to the sibling tasks, and do not overreach into them. Unde
 >
 > One rule, both paths. Whether the right verdict is "accept both, since different inputs mean a different topic0 and they are distinguishable on the wire" or "refuse, naming them", it must not depend on `parseAllEventsIrrespectiveOfAddresses`. Decide it, record WHY in your `## Decisions` block, and make both call sites agree.
 >
-> Scope. This is about two DIFFERENT CONTRACTS in one source declaring same-named events with different inputs, within one block range. It is NOT about two versions of one contract's event across an upgrade: `work/tasks/ready/abi-versions-are-block-ranged.md` keeps those in separate per-range buckets so they never meet here. Read that task before starting so you do not solve its problem twice or build something it contradicts. Keep the legitimate de-duplication working: two contracts sharing an identical event must still collapse to one without error.
+> Scope, and note it GREW on 2026-08-28. This covers BOTH two different contracts declaring
+> same-named events with different inputs, AND two versions of one contract's event across an
+> upgrade. An earlier version of this task excluded the upgrade case on the grounds that
+> `abi-versions-are-block-ranged` would hold versions in separate per-range buckets; that model
+> was rejected, there are no buckets, and both cases now reach this code as one flat ABI list told
+> apart by topic0. Read `work/tasks/ready/abi-versions-are-block-ranged.md`, including its
+> re-scope note, before starting: it is BLOCKED BY this task and cannot be built until you land.
+> Keep the legitimate de-duplication working: two contracts sharing an IDENTICAL event must still
+> collapse to one without error.
 >
 > Add a changeset for the behaviour change. Record any non-obvious in-scope decision in a `## Decisions` block in your final report, and do not commit without confirmation.
