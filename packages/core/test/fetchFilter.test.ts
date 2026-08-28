@@ -239,6 +239,76 @@ describe('two versions of one contract event across an upgrade', () => {
 	});
 });
 
+describe('an upgrade declared as block ranges', () => {
+	// The ranges exist for INVALIDATION (and, later, for narrowing what a range
+	// requests). They must not change what is requested today, and they must never
+	// change what DECODES a log: that is topic0 and nothing else.
+	const UPGRADE_BLOCK = 900;
+	const ranged = [
+		{
+			address: A,
+			abi: [
+				{...transferV1, firstBlock: 100, lastBlock: UPGRADE_BLOCK},
+				{...transferV2, firstBlock: UPGRADE_BLOCK},
+			] as unknown as Abi,
+			startBlock: 100,
+		},
+	];
+
+	it('accepts the same number on both sides of the upgrade and requests BOTH topics at that block', async () => {
+		// `A.lastBlock = b` together with `B.firstBlock = b` is the CORRECT
+		// declaration, because a transaction earlier in block b still fires A.
+		const topics = await topicsRequested(ranged, {}, {fromBlock: UPGRADE_BLOCK, toBlock: UPGRADE_BLOCK});
+		expect(topics.sort()).toEqual([TRANSFER_V1, TRANSFER_V2].sort());
+	});
+
+	for (const {label, parse} of BOTH_PATHS) {
+		it(`requests both topics over the whole history, since the ranges do not narrow the filter yet (${label})`, async () => {
+			const topics = await topicsRequested(ranged, parse, {fromBlock: 100, toBlock: 200});
+			expect(topics.sort()).toEqual([TRANSFER_V1, TRANSFER_V2].sort());
+		});
+	}
+
+	it('decodes by topic0 with no block axis, ranges or not', () => {
+		const fetcher = new LogEventFetcher({request: async () => undefined} as any, ranged as any);
+		const from = `0x${'0'.repeat(24)}${A.slice(2)}` as const;
+		const to = `0x${'0'.repeat(24)}${B.slice(2)}` as const;
+		// a PRE-upgrade log decoded well AFTER the boundary, and a POST-upgrade log
+		// decoded well before it: the block number is not consulted either way
+		const [v1, v2] = fetcher.parse([
+			{
+				blockNumber: '0x3e8',
+				blockHash: '0xaaa',
+				transactionIndex: '0x0',
+				removed: false,
+				address: A,
+				data: `0x${(7).toString(16).padStart(64, '0')}`,
+				topics: [TRANSFER_V1, from, to],
+				transactionHash: `0x${'1'.padStart(64, '0')}`,
+				logIndex: '0x0',
+			},
+			{
+				blockNumber: '0x64',
+				blockHash: '0xbbb',
+				transactionIndex: '0x0',
+				removed: false,
+				address: A,
+				data:
+					`0x${(9).toString(16).padStart(64, '0')}` +
+					`${(64).toString(16).padStart(64, '0')}` +
+					`${(2).toString(16).padStart(64, '0')}` +
+					`beef${'0'.repeat(60)}`,
+				topics: [TRANSFER_V2, from, to],
+				transactionHash: `0x${'2'.padStart(64, '0')}`,
+				logIndex: '0x0',
+			},
+		] as any);
+
+		expect((v1 as any).args).toMatchObject({id: 7n});
+		expect((v2 as any).args).toMatchObject({id: 9n, memo: '0xbeef'});
+	});
+});
+
 describe('a genuinely ambiguous ABI is refused, loudly, on every path', () => {
 	// One topic0 meaning two things cannot be resolved by anything on the wire, and
 	// no block boundary helps either: the upgrade tx sits mid-block, so both
@@ -265,6 +335,20 @@ describe('a genuinely ambiguous ABI is refused, loudly, on every path', () => {
 		{
 			label: 'a single merged ABI',
 			contractsData: {abi: [transferV1, transferV1Colliding] as unknown as Abi},
+		},
+		{
+			// a boundary resolves nothing: the upgrade transaction sits mid-block, so
+			// both meanings share block 900 whatever the ranges say
+			label: 'the two declarations given disjoint block ranges',
+			contractsData: [
+				{
+					address: A,
+					abi: [
+						{...transferV1, firstBlock: 100, lastBlock: 900},
+						{...transferV1Colliding, firstBlock: 900},
+					] as unknown as Abi,
+				},
+			],
 		},
 	];
 

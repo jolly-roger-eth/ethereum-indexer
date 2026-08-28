@@ -290,16 +290,116 @@ export function defaultFromBlockOf<ABI extends Abi>(source: IndexingSource<ABI>)
 }
 
 /**
+ * WHETHER the stored data is still valid, and FROM WHICH BLOCK it stopped being
+ * so.
+ *
+ * The block is deliberately part of the answer even though the only thing acting
+ * on it today is "therefore discard everything and re-index from the start
+ * block". A later refinement wants to BRANCH the stream at the boundary instead:
+ * with the cursor at 900 and an entry appended at 780, blocks `0..779` were
+ * fetched under a filter that was correct and complete, so only `780..900`
+ * actually needs re-fetching. Collapsing this into a bare boolean, or burying
+ * "re-index from the start block" inside the comparison, would make that a
+ * rewrite instead of a refinement. See
+ * `work/notes/ideas/a-stream-branches-instead-of-being-discarded.md`.
+ */
+export type SourceInvalidation =
+	| {valid: true}
+	| {
+			valid: false;
+			/** The lowest block at which the stored data stopped describing this source. */
+			invalidFromBlock: number;
+			reason: 'stream-config' | 'entry-changed' | 'entry-added' | 'entry-removed';
+	  };
+
+/**
  * Whether a persisted `lastSync` describes the source and stream config we are
- * running now.
+ * running now, and from where it stopped doing so.
  *
  * It answers about the first two identities only; `context.processor` is
  * compared separately by the caller, because the two mismatches mean different
  * things (a processor upgrade is expected and routine, a source change is not).
  *
- * A source entry the stored context does not have is only a mismatch if it could
- * have contributed: a contract whose `startBlock` is above what was indexed had
- * nothing to say yet, so adding it does not invalidate what came before.
+ * The rule, unchanged in what it decides:
+ *
+ * - a differing stream config invalidates EVERYTHING, from block 0;
+ * - an entry the stored context HAS, with a different hash, invalidates from the
+ *   lower of the two blocks: something already indexed is described differently
+ *   now;
+ * - an entry the stored context LACKS only invalidates if it could have
+ *   contributed. An event (or a contract) that starts above what was indexed had
+ *   nothing to say yet, so appending it costs nothing -- that is the whole point
+ *   of block-ranged entries;
+ * - and symmetrically, an entry the stored context has and the source no longer
+ *   declares invalidates from its own block, because state derived from an event
+ *   we have stopped indexing is stale. Only reachable for a ranged source: a
+ *   source declaring no range is one whole-source entry, where any change is
+ *   already a hash change at index 0.
+ *
+ * The MINIMUM matching block is reported rather than the first one found, so the
+ * answer is the earliest block that stopped being valid rather than an artefact
+ * of list order.
+ */
+export function sourceInvalidationOf(
+	// this is the indexer settings to be applied
+	indexerSourceHashes: {startBlock: number; hash: string}[],
+	indexerConfigHash: string,
+	// this is the stream loaded
+	lastToBlock: number,
+	context: ContextIdentifier,
+): SourceInvalidation {
+	if (context.config !== indexerConfigHash) {
+		return {valid: false, invalidFromBlock: 0, reason: 'stream-config'};
+	}
+
+	let invalidFromBlock: number | undefined;
+	let reason: 'entry-changed' | 'entry-added' | 'entry-removed' | undefined;
+	const invalidFrom = (block: number, why: 'entry-changed' | 'entry-added' | 'entry-removed') => {
+		if (invalidFromBlock === undefined || block < invalidFromBlock) {
+			invalidFromBlock = block;
+			reason = why;
+		}
+	};
+
+	for (let i = 0; i < indexerSourceHashes.length; i++) {
+		const indexerSourceItem = indexerSourceHashes[i];
+		const fetchedSourceItem = context.source[i];
+		if (fetchedSourceItem) {
+			if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
+				invalidFrom(Math.min(indexerSourceItem.startBlock, fetchedSourceItem.startBlock), 'entry-changed');
+			}
+		} else {
+			if (indexerSourceItem.startBlock <= lastToBlock) {
+				invalidFrom(indexerSourceItem.startBlock, 'entry-added');
+			}
+		}
+	}
+
+	// entries the stored context carries BEYOND the current list: the loop above
+	// never looks at them, so a source that dropped its last entries would keep
+	// state derived from events it no longer indexes
+	if (context.source.length > indexerSourceHashes.length) {
+		const declaredNow = new Set(indexerSourceHashes.map((entry) => entry.hash));
+		for (let i = indexerSourceHashes.length; i < context.source.length; i++) {
+			const fetchedSourceItem = context.source[i];
+			if (!declaredNow.has(fetchedSourceItem.hash) && fetchedSourceItem.startBlock <= lastToBlock) {
+				invalidFrom(fetchedSourceItem.startBlock, 'entry-removed');
+			}
+		}
+	}
+
+	if (invalidFromBlock === undefined || reason === undefined) {
+		return {valid: true};
+	}
+	return {valid: false, invalidFromBlock, reason};
+}
+
+/**
+ * The same decision as a bare boolean, for the callers that only ever discard
+ * everything.
+ *
+ * Kept as the narrow surface it always was; `sourceInvalidationOf` is where the
+ * block lives, so acting on it later does not mean re-deriving the rule.
  */
 export function indexerMatches(
 	// this is the indexer settings to be applied
@@ -310,25 +410,7 @@ export function indexerMatches(
 	context: ContextIdentifier,
 	// if they do not match the indexer will take over and restart from zero
 ): boolean {
-	if (context.config !== indexerConfigHash) {
-		return false;
-	}
-
-	for (let i = 0; i < indexerSourceHashes.length; i++) {
-		const indexerSourceItem = indexerSourceHashes[i];
-		const fetchedSourceItem = context.source[i];
-		if (fetchedSourceItem) {
-			if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
-				return false;
-			}
-		} else {
-			if (indexerSourceItem.startBlock <= lastToBlock) {
-				return false;
-			}
-		}
-	}
-	// no mismatch found
-	return true;
+	return sourceInvalidationOf(indexerSourceHashes, indexerConfigHash, lastToBlock, context).valid;
 }
 
 /**

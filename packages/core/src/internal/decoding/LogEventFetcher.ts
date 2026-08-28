@@ -3,7 +3,8 @@ import {ExtraFilters} from '../engine/ethereum.js';
 import {RangeLogFetcher, LogFetcherConfig} from '../engine/RangeLogFetcher.js';
 import type {Abi, AbiEvent} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
-import {decodeEventLog, toEventSelector, toEventSignature} from 'viem';
+import {decodeEventLog} from 'viem';
+import {canonicalSignatureOf, decodingShapeOf, describeEventDeclaration, topic0Of} from './eventIdentity.js';
 import {deepEqual} from '../utils/compare.js';
 import type {
 	IncludedEIP1193Log,
@@ -14,47 +15,6 @@ import type {
 } from '../../types.js';
 import {normalizeAddress} from '../utils/address.js';
 import {UnlessCancelledFunction} from '../utils/promises.js';
-
-/**
- * The `topic0` an event's logs carry, or `undefined` for an ANONYMOUS event,
- * which carries none.
- *
- * Computed per EVENT and never by name, which is the whole point:
- * `encodeEventTopics` selects an ABI item by NAME, so two events sharing a name
- * resolve to whichever one it found first, and the other's topic0 could never
- * enter the fetch filter.
- */
-function topic0Of(event: AbiEvent): `0x${string}` | undefined {
-	return event.anonymous ? undefined : toEventSelector(event);
-}
-
-/** An event as an operator would recognise it in the ABI, for a refusal message. */
-function describeEventDeclaration(event: AbiEvent): string {
-	const inputs = event.inputs
-		.map((input) => `${input.type}${input.indexed ? ' indexed' : ''}${input.name ? ` ${input.name}` : ''}`)
-		.join(', ');
-	return `${event.anonymous ? 'anonymous ' : ''}event ${event.name}(${inputs})`;
-}
-
-/**
- * What decoding a log against this event actually READS.
- *
- * Deliberately NOT `internalType`, which is a Solidity-side annotation that two
- * compilations of the same event routinely disagree about (`address` vs
- * `contract IERC20`). Refusing on it would reject an ABI that is genuinely the
- * same event, and this refusal stops the indexer starting, so it has to be
- * about the wire and nothing else. A missing parameter name reads as `''` for
- * the same reason.
- */
-function decodingShapeOf(event: AbiEvent): unknown {
-	const shapeOfParameter = (parameter: any): unknown => ({
-		name: parameter.name ?? '',
-		type: parameter.type,
-		indexed: !!parameter.indexed,
-		components: parameter.components ? parameter.components.map(shapeOfParameter) : undefined,
-	});
-	return {anonymous: !!event.anonymous, inputs: event.inputs.map(shapeOfParameter)};
-}
 
 /**
  * Collapse the events that ARE the same event, and refuse the ones nothing can
@@ -82,7 +42,7 @@ function deleteDuplicateEvents(events: AbiEvent[]) {
 	const declaredPerSignature = new Map<string, AbiEvent>();
 	for (let i = 0; i < events.length; i++) {
 		const event = events[i];
-		const signature = toEventSignature(event);
+		const signature = canonicalSignatureOf(event);
 		const declared = declaredPerSignature.get(signature);
 		if (!declared) {
 			declaredPerSignature.set(signature, event);

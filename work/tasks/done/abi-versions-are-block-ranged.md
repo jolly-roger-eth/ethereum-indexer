@@ -209,3 +209,17 @@ re-derives nothing. That is the headline benefit and it should be the headline t
 >
 > Add a changeset for the source type change. Record any non-obvious in-scope decision in a
 > `## Decisions` block in your final report, and do not commit without confirmation.
+
+## Decisions
+
+**The ranges live on the ABI EVENT ENTRIES, not on a per-contract ABI-version list.** `[A@a, B@b, A@c]` is then literally the ABI list, which is what the task's normalisation rule and its per-event gap refusal are phrased against. Alternative considered: generalising the (unused) `ContractData.history` into `{abi, firstBlock, lastBlock}[]`, which keeps the generated ABI untouched but groups by version and risks re-meaning the per-range ABI *buckets* the re-scope rejected. Cost of my choice: an author must write `satisfies RangedAbi` instead of `satisfies Abi`, and a generator post-processes the compiler's ABI. Touches: the public source type, and `a-range-requests-only-the-events-it-can-contain`, which reads the same normalised output.
+
+**`ContractData.history` is REMOVED.** It was the never-implemented `{abi, startBlock}[]` placeholder for exactly this feature, keyed on the one field name the task forbids, consumed by nothing. Alternative: leave it, which means two overlapping concepts and a field a user can declare to no effect. Touches: the public source type (in the changeset).
+
+**A stored entry the source no longer declares now invalidates**, if it sits at or below the cursor. The element-wise loop never looks past the current list, so a ranged source that dropped its last event would have kept state derived from an event it stopped indexing — a regression against today, where any removal moves the whole-source hash. Unreachable for a source with no ranges (one entry, caught at index 0). Alternative: leave the asymmetry, which is silently wrong in the unsafe direction.
+
+**Two new refusals at construction**, beyond the gap: `lastBlock < firstBlock`, and a block number that is not a whole non-negative integer. Both are empty or nonsensical ranges, the same "a span nobody requests" family as the gap. Alternative: coerce or ignore, which converts a typo into silent loss.
+
+**`wireContextOf` is deliberately NOT ranged**, so the server split (`LogFetcher`/`StreamBuilder`) keeps the single whole-source wire identity and does not yet get incremental invalidation. Ranged entries there would change the ADR-0004 `{source, config}` digest and its `409`/context-mismatch surface, which is a wire-contract decision this task should not make. `captureStream` DOES use the ranged producer, because that one is compared against the indexer's own list and a captured fixture for a ranged source would otherwise be silently rejected.
+
+**Ordering ties are broken by hash.** Two entries with the same `firstBlock` sort deterministically but arbitrarily, so appending one at a block that already has an entry can shift and force a conservative re-index even above the cursor. Alternative: a set-keyed comparison, which the task explicitly steers away from ("`indexerMatches` compares element-wise BY INDEX ... normalise so it does not shift"). The failure mode is a needless re-index, never a missed one.

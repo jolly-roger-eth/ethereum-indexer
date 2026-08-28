@@ -1,4 +1,4 @@
-import type {Abi, IndexingSource, LastSync} from '@etherfold/core';
+import type {Abi, IndexingSource, LastSync, RangedAbi} from '@etherfold/core';
 import {EntityEventProcessor, type EntityProcessor, type EntityStateView} from '@etherfold/processor-entities';
 import type {StateStore} from '@etherfold/state-store';
 import {createIndexerState} from '../src/index.js';
@@ -155,6 +155,58 @@ export const SOURCE_REDEPLOYED_SAME_ABI: IndexingSource<TestABI> = {
 	chainId: '1',
 	contracts: [{abi: [...abi] as unknown as TestABI, address: CONTRACT, startBlock: START_BLOCK}],
 };
+
+// ---------------------------------------------------------------------------
+// The same deployment, with the block ranges its events are live over DECLARED.
+// ---------------------------------------------------------------------------
+// An upgrade APPENDS an entry here rather than moving one whole-source hash, so
+// the interesting question stops being "did the state survive" and becomes "was
+// anything re-fetched". Only the ranges the fake chain was asked for can answer
+// that: a re-index and a resume land on identical rows.
+
+/** The event that already exists, saying out loud that it is live from the start block. */
+const transferFrom = (firstBlock: number, lastBlock?: number) =>
+	({...abi[0], firstBlock, ...(lastBlock === undefined ? {} : {lastBlock})}) as const;
+
+/** The event an upgraded implementation added, which could not have fired before it existed. */
+const approvalFrom = (firstBlock: number) => ({...abiV2[1], firstBlock}) as const;
+
+function rangedSource(abi: RangedAbi): IndexingSource<TestABI> {
+	return {chainId: '1', contracts: [{abi: abi as unknown as TestABI, address: CONTRACT, startBlock: START_BLOCK}]};
+}
+
+/** The baseline: one event, one declared range, open-ended. */
+export const SOURCE_RANGED = rangedSource([transferFrom(START_BLOCK)]);
+
+/** The upgrade: a second event appended, live only from a block ABOVE the cursor. */
+export const APPENDED_ABOVE_BLOCK = 200;
+export const SOURCE_RANGED_APPENDED_ABOVE = rangedSource([
+	transferFrom(START_BLOCK),
+	approvalFrom(APPENDED_ABOVE_BLOCK),
+]);
+
+/** The same append, declared from a block the indexer has already been past. */
+export const APPENDED_BELOW_BLOCK = 102;
+export const SOURCE_RANGED_APPENDED_BELOW = rangedSource([
+	transferFrom(START_BLOCK),
+	approvalFrom(APPENDED_BELOW_BLOCK),
+]);
+
+/**
+ * `[A@a, B@b, A@c]`: what a generator that cannot recognise a ROLLBACK appends.
+ *
+ * It saw a proxy upgrade and appended `Approval`, then saw another and appended
+ * `Transfer` again. The third entry says nothing the first does not, and the
+ * normalised coverage is byte-identical, so it must cost nothing.
+ */
+export const SOURCE_RANGED_WITH_REDUNDANT_APPEND = rangedSource([
+	transferFrom(START_BLOCK),
+	approvalFrom(APPENDED_ABOVE_BLOCK),
+	transferFrom(300),
+]);
+
+/** An EDIT to the entry that is already below the cursor: the list length does not move. */
+export const SOURCE_RANGED_EDITED_BELOW = rangedSource([transferFrom(START_BLOCK, 104)]);
 
 /** Small on purpose: the reorg below has to fall INSIDE the unconfirmed window. */
 export const FINALITY = 3;
