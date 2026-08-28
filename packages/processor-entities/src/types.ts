@@ -10,9 +10,28 @@ import type {
 import type {EntityDeclaration, MutationContext} from '@etherfold/state-store';
 
 export type InputNames<T extends AbiEvent> = Extract<T['inputs'][number], {name: string}>['name'];
-export type InputValues<T extends AbiEvent> = {
-	[Property in InputNames<T>]: AbiParameterToPrimitiveType<Extract<T['inputs'][number], {name: Property}>>;
-};
+
+/**
+ * The named inputs of an event, as a UNION when `T` is one.
+ *
+ * The conditional is not decoration: it makes the mapped type DISTRIBUTE. An
+ * upgraded contract can carry two events under one name
+ * (`Transfer(address,address,uint256)` then
+ * `Transfer(address,address,uint256,bytes)`), and `ExtractAbiEvent` hands both
+ * of them over as a union, because a handler is keyed by NAME. Mapped without
+ * distributing, the two input lists MERGED into `{from, to, id, memo}` with
+ * `memo` REQUIRED -- so a pre-upgrade log handed the author `undefined` through
+ * a type promising a value. Distributed, `args` is a union the author narrows
+ * (`'memo' in event.args`) before reading a field only one version has.
+ *
+ * The single-version case is unchanged: distributing over a non-union is the
+ * mapped type itself. Pinned both ways in `test/handler-args.test.ts`, under
+ * `pnpm typecheck`. The js-processor package holds its own copy of this type
+ * and the two must stay in step.
+ */
+export type InputValues<T extends AbiEvent> = T extends AbiEvent
+	? {[Property in InputNames<T>]: AbiParameterToPrimitiveType<Extract<T['inputs'][number], {name: Property}>>}
+	: never;
 
 /** `on<EventName>` handlers, typed off the ABI exactly as the JS-object path types them. */
 export type EventHandlers<ABI extends Abi, ProcessorConfig = undefined> = {
