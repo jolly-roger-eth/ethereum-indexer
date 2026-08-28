@@ -40,3 +40,34 @@
 <!-- q2 fields: id=q2 kind=stuck -->
 
 **Your answer** (write below this line):
+
+## Q3
+
+**'task:abi-versions-are-block-ranged' was bounced — how should we proceed?**
+
+> acceptance gate failed (exit 1) on the rebased tip — the failing step was: `pnpm format:check && { [ "$GITHUB_HEAD_REF" = "changeset-release/main" ] && echo 'skip changeset status on the Version PR (it consumes changesets)' || pnpm changeset status --since=main; } && pnpm build && pnpm typecheck && pnpm test`; its last output was:
+>
+> packages/server test:  FAIL  test/sql2ts.test.ts > sql2ts round-trips SQL through a TypeScript module > round-trips the schema this package actually ships
+> packages/server test: Error: Test timed out in 5000ms.
+> packages/server test: If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+> packages/server test:  ❯ test/sql2ts.test.ts:78:2
+> packages/server test:      76|  });
+> packages/server test:      77|
+> packages/server test:      78|  it('round-trips the schema this package actually ships', async () => {
+> packages/server test:        |  ^
+> packages/server test:      79|   const outDir = generateInto(join(pkgRoot, 'src', 'schema', 'sql'));
+> packages/server test:      80|   const mod = await import(/* @vite-ignore */ pathToFileURL(join(outDi…
+> packages/server test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+> packages/server test:  Test Files  2 failed | 3 passed (5)
+> packages/server test:       Tests  5 failed | 42 passed (47)
+> packages/server test:    Start at  15:07:31
+> packages/server test:    Duration  340.13s (transform 466.47s, setup 0ms, import 786.22s, tests 89.92s, environment 12ms)
+> packages/server test: Failed
+> /tmp/dorfl-fresh-gate-Il9fSM/tip/packages/server:
+>  ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @etherfold/server@0.1.0 test: `vitest run`
+> Exit status 1
+>  ELIFECYCLE  Test failed. See above for more details.
+
+<!-- q3 fields: id=q3 kind=stuck -->
+
+**Your answer** (write below this line):
