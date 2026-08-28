@@ -117,6 +117,19 @@ a finding.
 A fetch range crossing a boundary may simply use the union for that range; splitting is cheap
 because boundaries are rare.
 
+> **FORWARD-POINTER: keep the DECISION separable from the ACTION.** This task keeps the simple
+> all-or-nothing rule (append at or below the cursor discards everything and re-indexes from the
+> start block), and that is deliberate. But a later refinement wants to BRANCH the stream at the
+> boundary instead: when the cursor is at 900 and you append `B@780`, blocks `0..779` were fetched
+> under the correct and complete filter, so only `780..900` actually needs re-fetching. See
+> `work/notes/ideas/a-stream-branches-instead-of-being-discarded.md`.
+>
+> Do not build that here. DO shape the invalidation so it stays reachable: the code that DECIDES
+> should be able to say "invalid from block N", even if the only thing acting on it today is
+> "therefore discard everything". Do not collapse the decision into a bare boolean, and do not
+> bury "re-index from the start block" inside the comparison itself. If the decision can name a
+> block, branching is a later refinement; if it cannot, branching is a rewrite.
+
 **Two traps beyond the `startBlock` one.**
 
 - **A source with no ranges must behave exactly as it does today.** No existing deployment
@@ -145,6 +158,7 @@ because boundaries are rare.
 - [ ] Existing persisted `ContextIdentifier` values are still readable, or migrated.
 - [ ] Tests cover the new behaviour in the repo's vitest style.
 - [ ] A changeset covers the public API change to the source type.
+- [ ] The invalidation decision can name the block from which the stored data stopped being valid, even though the only action taken on it here is a full discard. This is what keeps stream branching a later refinement rather than a rewrite; see the forward-pointer above.
 
 ## Blocked by
 
