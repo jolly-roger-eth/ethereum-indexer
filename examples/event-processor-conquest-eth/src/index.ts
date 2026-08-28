@@ -1,10 +1,11 @@
-import {JSProcessor, fromJSProcessor} from '@etherfold/js-processor';
+import type {JSProcessor} from '@etherfold/js-processor';
+import {fromJSProcessor} from '@etherfold/js-processor';
 
 import {logs} from 'named-logs';
 
 import OuterSpace from './abis/OuterSpace.js';
 import erc20 from './abis/erc20.js';
-import {Data, Planet, Player, StakedPlanet} from './types/db.js';
+import type {Data, Planet, Player, StakedPlanet} from './types/db.js';
 
 const namedLogger = logs('ConquestEventProcessor');
 

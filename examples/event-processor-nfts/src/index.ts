@@ -1,6 +1,7 @@
-import {fromJSProcessor, JSProcessor} from '@etherfold/js-processor';
+import type {JSProcessor} from '@etherfold/js-processor';
+import {fromJSProcessor} from '@etherfold/js-processor';
 import eip721 from './eip721.js';
-import {Data, NFT} from './types.js';
+import type {Data, NFT} from './types.js';
 
 // we just need to define as a JSProcessor type to get type safety automatically added
 // including event argument types

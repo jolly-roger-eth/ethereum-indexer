@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "src/index.ts",
   "keywords": [],
   "author": "",
   "license": "MIT",

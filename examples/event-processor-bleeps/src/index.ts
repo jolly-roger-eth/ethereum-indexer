@@ -1,7 +1,8 @@
-import {fromJSProcessor, JSProcessor} from '@etherfold/js-processor';
+import type {JSProcessor} from '@etherfold/js-processor';
+import {fromJSProcessor} from '@etherfold/js-processor';
 
 import eip721 from './eip721.js';
-import {Data, Bleep} from './types.js';
+import type {Data, Bleep} from './types.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
