@@ -4,6 +4,7 @@ slug: handler-types-do-not-lie-when-one-name-covers-two-events
 spec: an-upgraded-contract-is-indexable-from-its-first-block
 blockedBy: []
 covers: [8, 9]
+needsAnswers: true
 ---
 
 ## What to build
