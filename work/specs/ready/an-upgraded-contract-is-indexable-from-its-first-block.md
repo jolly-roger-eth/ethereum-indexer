@@ -42,7 +42,7 @@ The developer's declared boundary is an assertion the indexer cannot verify, onl
 7. As a developer with no upgrade, I want to write one ABI with no boundary and have nothing change, so that the common case pays nothing.
 8. As a processor author handling an event whose signature changed, I want the compiler to force me to narrow before reading a field that exists in only one version, so that I cannot read `undefined` through a type that promised a value.
 9. As a processor author with an ordinary single-version ABI, I want my handler types unchanged.
-10. As a developer using argument filters, I want a range to request only the versions it can contain, so that an upgrade does not multiply the requests every range costs.
+10. As a developer, I want a range to request only the versions it can contain, so that an upgrade does not make every earlier range more expensive: under argument filters it multiplies the requests, and in every case it widens the block set the node must screen and scan.
 11. As a developer, I NEVER want an event silently dropped from the fetch filter, so that "no logs found" always means the chain had none.
 12. As an operator, I want the same ABI accepted or refused identically whether or not `parseAllEventsIrrespectiveOfAddresses` is set.
 
@@ -58,7 +58,20 @@ All three tasks are ordinary agent-buildable work: typed seams, existing test st
 
 **Per-version hashing.** Appending must not disturb the hashes of versions below it, or nothing is saved; editing a version below the cursor must still invalidate. `indexerMatches` already compares the list element-wise and by index, so inserting a version in the middle shifts and invalidates. That is correct but should be deliberate.
 
-**Fetch narrowing is CONDITIONAL, and is not the reason to do this.** Measured in `generateLogRequestForTopicsAndFiltersCombinations`: with no argument filters, all topics go in ONE request, so extra topics cost nothing and narrowing saves nothing. With argument filters, there is one request per (event topic × filter), run sequentially, so a version that cannot exist in a range still costs its own round trips. That is the browser shape (the NFT example issues two per range for one event), so the saving is real there and near zero elsewhere. A fetch range that CROSSES a boundary must either split at it or use the union for that range; splitting is cheap because boundaries are rare.
+**Fetch narrowing is a real saving, in two separate ways, and is still not the reason to do this.**
+
+The first is request COUNT, and it is measured here: `generateLogRequestForTopicsAndFiltersCombinations` puts every topic in ONE request when no argument filters are configured, but emits one request per (event topic × filter) when they are, run sequentially. So under filters a version that cannot exist in a range still costs its own round trips. That is the browser shape (the NFT example issues two per range for one event).
+
+The second is the NODE's own work, and it applies even in the single-request case. **Carrying a topic that cannot match still costs the node**, because it is asked to establish that nothing matches:
+
+- Nodes screen blocks with the header `logsBloom`, and a block passes when it COULD hold a matching log. Topics are OR'd at position 0, so each additional topic widens the set of blocks that pass and therefore the set whose receipts are loaded and scanned.
+- The bloom is probabilistic, so each additional topic adds its own false-positive opportunities, and those blocks are loaded for nothing.
+
+Magnitude depends on the address filter. With a tight address filter a block must match the address AND a topic, so the extra cost is mostly false positives: small, not zero. **Address-agnostic** (`parseAllEventsIrrespectiveOfAddresses`, which the NFT example uses) the topic is the only screen, so carrying a common topic0 such as `Transfer` widens the scan a great deal. This repo already treats `eth_getLogs` as the most constrained call it makes: `work/specs/proposed/node-log-api.md` calls provider limits on it "the single most painful constraint", and the whole truncation apparatus in `agnostic-log-fetcher` exists because of its result caps.
+
+**This second mechanism is NOT measured here.** It is how nodes implement the method, not a fact established against this codebase, and a builder should not quote it as one. What is measured is the request-count half.
+
+It is still not the justification, because the justification is that an append re-fetches nothing at all. It is last in build order for the same reason it is possible at all: it needs the ranges to exist first. A fetch range that CROSSES a boundary must either split at it or use the union for that range; splitting is cheap because boundaries are rare.
 
 **The direction asymmetry.** Declaring the boundary EARLIER than the real upgrade costs at most an unnecessary re-index and some redundant topics. Declaring it LATER means the logs between the real upgrade and the declared block are never fetched, and are **undetectable afterwards**, because the topic was not in the filter to check with. For a proxy deployment the implementation's own deploy block is naturally safe, since an implementation cannot emit before it exists.
 

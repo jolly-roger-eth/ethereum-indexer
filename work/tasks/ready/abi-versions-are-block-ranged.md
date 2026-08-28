@@ -31,7 +31,14 @@ This is what makes a CHANGED event signature work at all. `Transfer(address,addr
 
 A true topic0 collision (one topic0 meaning two things) is still refused, on every path. A boundary cannot resolve it either, because the upgrade transaction sits mid-block and both meanings share that block.
 
-**3. Narrow the fetch to the versions a range can contain.** Conditional, and deliberately last: measured in `generateLogRequestForTopicsAndFiltersCombinations`, with no argument filters every topic goes into ONE request so narrowing saves nothing, while with argument filters there is one request per (event topic × filter) run sequentially, so a version that cannot exist in a range still costs its own round trips. The browser shape uses filters, so the saving is real there. A fetch range that CROSSES a boundary must split at it or use the union for that range; splitting is cheap because boundaries are rare.
+**3. Narrow the fetch to the versions a range can contain.** Last in order, because it needs the ranges to exist, not because it is marginal. It saves in two separate ways:
+
+- **Request count**, measured here: `generateLogRequestForTopicsAndFiltersCombinations` puts every topic in ONE request with no argument filters, but emits one request per (event topic × filter), run sequentially, when they are configured. Under filters a version that cannot exist in a range still costs its own round trips, and the browser shape uses filters.
+- **The node's own work**, which applies even in the single-request case. A topic that cannot match still costs the node, because it is asked to establish that nothing matches: block screening is done against the header `logsBloom`, topics are OR'd at position 0, so each extra topic widens the set of blocks that pass the screen and therefore the set whose receipts are loaded and scanned, and each adds its own bloom false positives. With a tight address filter this is mostly false positives; **address-agnostic** (`parseAllEventsIrrespectiveOfAddresses`) the topic is the only screen and carrying a common topic0 widens the scan considerably.
+
+  This second mechanism is how nodes implement the method and is **not measured in this repository**. Do not cite it as one of our measurements; if you want a number, measure it against a real node and record it as a finding.
+
+A fetch range that CROSSES a boundary must split at it or use the union for that range; splitting is cheap because boundaries are rare.
 
 Three traps:
 
@@ -51,7 +58,7 @@ Three traps:
 - [ ] A true topic0 collision is refused at construction, naming the colliding events, identically with and without `parseAllEventsIrrespectiveOfAddresses`.
 - [ ] A source declaring no boundary behaves exactly as today.
 - [ ] `defaultFromBlock` is unaffected by a boundary and still derives from `startBlock` alone.
-- [ ] With argument filters configured, a range below a boundary issues no request for the later version's topics.
+- [ ] A range below a boundary does not carry the later version's topics: with argument filters configured it issues no request for them, and without filters they are absent from the single request's topic set.
 - [ ] The direction asymmetry (early is safe, late loses logs undetectably) is documented on the source type and in the browser guide's axis-two section.
 - [ ] Tests cover the new behaviour in the repo's vitest style.
 - [ ] A changeset covers the public API change to the source type.
@@ -76,6 +83,6 @@ Three traps:
 >
 > Document the direction asymmetry wherever a developer picks the number, because one side is unrecoverable: EARLY costs at most a needless re-index, LATE means the logs between the real upgrade and the declared block are never fetched and cannot be detected afterwards, since the topic was never in the filter. For a proxy deployment the implementation's own deploy block is naturally safe.
 >
-> Do the fetch narrowing LAST and treat it as conditional: it saves request count only where argument filters are configured, and nothing at all otherwise. A range crossing a boundary may simply use the union for that range.
+> Do the fetch narrowing LAST, because it needs the ranges to exist first, not because it is marginal. It saves twice: request COUNT where argument filters are configured (one request per topic-and-filter combination, run sequentially), and the NODE's own work in every case, since a topic that cannot match still widens the `logsBloom` screen and so the set of blocks whose receipts get loaded and scanned. That second mechanism is how nodes implement the method and is NOT measured in this repository; do not present it as one of our measurements, and if you want a number, measure it against a real node and record a finding. A range crossing a boundary may simply use the union for that range.
 >
 > Add a changeset for the source type change. Record any non-obvious in-scope decision in a `## Decisions` block in your final report, and do not commit without confirmation.
