@@ -4,6 +4,7 @@ slug: abi-versions-are-block-ranged
 spec: an-upgraded-contract-is-indexable-from-its-first-block
 blockedBy: []
 covers: [1, 2, 3, 4, 5, 6, 7, 10]
+needsAnswers: true
 ---
 
 ## What to build
