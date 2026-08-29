@@ -2,6 +2,7 @@
 title: 'A reconfigure is not an outage: the live deployment serves while the pending one catches up'
 slug: a-reconfigure-is-not-an-outage
 taskedAfter: [the-stream-is-what-the-node-said-appended-once]
+needsAnswers: true
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -12,11 +13,27 @@ taskedAfter: [the-stream-is-what-the-node-said-appended-once]
 > corrected: identity is NOT digest-set equality, and the prerequisite must actually deliver
 > something to point at.
 
-> ALL OPEN QUESTIONS ANSWERED 2026-08-29. A **processor** change DOES make a deployment
-> (`updateProcessor` blanks the app just as badly, and it is the most routine reconfigure there is).
-> **Doubled fetch traffic during catch-up is acceptable**, and is cheaper than it first looked: the
-> doubling is only the head-following TAIL, never the history. And **reads do NOT carry deployment
-> identity**; see below, the question dissolved rather than needing an answer.
+> ANSWERED 2026-08-29. A **processor** change DOES make a deployment (`updateProcessor` blanks the
+> app just as badly, and it is the most routine reconfigure there is). **Doubled fetch traffic during
+> catch-up is acceptable**, and is cheaper than it first looked: the doubling is only the
+> head-following TAIL, never the history. And **reads do NOT carry deployment identity**; the
+> question dissolved rather than needing an answer.
+
+<!-- open-questions -->
+
+## Open questions
+
+1. **Who allocates the pending deployment's store, and therefore where does the indirect handle
+   live?** These are ONE question, not two, which is why `needsAnswers` is back. `createIndexerState`
+   takes ONE pre-built processor with its store already bound, so the answer changes the PUBLIC
+   surface of `createIndexerState` and decides the handle's shape: if the pending deployment is a
+   second `EntityEventProcessor`, the indirection must sit in a layer ABOVE it; if it is a swappable
+   store inside one processor, it is close to a getter in `view.ts`. At least three shapes exist (a
+   store-factory option, a processor factory, or the browser package building it). Answer this before
+   tasking, or the first task picks the public API by accident.
+2. **What shape does `SyncingState` grow?** It is a single flat record with one `lastSync` and one
+   `syncPercentage`, and stories 3 and 4 need pending catch-up progress. This is published surface
+   too.
 
 ## Problem Statement
 
@@ -43,7 +60,7 @@ PENDING one, which is catching up and answers nobody.
 - Reconfiguring creates a pending deployment instead of mutating the live one.
 - The pending deployment builds its own state, re-folding from the stream, re-fetching only what its
   source needs and the stream does not already hold.
-- Reads are served by the live deployment throughout, and can ask which deployment answered.
+- Reads are served by the live deployment throughout.
 - **Promotion** makes the pending deployment live: manual on a server, automatic in the browser,
   with an option to disable the auto-switch and surface catch-up progress instead.
 - Reconfiguring again while one is pending REPLACES the pending one. Two, never three.
@@ -82,8 +99,11 @@ Identity resting on the verdict rather than on hash equality keeps that exposure
 3. As a browser user, I want the app to keep rendering while the new deployment builds, and switch
    when it is ready.
 4. As a browser developer, I want to turn the auto-switch off and show catch-up progress instead.
-5. As a reader holding a state handle across a promotion, I want it to keep answering, from the
-   deployment that is now live, so that holding a reference is never a way to be silently stale.
+5. As a reader holding a state handle across a promotion ON THE ENTITIES PATH, I want it to keep
+   answering from the deployment that is now live, so holding a reference is never a way to be
+   silently stale. (On the js-object path the published value is a plain object replaced wholesale,
+   so a holder of the OLD reference is stale exactly as it is today; that is unchanged by this spec
+   and is not regressed by it.)
 6. As an operator, I want a reconfigure the invalidation verdict calls a no-op to cost nothing.
 7. As an operator reconfiguring twice, I want the second to replace the first pending deployment.
 8. As an operator, I want a deployment whose stream is unavailable to fall back to a full re-index,
@@ -105,9 +125,9 @@ at, clamped down to that head. Clamping DOWNWARD is the safe direction, costing 
 and losing nothing.
 
 **Reorgs are handled per deployment, independently.** Above the graft point each follows the head and
-processes reorgs itself. They may briefly disagree; each is internally consistent, both converge, and
-reads carry which one answered. The clamp above is what keeps the shared prefix beneath the reorg
-window, so no reorg can invalidate bytes both depend on.
+processes reorgs itself. They may briefly disagree; each is internally consistent and both converge.
+The clamp above is what keeps the shared prefix beneath the reorg window, so no reorg can invalidate
+bytes both depend on.
 
 **Prefix sharing is TOTAL for the common cases, and absent only in the rare one.** An earlier draft
 said the opposite, having weighted the rarest case. Ranked by how often a real deployment actually
@@ -174,10 +194,34 @@ reactive shape is not one of them (the root store replaces its value wholesale):
 **Promotion is a step, not a blend.** The cursor jumps. Interpolating would serve a state neither
 deployment ever had.
 
+**`ReconfigureOutcome.stateDiscarded` is a published API this design falsifies, and it is owned
+here.** It shipped days ago on all three reconfigure verbs and is pinned by roughly 26 assertions
+across the core tests and the browser harness. Under a pending deployment neither `updateIndexer`
+nor `updateProcessor` discards anything: the live deployment keeps its state throughout, so the flag
+collapses to permanently false and stops distinguishing the thing it was added to distinguish. That
+is a DELETION SWEEP, not a detail: the reconfigure outcome must grow a shape that says what actually
+happened (a deployment was created, or the verdict was a no-op, or `reset` discarded), every
+assertion pinning the old flag must be migrated by the task that changes it, and the browser
+consumers of `stateDiscarded` in `IndexerState` must move with it. A spec that left this unnamed
+would have the first task to trip over it rewrite the corpus by guess.
+
+**`reset` stays an unconditional discard, and it also drops the pending deployment.** It is the one
+verb whose caller MEANS discard, so it does not create a deployment. Two consequences to build
+deliberately: it discards the pending deployment as well as the live one, and it is the only path
+that clears the STREAM, which under sharing is the prefix a pending deployment may be folding from,
+so it must not run while a pending deployment depends on it.
+
+**No object owns the live-plus-pending pair today, and something must.** `EthereumIndexer` holds
+exactly one processor, one `lastSync` and one `keepStream` key. The spec does not decide whether a
+pending deployment is a second `EthereumIndexer` or a container above it, because open question 1
+decides it. Server-side `promote` also needs a named surface (an indexer method, or an admin
+endpoint on `@etherfold/server`), and it has none.
+
 ## Testing Decisions
 
 - **Not-an-outage is the claim, so assert on READS during catch-up**, not on the end state: reads
-  succeed continuously across a reconfigure and report the live deployment until promotion.
+  succeed continuously across a reconfigure, and answer from the live deployment's state until
+  promotion. Assert on the ANSWERS, since reads do not report identity.
 - **The no-op claim** asserts on ranges fetched AND on state discarded, the pair ADR-0034
   established, since neither alone separates a resume from a rebuild.
 - **Replacement**: reconfiguring twice leaves exactly two deployments and reclaims the first pending
@@ -190,6 +234,8 @@ deployment ever had.
   is the most common reconfigure and the one with the most to share, so it is the sharing test.
 - **A handle held across a promotion** keeps answering and answers from the newly-live deployment,
   which is the regression guard for the silent-staleness the indirect handle exists to remove.
+- **The reconfigure outcome** says what happened under a pending deployment, and every existing
+  assertion on `stateDiscarded` is migrated rather than left inverted.
 
 ## Out of Scope
 
