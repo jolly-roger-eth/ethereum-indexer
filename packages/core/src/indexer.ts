@@ -18,6 +18,7 @@ import type {
 	ContextIdentifier,
 	ProcessorDriftReport,
 	ProvidedStreamConfig,
+	SourceHashEntry,
 	UsedStreamConfig,
 	LogEvent,
 } from './types.js';
@@ -28,9 +29,10 @@ import {
 	generateStreamToAppend,
 	getFromBlock,
 	groupStreamPerBlock,
-	indexerMatches,
 	resolveStreamConfig,
 	sourceInvalidationOf,
+	stateMatches,
+	streamMatches,
 	wait,
 } from './internal/engine/utils.js';
 import {sourceHashesOf} from './internal/engine/eventRanges.js';
@@ -134,7 +136,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	protected config!: UsedIndexerConfig<ABI>;
 	protected finality!: number;
 
-	protected sourceHashes!: {startBlock: number; hash: string}[];
+	protected sourceHashes!: SourceHashEntry[];
 	protected streamConfigHash!: string;
 
 	protected logEventFetcher!: LogEventFetcher<ABI>;
@@ -330,10 +332,13 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			config: this.streamConfigHash,
 			processor: processorVersionHash,
 		});
-		// Today the only action is a full discard, and the block the decision names is
-		// carried no further than this log line. That is deliberate: see
-		// `SourceInvalidation`.
-		const resetNeeded = !invalidation.valid;
+		// The STATE half, and not the stream half: what a reset discards is the fold.
+		// A stream that is no longer covered is dealt with where it is read, in
+		// `promiseToLoad`, so a state discard whose stream SURVIVED rebuilds from the
+		// cache instead of going back to the node. Today the only action is still a
+		// full discard, and the block each half names is carried no further than the
+		// log line below. That is deliberate: see `InvalidationVerdict`.
+		const resetNeeded = !invalidation.state.valid;
 
 		// TODO remove, this is the responsibility of the developer to ensure it pass correct data when indexer context changes
 		// for now we do a minimum check of chainId
@@ -486,7 +491,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			const {lastSync: loadedLastSync, state} = loaded;
 			if (
 				processorHash === loadedLastSync.context.processor &&
-				this.indexerMatches(loadedLastSync.lastToBlock, loadedLastSync.context)
+				this.stateMatches(loadedLastSync.lastToBlock, loadedLastSync.context)
 			) {
 				// The state is about to be ADOPTED, which is the only branch where drift can
 				// matter: a differing version hash discards the state anyway (a deliberate
@@ -543,12 +548,28 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 					// NOTE save shoudl probably do it itself, really, but here we deal even if it did not
 					lastSyncFetched.lastFromBlock = fromBlock;
 
-					if (this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
-						// we update the processorHash in case it was changed
-						currentLastSync.context.processor = processorHash;
-						if (eventsFetched.length > 0) {
-							await this._onLoad('ProcessingEventStream');
-							await this.feed(eventsFetched, lastSyncFetched);
+					// the STREAM half: these are raw logs under a topic-and-address filter, so
+					// they are reusable whenever that filter did not GROW -- which is what lets
+					// a discarded state be rebuilt without re-fetching a block
+					if (this.streamMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
+						// What survived is the RAW half. `args` and `eventName` are a decode some
+						// earlier ABI made of those bytes, and a change can move the decode without
+						// moving the fetch at all -- a renamed non-indexed parameter leaves every
+						// cached log exactly right and every cached `args` filed under a key the
+						// handler no longer reads. So the stream is decoded AGAIN, against the
+						// source running now, before a single event reaches the processor.
+						const replayable = this.logEventFetcher.reparse(eventsFetched);
+						if (!replayable) {
+							// a `logValues` projection dropped the raw log, so this stream cannot be
+							// re-read and must not be replayed on trust
+							await this.config.keepStream.clear(this.source);
+						} else {
+							// we update the processorHash in case it was changed
+							currentLastSync.context.processor = processorHash;
+							if (replayable.length > 0) {
+								await this._onLoad('ProcessingEventStream');
+								await this.feed(replayable, lastSyncFetched);
+							}
 						}
 					} else {
 						await this.config.keepStream.clear(this.source);
@@ -566,7 +587,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				);
 				if (existingStreamData) {
 					const {lastSync: lastSyncFetched} = existingStreamData;
-					if (!this.indexerMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
+					if (!this.streamMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
 						await this.config.keepStream.clear(this.source);
 					}
 				}
@@ -819,8 +840,14 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		);
 	}
 
-	protected indexerMatches(lastToBlock: number, context: ContextIdentifier): boolean {
-		return indexerMatches(this.sourceHashes, this.streamConfigHash, lastToBlock, context);
+	/** Whether the persisted STATE is still a fold over what this source means. */
+	protected stateMatches(lastToBlock: number, context: ContextIdentifier): boolean {
+		return stateMatches(this.sourceHashes, this.streamConfigHash, lastToBlock, context);
+	}
+
+	/** Whether the cached raw log STREAM was fetched under a filter this source is still covered by. */
+	protected streamMatches(lastToBlock: number, context: ContextIdentifier): boolean {
+		return streamMatches(this.sourceHashes, this.streamConfigHash, lastToBlock, context);
 	}
 
 	/**

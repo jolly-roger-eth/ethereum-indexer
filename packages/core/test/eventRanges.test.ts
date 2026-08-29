@@ -1,9 +1,8 @@
 import type {Abi} from 'abitype';
 import {describe, expect, it} from 'vitest';
 import {liveEventsOf, sourceHashesOf} from '../src/internal/engine/eventRanges.js';
-import {defaultFromBlockOf, indexerMatches, sourceInvalidationOf} from '../src/internal/engine/utils.js';
-import {simple_hash} from '../src/utils/hash.js';
-import type {ContextIdentifier, IndexingSource} from '../src/types.js';
+import {defaultFromBlockOf, sourceInvalidationOf, stateMatches} from '../src/internal/engine/utils.js';
+import type {ContextIdentifier, IndexingSource, SourceHashEntry} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
 // AN ABI EVENT IS LIVE OVER BLOCK RANGES
@@ -80,11 +79,19 @@ function rangesOf(source: IndexingSource<Abi>, signatureFragment: string): [numb
 		.flatMap((live) => live.ranges.map((range) => [range.firstBlock, range.lastBlock] as [number, number | undefined]));
 }
 
-const contextOf = (hashes: {startBlock: number; hash: string}[], config = 'cfg'): ContextIdentifier => ({
+const contextOf = (hashes: SourceHashEntry[], config = 'cfg'): ContextIdentifier => ({
 	source: hashes,
 	config,
 	processor: 'p',
 });
+
+/**
+ * The entries as INVALIDATION reads them: every field but the `legacyHash`
+ * migration bridge, which is a digest of the WHOLE source by design and is
+ * pinned in `invalidation.test.ts`.
+ */
+const identityOf = (source: IndexingSource<Abi>) =>
+	sourceHashesOf(source).map(({startBlock, hash, streamHash}) => ({startBlock, hash, streamHash}));
 
 // ---------------------------------------------------------------------------
 
@@ -226,12 +233,14 @@ describe('normalisation, which is what makes a naive generator cheap', () => {
 });
 
 describe('the source hashes an invalidation is computed on', () => {
-	it('is byte-identical to today when the source declares no range at all', () => {
-		// No existing deployment may change behaviour merely by upgrading, so a
-		// source with no ranges must still hash to the one whole-source entry.
-		const source = sourceOf([transferV1, approval]);
+	it('is one entry per event even when the source declares no range at all', () => {
+		// The un-ranged path is the ranged one with the contract's own `startBlock`
+		// standing in for a declaration, so a regenerated ABI costs what it actually
+		// changed. What carries an existing stored context across is the bridge, not a
+		// second hashing scheme: see `invalidation.test.ts`.
+		const hashes = sourceHashesOf(sourceOf([transferV1, approval], {startBlock: 100}));
 
-		expect(sourceHashesOf(source)).toEqual([{startBlock: 0, hash: simple_hash(source)}]);
+		expect(hashes.map((entry) => entry.startBlock)).toEqual([0, 100, 100]);
 	});
 
 	it('is one entry per normalised range, ordered so an append lands at the END', () => {
@@ -242,8 +251,8 @@ describe('the source hashes an invalidation is computed on', () => {
 	});
 
 	it('leaves the existing entries untouched when an entry is appended above them', () => {
-		const before = sourceHashesOf(sourceOf([withRange(transferV1, {firstBlock: 100})]));
-		const after = sourceHashesOf(
+		const before = identityOf(sourceOf([withRange(transferV1, {firstBlock: 100})]));
+		const after = identityOf(
 			sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(approval, {firstBlock: 900})]),
 		);
 
@@ -251,9 +260,9 @@ describe('the source hashes an invalidation is computed on', () => {
 	});
 
 	it('is UNCHANGED by a redundant append that normalises away', () => {
-		// `[A@a, B@b, A@c]`: the rollback entry vanishes, so the list must not shift.
-		// `indexerMatches` compares element-wise BY INDEX, so a shift would re-index
-		// the world for a generator that simply could not recognise a rollback.
+		// `[A@a, B@b, A@c]`: the rollback entry vanishes, so the coverage is
+		// byte-identical and a generator that simply could not recognise a rollback
+		// costs nothing.
 		const twoEntries = sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(transferV2, {firstBlock: 400})]);
 		const withRollback = sourceOf([
 			withRange(transferV1, {firstBlock: 100}),
@@ -261,14 +270,14 @@ describe('the source hashes an invalidation is computed on', () => {
 			withRange(transferV1, {firstBlock: 700}),
 		]);
 
-		expect(sourceHashesOf(withRollback)).toEqual(sourceHashesOf(twoEntries));
+		expect(identityOf(withRollback)).toEqual(identityOf(twoEntries));
 	});
 
 	it('moves the entry whose event definition was edited, and only that one', () => {
-		const before = sourceHashesOf(
+		const before = identityOf(
 			sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(approval, {firstBlock: 900})]),
 		);
-		const after = sourceHashesOf(
+		const after = identityOf(
 			sourceOf([withRange(transferV2, {firstBlock: 100}), withRange(approval, {firstBlock: 900})]),
 		);
 
@@ -296,50 +305,65 @@ describe('the invalidation decision, which can name the block it starts at', () 
 	it('keeps everything when an entry is appended ABOVE the cursor', () => {
 		const appended = sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(approval, {firstBlock: 900})]);
 
-		expect(decide(appended)).toEqual({valid: true});
-		expect(indexerMatches(sourceHashesOf(appended), 'cfg', CURSOR, stored)).toBe(true);
+		expect(decide(appended)).toEqual({state: {valid: true}, stream: {valid: true}});
+		expect(stateMatches(sourceHashesOf(appended), 'cfg', CURSOR, stored)).toBe(true);
 	});
 
 	it('invalidates from the appended block when the entry starts AT or BELOW the cursor', () => {
 		const atCursor = sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(approval, {firstBlock: CURSOR})]);
 		const below = sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(approval, {firstBlock: 400})]);
 
-		expect(decide(atCursor)).toMatchObject({valid: false, invalidFromBlock: CURSOR});
-		expect(decide(below)).toMatchObject({valid: false, invalidFromBlock: 400});
+		expect(decide(atCursor).state).toMatchObject({valid: false, invalidFromBlock: CURSOR});
+		expect(decide(below).state).toMatchObject({valid: false, invalidFromBlock: 400});
+		// the topic set GREW, so the cached stream is short of logs nobody asked for
+		expect(decide(below).stream).toMatchObject({valid: false, invalidFromBlock: 400});
 	});
 
 	it('invalidates when an entry already below the cursor was EDITED, though the length did not change', () => {
 		const edited = sourceOf([withRange(transferV1, {firstBlock: 100, lastBlock: 900})]);
 
-		expect(decide(edited)).toMatchObject({valid: false, invalidFromBlock: 100});
+		expect(decide(edited).state).toMatchObject({valid: false, invalidFromBlock: 100});
 	});
 
 	it('invalidates when an entry below the cursor was REMOVED', () => {
 		const twoEntries = sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(approval, {firstBlock: 200})]);
 		const removed = sourceOf([withRange(transferV1, {firstBlock: 100})]);
 
-		expect(decide(removed, contextOf(sourceHashesOf(twoEntries)))).toMatchObject({valid: false, invalidFromBlock: 200});
+		expect(decide(removed, contextOf(sourceHashesOf(twoEntries))).state).toMatchObject({
+			valid: false,
+			invalidFromBlock: 200,
+			reason: 'entry-removed',
+		});
 	});
 
 	it('keeps everything when a redundant entry is appended', () => {
 		const withRollback = sourceOf([withRange(transferV1, {firstBlock: 100}), withRange(transferV1, {firstBlock: 900})]);
 
-		expect(decide(withRollback)).toEqual({valid: true});
+		expect(decide(withRollback)).toEqual({state: {valid: true}, stream: {valid: true}});
 	});
 
 	it('invalidates from block 0 when the stream config moved, whatever the ranges say', () => {
-		expect(decide(base, contextOf(sourceHashesOf(base), 'other'))).toMatchObject({valid: false, invalidFromBlock: 0});
-	});
-
-	it('answers exactly as before for a source that declares no range', () => {
-		const noRanges = sourceOf([transferV1]);
-		const changed = sourceOf([transferV2]);
-		const legacy = contextOf(sourceHashesOf(noRanges));
-
-		expect(sourceInvalidationOf(sourceHashesOf(noRanges), 'cfg', CURSOR, legacy)).toEqual({valid: true});
-		expect(sourceInvalidationOf(sourceHashesOf(changed), 'cfg', CURSOR, legacy)).toMatchObject({
+		expect(decide(base, contextOf(sourceHashesOf(base), 'other')).state).toMatchObject({
 			valid: false,
 			invalidFromBlock: 0,
+		});
+	});
+
+	it('answers per EVENT for a source that declares no range, rather than from block 0', () => {
+		// What used to be one whole-source entry at block 0 is now the contract's own
+		// events at its own start block, so a changed event names the block it changed
+		// at instead of condemning everything.
+		const noRanges = sourceOf([transferV1], {startBlock: 100});
+		const changed = sourceOf([transferV2], {startBlock: 100});
+		const context = contextOf(sourceHashesOf(noRanges));
+
+		expect(sourceInvalidationOf(sourceHashesOf(noRanges), 'cfg', CURSOR, context)).toEqual({
+			state: {valid: true},
+			stream: {valid: true},
+		});
+		expect(sourceInvalidationOf(sourceHashesOf(changed), 'cfg', CURSOR, context).state).toMatchObject({
+			valid: false,
+			invalidFromBlock: 100,
 		});
 	});
 });

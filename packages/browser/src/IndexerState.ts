@@ -256,8 +256,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	 * Read ONLY as a comparison across a reconfigure, to answer "did the core
 	 * produce a state while that call was running?". A reconfigure that discards
 	 * does not always end with nothing: when a kept STREAM is still valid (a
-	 * processor swap leaves the cached events untouched, since `indexerMatches`
-	 * compares the source and the config and not the processor), `load` replays it
+	 * processor swap leaves the cached events untouched, since the STREAM verdict
+	 * is about the source and the config and not the processor), `load` replays it
 	 * and publishes the REBUILT state before the call returns. Re-seeding after
 	 * that would throw away the very thing the rebuild produced.
 	 */

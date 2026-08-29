@@ -77,8 +77,54 @@ export type IncludedEIP1193Log = EIP1193Log & {
 	transactionHash: EIP1193DATA;
 };
 
+/**
+ * ONE entry of the source identity a `ContextIdentifier` carries, and the unit
+ * invalidation is decided on.
+ *
+ * There is one entry per (contract, event, live range) plus a leading SKELETON
+ * entry at block 0 for everything an ABI cannot describe (the chain id, the
+ * genesis hash, each contract's address and `startBlock`). A non-event ABI
+ * member has no entry, because a function is not indexed, does not enter the
+ * fetch filter and cannot change what a log decodes to.
+ *
+ * The two digests exist because the fetch and the fold do not depend on the
+ * same thing, and one verdict over one digest could not say so.
+ *
+ * PERSISTED, so every field but `startBlock` and `hash` is optional and absence
+ * means "written before this field existed" rather than "changed".
+ */
+export type SourceHashEntry = {
+	/** The lowest block this entry describes, and therefore the block it invalidates FROM. */
+	startBlock: number;
+	/**
+	 * What the STATE depends on: the address, the canonical signature, the
+	 * DECODING SHAPE and the live range. The state is a fold over decoded events,
+	 * so it dies whenever any of those moved.
+	 */
+	hash: string;
+	/**
+	 * What the STREAM depends on: the address, the `topic0` and the live range,
+	 * and nothing about names or parameter shapes. Raw logs are fetched under a
+	 * topic-and-address filter, so they survive a change this digest cannot see.
+	 *
+	 * Absent on a context persisted before the split, which reads as "this entry
+	 * cannot answer about the filter" and falls back to the state verdict.
+	 */
+	streamHash?: string;
+	/**
+	 * The MIGRATION BRIDGE, on the block-0 entry only: the whole-source digest the
+	 * pre-per-event code persisted as its single entry.
+	 *
+	 * It is the one thing that lets a context written by that code be compared at
+	 * all, since a whole-source digest commits to bytes no per-event entry
+	 * reproduces. Without it every existing deployment would re-index on upgrade,
+	 * which is precisely the cost per-event hashing removes.
+	 */
+	legacyHash?: string;
+};
+
 export type ContextIdentifier = {
-	source: {startBlock: number; hash: string}[];
+	source: SourceHashEntry[];
 	config: string;
 	processor: string;
 	/**
@@ -93,7 +139,7 @@ export type ContextIdentifier = {
 	 * `lastSync` is the one thing EVERY persistence path round-trips whole (the
 	 * fs / localStorage / IndexedDB keepers, the CLI snapshot envelope, and the
 	 * sync cursor a `StateStore` keeps behind the storage seam). It is NOT part of
-	 * `indexerMatches`, which decides whether to discard state.
+	 * `sourceInvalidationOf`, which decides whether to discard state.
 	 */
 	processorFingerprint?: string;
 };
@@ -132,7 +178,7 @@ export type LastSync<ABI extends Abi> = {
  * what makes comparing them a real check rather than an echo.
  */
 export type WireContext = {
-	source: {startBlock: number; hash: string}[];
+	source: SourceHashEntry[];
 	config: string;
 };
 
