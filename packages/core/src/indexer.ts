@@ -30,8 +30,10 @@ import {
 	groupStreamPerBlock,
 	indexerMatches,
 	resolveStreamConfig,
+	sourceInvalidationOf,
 	wait,
 } from './internal/engine/utils.js';
+import {sourceHashesOf} from './internal/engine/eventRanges.js';
 import {CancelOperations, createAction} from './internal/utils/promises.js';
 import {simple_hash} from './utils/index.js';
 
@@ -188,8 +190,12 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.provider = provider;
 
 		this.source = source;
-		// TODO handle history (in reverse order)
-		this.sourceHashes = [{startBlock: 0, hash: simple_hash(this.source)}];
+		// One entry per event per NORMALISED live range, ordered so that an append
+		// lands at the end of the list -- which is what lets an upgrade keep the
+		// state AND the cached stream instead of re-fetching every block. A source
+		// declaring no range still produces the single whole-source entry it always
+		// did, so no existing deployment changes behaviour by upgrading.
+		this.sourceHashes = sourceHashesOf(this.source);
 
 		const streamConfig: UsedStreamConfig = resolveStreamConfig(config.stream);
 		this.config = {feedBatchSize: 300, ...config, stream: streamConfig};
@@ -309,17 +315,25 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.disableProcessing();
 		const newConfigHash = update.streamConfig ? simple_hash(update.streamConfig) : this.streamConfigHash;
 
-		// TODO handle history (in reverse order)
-		const newSourceHashes = update.source ? [{startBlock: 0, hash: simple_hash(update.source)}] : this.sourceHashes;
+		const newSourceHashes = update.source ? sourceHashesOf(update.source) : this.sourceHashes;
 		const newProvider = update.provider || this.provider;
 		const oldSource = this.source;
 
+		// The CURSOR, and not 0. Whether an appended entry can be absorbed is exactly
+		// the question "does it describe blocks nothing has indexed yet", so asking it
+		// against block 0 answered "yes, always" and kept state that had been derived
+		// over blocks the new entry describes.
+		const cursor = this.lastSync?.lastToBlock ?? 0;
 		const processorVersionHash = this.processor.getVersionHash();
-		const resetNeeded = !indexerMatches(newSourceHashes, newConfigHash, 0, {
+		const invalidation = sourceInvalidationOf(newSourceHashes, newConfigHash, cursor, {
 			source: this.sourceHashes,
 			config: this.streamConfigHash,
 			processor: processorVersionHash,
 		});
+		// Today the only action is a full discard, and the block the decision names is
+		// carried no further than this log line. That is deliberate: see
+		// `SourceInvalidation`.
+		const resetNeeded = !invalidation.valid;
 
 		// TODO remove, this is the responsibility of the developer to ensure it pass correct data when indexer context changes
 		// for now we do a minimum check of chainId
@@ -339,6 +353,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		} else {
 			if (this.config?.logLevel && this.config.logLevel >= 1) {
 				namedLogger.info(`updateIndexer: Reset needed, Indexer do not match`, {
+					invalidation,
 					newSourceHashes,
 					newConfigHash,
 					sourceHashes: this.sourceHashes,
@@ -364,6 +379,16 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				.then((v) => this.load())
 				.then(() => this.reenableProcessing());
 		} else {
+			// The state SURVIVED a source that is not the one it was computed under, so
+			// the context it carries has to say so. Leaving the old list there would
+			// invalidate the state on the next reload: the appended entry would then be
+			// compared against a cursor that has since moved past it, and an append that
+			// cost nothing today would cost a full re-index tomorrow.
+			if (this.lastSync) {
+				this.lastSync.context.source = this.sourceHashes;
+				this.lastSync.context.config = this.streamConfigHash;
+				this._onLastSyncUpdated();
+			}
 			this.reenableProcessing();
 		}
 		return {stateDiscarded: resetNeeded};
@@ -470,6 +495,11 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 				// handing the stale state to a listener.
 				this.reportProcessorDriftIfAny(loadedLastSync.context, processorHash);
 				currentLastSync = loadedLastSync;
+				// The state is valid under the CURRENT source, so record it as such. Without
+				// this an absorbed append would be re-judged on every reload against the
+				// stored list it was absorbed into, and would flip to a re-index as soon as
+				// the cursor passed the appended entry's own block.
+				currentLastSync.context.source = this.sourceHashes;
 				this._onStateUpdated(state);
 			} else {
 				namedLogger.info(`STATE DISCARDED AS PROCESSOR CHANGED`);

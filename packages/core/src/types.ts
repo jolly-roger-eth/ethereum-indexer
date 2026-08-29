@@ -1,4 +1,4 @@
-import type {Abi} from 'abitype';
+import type {Abi, AbiEvent} from 'abitype';
 import type {EIP1193DATA, EIP1193Log, EIP1193QUANTITY} from 'eip-1193';
 import type {DecodeEventLogReturnType} from 'viem';
 import type {NumberifiedLog} from './internal/decoding/LogEventFetcher.js';
@@ -181,11 +181,70 @@ export type WireBatch<ABI extends Abi> = {
  */
 export type UntypedWireBatch = Omit<WireBatch<Abi>, 'logs'> & {logs: unknown[]};
 
+/**
+ * An ABI event entry that also declares the BLOCK RANGE its event is live over.
+ *
+ * An event is not a fact about a contract, it is a fact about a contract over a
+ * range of blocks. Declaring that range is what lets an upgrade APPEND an entry
+ * instead of moving one whole-source hash: an entry that starts above the sync
+ * cursor describes blocks nothing has indexed yet, so the state and the cached
+ * event stream both survive it.
+ *
+ * ## Both bounds are INCLUSIVE, and both directions of error are asymmetric
+ *
+ * For an upgrade at block `b`, the correct declaration is `A.lastBlock = b`
+ * TOGETHER WITH `B.firstBlock = b` -- the SAME number on both -- because a
+ * transaction earlier in block `b` still fires the old event while the upgrade
+ * transaction later in that block starts the new one. That one-block overlap is
+ * CORRECT and is deliberately not normalised away. An exclusive end would make
+ * the correct declaration read `b + 1`, and the obvious thing to type would
+ * silently drop every pre-upgrade log in block `b`.
+ *
+ * Which way to err, because the indexer cannot check either number for you:
+ *
+ * - **`firstBlock` too EARLY is safe**; too LATE loses logs undetectably. The
+ *   blocks between the real first occurrence and the declared one are indexed
+ *   without that event in the filter, so afterwards nothing distinguishes a
+ *   chain that had no such log from a request that was never made. For a proxy
+ *   deployment the implementation's own deploy block is naturally safe: an
+ *   implementation cannot emit before it exists.
+ * - **`lastBlock` too LATE is safe**; too EARLY loses logs the same way, and for
+ *   the same reason. Omit it unless you know the event stopped.
+ *
+ * A `lastBlock` is an ASSERTION the indexer can act on and can never verify.
+ * The only thing it does verify is coverage: a GAP between two ranges of one
+ * event is refused at construction, because a hole is a span nobody requests.
+ */
+export type RangedAbiEvent = AbiEvent & {
+	/** Inclusive. The earliest block this event can appear in; defaults to the contract's `startBlock`. */
+	readonly firstBlock?: number;
+	/** Inclusive. The latest block this event can appear in; omit for open-ended. */
+	readonly lastBlock?: number;
+};
+
+/**
+ * An ABI whose event entries MAY declare the block range they are live over.
+ *
+ * Write `as const satisfies RangedAbi` instead of `satisfies Abi` when an entry
+ * carries `firstBlock`/`lastBlock`; the result is still an `Abi` everywhere
+ * else, so nothing downstream changes. An ABI that declares no range at all
+ * needs nothing: `satisfies Abi` keeps working and the indexer behaves exactly
+ * as it did before ranges existed.
+ */
+export type RangedAbi = readonly (Abi[number] | RangedAbiEvent)[];
+
 export type ContractData<ABI extends Abi> = {
 	readonly abi: ABI;
 	readonly address: `0x${string}`;
+	/**
+	 * Do not look for this contract's logs before here.
+	 *
+	 * NOT a per-event range, and deliberately a different field from
+	 * `RangedAbiEvent.firstBlock`: this one is MINIMISED across contracts by
+	 * `defaultFromBlockOf` to decide the first block ever fetched, so a per-event
+	 * range sharing its name or its shape would drag that floor down.
+	 */
 	readonly startBlock?: number;
-	readonly history?: readonly {readonly abi: ABI; readonly startBlock?: number}[];
 };
 
 export type AllContractData<ABI extends Abi> = {

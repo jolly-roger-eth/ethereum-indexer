@@ -1,6 +1,7 @@
 import type {Abi} from 'abitype';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {LogEventFetcher} from '../internal/decoding/LogEventFetcher.js';
+import {sourceHashesOf} from '../internal/engine/eventRanges.js';
 import type {FetchConfig, IndexingSource, LogEvent, LogParseConfig, ProvidedStreamConfig} from '../types.js';
 import {simple_hash} from '../utils/hash.js';
 import {STREAM_FIXTURE_FORMAT, type StreamFixture} from './fixture.js';
@@ -102,7 +103,11 @@ export async function captureStream<ABI extends Abi>(
 		source,
 		lastSync: {
 			context: {
-				source: [{startBlock: 0, hash: simple_hash(source)}],
+				// The SAME producer the indexer uses, so a fixture captured from a source
+				// that declares event block ranges is still recognised when it is replayed
+				// through `replayStream`. A source declaring none produces the single
+				// whole-source entry it always did, so every existing fixture stays valid.
+				source: sourceHashesOf(source),
 				config: simple_hash(streamConfig),
 				// A stream is processor-independent: the same logs feed any processor,
 				// and which one will read this fixture is not knowable at capture time.
