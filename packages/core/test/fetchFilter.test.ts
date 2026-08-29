@@ -1,6 +1,7 @@
 import type {Abi} from 'abitype';
 import {describe, expect, it} from 'vitest';
 import {LogEventFetcher} from '../src/internal/decoding/LogEventFetcher.js';
+import type {LogFetcherConfig} from '../src/internal/engine/RangeLogFetcher.js';
 import type {LogParseConfig} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@ const B = '0x0000000000000000000000000000000000000002' as const;
 const TRANSFER_V1 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'; // Transfer(address,address,uint256)
 const TRANSFER_V2 = '0xe19260aff97b920c7df27010903aeb9c8d2be5d310a2c67824cf3f15396e4c16'; // Transfer(address,address,uint256,bytes)
 const TRANSFER_OTHER = '0x69ca02dd4edd7bf0a4abb9ed3b7af3f14778db5d61921c7dc7cd545266326de2'; // Transfer(address,uint256)
+const APPROVAL = '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925'; // Approval(address,address,uint256)
 
 /** `Transfer(address,address,uint256)` -- the pre-upgrade signature. */
 const transferV1 = {
@@ -56,6 +58,18 @@ const transferV2 = {
 		{indexed: true, name: 'to', type: 'address'},
 		{indexed: false, name: 'id', type: 'uint256'},
 		{indexed: false, name: 'memo', type: 'bytes'},
+	],
+} as const;
+
+/** An event that declares NO range, used to check that nothing undeclared is ever narrowed away. */
+const approval = {
+	type: 'event',
+	name: 'Approval',
+	anonymous: false,
+	inputs: [
+		{indexed: true, name: 'owner', type: 'address'},
+		{indexed: true, name: 'spender', type: 'address'},
+		{indexed: false, name: 'value', type: 'uint256'},
 	],
 } as const;
 
@@ -107,6 +121,25 @@ function recordingProvider() {
 }
 
 /**
+ * Every `eth_getLogs` call the fetcher made for one block range, in order.
+ *
+ * The COUNT is an assertion of its own: with argument filters configured the
+ * fetcher issues one request per (topic x filter), sequentially, so a topic that
+ * cannot occur in the range costs its own round trips.
+ */
+async function requestsMade(
+	contractsData: any,
+	parseConfig?: LogParseConfig,
+	range: {fromBlock: number; toBlock: number} = {fromBlock: 100, toBlock: 110},
+	fetcherConfig: LogFetcherConfig = {},
+): Promise<{address?: string[]; topics?: (string | string[])[]}[]> {
+	const {provider, requests} = recordingProvider();
+	const fetcher = new LogEventFetcher(provider, contractsData, fetcherConfig, parseConfig);
+	await fetcher.getLogEvents({...range, retry: 0}, passThrough);
+	return requests;
+}
+
+/**
  * Every topic0 the fetcher put in front of the node for one block range, across
  * every request it made (a filtered config issues one request per topic).
  */
@@ -114,10 +147,9 @@ async function topicsRequested(
 	contractsData: any,
 	parseConfig?: LogParseConfig,
 	range: {fromBlock: number; toBlock: number} = {fromBlock: 100, toBlock: 110},
+	fetcherConfig: LogFetcherConfig = {},
 ): Promise<string[]> {
-	const {provider, requests} = recordingProvider();
-	const fetcher = new LogEventFetcher(provider, contractsData, {}, parseConfig);
-	await fetcher.getLogEvents({...range, retry: 0}, passThrough);
+	const requests = await requestsMade(contractsData, parseConfig, range, fetcherConfig);
 	const topics: string[] = [];
 	for (const request of requests) {
 		const topic0 = request.topics?.[0];
@@ -127,6 +159,14 @@ async function topicsRequested(
 	}
 	return topics;
 }
+
+/**
+ * Enough blocks per fetch that the range a test asks for is the range that
+ * reaches the node. `RangeLogFetcher` clamps `toBlock` to
+ * `fromBlock + numBlocksToFetchAtStart - 1` (50 by default), and the narrowing
+ * is computed on the range actually REQUESTED, not on the one asked for.
+ */
+const WIDE_ENOUGH: LogFetcherConfig = {numBlocksToFetchAtStart: 100_000};
 
 /** The same source, asked for under both readings of the parse config. */
 const BOTH_PATHS: {label: string; parse: LogParseConfig}[] = [
@@ -240,9 +280,8 @@ describe('two versions of one contract event across an upgrade', () => {
 });
 
 describe('an upgrade declared as block ranges', () => {
-	// The ranges exist for INVALIDATION (and, later, for narrowing what a range
-	// requests). They must not change what is requested today, and they must never
-	// change what DECODES a log: that is topic0 and nothing else.
+	// The ranges narrow what a range REQUESTS (see the next describe), and they
+	// must never change what DECODES a log: that is topic0 and nothing else.
 	const UPGRADE_BLOCK = 900;
 	const ranged = [
 		{
@@ -263,8 +302,8 @@ describe('an upgrade declared as block ranges', () => {
 	});
 
 	for (const {label, parse} of BOTH_PATHS) {
-		it(`requests both topics over the whole history, since the ranges do not narrow the filter yet (${label})`, async () => {
-			const topics = await topicsRequested(ranged, parse, {fromBlock: 100, toBlock: 200});
+		it(`requests both topics over a range that spans the boundary (${label})`, async () => {
+			const topics = await topicsRequested(ranged, parse, {fromBlock: 890, toBlock: 910}, WIDE_ENOUGH);
 			expect(topics.sort()).toEqual([TRANSFER_V1, TRANSFER_V2].sort());
 		});
 	}
@@ -306,6 +345,207 @@ describe('an upgrade declared as block ranges', () => {
 
 		expect((v1 as any).args).toMatchObject({id: 7n});
 		expect((v2 as any).args).toMatchObject({id: 9n, memo: '0xbeef'});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// A BLOCK RANGE REQUESTS ONLY THE EVENTS THAT CAN OCCUR IN IT
+// ---------------------------------------------------------------------------
+// This is the ONE operation in the ranged design that REMOVES a topic from a
+// request, so it is the one that can reintroduce the failure the top of this
+// file exists to prevent. Every omission below must follow from a DECLARED
+// range and from nothing else: never from an observed first appearance, never
+// from a contract's `startBlock`, never from "we have not seen it".
+// ---------------------------------------------------------------------------
+
+describe('a block range requests only the events that can occur in it', () => {
+	const UPGRADE_BLOCK = 900;
+	const ranged = [
+		{
+			address: A,
+			abi: [
+				{...transferV1, firstBlock: 100, lastBlock: UPGRADE_BLOCK},
+				{...transferV2, firstBlock: UPGRADE_BLOCK},
+			] as unknown as Abi,
+			startBlock: 100,
+		},
+	];
+
+	/** One holder, so `Transfer` carries an argument filter and the shape splits per topic. */
+	const holder = `0x${'11'.repeat(20)}`.padEnd(66, '0') as `0x${string}`;
+	const FILTERED: LogParseConfig = {filters: {Transfer: [[holder]]}};
+
+	for (const {label, parse} of BOTH_PATHS) {
+		it(`does not carry a topic below its firstBlock (${label})`, async () => {
+			const topics = await topicsRequested(ranged, parse, {fromBlock: 100, toBlock: 200}, WIDE_ENOUGH);
+			expect(topics).toEqual([TRANSFER_V1]);
+		});
+
+		it(`does not carry a topic above its lastBlock (${label})`, async () => {
+			const topics = await topicsRequested(ranged, parse, {fromBlock: 901, toBlock: 1000}, WIDE_ENOUGH);
+			expect(topics).toEqual([TRANSFER_V2]);
+		});
+	}
+
+	it('narrows identically whether or not parseAllEventsIrrespectiveOfAddresses is set', async () => {
+		// the flag chooses which ABI DECODES a log; it must never choose which logs
+		// are fetched at all, and that holds for the narrowed filter too
+		const range = {fromBlock: 100, toBlock: 200};
+		const perAddress = await topicsRequested(ranged, BOTH_PATHS[0].parse, range, WIDE_ENOUGH);
+		const agnostic = await topicsRequested(ranged, BOTH_PATHS[1].parse, range, WIDE_ENOUGH);
+		expect(agnostic).toEqual(perAddress);
+	});
+
+	it('requests the UNION over a range that crosses the boundary', async () => {
+		// splitting at the boundary is allowed; the union is what must never be undercut
+		const topics = await topicsRequested(ranged, {}, {fromBlock: 800, toBlock: 1000}, WIDE_ENOUGH);
+		expect(topics.sort()).toEqual([TRANSFER_V1, TRANSFER_V2].sort());
+	});
+
+	it('requests BOTH versions at the upgrade block itself, keeping the one-block overlap', async () => {
+		// a transaction earlier in block 900 still fires the old event
+		const topics = await topicsRequested(ranged, {}, {fromBlock: UPGRADE_BLOCK, toBlock: UPGRADE_BLOCK}, WIDE_ENOUGH);
+		expect(topics.sort()).toEqual([TRANSFER_V1, TRANSFER_V2].sort());
+	});
+
+	it('never drops an event with no lastBlock, at any height at or above its firstBlock', async () => {
+		// open-ended is the default and the safe case: there is no height at which
+		// "we have not seen it lately" may take it out of the filter
+		for (const fromBlock of [UPGRADE_BLOCK, 1_000, 50_000, 10_000_000]) {
+			const topics = await topicsRequested(ranged, {}, {fromBlock, toBlock: fromBlock + 10}, WIDE_ENOUGH);
+			expect(topics).toContain(TRANSFER_V2);
+		}
+	});
+
+	it('never drops an event that DECLARED no range, at any height, even below its contract startBlock', async () => {
+		// `Approval` declares nothing while `Transfer` declares ranges. An omission
+		// must follow from a DECLARATION, and `startBlock` is not one: it means "do
+		// not look before here" per contract, which is a different statement.
+		const mixed = [
+			{
+				address: A,
+				abi: [{...transferV1, firstBlock: 100, lastBlock: UPGRADE_BLOCK}, approval] as unknown as Abi,
+				startBlock: 100,
+			},
+		];
+		for (const fromBlock of [0, 50, 500, 10_000]) {
+			const topics = await topicsRequested(mixed, {}, {fromBlock, toBlock: fromBlock + 10}, WIDE_ENOUGH);
+			expect(topics).toContain(APPROVAL);
+		}
+	});
+
+	it('asks for NOTHING when no declared event can occur in the range', async () => {
+		// the honest end of the same rule: not an empty topic list (which a node
+		// reads as "anything"), and not a request nobody can answer -- no call at all
+		const dead = [
+			{
+				address: A,
+				abi: [{...transferV1, firstBlock: 100, lastBlock: UPGRADE_BLOCK}] as unknown as Abi,
+				startBlock: 100,
+			},
+		];
+		expect(await requestsMade(dead, {}, {fromBlock: 901, toBlock: 950}, WIDE_ENOUGH)).toEqual([]);
+		expect(await requestsMade(dead, FILTERED, {fromBlock: 901, toBlock: 950}, WIDE_ENOUGH)).toEqual([]);
+	});
+
+	it('narrows a single merged ABI too, which names no address at all', async () => {
+		const merged = {
+			abi: [
+				{...transferV1, firstBlock: 100, lastBlock: UPGRADE_BLOCK},
+				{...transferV2, firstBlock: UPGRADE_BLOCK},
+			] as unknown as Abi,
+		};
+		expect(await topicsRequested(merged, {}, {fromBlock: 100, toBlock: 200}, WIDE_ENOUGH)).toEqual([TRANSFER_V1]);
+		expect(await topicsRequested(merged, {}, {fromBlock: 901, toBlock: 1000}, WIDE_ENOUGH)).toEqual([TRANSFER_V2]);
+	});
+
+	describe('two contracts declaring the same event have independent lifetimes', () => {
+		// The topic filter of a request is global to the request while a range is
+		// declared per contract, so the ranges of one topic0 are UNIONED across
+		// contracts. One address going quiet is not a hole in another's coverage.
+		it('keeps the topic above one contract lastBlock while another declares it open-ended', async () => {
+			const contracts = [
+				{address: A, abi: [{...transferV1, firstBlock: 100, lastBlock: 200}] as unknown as Abi},
+				{address: B, abi: [{...transferV1, firstBlock: 100}] as unknown as Abi},
+			];
+			const topics = await topicsRequested(contracts, {}, {fromBlock: 5_000, toBlock: 5_010}, WIDE_ENOUGH);
+			expect(topics).toEqual([TRANSFER_V1]);
+		});
+
+		it('keeps the topic where either contract declares it live, and accepts the hole between them', async () => {
+			// a hole BETWEEN two contracts is not a gap in an event coverage, so it is
+			// not refused; and inside it BOTH declarations say the event cannot occur
+			const contracts = [
+				{address: A, abi: [{...transferV1, firstBlock: 100, lastBlock: 200}] as unknown as Abi},
+				{address: B, abi: [{...transferV1, firstBlock: 400, lastBlock: 500}] as unknown as Abi},
+			];
+			expect(await topicsRequested(contracts, {}, {fromBlock: 150, toBlock: 160}, WIDE_ENOUGH)).toEqual([TRANSFER_V1]);
+			expect(await topicsRequested(contracts, {}, {fromBlock: 450, toBlock: 460}, WIDE_ENOUGH)).toEqual([TRANSFER_V1]);
+			expect(await requestsMade(contracts, {}, {fromBlock: 250, toBlock: 300}, WIDE_ENOUGH)).toEqual([]);
+		});
+
+		it('never narrows a topic one contract declared and another did not', async () => {
+			const contracts = [
+				{address: A, abi: [{...transferV1, firstBlock: 100, lastBlock: 200}] as unknown as Abi},
+				{address: B, abi: [transferV1] as unknown as Abi, startBlock: 300},
+			];
+			for (const fromBlock of [0, 250, 10_000]) {
+				const topics = await topicsRequested(contracts, {}, {fromBlock, toBlock: fromBlock + 10}, WIDE_ENOUGH);
+				expect(topics).toEqual([TRANSFER_V1]);
+			}
+		});
+	});
+
+	describe('the request-count saving, which IS measured here', () => {
+		// `generateLogRequestForTopicsAndFiltersCombinations` puts every topic in ONE
+		// request when no argument filter is configured, and emits one request per
+		// (topic x filter) when one is. So under filters a version that cannot occur
+		// in a range costs its own round trip -- until it is narrowed away.
+		//
+		// (The NODE's own work -- a topic that cannot match still widens the
+		// `logsBloom` screen, and so the set of blocks whose receipts are loaded --
+		// is how nodes implement the method and is NOT measured here.)
+		it('issues one request per live topic under argument filters, and one in total without', async () => {
+			const acrossBoundary = {fromBlock: 895, toBlock: 905};
+			expect(await requestsMade(ranged, FILTERED, acrossBoundary, WIDE_ENOUGH)).toHaveLength(2);
+
+			const unfiltered = await requestsMade(ranged, {}, acrossBoundary, WIDE_ENOUGH);
+			expect(unfiltered).toHaveLength(1);
+			expect(unfiltered[0].topics?.[0]).toEqual([TRANSFER_V1, TRANSFER_V2]);
+		});
+
+		it('issues STRICTLY FEWER requests for a range that cannot contain one of the versions', async () => {
+			const acrossBoundary = await requestsMade(ranged, FILTERED, {fromBlock: 895, toBlock: 905}, WIDE_ENOUGH);
+			const belowTheUpgrade = await requestsMade(ranged, FILTERED, {fromBlock: 100, toBlock: 200}, WIDE_ENOUGH);
+
+			expect(belowTheUpgrade.length).toBeLessThan(acrossBoundary.length);
+			expect(belowTheUpgrade).toHaveLength(1);
+			expect(belowTheUpgrade[0].topics?.[0]).toEqual(TRANSFER_V1);
+		});
+	});
+
+	describe('a source declaring no range', () => {
+		const unranged = [{address: A, abi: [transferV1, transferV2] as unknown as Abi, startBlock: 100}];
+		const everywhere = [
+			{fromBlock: 0, toBlock: 10},
+			{fromBlock: 100, toBlock: 200},
+			{fromBlock: 900, toBlock: 900},
+			{fromBlock: 10_000, toBlock: 10_010},
+		];
+
+		it('requests exactly what it requests today, topic for topic, at every height', async () => {
+			for (const range of everywhere) {
+				const requests = await requestsMade(unranged, {}, range, WIDE_ENOUGH);
+				expect(requests).toHaveLength(1);
+				expect(requests[0].topics?.[0]).toEqual([TRANSFER_V1, TRANSFER_V2]);
+			}
+		});
+
+		it('costs exactly as many requests as today under argument filters', async () => {
+			for (const range of everywhere) {
+				expect(await requestsMade(unranged, FILTERED, range, WIDE_ENOUGH)).toHaveLength(2);
+			}
+		});
 	});
 });
 

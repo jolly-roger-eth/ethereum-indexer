@@ -1,15 +1,16 @@
 import type {Abi, AbiEvent} from 'abitype';
-import {canonicalSignatureOf, decodingShapeOf, describeEventDeclaration} from '../decoding/eventIdentity.js';
+import {canonicalSignatureOf, decodingShapeOf, describeEventDeclaration, topic0Of} from '../decoding/eventIdentity.js';
 import type {AllContractData, ContractData, IndexingSource, RangedAbiEvent} from '../../types.js';
 import {simple_hash} from '../../utils/hash.js';
 
 /**
  * AN EVENT IS LIVE OVER BLOCK RANGES, and this is where the declaration becomes
- * a normalised, invalidation-ready form.
+ * a normalised form the rest of the indexer can act on.
  *
  * The ranges are used for exactly two things and no others: whether a source
  * change can be absorbed without re-fetching (here, via `sourceHashesOf`), and
- * -- later -- which topics a given block range needs to request. They are NOT a
+ * which topics a given block range needs to request (here, via
+ * `requestableRangesPerTopic`, read by `RangeLogFetcher`). They are NOT a
  * decoding concern: a log is decoded by its `topic0`, with no block axis, since
  * two versions with different signatures are told apart on the wire and two
  * versions sharing a `topic0` cannot be told apart by a boundary either (the
@@ -18,6 +19,19 @@ import {simple_hash} from '../../utils/hash.js';
 
 /** A span of blocks an event is live over. Both bounds INCLUSIVE; no `lastBlock` means open-ended. */
 export type EventBlockRange = {readonly firstBlock: number; readonly lastBlock?: number};
+
+/** The contracts half of an `IndexingSource`, which is all either reading here needs. */
+type ContractsData<ABI extends Abi> = IndexingSource<ABI>['contracts'];
+
+/** One contract, with the first block an event that DECLARES nothing is live from. */
+type ContractEntry = {address?: `0x${string}`; abi: Abi; defaultFirstBlock: number};
+
+/**
+ * The live ranges of each `topic0` in a fetch filter, unioned across contracts.
+ *
+ * An EMPTY map means nothing declared a range, so nothing narrows.
+ */
+export type TopicBlockRanges = ReadonlyMap<`0x${string}`, readonly EventBlockRange[]>;
 
 /**
  * One event of one contract, with the ranges it is live over, NORMALISED.
@@ -73,9 +87,14 @@ function declaredRangeOf(event: AbiEvent, contractStartBlock: number): EventBloc
  * deployment changes behaviour merely by upgrading.
  */
 export function sourceDeclaresEventRanges<ABI extends Abi>(source: IndexingSource<ABI>): boolean {
-	const abis = Array.isArray(source.contracts)
-		? (source.contracts as readonly ContractData<ABI>[]).map((contract) => contract.abi)
-		: [(source.contracts as AllContractData<ABI>).abi];
+	return contractsDeclareEventRanges(source.contracts);
+}
+
+/** As `sourceDeclaresEventRanges`, for a caller that holds the contracts and not the whole source. */
+export function contractsDeclareEventRanges<ABI extends Abi>(contracts: ContractsData<ABI>): boolean {
+	const abis = Array.isArray(contracts)
+		? (contracts as readonly ContractData<ABI>[]).map((contract) => contract.abi)
+		: [(contracts as AllContractData<ABI>).abi];
 	for (const abi of abis) {
 		for (const item of abi) {
 			if (item.type !== 'event') continue;
@@ -146,19 +165,35 @@ function normalizeRanges(ranges: EventBlockRange[], event: AbiEvent, address?: `
  * onward, which is what it has always meant.
  */
 export function liveEventsOf<ABI extends Abi>(source: IndexingSource<ABI>): LiveEvent[] {
-	const contracts: {address?: `0x${string}`; abi: Abi; startBlock: number}[] = Array.isArray(source.contracts)
-		? (source.contracts as readonly ContractData<ABI>[]).map((contract) => ({
+	return liveEventsIn(contractEntriesOf(source.contracts, FROM_THE_CONTRACT_START_BLOCK));
+}
+
+/** For INVALIDATION: an event that declares nothing is live from its contract's `startBlock`. */
+const FROM_THE_CONTRACT_START_BLOCK = (contract: {startBlock?: number}) => contract.startBlock ?? 0;
+
+/** For the FETCH FILTER: it is live from block 0 instead -- see `requestableRangesPerTopic`. */
+const FROM_BLOCK_ZERO = () => 0;
+
+/** What the two callers of `liveEventsIn` disagree about is ONLY the default first block. */
+function contractEntriesOf<ABI extends Abi>(
+	contracts: ContractsData<ABI>,
+	defaultFirstBlockOf: (contract: {startBlock?: number}) => number,
+): ContractEntry[] {
+	return Array.isArray(contracts)
+		? (contracts as readonly ContractData<ABI>[]).map((contract) => ({
 				address: contract.address,
 				abi: contract.abi,
-				startBlock: contract.startBlock ?? 0,
+				defaultFirstBlock: defaultFirstBlockOf(contract),
 			}))
 		: [
 				{
-					abi: (source.contracts as AllContractData<ABI>).abi,
-					startBlock: (source.contracts as AllContractData<ABI>).startBlock ?? 0,
+					abi: (contracts as AllContractData<ABI>).abi,
+					defaultFirstBlock: defaultFirstBlockOf(contracts as AllContractData<ABI>),
 				},
 			];
+}
 
+function liveEventsIn(contracts: readonly ContractEntry[]): LiveEvent[] {
 	const live: LiveEvent[] = [];
 	for (const contract of contracts) {
 		// insertion-ordered, so the output follows the ABI rather than a hash order
@@ -167,7 +202,7 @@ export function liveEventsOf<ABI extends Abi>(source: IndexingSource<ABI>): Live
 			if (item.type !== 'event') continue;
 			const event = item as AbiEvent;
 			const signature = canonicalSignatureOf(event);
-			const range = declaredRangeOf(event, contract.startBlock) ?? {firstBlock: contract.startBlock};
+			const range = declaredRangeOf(event, contract.defaultFirstBlock) ?? {firstBlock: contract.defaultFirstBlock};
 			const group = perSignature.get(signature);
 			if (group) {
 				group.ranges.push(range);
@@ -185,6 +220,76 @@ export function liveEventsOf<ABI extends Abi>(source: IndexingSource<ABI>): Live
 		}
 	}
 	return live;
+}
+
+/**
+ * The live ranges of each `topic0`, as the FETCH FILTER must read them.
+ *
+ * EMPTY when nothing in the source declares a range, which is what makes such a
+ * source request exactly what it always requested, topic for topic.
+ *
+ * Two things separate this from `liveEventsOf`, and both exist because this is
+ * the one reading that REMOVES a topic from a request.
+ *
+ * - An event that DECLARES nothing is live from block **0**, open-ended, rather
+ *   than from its contract's `startBlock`. `startBlock` means "do not look
+ *   before here" per contract and is MINIMISED across contracts by
+ *   `defaultFromBlockOf`, so a range below one contract's `startBlock` is still
+ *   fetched with that contract's address in the filter; narrowing on it would
+ *   drop an event nobody gave a range, and adding a range to ONE event would
+ *   silently change what an UNRELATED event fetches. Every omission has to
+ *   follow from a declaration. Invalidation defaults to `startBlock` instead
+ *   because it is comparing coverage, not deciding what to ask for.
+ * - Ranges are keyed by `topic0` and UNIONED across contracts, since the topic
+ *   filter of an `eth_getLogs` request is global to the request while a range is
+ *   declared per contract. Two contracts have independent lifetimes, so one
+ *   address going quiet is not a hole in another's coverage, and the union is
+ *   the only safe reading. (For the SAME reason the union is not re-normalised:
+ *   a gap BETWEEN two contracts is not a gap in an event's coverage.)
+ */
+export function requestableRangesPerTopic<ABI extends Abi>(contracts: ContractsData<ABI>): TopicBlockRanges {
+	const perTopic = new Map<`0x${string}`, EventBlockRange[]>();
+	if (!contractsDeclareEventRanges(contracts)) {
+		return perTopic;
+	}
+	for (const live of liveEventsIn(contractEntriesOf(contracts, FROM_BLOCK_ZERO))) {
+		const topic0 = topic0Of(live.event);
+		if (!topic0) {
+			// an anonymous event carries no topic0, so it is in no filter to narrow
+			continue;
+		}
+		const existing = perTopic.get(topic0);
+		if (existing) {
+			existing.push(...live.ranges);
+		} else {
+			perTopic.set(topic0, [...live.ranges]);
+		}
+	}
+	return perTopic;
+}
+
+/**
+ * Whether an event live over `ranges` can occur ANYWHERE in `[fromBlock,
+ * toBlock]`, both inclusive.
+ *
+ * `undefined` ranges mean the event declared none, and an event that declared
+ * nothing is never dropped. Same for an open-ended `lastBlock`: open-ended is
+ * the default and the safe case.
+ *
+ * A range that crosses a boundary matches both sides, which is the UNION rather
+ * than a split. Requesting more than necessary is safe; requesting less is not.
+ */
+export function canOccurIn(
+	ranges: readonly EventBlockRange[] | undefined,
+	fromBlock: number,
+	toBlock: number,
+): boolean {
+	if (!ranges) {
+		return true;
+	}
+	return ranges.some(
+		(range) => range.firstBlock <= toBlock && (range.lastBlock ?? Number.POSITIVE_INFINITY) >= fromBlock,
+	);
 }
 
 /**

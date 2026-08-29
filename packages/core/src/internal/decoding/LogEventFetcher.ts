@@ -1,6 +1,7 @@
 import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {ExtraFilters} from '../engine/ethereum.js';
 import {RangeLogFetcher, LogFetcherConfig} from '../engine/RangeLogFetcher.js';
+import {requestableRangesPerTopic} from '../engine/eventRanges.js';
 import type {Abi, AbiEvent} from 'abitype';
 import type {DecodeEventLogReturnType} from 'viem';
 import {decodeEventLog} from 'viem';
@@ -222,7 +223,11 @@ export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 			fetcherConfig = {...fetcherConfig, filters};
 		}
 
-		super(provider, contractAddresses, eventNameTopics, fetcherConfig);
+		// A BLOCK RANGE REQUESTS ONLY THE EVENTS THAT CAN OCCUR IN IT. Declared
+		// ranges narrow the topics of each request (and, under argument filters,
+		// remove its whole round trip); a source declaring none narrows nothing and
+		// requests exactly what it always requested.
+		super(provider, contractAddresses, eventNameTopics, fetcherConfig, requestableRangesPerTopic(contractsData));
 		this.allABIEvents = _allABIEvents;
 		this.abiPerAddress = _abiPerAddress;
 		this.abiEventPerTopic = _abiEventPerTopic;
