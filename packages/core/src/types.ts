@@ -190,6 +190,12 @@ export type UntypedWireBatch = Omit<WireBatch<Abi>, 'logs'> & {logs: unknown[]};
  * cursor describes blocks nothing has indexed yet, so the state and the cached
  * event stream both survive it.
  *
+ * It is also what lets a fetched block range ask only for the events that can
+ * occur in it: below a `firstBlock`, or above a `lastBlock`, that event's
+ * `topic0` is not in the request at all, and under argument filters that is a
+ * whole `eth_getLogs` round trip the range no longer makes. It is never
+ * consulted to DECODE a log, which is by `topic0` alone (ADR-0033).
+ *
  * ## Both bounds are INCLUSIVE, and both directions of error are asymmetric
  *
  * For an upgrade at block `b`, the correct declaration is `A.lastBlock = b`
@@ -216,7 +222,15 @@ export type UntypedWireBatch = Omit<WireBatch<Abi>, 'logs'> & {logs: unknown[]};
  * event is refused at construction, because a hole is a span nobody requests.
  */
 export type RangedAbiEvent = AbiEvent & {
-	/** Inclusive. The earliest block this event can appear in; defaults to the contract's `startBlock`. */
+	/**
+	 * Inclusive. The earliest block this event can appear in.
+	 *
+	 * Omitted, the event is live from its contract's `startBlock` for
+	 * INVALIDATION, and from block 0 for the FETCH FILTER, which narrows on
+	 * nothing but a declaration: `startBlock` is a per-contract "do not look
+	 * before here", so an event nobody gave a range must never leave a request
+	 * because of it.
+	 */
 	readonly firstBlock?: number;
 	/** Inclusive. The latest block this event can appear in; omit for open-ended. */
 	readonly lastBlock?: number;

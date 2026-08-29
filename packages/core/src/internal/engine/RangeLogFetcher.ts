@@ -2,6 +2,7 @@ import {EIP1193Account, EIP1193DATA, EIP1193ProviderWithoutEvents} from 'eip-119
 import {logs} from 'named-logs';
 import {IncludedEIP1193Log} from '../../types.js';
 import {UnlessCancelledFunction} from '../utils/promises.js';
+import {canOccurIn, type TopicBlockRanges} from './eventRanges.js';
 import {ExtraFilters, getLogs, getLogsWithVariousFilters} from './ethereum.js';
 
 const namedLogger = logs('@etherfold/core');
@@ -79,6 +80,11 @@ export class RangeLogFetcher {
 		protected contractAddresses: EIP1193Account[] | null,
 		protected eventNameTopics: EIP1193DATA[] | null,
 		readonly conf: LogFetcherConfig = {},
+		/**
+		 * The DECLARED live ranges of each topic, so a block range asks only for the
+		 * events that can occur in it. Empty (the default) narrows nothing.
+		 */
+		protected readonly topicBlockRanges: TopicBlockRanges = new Map(),
 	) {
 		this.config = Object.assign(
 			{
@@ -93,6 +99,27 @@ export class RangeLogFetcher {
 		this.numBlocksToFetch = Math.min(this.config.numBlocksToFetchAtStart, this.config.maxBlocksPerFetch);
 	}
 
+	/**
+	 * The topics that can occur in `[fromBlock, toBlock]`, or `null` when nothing
+	 * narrows and the fetcher must ask for exactly what it has always asked for.
+	 *
+	 * This is the ONE place a topic is REMOVED from a request, and an unrequested
+	 * topic produces no error, no log and no fetch: afterwards a chain that had
+	 * none and a request nobody made look identical. So an omission may follow
+	 * from a DECLARED range and nothing else -- not an observed first appearance,
+	 * not a contract's `startBlock`, not the fact that an event has never been
+	 * seen. An event with no `lastBlock` is open-ended and is never dropped above
+	 * its `firstBlock`.
+	 */
+	protected topicsThatCanOccurIn(fromBlock: number, toBlock: number): EIP1193DATA[] | null {
+		if (!this.eventNameTopics || this.topicBlockRanges.size === 0) {
+			return null;
+		}
+		return this.eventNameTopics.filter((topic) =>
+			canOccurIn(this.topicBlockRanges.get(topic as `0x${string}`), fromBlock, toBlock),
+		);
+	}
+
 	async getLogs(
 		options: {fromBlock: number; toBlock: number; retry?: number},
 		unlessCancelled: UnlessCancelledFunction,
@@ -102,12 +129,20 @@ export class RangeLogFetcher {
 
 		const fromBlock = options.fromBlock;
 		let toBlock = Math.min(options.toBlock, fromBlock + this.numBlocksToFetch - 1);
+		// on the range actually REQUESTED, which the line above may have shrunk
+		const narrowedTopics = this.topicsThatCanOccurIn(fromBlock, toBlock);
+		const topicsToRequest = narrowedTopics ?? this.eventNameTopics;
 		try {
-			if (this.conf.filters) {
+			if (narrowedTopics && narrowedTopics.length === 0) {
+				// No DECLARED event is live anywhere in this range, so there is nothing to
+				// ask for -- and asking with an empty topic list would ask for EVERY log,
+				// since a node reads an empty position as a wildcard.
+				logs = [];
+			} else if (this.conf.filters) {
 				logs = await getLogsWithVariousFilters(
 					this.provider,
 					this.contractAddresses,
-					this.eventNameTopics,
+					topicsToRequest,
 					this.conf.filters,
 					{
 						fromBlock,
@@ -117,7 +152,7 @@ export class RangeLogFetcher {
 				);
 			} else {
 				logs = await unlessCancelled(
-					getLogs(this.provider, this.contractAddresses, this.eventNameTopics ? [this.eventNameTopics] : null, {
+					getLogs(this.provider, this.contractAddresses, topicsToRequest ? [topicsToRequest] : null, {
 						fromBlock,
 						toBlock,
 					}),
