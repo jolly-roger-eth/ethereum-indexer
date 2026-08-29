@@ -48,6 +48,11 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      # Two branches can each add an ADR-0032 and each be green on its own; the
+      # collision exists only in the merge, which is why this runs here.
+      - name: Check ADR numbering
+        run: pnpm check:adr
+
       # `prepare` already built during install; this re-runs it explicitly so a
       # build failure is attributed to the build rather than to installation.
       - name: Build packages and platforms
