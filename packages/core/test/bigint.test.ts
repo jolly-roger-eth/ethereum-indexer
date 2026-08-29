@@ -63,18 +63,11 @@ describe('the tagged BigInt codec', () => {
 		}
 	});
 
-	// SKIPPED 2026-08-28: not a failing assertion, a wall-clock flake. The body is
-	// deterministic, but it makes 40,000 assertions across 20,000 iterations against
-	// vitest's 5s default, so it reds the acceptance gate on a loaded machine and
-	// blocks whatever unrelated task happens to be building at the time.
-	//
-	// It guards a REAL past regression (the reviver used to throw on a base36 digest
-	// that starts with a digit and ends in `n`), so this is a coverage loss, not dead
-	// weight. Restoring it wants either a raised timeout or far fewer iterations
-	// rather than a permanent skip: the dangerous shape is hit early, so the sweep
-	// does not need 20,000 rounds to find it.
-	// See work/notes/observations/bigint-digest-sweep-flakes-the-gate.md
-	it.skip('never throws on a bare base36 digest either, including the shape that used to break', () => {
+	// UN-SKIPPED 2026-08-28, same day it was skipped. The skip treated the symptom:
+	// this never failed an assertion, it ran out of wall clock against vitest's 5s
+	// default while the machine was busy. The default is now 60s workspace-wide
+	// (ADR-0032), which is the fix this actually wanted, so the guard is back.
+	it('never throws on a bare base36 digest either, including the shape that used to break', () => {
 		let sawTheDangerousShape = false;
 		for (let i = 0; i < 20000; i++) {
 			const digest = ((i * 2654435761) % 0xffffffff).toString(36);

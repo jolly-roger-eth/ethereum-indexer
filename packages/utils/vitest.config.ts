@@ -1,12 +1,5 @@
 import {defineConfig} from 'vitest/config';
 
-/**
- * Vitest runs the node-side tests only.
- *
- * `browser/` holds the shared workload and the Playwright specs that drive it in
- * a real engine (`pnpm test:browser`). Their `.spec.ts` names would otherwise be
- * collected here and fail on `@playwright/test`'s `test` export.
- */
 export default defineConfig({
 	test: {
 		// Vitest defaults to 5s. That is fine on an idle box and wrong on a machine
@@ -18,6 +11,5 @@ export default defineConfig({
 		// pass, since it is only reached on failure. See ADR-0032.
 		testTimeout: 60_000,
 		hookTimeout: 60_000,
-		include: ['test/**/*.test.ts'],
 	},
 });

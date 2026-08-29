@@ -35,3 +35,14 @@ A permanent skip is the wrong end state. Two cheaper fixes preserve the guard:
 
 The second is probably right: the sweep's value is hitting the shape at all, not hitting it
 20,000 times.
+
+## Resolved 2026-08-28, the same day
+
+The skip was the wrong fix and lasted hours. Two more instances of the identical shape appeared
+immediately after: four cases in `packages/state-store-sqlite/test/conformance.test.ts`, then
+`packages/server/test/sql2ts.test.ts`. Three unrelated packages, one cause, so it was never about
+this test.
+
+`testTimeout` and `hookTimeout` are now 60s in every package that runs vitest (ADR-0032), and this
+test is un-skipped. The guard is back and the flake class is closed at the root rather than one
+`it.skip` at a time.
