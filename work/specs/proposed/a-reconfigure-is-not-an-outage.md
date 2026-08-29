@@ -32,9 +32,9 @@ needsAnswers: true
    store-factory option, a processor factory, or the browser package building it). Answer this before
    tasking, or the first task picks the public API by accident.
 2. **What shape does `SyncingState` grow?** It is a single flat record with one `lastSync` and one
-   `syncPercentage`, and it must now carry two things: pending catch-up progress (stories 3 and 4)
-   AND the superseded marking that lets an app decide whether to render the live deployment's state
-   (story 9). Both are published surface.
+   `syncPercentage`, and it must express a pending CANDIDATE's catch-up progress (stories 3, 4 and
+   9). One signal, not two: reporting progress is what tells a consumer a candidate exists. This is
+   published surface.
 
 ## Problem Statement
 
@@ -62,8 +62,11 @@ PENDING one, which is catching up and answers nobody.
 - The pending deployment builds its own state, re-folding from the stream, re-fetching only what its
   source needs and the stream does not already hold.
 - Reads are served by the live deployment throughout.
-- **Promotion** makes the pending deployment live: manual on a server, automatic in the browser,
-  with an option to disable the auto-switch and surface catch-up progress instead.
+- **Promotion** makes the candidate live. It is a POLICY knob, not a property of the runtime:
+  automatic on catch-up, or manual. Manual suits a production server, where someone wants to look
+  before readers move; automatic suits a browser app and equally a DEV server, where iterating on a
+  processor and hand-promoting after every edit would be absurd. Defaults follow the runtime;
+  the knob is one knob.
 - Reconfiguring again while one is pending REPLACES the pending one. Two, never three.
 
 ## Identity, which is not digest equality
@@ -109,9 +112,9 @@ Identity resting on the verdict rather than on hash equality keeps that exposure
 7. As an operator reconfiguring twice, I want the second to replace the first pending deployment.
 8. As an operator, I want a deployment whose stream is unavailable to fall back to a full re-index,
    which is today's behaviour, so the feature degrades rather than breaks.
-9. As an app author, I want to be TOLD that the state I am reading comes from a superseded
-   deployment with a replacement catching up, so that I decide whether to render it, dim it or hide
-   it, since only I know whether my reconfigure made the old answers wrong or merely incomplete.
+9. As an app author, I want to know that a candidate deployment exists and how far it has caught up,
+   so I decide whether to render, dim or hide the live state, since only I know whether my
+   reconfigure made the old answers wrong or merely incomplete.
 
 ## Implementation Decisions
 
@@ -186,8 +189,16 @@ rode on the handle or on every read return. Both are dropped, because the questi
   transparent to every holder, and the entire staleness class disappears instead of being made
   detectable.
 
-**The superseded deployment KEEPS INDEXING, and its state is served MARKED.** Two alternatives were
-considered and rejected, and the reasoning is the load-bearing part.
+**The live deployment KEEPS INDEXING while a candidate is pending, and the only signal a consumer
+gets is that a candidate EXISTS and how far along it is.**
+
+Note the word, because an earlier draft got it wrong. The live deployment is not "superseded" while
+a candidate catches up: supersession is precisely the decision promotion makes and has NOT yet made.
+Marking the live state superseded would encode a verdict nobody has reached, and would be false
+outright if the operator inspects the candidate and rejects it. Until promotion the live deployment
+is simply LIVE and the pending one is a CANDIDATE.
+
+Two alternatives were considered and rejected, and the reasoning is the load-bearing part.
 
 _Freezing it_ (retiring it from indexing the moment a pending deployment starts) looks free and is
 not. An indexer that stops carries an UNCONFIRMED window, blocks inside the finality depth that it
@@ -198,7 +209,7 @@ retired the only machinery that could have discovered that. Freezing safely woul
 doubled tail fetch is already accepted, keeping it live costs something already paid for and buys
 correctness for nothing.
 
-_Discarding immediately_ (today's behaviour, kept as a mode, so the app never shows superseded data)
+_Discarding immediately_ (today's behaviour, kept as a mode, so the app never shows the older state)
 was rejected because it makes the INDEXER decide something only the APP knows. Whether old data is
 misleading depends entirely on WHY the reconfigure happened, and the indexer cannot see that: after
 a processor bug fix the old state is WRONG, which is why it was fixed; after an added event it is
@@ -206,17 +217,25 @@ merely INCOMPLETE, and everything it says is still true; after a renamed paramet
 `sourceInvalidationOf` can say what moved, never whether the old answers are now lies. So there is
 no safe default, and a second indexer mode would only relocate the guess.
 
-Instead the superseded state is served **marked**: the consumer receives it together with the fact
-that it is superseded and that a pending deployment is catching up. The app then renders it, dims
-it, banners it, or refuses to show it, because the app author is the only party who knows which of
-the three cases above they are in. This is why there is ONE mechanism and no discard mode: the
-presentation decision moves to where the information is, rather than a branch inside the indexer.
+Instead the live state keeps being served, and the consumer is told **a candidate exists and how far
+it has caught up**. The app then renders, dims, banners or hides, because the app author is the only
+party who knows which of the three cases above they are in. One mechanism, no discard mode, and the
+presentation decision sits where the information is rather than as a branch inside the indexer.
 
-The marking rides on the same published surface as catch-up progress, which is open question 2.
+**That signal is not a second thing to publish.** Catch-up progress and the existence of a candidate
+are the SAME fact: if progress is being reported, a candidate exists. So it collapses into open
+question 2 rather than adding surface, and there is no flag on the live deployment at all.
+
+Worth noting how little the app needs. It does not need the indexer to CHARACTERISE anything,
+because the app is what called `updateProcessor` or `updateIndexer` and already knows whether it was
+fixing a bug, adding an event or renaming a field. The one thing it cannot know by itself is whether
+the replacement is ready. That is the whole signal.
 
 **One mechanism, two runtimes.** The browser case is the stronger one: today a reconfigure blanks the
-app. Only the promotion POLICY differs, which is a knob. Two concrete browser gaps remain, and the
-reactive shape is not one of them (the root store replaces its value wholesale):
+app. Only the promotion POLICY differs, and it is a knob whose axis is the ENVIRONMENT rather than
+the runtime: production wants manual, development wants automatic, and that is as true of a dev
+server as of a browser. Two concrete browser gaps remain, and the reactive shape is not one of them
+(the root store replaces its value wholesale):
 
 - `createIndexerState` receives ONE pre-built processor with its store already bound, so nothing
   currently owns allocating the pending deployment's store;
@@ -273,6 +292,11 @@ endpoint on `@etherfold/server`), and it has none.
   which is the regression guard for the silent-staleness the indirect handle exists to remove.
 - **The reconfigure outcome** says what happened under a pending deployment, and every existing
   assertion on `stateDiscarded` is migrated rather than left inverted.
+- **The live deployment keeps advancing** while a candidate is pending: its cursor moves and it
+  processes a reorg in its own unconfirmed window. This is the regression guard against freezing it
+  and stranding a tail it could never correct.
+- **A candidate's progress is visible** for as long as one is pending, and stops being reported at
+  promotion, because after promotion there is no candidate.
 
 ## Out of Scope
 
