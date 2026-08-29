@@ -5,7 +5,7 @@ import {
 	defaultFromBlockOf,
 	generateStreamToAppend,
 	getFromBlock,
-	indexerMatches,
+	stateMatches,
 	resolveStreamConfig,
 	sameWireContext,
 	wireContextOf,
@@ -206,7 +206,7 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 			const {lastSync} = loaded;
 			if (
 				processorHash === lastSync.context.processor &&
-				indexerMatches(this.context.source, this.context.config, lastSync.lastToBlock, lastSync.context)
+				stateMatches(this.context.source, this.context.config, lastSync.lastToBlock, lastSync.context)
 			) {
 				return lastSync;
 			}

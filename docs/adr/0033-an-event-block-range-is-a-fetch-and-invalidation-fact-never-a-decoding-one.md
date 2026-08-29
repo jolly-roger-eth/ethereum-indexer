@@ -20,7 +20,7 @@ A GAP between two ranges of one event is REFUSED at construction, naming the eve
 
 A `lastBlock` is an assertion the indexer acts on and cannot verify, and both bounds are asymmetric in the same direction: `firstBlock` too EARLY and `lastBlock` too LATE cost a little redundant fetching, while `firstBlock` too LATE and `lastBlock` too EARLY lose logs undetectably.
 
-A source that declares NO range still produces the single whole-source context entry it always did, so `ContextIdentifier` keeps its stored shape, every persisted value stays readable, and no existing deployment changes behaviour merely by upgrading.
+A source that declares NO range still produces the single whole-source context entry it always did, so `ContextIdentifier` keeps its stored shape, every persisted value stays readable, and no existing deployment changes behaviour merely by upgrading. (SUPERSEDED by ADR-0034: entries are now per event whether or not a range is declared, and a stored whole-source entry is carried across by a bridge digest rather than by producing one. Nothing else here is affected, and no existing deployment changes behaviour merely by upgrading either way.)
 
 The invalidation decision (`sourceInvalidationOf`) names the BLOCK from which stored data stopped being valid, even though the only action taken on it today is a full discard. That is what keeps stream branching (`work/notes/ideas/a-stream-branches-instead-of-being-discarded.md`) a later refinement rather than a rewrite.
 

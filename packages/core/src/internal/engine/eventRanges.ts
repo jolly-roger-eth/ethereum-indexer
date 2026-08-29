@@ -1,6 +1,6 @@
 import type {Abi, AbiEvent} from 'abitype';
 import {canonicalSignatureOf, decodingShapeOf, describeEventDeclaration, topic0Of} from '../decoding/eventIdentity.js';
-import type {AllContractData, ContractData, IndexingSource, RangedAbiEvent} from '../../types.js';
+import type {AllContractData, ContractData, IndexingSource, RangedAbiEvent, SourceHashEntry} from '../../types.js';
 import {simple_hash} from '../../utils/hash.js';
 
 /**
@@ -80,17 +80,13 @@ function declaredRangeOf(event: AbiEvent, contractStartBlock: number): EventBloc
 }
 
 /**
- * Whether ANY event entry in the source declares a range.
+ * Whether ANY event entry in these contracts declares a range.
  *
- * The whole point of asking: a source that declares none must behave EXACTLY as
- * it did before ranges existed, down to the persisted context bytes, so no
- * deployment changes behaviour merely by upgrading.
+ * Asked by ONE reader, `requestableRangesPerTopic`, and the whole point of
+ * asking is there: a source that declares no range must REQUEST exactly what it
+ * always requested, topic for topic, so nothing narrows until something
+ * declares. INVALIDATION does not ask, because it hashes per event either way.
  */
-export function sourceDeclaresEventRanges<ABI extends Abi>(source: IndexingSource<ABI>): boolean {
-	return contractsDeclareEventRanges(source.contracts);
-}
-
-/** As `sourceDeclaresEventRanges`, for a caller that holds the contracts and not the whole source. */
 export function contractsDeclareEventRanges<ABI extends Abi>(contracts: ContractsData<ABI>): boolean {
 	const abis = Array.isArray(contracts)
 		? (contracts as readonly ContractData<ABI>[]).map((contract) => contract.abi)
@@ -313,30 +309,43 @@ function sourceSkeletonOf<ABI extends Abi>(source: IndexingSource<ABI>): unknown
 }
 
 /**
- * The `{startBlock, hash}[]` a `ContextIdentifier` carries, computed from the
- * NORMALISED ranges rather than from the raw ABI list.
+ * The `SourceHashEntry[]` a `ContextIdentifier` carries: one entry per
+ * (contract, event, live range), computed from the NORMALISED ranges rather than
+ * from the raw ABI list, over a leading SKELETON entry at block 0.
  *
- * Normalised is load-bearing: `indexerMatches` compares element-wise BY INDEX,
- * so a redundant appended entry (the rollback a generator cannot recognise)
- * would otherwise shift every later entry and re-index the world. Normalised, it
- * produces a byte-identical list and costs nothing.
+ * PER EVENT WHETHER OR NOT A RANGE IS DECLARED. An ABI is REGENERATED and not
+ * hand-edited, so the members that move most often are the ones no log depends
+ * on: an added view function, a reordered array, an `internalType` a second
+ * compilation spells differently. Hashing the whole source into one entry made
+ * every one of those discard the state AND re-fetch all history. A non-event ABI
+ * member therefore contributes to NOTHING here: a function is not indexed, does
+ * not enter the fetch filter and cannot change what a log decodes to.
  *
- * Entries are ordered by `startBlock` so that an APPEND lands at the END of the
- * list, which is the shape `indexerMatches` reads as "the stored context simply
- * did not have this yet". The entry at block 0 is the source skeleton and stays
- * first.
+ * The rest of the source is NOT free. `chainId`, `genesisHash`, a contract's
+ * `address` and its `startBlock` are exactly what a range cannot describe, so
+ * they are hashed into the block-0 entry and still invalidate everything.
  *
- * A source that declares NO range produces exactly what it has always produced:
- * one entry, at block 0, hashing the whole source. That is deliberate rather
- * than incidental -- `ContextIdentifier` is persisted, and this is what makes
- * every existing stored context still match, with no migration.
+ * TWO DIGESTS PER ENTRY, because the fetch and the fold depend on different
+ * things (see `SourceHashEntry`). `hash` is what the state is a fold over, so it
+ * covers the decoding shape; `streamHash` is what the filter is built from, so
+ * it covers the `topic0` and nothing about names. A renamed non-indexed
+ * parameter moves the first and not the second, which is what lets the stream be
+ * kept while the state is discarded.
+ *
+ * Normalisation is load-bearing: a redundant appended entry (the rollback a
+ * generator cannot recognise) collapses away, so the list is byte-identical and
+ * costs nothing. So is the ORDER: entries are sorted by `startBlock` and then by
+ * `hash`, which makes the list a canonical set rather than a transcription of
+ * the ABI array, so REORDERING the events in an ABI produces the same bytes.
+ *
+ * `hash` is deliberately computed exactly as the ranged path always computed it,
+ * so a source that DECLARES ranges hashes byte-identically to what is already
+ * persisted for it. The un-ranged case is the one that changes shape, and
+ * `legacyHash` is what carries a stored context of that shape across (see
+ * `sourceInvalidationOf`).
  */
-export function sourceHashesOf<ABI extends Abi>(source: IndexingSource<ABI>): {startBlock: number; hash: string}[] {
-	if (!sourceDeclaresEventRanges(source)) {
-		return [{startBlock: 0, hash: simple_hash(source)}];
-	}
-
-	const eventEntries: {startBlock: number; hash: string}[] = [];
+export function sourceHashesOf<ABI extends Abi>(source: IndexingSource<ABI>): SourceHashEntry[] {
+	const eventEntries: SourceHashEntry[] = [];
 	for (const live of liveEventsOf(source)) {
 		for (const range of live.ranges) {
 			eventEntries.push({
@@ -350,10 +359,26 @@ export function sourceHashesOf<ABI extends Abi>(source: IndexingSource<ABI>): {s
 					firstBlock: range.firstBlock,
 					lastBlock: range.lastBlock,
 				}),
+				// what the FETCH FILTER is built from, and nothing else. An ANONYMOUS event
+				// contributes no `topic0` because it is in no filter to grow, so two of them
+				// at one address over one range share a digest -- correctly, since neither
+				// can widen what is requested.
+				streamHash: simple_hash({
+					address: live.address,
+					topic0: topic0Of(live.event),
+					firstBlock: range.firstBlock,
+					lastBlock: range.lastBlock,
+				}),
 			});
 		}
 	}
 	eventEntries.sort((a, b) => a.startBlock - b.startBlock || (a.hash < b.hash ? -1 : a.hash > b.hash ? 1 : 0));
 
-	return [{startBlock: 0, hash: simple_hash(sourceSkeletonOf(source))}, ...eventEntries];
+	const skeleton = simple_hash(sourceSkeletonOf(source));
+	return [
+		// the skeleton is what the fetch and the fold BOTH rest on, so it is the same
+		// digest twice rather than two questions with one answer
+		{startBlock: 0, hash: skeleton, streamHash: skeleton, legacyHash: simple_hash(source)},
+		...eventEntries,
+	];
 }

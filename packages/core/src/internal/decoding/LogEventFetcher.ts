@@ -261,32 +261,7 @@ export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 				// kept when the node provides it, so no second round-trip is needed
 				...(blockTimestamp === undefined ? {} : {blockTimestamp}),
 			};
-			const useAllABIEvents = this.abiPerAddress.size === 0 || this.parseConfig?.parseAllEventsIrrespectiveOfAddresses;
-			const correspondingABI: AbiEvent[] | undefined = useAllABIEvents
-				? this.allABIEvents
-				: this.abiPerAddress.get(eventAddress);
-			if (correspondingABI) {
-				let parsed: DecodeEventLogReturnType<AbiEvent[]> | null = null;
-				try {
-					parsed = decodeEventLog({
-						abi: correspondingABI,
-						data: log.data,
-						topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
-					});
-				} catch (err) {
-					parsed = null;
-					(event as LogEventWithParsingFailure).decodeError = `decoding error: ${err}`;
-				}
-
-				if (parsed) {
-					(event as ParsedLogEvent<ABI>).args = parsed.args as any;
-					(event as ParsedLogEvent<ABI>).eventName = parsed.eventName as ParsedLogEvent<ABI>['eventName'];
-				} else {
-					(event as LogEventWithParsingFailure).decodeError = `parsing did not return any results`;
-				}
-			} else {
-				(event as LogEventWithParsingFailure).decodeError = `event triggered at a different address`;
-			}
+			this.decodeOnto(event);
 
 			if (this.parseConfig?.logValues) {
 				const eventWithFilteredValues: LogEvent<ABI> = {} as LogEvent<ABI>;
@@ -304,5 +279,89 @@ export class LogEventFetcher<ABI extends Abi> extends RangeLogFetcher {
 			}
 		}
 		return events;
+	}
+
+	/**
+	 * DECODE a cached stream again, because its decoded half is a CACHE and this
+	 * ABI is the authority.
+	 *
+	 * A stored event is two things at once: the raw log (`topics`, `data`,
+	 * `address`), which is what the node said and is true forever, and `args` /
+	 * `eventName`, which is what SOME ABI made of it. Keeping a stream across a
+	 * source change keeps the first; the second has to be recomputed, because a
+	 * change can move the decode without moving the fetch at all. A renamed
+	 * non-indexed parameter is the case: `topic0` hashes types and not names, so
+	 * every cached log is still exactly the right log and every cached `args` is
+	 * filed under a key the handler no longer reads.
+	 *
+	 * Unconditional rather than "only when the shape moved": the stream file
+	 * carries ONE context for events appended across several sources, so "was this
+	 * event decoded under the current ABI" is not a question it can answer per
+	 * event. Decoding is what the fetch path pays anyway.
+	 *
+	 * `undefined` when an event carries no raw log to decode -- which only a
+	 * `logValues` projection that dropped `topics` or `data` can cause. The caller
+	 * then has a stream it cannot re-read and must not replay on trust.
+	 */
+	reparse(events: readonly LogEvent<ABI>[]): LogEvent<ABI>[] | undefined {
+		const reparsed: LogEvent<ABI>[] = [];
+		for (const stored of events) {
+			if (!stored.topics || !stored.data || !stored.address) {
+				return undefined;
+			}
+			// the decoded half is dropped rather than overwritten, so a decode that now
+			// FAILS cannot leave the previous `args` sitting next to its `decodeError`
+			const {
+				args: _args,
+				eventName: _eventName,
+				decodeError: _decodeError,
+				...raw
+			} = stored as LogEvent<ABI> & {
+				args?: unknown;
+				eventName?: unknown;
+				decodeError?: unknown;
+			};
+			const event = raw as unknown as NumberifiedLog;
+			this.decodeOnto(event);
+			reparsed.push(event as LogEvent<ABI>);
+		}
+		return reparsed;
+	}
+
+	/**
+	 * What ONE raw log means under THIS ABI, written onto the event.
+	 *
+	 * Extracted so that the fetch path and the cached-stream replay decode through
+	 * the same rule rather than through two copies of it: which ABI applies at an
+	 * address, the `topic0` keying of ADR-0031, and how a failure is recorded are
+	 * all decisions this must make identically wherever the log came from.
+	 */
+	private decodeOnto(event: NumberifiedLog): void {
+		const useAllABIEvents = this.abiPerAddress.size === 0 || this.parseConfig?.parseAllEventsIrrespectiveOfAddresses;
+		const correspondingABI: AbiEvent[] | undefined = useAllABIEvents
+			? this.allABIEvents
+			: this.abiPerAddress.get(event.address);
+		if (!correspondingABI) {
+			(event as LogEventWithParsingFailure).decodeError = `event triggered at a different address`;
+			return;
+		}
+		let parsed: DecodeEventLogReturnType<AbiEvent[]> | null = null;
+		try {
+			parsed = decodeEventLog({
+				abi: correspondingABI,
+				data: event.data,
+				topics: event.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
+			});
+		} catch (err) {
+			parsed = null;
+			(event as LogEventWithParsingFailure).decodeError = `decoding error: ${err}`;
+		}
+
+		if (parsed) {
+			(event as ParsedLogEvent<ABI>).args = parsed.args as any;
+			(event as ParsedLogEvent<ABI>).eventName = parsed.eventName as ParsedLogEvent<ABI>['eventName'];
+		} else {
+			(event as LogEventWithParsingFailure).decodeError = `parsing did not return any results`;
+		}
 	}
 }

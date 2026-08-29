@@ -394,8 +394,8 @@ describe('the state a subscriber is holding, after a discard', () => {
 	 * A discard does NOT always leave nothing, and the hook must not assume it does.
 	 *
 	 * With a kept STREAM the rebuild happens INSIDE the reconfigure: a processor
-	 * swap leaves the cached events valid (`indexerMatches` compares the source and
-	 * the config, not the processor), so `load` replays them and publishes the
+	 * swap leaves the cached events valid (the STREAM verdict is about the source
+	 * and the config, not the processor), so `load` replays them and publishes the
 	 * rebuilt state before `updateProcessor` even returns. This is the whole point
 	 * of caching the stream -- re-index without re-fetching -- and it is the case a
 	 * blanket "discarded, therefore empty" re-seed silently destroys.

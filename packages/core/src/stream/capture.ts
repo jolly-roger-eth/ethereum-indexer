@@ -105,14 +105,13 @@ export async function captureStream<ABI extends Abi>(
 			context: {
 				// The SAME producer the indexer uses, so a fixture captured from a source
 				// that declares event block ranges is still recognised when it is replayed
-				// through `replayStream`. A source declaring none produces the single
-				// whole-source entry it always did, so every existing fixture stays valid.
+				// through `replayStream`.
 				source: sourceHashesOf(source),
 				config: simple_hash(streamConfig),
 				// A stream is processor-independent: the same logs feed any processor,
 				// and which one will read this fixture is not knowable at capture time.
 				// It is left empty rather than filled with a plausible-looking digest,
-				// because `indexerMatches` does not consult it and a fake one would only
+				// because `sourceInvalidationOf` does not consult it and a fake one would only
 				// mislead a human reading the file.
 				processor: '',
 			},

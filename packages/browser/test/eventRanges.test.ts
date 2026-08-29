@@ -23,9 +23,9 @@ import {
 /**
  * AN UPGRADE APPENDS AN ENTRY INSTEAD OF RE-FETCHING HISTORY.
  *
- * The headline is NOT that the state survives. `indexerMatches` gates the kept
- * event STREAM as well as the state, so what an append actually buys is that
- * NOTHING IS RE-FETCHED -- and state cannot tell you whether that happened,
+ * The headline is NOT that the state survives. An append is judged against the
+ * kept event STREAM as well as against the state, so what it actually buys is
+ * that NOTHING IS RE-FETCHED -- and state cannot tell you whether that happened,
  * because a re-index and a resume land on identical rows. So every claim here is
  * asserted on the RANGES the node was asked for, with `{stateDiscarded}` as the
  * second reading rather than the first.

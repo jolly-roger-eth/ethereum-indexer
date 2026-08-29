@@ -144,6 +144,62 @@ export const SOURCE_V2: IndexingSource<typeof abiV2> = {
 };
 
 /**
+ * The SAME events, plus the members a REGENERATION routinely adds.
+ *
+ * A view function, an error and a constructor: none of them is indexed, none
+ * enters the fetch filter, and none can change what a log decodes to. This is
+ * the ordinary shape of an ABI diff, and it is the one that used to cost a
+ * complete re-fetch of all history.
+ */
+export const abiWithNonEventMembers = [
+	...abi,
+	{
+		type: 'function',
+		name: 'balanceOf',
+		stateMutability: 'view',
+		inputs: [{name: 'owner', type: 'address'}],
+		outputs: [{name: '', type: 'uint256'}],
+	},
+	{type: 'error', name: 'NotOwner', inputs: [{name: 'caller', type: 'address'}]},
+	{type: 'constructor', stateMutability: 'nonpayable', inputs: [{name: 'admin', type: 'address'}]},
+] as const satisfies Abi;
+
+/** The regenerated ABI at the address the proxy keeps constant. */
+export const SOURCE_WITH_NON_EVENT_MEMBERS: IndexingSource<typeof abiWithNonEventMembers> = {
+	chainId: '1',
+	contracts: [{abi: abiWithNonEventMembers, address: CONTRACT, startBlock: START_BLOCK}],
+};
+
+/**
+ * The same event with a NON-INDEXED parameter renamed, which is the case that
+ * splits the two verdicts.
+ *
+ * `topic0` is the hash of the canonical signature, and that hashes TYPES and not
+ * names -- so `Transfer(address,address,uint256)` is the same topic before and
+ * after, every cached log is still exactly the right log, and the FETCH has
+ * nothing to redo. What did move is the DECODE: `args.id` is now `args.tokenId`,
+ * so a fold computed under the old names is stale and the stream has to be
+ * decoded again on its way back through.
+ */
+export const abiRenamedParameter = [
+	{
+		type: 'event',
+		name: 'Transfer',
+		anonymous: false,
+		inputs: [
+			{indexed: true, name: 'from', type: 'address'},
+			{indexed: true, name: 'to', type: 'address'},
+			{indexed: false, name: 'tokenId', type: 'uint256'},
+		],
+	},
+] as const satisfies Abi;
+
+export const SOURCE_RENAMED_PARAMETER: IndexingSource<typeof abiRenamedParameter> = {
+	chainId: '1',
+	contracts: [{abi: abiRenamedParameter, address: CONTRACT, startBlock: START_BLOCK}],
+};
+
+/**
  * A DIFFERENT source object carrying the SAME ABI, address and start block.
  *
  * The case a redeploy produces when the implementation changed but its events

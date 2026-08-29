@@ -9,6 +9,7 @@ import type {
 	LastSync,
 	LogEvent,
 	ProvidedStreamConfig,
+	SourceHashEntry,
 	UsedStreamConfig,
 	WireContext,
 } from '../../types.js';
@@ -289,9 +290,11 @@ export function defaultFromBlockOf<ABI extends Abi>(source: IndexingSource<ABI>)
 	return fromBlockFromContracts || 0;
 }
 
+export type InvalidationReason = 'stream-config' | 'entry-changed' | 'entry-added' | 'entry-removed';
+
 /**
- * WHETHER the stored data is still valid, and FROM WHICH BLOCK it stopped being
- * so.
+ * WHETHER one half of the stored data is still valid, and FROM WHICH BLOCK it
+ * stopped being so.
  *
  * The block is deliberately part of the answer even though the only thing acting
  * on it today is "therefore discard everything and re-index from the start
@@ -303,88 +306,99 @@ export function defaultFromBlockOf<ABI extends Abi>(source: IndexingSource<ABI>)
  * rewrite instead of a refinement. See
  * `work/notes/ideas/a-stream-branches-instead-of-being-discarded.md`.
  */
-export type SourceInvalidation =
+export type InvalidationVerdict =
 	| {valid: true}
 	| {
 			valid: false;
 			/** The lowest block at which the stored data stopped describing this source. */
 			invalidFromBlock: number;
-			reason: 'stream-config' | 'entry-changed' | 'entry-added' | 'entry-removed';
+			reason: InvalidationReason;
 	  };
 
 /**
- * Whether a persisted `lastSync` describes the source and stream config we are
- * running now, and from where it stopped doing so.
+ * The TWO verdicts, because the fetch and the fold do not depend on the same
+ * thing and one verdict could not say so.
  *
- * It answers about the first two identities only; `context.processor` is
- * compared separately by the caller, because the two mismatches mean different
- * things (a processor upgrade is expected and routine, a source change is not).
+ * - `stream` is about the raw logs, fetched under a topic-and-address filter. It
+ *   survives everything that did not GROW that filter, so a shrunken topic set
+ *   leaves a strict SUPERSET, which is reusable: decode less.
+ * - `state` is about the fold over DECODED events. It dies whenever the decoding
+ *   shape moved, even if not one log needs re-fetching.
  *
- * The rule, unchanged in what it decides:
+ * A renamed non-indexed parameter is the case that proves they are two
+ * questions: `topic0` hashes types and not names, so the fetch is untouched and
+ * the decode is not.
  *
- * - a differing stream config invalidates EVERYTHING, from block 0;
- * - an entry the stored context HAS, with a different hash, invalidates from the
- *   lower of the two blocks: something already indexed is described differently
- *   now;
- * - an entry the stored context LACKS only invalidates if it could have
- *   contributed. An event (or a contract) that starts above what was indexed had
- *   nothing to say yet, so appending it costs nothing -- that is the whole point
- *   of block-ranged entries;
- * - and symmetrically, an entry the stored context has and the source no longer
- *   declares invalidates from its own block, because state derived from an event
- *   we have stopped indexing is stale. Only reachable for a ranged source: a
- *   source declaring no range is one whole-source entry, where any change is
- *   already a hash change at index 0.
+ * The implication runs ONE WAY, by construction rather than by rule: an invalid
+ * stream is always an invalid state too, because everything `streamHash` commits
+ * to (the address, the `topic0`, the range) is also committed to by `hash`, so
+ * nothing can move the filter without moving the decode. The converse is exactly
+ * what this type exists to express.
+ */
+export type SourceInvalidation = {
+	state: InvalidationVerdict;
+	stream: InvalidationVerdict;
+};
+
+/** A source-hash list written by the code that hashed the WHOLE source into one entry. */
+function isWholeSourceContext(entries: readonly SourceHashEntry[]): boolean {
+	return entries.length === 1 && entries[0].startBlock === 0 && entries[0].streamHash === undefined;
+}
+
+/**
+ * The diff between two entry lists, as SETS rather than element-wise by index.
+ *
+ * By index was workable while every entry was per-RANGE and the list was ordered
+ * by `startBlock`, so an append landed at the end. It is not workable now that
+ * an un-ranged source puts every one of its events at the same block: inserting
+ * an event shifts whatever sorts after it, and every shifted entry would read as
+ * a change to something already indexed. A set diff asks the question that was
+ * always meant -- which entries are NEW, which are GONE -- and is immune to
+ * where they land.
+ *
+ * `removalInvalidates` is the whole of the stream/state difference. A removed
+ * entry means state was folded from an event we no longer index, so the state is
+ * stale; but it means the filter only ever asked for MORE than it now needs, so
+ * the stream is a superset and stands.
  *
  * The MINIMUM matching block is reported rather than the first one found, so the
  * answer is the earliest block that stopped being valid rather than an artefact
  * of list order.
  */
-export function sourceInvalidationOf(
-	// this is the indexer settings to be applied
-	indexerSourceHashes: {startBlock: number; hash: string}[],
-	indexerConfigHash: string,
-	// this is the stream loaded
+function verdictOn(
+	current: readonly SourceHashEntry[],
+	stored: readonly SourceHashEntry[],
+	digestOf: (entry: SourceHashEntry) => string,
 	lastToBlock: number,
-	context: ContextIdentifier,
-): SourceInvalidation {
-	if (context.config !== indexerConfigHash) {
-		return {valid: false, invalidFromBlock: 0, reason: 'stream-config'};
-	}
+	removalInvalidates: boolean,
+): InvalidationVerdict {
+	const storedDigests = new Set(stored.map(digestOf));
+	const currentDigests = new Set(current.map(digestOf));
+	const added = current.filter((entry) => !storedDigests.has(digestOf(entry)));
+	const removed = removalInvalidates ? stored.filter((entry) => !currentDigests.has(digestOf(entry))) : [];
+	const addedBlocks = new Set(added.map((entry) => entry.startBlock));
+	const removedBlocks = new Set(removed.map((entry) => entry.startBlock));
 
 	let invalidFromBlock: number | undefined;
-	let reason: 'entry-changed' | 'entry-added' | 'entry-removed' | undefined;
-	const invalidFrom = (block: number, why: 'entry-changed' | 'entry-added' | 'entry-removed') => {
+	let reason: InvalidationReason | undefined;
+	const invalidFrom = (block: number, why: InvalidationReason) => {
 		if (invalidFromBlock === undefined || block < invalidFromBlock) {
 			invalidFromBlock = block;
 			reason = why;
 		}
 	};
 
-	for (let i = 0; i < indexerSourceHashes.length; i++) {
-		const indexerSourceItem = indexerSourceHashes[i];
-		const fetchedSourceItem = context.source[i];
-		if (fetchedSourceItem) {
-			if (indexerSourceItem.hash !== fetchedSourceItem.hash) {
-				invalidFrom(Math.min(indexerSourceItem.startBlock, fetchedSourceItem.startBlock), 'entry-changed');
-			}
-		} else {
-			if (indexerSourceItem.startBlock <= lastToBlock) {
-				invalidFrom(indexerSourceItem.startBlock, 'entry-added');
-			}
+	// An entry the stored context LACKS only invalidates if it could have
+	// contributed: an event (or a contract) that starts above what was indexed had
+	// nothing to say yet, so appending it costs nothing.
+	for (const entry of added) {
+		if (entry.startBlock <= lastToBlock) {
+			invalidFrom(entry.startBlock, removedBlocks.has(entry.startBlock) ? 'entry-changed' : 'entry-added');
 		}
 	}
-
-	// entries the stored context carries BEYOND the current list: the loop above
-	// never looks at them, so a source that dropped its last entries would keep
-	// state derived from events it no longer indexes
-	if (context.source.length > indexerSourceHashes.length) {
-		const declaredNow = new Set(indexerSourceHashes.map((entry) => entry.hash));
-		for (let i = indexerSourceHashes.length; i < context.source.length; i++) {
-			const fetchedSourceItem = context.source[i];
-			if (!declaredNow.has(fetchedSourceItem.hash) && fetchedSourceItem.startBlock <= lastToBlock) {
-				invalidFrom(fetchedSourceItem.startBlock, 'entry-removed');
-			}
+	for (const entry of removed) {
+		if (entry.startBlock <= lastToBlock) {
+			invalidFrom(entry.startBlock, addedBlocks.has(entry.startBlock) ? 'entry-changed' : 'entry-removed');
 		}
 	}
 
@@ -395,22 +409,108 @@ export function sourceInvalidationOf(
 }
 
 /**
- * The same decision as a bare boolean, for the callers that only ever discard
- * everything.
+ * Whether a persisted `lastSync` describes the source and stream config we are
+ * running now, from where it stopped doing so, and SEPARATELY for the raw log
+ * stream and for the state folded out of it.
  *
- * Kept as the narrow surface it always was; `sourceInvalidationOf` is where the
- * block lives, so acting on it later does not mean re-deriving the rule.
+ * It answers about the first two identities only; `context.processor` is
+ * compared separately by the caller, because the two mismatches mean different
+ * things (a processor upgrade is expected and routine, a source change is not).
+ *
+ * A differing stream config invalidates EVERYTHING, from block 0, on both
+ * halves: it is hashed into the wire identity and describes how logs were
+ * fetched as much as what they meant.
+ *
+ * ## Reading a context written before this split
+ *
+ * `ContextIdentifier` is PERSISTED, so a stored context has to be readable
+ * whatever version wrote it. There are three shapes, and a context that does not
+ * describe a changed source must never read as invalid -- that would silently
+ * re-index every existing deployment on upgrade, which is the exact cost
+ * per-event hashing removes.
+ *
+ * - **per-event** (what this code writes): both halves are decided
+ *   independently.
+ * - **per-range, no `streamHash`** (what the ranged path wrote): the `hash` of
+ *   every entry is computed exactly as it was, so the set diff on `hash` matches
+ *   byte for byte and the state verdict is unchanged. The stored entries say
+ *   nothing about the FILTER they were fetched under, so the stream half falls
+ *   back to the state verdict rather than guessing.
+ * - **one whole-source entry** (what an un-ranged source wrote): a digest over
+ *   bytes no per-event entry reproduces, so it is compared against the one thing
+ *   that does reproduce them, `legacyHash` on the block-0 entry. Equal means the
+ *   source did not move and NOTHING is invalidated; unequal means it did, and
+ *   the old entry cannot say where, so both halves go from block 0 exactly as
+ *   they did before. Either way the next save writes the per-event list, so a
+ *   deployment pays this at most once.
  */
-export function indexerMatches(
+export function sourceInvalidationOf(
 	// this is the indexer settings to be applied
-	indexerSourceHashes: {startBlock: number; hash: string}[],
+	indexerSourceHashes: SourceHashEntry[],
+	indexerConfigHash: string,
+	// this is the stream loaded
+	lastToBlock: number,
+	context: ContextIdentifier,
+): SourceInvalidation {
+	if (context.config !== indexerConfigHash) {
+		const bothHalves = {valid: false, invalidFromBlock: 0, reason: 'stream-config'} as const;
+		return {state: bothHalves, stream: bothHalves};
+	}
+
+	const stored = context.source;
+	const legacyHash = indexerSourceHashes[0]?.legacyHash;
+	if (legacyHash !== undefined && isWholeSourceContext(stored)) {
+		if (stored[0].hash === legacyHash) {
+			return {state: {valid: true}, stream: {valid: true}};
+		}
+		const bothHalves = {valid: false, invalidFromBlock: 0, reason: 'entry-changed'} as const;
+		return {state: bothHalves, stream: bothHalves};
+	}
+
+	const state = verdictOn(indexerSourceHashes, stored, (entry) => entry.hash, lastToBlock, true);
+	const bothSidesKnowTheFilter =
+		indexerSourceHashes.every((entry) => entry.streamHash !== undefined) &&
+		stored.every((entry) => entry.streamHash !== undefined);
+	const stream = bothSidesKnowTheFilter
+		? verdictOn(indexerSourceHashes, stored, (entry) => entry.streamHash as string, lastToBlock, false)
+		: state;
+	return {state, stream};
+}
+
+/**
+ * Whether the persisted STATE is still a fold over what this source means.
+ *
+ * The narrow surface the callers that only ever discard everything want;
+ * `sourceInvalidationOf` is where the block lives, so acting on it later does
+ * not mean re-deriving the rule.
+ */
+export function stateMatches(
+	// this is the indexer settings to be applied
+	indexerSourceHashes: SourceHashEntry[],
 	indexerConfigHash: string,
 	// this is the stream loaded
 	lastToBlock: number,
 	context: ContextIdentifier,
 	// if they do not match the indexer will take over and restart from zero
 ): boolean {
-	return sourceInvalidationOf(indexerSourceHashes, indexerConfigHash, lastToBlock, context).valid;
+	return sourceInvalidationOf(indexerSourceHashes, indexerConfigHash, lastToBlock, context).state.valid;
+}
+
+/**
+ * Whether the cached raw log STREAM was fetched under a filter this source is
+ * still covered by.
+ *
+ * Deliberately a different question from `stateMatches`, and a weaker one: the
+ * stream is reusable whenever the topic-and-address filter did not GROW, so a
+ * discarded state can still be rebuilt from it without going back to the node.
+ */
+export function streamMatches(
+	indexerSourceHashes: SourceHashEntry[],
+	indexerConfigHash: string,
+	lastToBlock: number,
+	context: ContextIdentifier,
+): boolean {
+	return sourceInvalidationOf(indexerSourceHashes, indexerConfigHash, lastToBlock, context).stream.valid;
 }
 
 /**
