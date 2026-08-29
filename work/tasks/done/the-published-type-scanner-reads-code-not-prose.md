@@ -72,3 +72,9 @@ say so either way in your report rather than silently fixing one instance.
 >
 > Record any non-obvious in-scope decision in a `## Decisions` block in your final report, and do
 > not commit without confirmation.
+
+## Decisions
+
+**An import specifier that is only the TEXT of a string literal is no longer reported.** The old text search counted `export type Hint = "run: import x from 'left-pad'"`; a parse cannot, and I did not add a string-literal sweep to preserve that. A string literal type is data: nothing resolves it, so a consumer lacking that package is not broken by it, and counting it is the same false-positive class as counting a comment. The alternative (parse for declarations, then additionally regex string literals) reintroduces exactly the noise this task exists to remove, and cannot tell an illustrative snippet from anything else. Acceptance criterion 3 asked for this to be recorded. Touches only this test; nothing else consumes `importedPackages`.
+
+**The scan's COVERAGE is unchanged; only its reading changed.** A real parse could easily be widened to count `declare module 'x' {}` and triple-slash `/// <reference types="x" />`, both of which the text search never caught. I deliberately did not: widening what the gate catches is a different decision from fixing how it reads, and it can only turn packages red for reasons this task never examined (tsc emits `/// <reference types="node" />` on its own in some configurations). No dist file in the workspace currently contains either form. Recorded because a reviewer might reasonably expect "parse it properly" to imply "catch more"; it deliberately does not. Documented at the choice site in the `importedPackages` JSDoc.
