@@ -17,19 +17,16 @@ needsAnswers: true
 
 ## Open questions
 
-1. **Does a deployment cover a PROCESSOR change, or only a SOURCE change?** `updateProcessor` on a
-   changed version hash clears and reloads today, blanking a browser app exactly as badly as a
-   source change, and `ContextIdentifier` keeps `processor` and `config` as identities separate from
-   `source`. Covering it is more valuable and strictly larger. (Recommendation: cover it. A
-   processor upgrade is the most routine reconfigure there is, and excluding it leaves the headline
-   promise false for the common case.)
-2. **Does deployment identity ride on the read HANDLE or on every read RETURN?** The handle is cheap
+1. **Does deployment identity ride on the read HANDLE or on every read RETURN?** The handle is cheap
    and covers the js-object path, where there is no read call at all. Per-return touches four
    `StateStore` verbs, `createReadSurface`, `EntityStateView`, `VersionedStateView`, four backends
-   and the conformance suite. (Recommendation: the handle.)
-3. **Is doubled fetch traffic during catch-up acceptable**, or does the pending deployment need
-   throttling or a shared fetch? Two deployments each following the head means roughly two times the
-   `eth_getLogs`, which matters in a browser tab and on a rate-limited RPC.
+   and the conformance suite. (Recommendation: the handle, plus marking a handle STALE at promotion
+   so a consumer that cached one can detect it rather than read the old deployment silently.)
+
+> ANSWERED 2026-08-29: a **processor** change DOES make a deployment (`updateProcessor` blanks the
+> app just as badly, and it is the most routine reconfigure there is). And **doubled fetch traffic
+> during catch-up is acceptable**, which is easier than it first looked: see the sharing section, the
+> doubling applies only to the head-following TAIL, never to the history.
 
 ## Problem Statement
 
@@ -79,13 +76,18 @@ deployment is needed exactly when `sourceInvalidationOf` says something already 
 invalid, or when a hash `ContextIdentifier` tracks separately moved. An unchanged source is a no-op
 because the verdict says nothing changed, not because two digests matched.
 
+The `processor` half is not a footnote: a changed processor version hash makes a deployment, so all
+three reconfigure entry points route through this. `updateProcessor` creates a pending deployment
+instead of clearing and reloading; `updateIndexer` does the same on a source verdict; `reset` stays
+what it is, an explicit unconditional discard, because it is the one the caller means as a discard.
+
 Note also that `simple_hash` is a 32-bit non-cryptographic hash. As a change DETECTOR a collision
 costs one missed invalidation; as an IDENTITY it would silently adopt another deployment's state.
 Identity resting on the verdict rather than on hash equality keeps that exposure where it already is.
 
 ## User Stories
 
-1. As an operator, I want to change the source without my server going dark.
+1. As an operator, I want to change the source OR the processor without my server going dark.
 2. As an operator, I want to promote deliberately, after seeing the pending deployment has caught up.
 3. As a browser user, I want the app to keep rendering while the new deployment builds, and switch
    when it is ready.
@@ -116,11 +118,29 @@ processes reorgs itself. They may briefly disagree; each is internally consisten
 reads carry which one answered. The clamp above is what keeps the shared prefix beneath the reorg
 window, so no reorg can invalidate bytes both depend on.
 
-**Prefix sharing buys less than the first draft implied, and the feature survives that.** A changed
-`address` or a new contract lands in the block-0 SKELETON entry, so the graft point is 0 and nothing
-is shared. Two of the three motivating cases therefore re-fetch from the start. **The no-outage
-value does not depend on sharing**: the live deployment keeps answering regardless. Sharing is an
-optimisation for the cases that have a graft point above 0, chiefly an appended event.
+**Prefix sharing is TOTAL for the common cases, and absent only in the rare one.** An earlier draft
+said the opposite, having weighted the rarest case. Ranked by how often a real deployment actually
+reconfigures:
+
+- **A processor change** (a handler bug fix, the most routine reconfigure of all) leaves the source
+  untouched, so every source digest is unchanged and the ENTIRE stream is valid. The pending
+  deployment re-fetches NO history at all; it only re-folds. Maximal sharing.
+- **A decode-only source change** (a renamed non-indexed parameter) leaves the topic set unchanged,
+  so again the entire stream is valid and only the fold is redone.
+- **An event added ABOVE the cursor** creates no deployment at all: `sourceInvalidationOf` already
+  calls it free.
+- **An event added or edited BELOW the cursor** grafts at that event's `firstBlock` and shares
+  everything beneath it.
+- **A changed `address` or a new contract** lands in the block-0 SKELETON entry, so the graft point
+  is 0 and nothing is shared. This is the rare case, not the representative one.
+
+So the cases that create a deployment mostly share the WHOLE stream, and the expensive work is
+re-folding rather than re-fetching. That also bounds open question 3: the pending deployment does
+not re-fetch history, so the doubled `eth_getLogs` is only the tail both deployments follow while
+one is pending, never a doubled backfill.
+
+**The no-outage value does not depend on sharing at all**: the live deployment keeps answering
+regardless. Sharing decides how expensive catching up is, not whether reads survive.
 
 **Prerequisite: `the-stream-is-what-the-node-said-appended-once`.** That spec now delivers segments
 that are IMMUTABLE and ADDRESSABLE, which is what a prefix reference needs. It deliberately does not
@@ -159,6 +179,8 @@ deployment ever had.
   reorg above the graft point is handled per deployment.
 - **Identity**: an event appended above the cursor does NOT create a pending deployment, which is the
   regression guard for ADR-0034's headline.
+- **A processor-only change re-fetches NOTHING**, asserted on the ranges the node was asked for. It
+  is the most common reconfigure and the one with the most to share, so it is the sharing test.
 
 ## Out of Scope
 
