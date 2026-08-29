@@ -1,0 +1,138 @@
+---
+title: 'Invalidation is computed on what each thing actually depends on, not on one hash of the whole source'
+slug: invalidation-is-computed-on-what-each-thing-depends-on
+blockedBy: []
+---
+
+## What to build
+
+`abi-versions-are-block-ranged` made invalidation per-event AND per-range, but only for a source
+that DECLARES ranges. `sourceHashesOf` still has this at the top:
+
+```ts
+if (!sourceDeclaresEventRanges(source)) {
+	return [{startBlock: 0, hash: simple_hash(source)}];
+}
+```
+
+So every source that declares no range — which is every existing deployment, and the common case
+the ranged work promised would pay nothing — still hashes the WHOLE source into one entry at block
+0. Any difference anywhere in it discards the state and the cached stream and re-fetches all
+history.
+
+That is wrong in a way developers meet constantly, because an ABI is usually REGENERATED rather
+than hand-edited:
+
+- **adding a view function, an error, or a constructor argument** changes no event and no topic,
+  and today costs a complete re-fetch;
+- **reordering or reformatting** the ABI array, which regeneration does routinely, likewise;
+- **renaming a non-indexed parameter** does not move `topic0`, because the canonical signature
+  hashes types and not names, so the FETCH is unaffected even though decoding reads a different
+  key.
+
+Two things to build, and the second is the more valuable.
+
+**1. Hash per event whether or not ranges are declared.**
+
+Extend what the ranged path already does to the un-ranged one, so an entry is per (address,
+signature, decoding shape) with `startBlock` taken from the contract rather than from a range.
+`liveEventsOf` already yields exactly this for both shapes, and `decodingShapeOf` is already the
+right unit: it deliberately excludes `internalType`, so a recompilation does not discard a user's
+history.
+
+Non-event ABI members must then contribute to NOTHING. A function is not indexed, does not enter
+the filter, and cannot change what a log decodes to.
+
+The rest of the source is NOT free, and must keep invalidating: `chainId`, a contract's `address`,
+a contract's `startBlock`, and anything else the fetch depends on. Only the ABI's non-event members
+become inert.
+
+**2. Split the STREAM verdict from the STATE verdict.**
+
+`sourceInvalidationOf` returns ONE verdict, and `indexerMatches` uses it to gate both the state and
+the cached stream (`promiseToLoad`'s `keepStream` branch). Those depend on different things:
+
+- **the stream** is raw logs fetched under a topic-and-address filter. It stays valid when the
+  topic set and address set did not GROW. A topic set that shrank leaves a stream that is a strict
+  superset, which is reusable: decode less.
+- **the state** is a fold over decoded events. It must be recomputed when the decoding shape
+  changed, even if not one log needs re-fetching.
+
+So a renamed non-indexed parameter should KEEP the stream and DISCARD the state, which today is not
+expressible. Keep `invalidFromBlock` on both halves: `abi-versions-are-block-ranged` established
+that the decision can name the block it starts at, and
+`work/notes/ideas/a-stream-branches-instead-of-being-discarded.md` needs it to stay that way. Do
+not collapse either half into a boolean.
+
+**Traps.**
+
+- **`ContextIdentifier` is PERSISTED.** This changes what is stored, so it needs a migration or a
+  tolerant read. A context written by the current code must not be misread as invalid, which would
+  silently re-index every existing deployment on upgrade — the exact cost this task exists to
+  remove.
+- **A source whose events did not change must produce a byte-identical set of entries**, so that
+  upgrading the library is not itself an invalidation event.
+- **Do not weaken removal.** An event dropped from the ABI must still discard state derived from
+  it. The existing `entry-removed` handling covers entries the stored context carries beyond the
+  current list; keep it correct under per-event hashing.
+
+## Acceptance criteria
+
+- [ ] Adding a non-event member (function, error, constructor) to an ABI invalidates NOTHING: no state discarded, no range re-fetched.
+- [ ] Reordering the events in an ABI invalidates nothing.
+- [ ] Reformatting the ABI (whitespace, `internalType` differences) invalidates nothing.
+- [ ] Renaming a NON-INDEXED parameter keeps the stream and discards the state, asserted as both: no range is re-fetched, and `{stateDiscarded: true}`.
+- [ ] Adding an event discards nothing below its contract `startBlock`, and re-fetches because the topic set grew.
+- [ ] Removing an event still discards state derived from it.
+- [ ] Changing `chainId`, a contract `address`, or a contract `startBlock` still invalidates as it does today.
+- [ ] The verdict carries a STREAM half and a STATE half, each able to name the block it is invalid from.
+- [ ] A context persisted by the CURRENT code is still read correctly, or migrated; upgrading the library does not by itself re-index.
+- [ ] A source whose events did not change hashes byte-identically across the change.
+- [ ] Sources that DECLARE ranges keep every behaviour `abi-versions-are-block-ranged` established, including the redundant-append no-op.
+- [ ] Tests cover the new behaviour in the repo's vitest style, asserting re-fetch on the ranges the node was asked for.
+- [ ] A changeset covers the behaviour change.
+
+## Blocked by
+
+- None. `abi-versions-are-block-ranged` and `a-range-requests-only-the-events-it-can-contain` have
+  both landed, and this generalises the first.
+
+## Prompt
+
+> Make invalidation depend on what each thing actually depends on, in the `etherfold` monorepo,
+> instead of one hash over the whole source.
+>
+> FIRST, check this against current reality. The claim is that `sourceHashesOf` in
+> `packages/core/src/internal/engine/eventRanges.ts` still short-circuits to
+> `[{startBlock: 0, hash: simple_hash(source)}]` when `sourceDeclaresEventRanges(source)` is false,
+> so every source without declared ranges hashes wholesale; and that `sourceInvalidationOf` in
+> `internal/engine/utils.ts` returns one verdict that `indexerMatches` uses to gate BOTH the state
+> and the kept stream. Verify both before building. If either has changed, route to
+> needs-attention.
+>
+> The user-visible point is that an ABI is REGENERATED, not hand-edited. Adding a view function
+> today costs a complete re-fetch of all history, and nothing about that function can affect a log.
+> Hash per event on both paths, using the `liveEventsOf` and `decodingShapeOf` units that already
+> exist, and let non-event ABI members contribute to nothing. Do NOT make the rest of the source
+> free: `chainId`, contract `address` and contract `startBlock` must still invalidate.
+>
+> The more valuable half is splitting the STREAM verdict from the STATE verdict. The stream is raw
+> logs fetched under a topic-and-address filter, so it survives when the topic set did not grow; a
+> shrunken topic set leaves a superset, which is reusable. The state is a fold over decoded events,
+> so it must be recomputed whenever the decoding shape changed even if nothing needs re-fetching. A
+> renamed non-indexed parameter is the case that proves it: `topic0` hashes types and not names, so
+> the fetch is untouched and the decode is not.
+>
+> Keep `invalidFromBlock` on BOTH halves. `abi-versions-are-block-ranged` deliberately made the
+> decision able to name the block it starts at, and
+> `work/notes/ideas/a-stream-branches-instead-of-being-discarded.md` depends on that staying true.
+> Do not collapse either half into a boolean.
+>
+> `ContextIdentifier` is PERSISTED, so this is a stored-format change. It needs a migration or a
+> tolerant read, and a context written by today's code must not read as invalid — that would
+> silently re-index every existing deployment on upgrade, which is precisely the cost this task
+> removes. Assert it: write a context with the current shape, read it with the new code, expect no
+> invalidation.
+>
+> Add a changeset. Record any non-obvious in-scope decision in a `## Decisions` block in your final
+> report, and do not commit without confirmation.
