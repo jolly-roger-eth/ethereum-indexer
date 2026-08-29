@@ -2,7 +2,6 @@
 title: 'A reconfigure is not an outage: the live deployment serves while the pending one catches up'
 slug: a-reconfigure-is-not-an-outage
 taskedAfter: [the-stream-is-what-the-node-said-appended-once]
-needsAnswers: true
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -13,20 +12,11 @@ needsAnswers: true
 > corrected: identity is NOT digest-set equality, and the prerequisite must actually deliver
 > something to point at.
 
-<!-- open-questions -->
-
-## Open questions
-
-1. **Does deployment identity ride on the read HANDLE or on every read RETURN?** The handle is cheap
-   and covers the js-object path, where there is no read call at all. Per-return touches four
-   `StateStore` verbs, `createReadSurface`, `EntityStateView`, `VersionedStateView`, four backends
-   and the conformance suite. (Recommendation: the handle, plus marking a handle STALE at promotion
-   so a consumer that cached one can detect it rather than read the old deployment silently.)
-
-> ANSWERED 2026-08-29: a **processor** change DOES make a deployment (`updateProcessor` blanks the
-> app just as badly, and it is the most routine reconfigure there is). And **doubled fetch traffic
-> during catch-up is acceptable**, which is easier than it first looked: see the sharing section, the
-> doubling applies only to the head-following TAIL, never to the history.
+> ALL OPEN QUESTIONS ANSWERED 2026-08-29. A **processor** change DOES make a deployment
+> (`updateProcessor` blanks the app just as badly, and it is the most routine reconfigure there is).
+> **Doubled fetch traffic during catch-up is acceptable**, and is cheaper than it first looked: the
+> doubling is only the head-following TAIL, never the history. And **reads do NOT carry deployment
+> identity**; see below, the question dissolved rather than needing an answer.
 
 ## Problem Statement
 
@@ -92,7 +82,8 @@ Identity resting on the verdict rather than on hash equality keeps that exposure
 3. As a browser user, I want the app to keep rendering while the new deployment builds, and switch
    when it is ready.
 4. As a browser developer, I want to turn the auto-switch off and show catch-up progress instead.
-5. As a reader, I want to know WHICH deployment answered me.
+5. As a reader holding a state handle across a promotion, I want it to keep answering, from the
+   deployment that is now live, so that holding a reference is never a way to be silently stale.
 6. As an operator, I want a reconfigure the invalidation verdict calls a no-op to cost nothing.
 7. As an operator reconfiguring twice, I want the second to replace the first pending deployment.
 8. As an operator, I want a deployment whose stream is unavailable to fall back to a full re-index,
@@ -153,12 +144,28 @@ filter-neutral: absence of a log means something only against the filter its ran
 and above the graft point the two deployments fetch under different filters. Shared segments
 therefore need per-segment filter provenance, owned here.
 
-**One mechanism, two runtimes.** The browser case is the stronger one: today a reconfigure blanks the
-app. Only the promotion POLICY differs, which is a knob. Three concrete browser gaps, none of which
-is the reactive shape (the root store replaces its value wholesale):
+**Reads do NOT carry deployment identity, and the handle FOLLOWS promotion.** An earlier draft had a
+story for a reader knowing which deployment answered it, and an open question about whether that
+rode on the handle or on every read return. Both are dropped, because the question dissolves:
 
-- the entities path publishes a HANDLE with stable identity, so a consumer that cached it would
-  silently keep reading the old deployment after promotion;
+- Per-read provenance (changing what the four `StateStore` verbs return) is the only option that
+  would have to be decided NOW, since it is a breaking change to the read seam, four backends and
+  the conformance suite. It is REJECTED.
+- The identity necessarily EXISTS internally, because promotion cannot work without the indexer
+  knowing which deployment is live. So exposing it later is purely additive, and a query layer is
+  its natural home, as a meta field on the response envelope rather than stapled to every row.
+  Nothing here forecloses that.
+- What remains is not provenance but LIFETIME, and it is the real defect the review found: the
+  entities path publishes a handle bound to a store, so a consumer holding one across a promotion
+  would silently keep reading the retired deployment. Fix it by making the handle INDIRECT, a
+  reference to whichever deployment is live rather than to a particular one. Promotion then becomes
+  transparent to every holder, and the entire staleness class disappears instead of being made
+  detectable.
+
+**One mechanism, two runtimes.** The browser case is the stronger one: today a reconfigure blanks the
+app. Only the promotion POLICY differs, which is a knob. Two concrete browser gaps remain, and the
+reactive shape is not one of them (the root store replaces its value wholesale):
+
 - `createIndexerState` receives ONE pre-built processor with its store already bound, so nothing
   currently owns allocating the pending deployment's store;
 - `SyncingState` is a single flat record with one `lastSync` and one `syncPercentage`, which cannot
@@ -181,6 +188,8 @@ deployment ever had.
   regression guard for ADR-0034's headline.
 - **A processor-only change re-fetches NOTHING**, asserted on the ranges the node was asked for. It
   is the most common reconfigure and the one with the most to share, so it is the sharing test.
+- **A handle held across a promotion** keeps answering and answers from the newly-live deployment,
+  which is the regression guard for the silent-staleness the indirect handle exists to remove.
 
 ## Out of Scope
 
