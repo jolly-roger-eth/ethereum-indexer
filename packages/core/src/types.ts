@@ -256,10 +256,10 @@ export type UntypedWireBatch = Omit<WireBatch<Abi>, 'logs'> & {logs: unknown[]};
  *
  * - **`firstBlock` too EARLY is safe**; too LATE loses logs undetectably. The
  *   blocks between the real first occurrence and the declared one are indexed
- *   without that event in the filter, so afterwards nothing distinguishes a
- *   chain that had no such log from a request that was never made. For a proxy
- *   deployment the implementation's own deploy block is naturally safe: an
- *   implementation cannot emit before it exists.
+ *   without that event in the filter, so afterwards nothing distinguishes "the
+ *   chain had none" from "we never asked". For a proxy deployment the
+ *   implementation's own deploy block is naturally safe: an implementation
+ *   cannot emit before it exists.
  * - **`lastBlock` too LATE is safe**; too EARLY loses logs the same way, and for
  *   the same reason. Omit it unless you know the event stopped.
  *

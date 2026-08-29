@@ -1,6 +1,7 @@
 import {existsSync, readFileSync, readdirSync} from 'node:fs';
 import {isBuiltin} from 'node:module';
 import {join} from 'node:path';
+import ts from 'typescript';
 import {describe, expect, it} from 'vitest';
 
 /**
@@ -34,6 +35,11 @@ import {describe, expect, it} from 'vitest';
  * loud: a package that should have declarations but has none is a FAILURE rather
  * than a silent skip, and any artifact the build could not have produced is a
  * failure naming the stale file.
+ *
+ * A NOTE ON HOW IT READS IT. It PARSES. This was a text search once, and a text
+ * search cannot tell a declaration from a sentence that mentions one: a doc
+ * comment was read as a dependency and reddened the gate over prose. See the
+ * second `describe` below, which is the reading rule.
  */
 
 const PACKAGES = new URL('../../', import.meta.url).pathname;
@@ -62,16 +68,55 @@ function allFiles(dir: string): string[] {
 	});
 }
 
-/** Bare specifiers a declaration file imports or re-exports, including `import('x')` types. */
+/**
+ * Bare specifiers a declaration file imports or re-exports, including
+ * `import('x')` types, read out of the PARSE rather than out of the text.
+ *
+ * The four syntactic forms below are the whole of how a `.d.ts` can name another
+ * module, and each one is a node the parser hands us as a module specifier: a
+ * position no comment and no string literal can occupy. That is the entire point
+ * of parsing here. TypeScript is already a devDependency of this package, so the
+ * honest reading costs nothing beyond one `createSourceFile` per file.
+ *
+ * `declare module 'x' {}` is deliberately NOT counted: it augments or shims a
+ * module rather than importing one, and whatever really pulls that module in is
+ * an import this already reports. Nor is a triple-slash
+ * `/// <reference types="x" />`, which the text search never caught either;
+ * widening what the gate catches is a separate decision from fixing how it
+ * reads.
+ */
 function importedPackages(source: string): Set<string> {
 	const found = new Set<string>();
-	for (const pattern of [/(?:from|import)\s*\(?\s*'([^']+)'/g, /(?:from|import)\s*\(?\s*"([^"]+)"/g]) {
-		for (const match of source.matchAll(pattern)) {
-			const specifier = match[1];
-			if (specifier.startsWith('.') || isBuiltin(specifier)) continue;
-			found.add(packageOf(specifier));
-		}
+	// The name matters: it is what makes TypeScript parse this as a declaration
+	// file. `setParentNodes` stays off because nothing here walks upwards.
+	const parsed = ts.createSourceFile('scanned.d.ts', source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+
+	function record(node: ts.Node | undefined): void {
+		if (!node || !ts.isStringLiteralLike(node)) return;
+		const specifier = node.text;
+		if (specifier.startsWith('.') || isBuiltin(specifier)) return;
+		found.add(packageOf(specifier));
 	}
+
+	function visit(node: ts.Node): void {
+		if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+			// `import ... from 'x'`, `export ... from 'x'`, `export * from 'x'`.
+			record(node.moduleSpecifier);
+		} else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
+			// `import('x').Type`, the form an inferred return type is emitted as, and
+			// the one most likely to name a package the author never typed.
+			record(node.argument.literal);
+		} else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+			// `import x = require('x')`.
+			record(node.moduleReference.expression);
+		} else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+			// `import('x')` as an expression, should one ever reach a declaration file.
+			record(node.arguments[0]);
+		}
+		ts.forEachChild(node, visit);
+	}
+
+	ts.forEachChild(parsed, visit);
 	return found;
 }
 
@@ -140,4 +185,92 @@ describe('published .d.ts files only import declared dependencies', () => {
 			).toEqual([]);
 		});
 	}
+});
+
+/**
+ * What the scan above COUNTS as an import, pinned directly.
+ *
+ * This used to be a text search, and a text search cannot tell a declaration
+ * from a sentence that mentions one. A doc comment reading `nothing
+ * distinguished "the chain had none" from "we never asked"` was reported as
+ * `core/dist/types.d.ts imports 'we never asked', which is not declared at all`,
+ * and the gate went red on a COMMENT. The author reworded the prose to get past
+ * it, which is the expensive lesson: it teaches people to change what a comment
+ * SAYS to satisfy a test that was never about comments, in a repository whose
+ * whole documentation style is long explanatory comments.
+ *
+ * So the cases below are the reading rule, not incidental examples. The first is
+ * the exact shape that broke it.
+ */
+describe('the scan reads declarations, not prose', () => {
+	it('ignores an import specifier written in JSDoc prose', () => {
+		const declaration = `
+/**
+ * A spliced event's logs were never asked for, and afterwards nothing
+ * distinguished "the chain had none" from "we never asked".
+ */
+export type Spliced = {topic0: string};
+`;
+		expect([...importedPackages(declaration)]).toEqual([]);
+	});
+
+	it('ignores an import written out inside an @example block', () => {
+		const declaration = `
+/**
+ * @example
+ * import {createIndexer} from 'left-pad';
+ * const indexer = createIndexer();
+ */
+export declare function createIndexer(): void;
+`;
+		expect([...importedPackages(declaration)]).toEqual([]);
+	});
+
+	it('ignores an import mentioned in a line comment', () => {
+		expect([...importedPackages(`// as in \`import x from 'left-pad'\`\nexport declare const x: number;\n`)]).toEqual(
+			[],
+		);
+	});
+
+	it('finds every form a declaration file really imports through', () => {
+		const declaration = `
+import type {Abi} from 'abitype';
+import {createClient} from 'viem/clients/createClient';
+export * from 'eip-1193';
+export type Logger = import('named-logs').Logger;
+export declare const later: () => Promise<typeof import('immer')>;
+`;
+		expect([...importedPackages(declaration)].sort()).toEqual(['abitype', 'eip-1193', 'immer', 'named-logs', 'viem']);
+	});
+
+	it('still ignores relative specifiers and node built-ins', () => {
+		const declaration = `
+import type {Local} from './local.js';
+import type {Buffer} from 'node:buffer';
+export type Held = {local: Local; buffer: Buffer};
+`;
+		expect([...importedPackages(declaration)]).toEqual([]);
+	});
+
+	it('does not count an import specifier that is merely the text of a string literal', () => {
+		// A string literal type is DATA, not a module reference: nothing resolves it,
+		// so a consumer missing that package is not broken by it. The old text search
+		// reported it; a parse cannot, and should not.
+		expect([...importedPackages(`export type Hint = "run: import x from 'left-pad'";\n`)]).toEqual([]);
+	});
+
+	it('reads the real emitted declarations rather than parsing them into nothing', () => {
+		// The failure mode of a parser-based scan is the silent one: a parse that
+		// yields no imports makes every package look clean. This package's public
+		// types are built out of `abitype` and `viem`, so an empty answer here means
+		// the scan stopped reading, not that the imports went away.
+		const found = new Set<string>();
+		for (const file of declarationFiles(join(PACKAGES, 'core', 'dist'))) {
+			for (const imported of importedPackages(readFileSync(file, 'utf-8'))) found.add(imported);
+		}
+		expect(
+			[...found],
+			'@etherfold/core\u2019s emitted declarations import nothing at all, which cannot be true',
+		).not.toEqual([]);
+	});
 });
