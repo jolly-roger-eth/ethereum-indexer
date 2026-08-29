@@ -32,8 +32,9 @@ needsAnswers: true
    store-factory option, a processor factory, or the browser package building it). Answer this before
    tasking, or the first task picks the public API by accident.
 2. **What shape does `SyncingState` grow?** It is a single flat record with one `lastSync` and one
-   `syncPercentage`, and stories 3 and 4 need pending catch-up progress. This is published surface
-   too.
+   `syncPercentage`, and it must now carry two things: pending catch-up progress (stories 3 and 4)
+   AND the superseded marking that lets an app decide whether to render the live deployment's state
+   (story 9). Both are published surface.
 
 ## Problem Statement
 
@@ -108,6 +109,9 @@ Identity resting on the verdict rather than on hash equality keeps that exposure
 7. As an operator reconfiguring twice, I want the second to replace the first pending deployment.
 8. As an operator, I want a deployment whose stream is unavailable to fall back to a full re-index,
    which is today's behaviour, so the feature degrades rather than breaks.
+9. As an app author, I want to be TOLD that the state I am reading comes from a superseded
+   deployment with a replacement catching up, so that I decide whether to render it, dim it or hide
+   it, since only I know whether my reconfigure made the old answers wrong or merely incomplete.
 
 ## Implementation Decisions
 
@@ -182,6 +186,34 @@ rode on the handle or on every read return. Both are dropped, because the questi
   transparent to every holder, and the entire staleness class disappears instead of being made
   detectable.
 
+**The superseded deployment KEEPS INDEXING, and its state is served MARKED.** Two alternatives were
+considered and rejected, and the reasoning is the load-bearing part.
+
+_Freezing it_ (retiring it from indexing the moment a pending deployment starts) looks free and is
+not. An indexer that stops carries an UNCONFIRMED window, blocks inside the finality depth that it
+has processed but that are not yet final. If it stops, and one of those is reorged away, it never
+finds out: its state permanently contains events from blocks that no longer exist, and it has
+retired the only machinery that could have discovered that. Freezing safely would mean
+`revertTo(finalisedHead)` first, which discards exactly the recent data a UI is showing. Since the
+doubled tail fetch is already accepted, keeping it live costs something already paid for and buys
+correctness for nothing.
+
+_Discarding immediately_ (today's behaviour, kept as a mode, so the app never shows superseded data)
+was rejected because it makes the INDEXER decide something only the APP knows. Whether old data is
+misleading depends entirely on WHY the reconfigure happened, and the indexer cannot see that: after
+a processor bug fix the old state is WRONG, which is why it was fixed; after an added event it is
+merely INCOMPLETE, and everything it says is still true; after a renamed parameter it is FINE.
+`sourceInvalidationOf` can say what moved, never whether the old answers are now lies. So there is
+no safe default, and a second indexer mode would only relocate the guess.
+
+Instead the superseded state is served **marked**: the consumer receives it together with the fact
+that it is superseded and that a pending deployment is catching up. The app then renders it, dims
+it, banners it, or refuses to show it, because the app author is the only party who knows which of
+the three cases above they are in. This is why there is ONE mechanism and no discard mode: the
+presentation decision moves to where the information is, rather than a branch inside the indexer.
+
+The marking rides on the same published surface as catch-up progress, which is open question 2.
+
 **One mechanism, two runtimes.** The browser case is the stronger one: today a reconfigure blanks the
 app. Only the promotion POLICY differs, which is a knob. Two concrete browser gaps remain, and the
 reactive shape is not one of them (the root store replaces its value wholesale):
@@ -204,6 +236,11 @@ happened (a deployment was created, or the verdict was a no-op, or `reset` disca
 assertion pinning the old flag must be migrated by the task that changes it, and the browser
 consumers of `stateDiscarded` in `IndexerState` must move with it. A spec that left this unnamed
 would have the first task to trip over it rewrite the corpus by guess.
+
+Retaining a discard-immediately MODE would have partly rescued the flag, by keeping a path on which
+it still varies. That mode is rejected above, so the rescue is not available: with no discard mode
+`reset` always discards and the two update verbs never do, which makes the flag a per-verb constant
+and dead as a signal. Settled, not open.
 
 **`reset` stays an unconditional discard, and it also drops the pending deployment.** It is the one
 verb whose caller MEANS discard, so it does not create a deployment. Two consequences to build
