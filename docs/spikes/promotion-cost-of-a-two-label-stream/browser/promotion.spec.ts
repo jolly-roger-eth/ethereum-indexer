@@ -34,16 +34,29 @@ const CASES = ['whole-stream', 'partial-graft', 'no-sharing'];
 
 const collected: Record<string, unknown>[] = [];
 
+/**
+ * Results are MERGED by `(arm, size, seal, case)`, not overwritten.
+ *
+ * A sweep is routinely run at one size at a time (`SPIKE_SIZES=8x`), and an
+ * overwriting write would silently drop every size not in the current run,
+ * leaving the finding quoting numbers no longer in the file it cites.
+ */
 test.afterAll(async ({}, testInfo) => {
 	fs.mkdirSync(RESULTS, {recursive: true});
+	const file = path.join(RESULTS, `browser-${testInfo.project.name}.json`);
+	const keyOf = (r: any) => `${r.arm}|${r.size}|${r.sealAfter}|${r.sharingCase}`;
+	const existing = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf-8')).rows ?? [] : [];
+	const merged = new Map<string, unknown>();
+	for (const row of existing) merged.set(keyOf(row), row);
+	for (const row of collected) merged.set(keyOf(row), row);
 	fs.writeFileSync(
-		path.join(RESULTS, `browser-${testInfo.project.name}.json`),
+		file,
 		JSON.stringify(
 			{
 				project: testInfo.project.name,
 				ranAt: new Date().toISOString(),
-				note: 'ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on.',
-				rows: collected,
+				note: 'ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on. Rows are merged across runs by (arm, size, seal, case).',
+				rows: [...merged.values()],
 			},
 			null,
 			2,

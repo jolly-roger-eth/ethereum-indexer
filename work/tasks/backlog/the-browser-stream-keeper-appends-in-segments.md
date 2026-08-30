@@ -3,10 +3,17 @@ title: 'The browser stream keeper appends in segments, on the same core helper'
 slug: the-browser-stream-keeper-appends-in-segments
 spec: appending-to-the-stream-costs-the-batch
 blockedBy: [segment-the-stream-behind-one-core-helper]
-covers: [2]
+covers: [1, 2, 3, 4, 5, 6, 7]
 ---
 
 ## What to build
+
+> **`covers` deliberately OVERLAPS the sibling task's.** Story 2 (no full structured-clone on the
+> browser) is this task's alone, but stories 1 and 3-7 are the shared `ExistingStream` contract and
+> are only shipped for a browser user when THIS task lands: the sibling delivers them on the
+> filesystem. Reading the sibling's `done` record as "story 5, an existing persisted stream keeps
+> working, is shipped" would be wrong while every browser user still holds the old blob. The overlap
+> records that, and it is per-substrate rather than duplicated work.
 
 Put `keepStreamOnIndexedDB` on the segmentation helper that
 `segment-the-stream-behind-one-core-helper` builds, so a save on the browser stops structured-cloning
@@ -61,13 +68,21 @@ for the migration test — rather than patching it blind on a red gate.
 - [ ] **`clear` removes every segment of ITS stream and nothing else** — via `keys` + `delMany` over
       the anchored match, never `idb-keyval`'s store-wide `clear()`. A test asserts an unrelated key
       in the same store survives.
-- [ ] **A gap in the ordinals is REFUSED** rather than replayed as a shorter stream.
+- [ ] **A gap in the ordinals is REFUSED AND THE REMAINDER CLEARED**, not thrown — matching whatever
+      the helper landed, and asserted here too because `indexer.ts` has no `try`/`catch` around
+      `fetchFrom`, so a throw would leave the browser indexer permanently unloadable.
 - [ ] **The migration**: write a stream in the shipped blob format, read it with the new code, assert
       NO re-fetch; and separately, a legacy blob with a dropped raw half is cleared per ADR-0034.
 - [ ] `packages/browser/test/invalidation.test.ts` is updated deliberately for the new key layout and
       still asserts what it was written to assert.
-- [ ] The behaviours above hold identically on BOTH keepers — this is the round-trip check that the
-      two independent implementations of one contract really agree.
+- [ ] The behaviours above are asserted PER PACKAGE, mirroring the fs assertions the sibling task
+      landed, and the mirroring is deliberate rather than incidental: `packages/browser` does not
+      depend on `@etherfold/fs` (check its `package.json`) and cannot import it, so a single
+      cross-keeper test is NOT in this task's scope and must not be attempted by widening the
+      dependency. If a genuinely shared contract suite is wanted, the repo's precedent is a separate
+      package (`packages/state-store-conformance`) and that is a NAMED follow-up, not this task.
+      What this criterion asks for is that the two packages assert the SAME behaviours, so a
+      divergence between the two implementations of one contract shows up as a red test somewhere.
 - [ ] `pnpm build && pnpm typecheck && pnpm test` green.
 
 ## Blocked by
@@ -118,7 +133,12 @@ survive a `clear`.
 **Scope fence.** Do NOT change the helper (that is the sibling task's file, and a change there means
 this task found drift — surface it rather than editing). Do NOT make the stream raw-only — that is
 `the-stream-stores-only-what-the-node-said`. Do NOT add per-segment block-range metadata. Do NOT touch
-core's `index.ts` or add a changeset; the sibling task owns both.
+core's `index.ts`; the sibling task owns it. Do NOT add a dependency on `@etherfold/fs`.
+
+DO ship your OWN changeset, for `@etherfold/browser` only. This task changes the persisted IndexedDB
+layout and adds a legacy-blob migration, which is exactly what a browser consumer needs a release
+note for, and the sibling task's changeset was written before this work existed so it cannot describe
+it. A separate changeset file means no merge contention with it.
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (how
 you mocked `idb-keyval`'s `set` for the cost assertion; anything the port had to do that the fs port

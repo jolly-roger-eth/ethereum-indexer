@@ -55,13 +55,20 @@ npx tsx run/measure-fs.ts                          # the filesystem sweep
 SPIKE_SIZES=1x,4x SPIKE_SEAL=1000 npx tsx run/measure-fs.ts    # a quicker pass
 
 npx playwright install chromium firefox webkit
-npx playwright test --project=chromium             # the IndexedDB sweep
+npx playwright test --project=chromium             # the IndexedDB sweep, 1x and 4x
+SPIKE_SIZES=8x SPIKE_SEAL=1000 npx playwright test --project=chromium   # the 136 MB rows
 ```
+
+The browser spec defaults to `SPIKE_SIZES=1x,4x`, so the 136 MB rows the finding quotes need `8x`
+asked for explicitly. Results are MERGED by `(arm, size, seal, case)` rather than overwritten, so
+running one size at a time accumulates rather than discarding the others.
 
 `SPIKE_DIR` chooses where the filesystem arm writes, and it is **not** a detail: `os.tmpdir()` is `tmpfs` on most Linux boxes, where a rename and a rewrite are both memory operations, so measuring there flatters the rewrite arm. The default is a real disk directory (`~/.cache/etherfold-promotion-spike`) and the chosen root is recorded in `results/fs.json`.
 
 ## Reading the numbers honestly
 
 `ms` is wall-clock and is the WEAKER number: it moves with machine load, which is why `appending-to-the-stream-costs-the-batch` insists its own append-cost claim be asserted as work rather than wall-clock (ADR-0032). The metrics the finding rests on are the WORK ones — `metadataRenames`, `payloadsRewritten`, `payloadBytesMoved`, `storeOps` — which are substrate-independent and reproduce exactly.
+
+How much weaker, measured rather than asserted: a first `8x` chromium sweep run on a busy machine produced key-label timings up to FIVE TIMES those of a quiet re-run, with byte-identical work counters. Treat any single timing as an order of magnitude, and treat a difference under about 2x between two arms as no difference at all.
 
 `payloadBytesMoved` is measured as the JSON length of every value passed through `set`. That is an accounting of the work, NOT a claim about what either store wrote to disk: IndexedDB does not expose structured-clone size, which is the same reason the seal threshold is counted in events rather than bytes, and a metric both keepers can report is the only one comparable across them.

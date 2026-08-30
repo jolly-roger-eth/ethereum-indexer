@@ -45,8 +45,18 @@ The shape to build:
   with an ordinal appended the chain-`1` prefix `stream_tag_1` is ALSO a prefix of every chain-`10`
   key (`stream_tag_10_0`). Match `^stream_<name>_<chainId>_(\d+)$` — full prefix, separator, and a
   remainder that parses as an ordinal.
-- **A gap in the ordinals is REFUSED, not tolerated.** A missing fragment replayed as if it were the
-  whole stream is the same silent-absence failure `SuspectedTruncationError` already refuses.
+- **A gap in the ordinals is REFUSED, and the refusal CLEARS THE REMAINDER — it does not throw.** A
+  missing fragment replayed as if it were the whole stream is a silent-absence failure and must not
+  happen. But the recovery is to DROP the stream, not to raise: `indexer.ts` calls
+  `keepStream.fetchFrom` with no `try`/`catch` anywhere in that method, so a throw escapes `load()`,
+  and the browser wrapper only records an error and rethrows without clearing. Every subsequent load
+  would throw again and the indexer would be permanently unloadable, with no recovery path a user
+  could reach — for a LOCAL CACHE whose correct recovery is simply to re-fetch. Clearing is also the
+  idiom already in that method: it calls `keepStream.clear(this.source)` on a stream whose context no
+  longer matches and on one whose raw half was dropped. Note this is why the
+  `SuspectedTruncationError` analogy does NOT extend to the action: that is a live NODE fetch where
+  retrying or narrowing is the recovery; a corrupt local cache has none but discard. So: detect the
+  gap, clear the remainder, log it, and let the indexer re-index.
 - **The legacy blob is ADOPTED IN PLACE as the earliest sealed segment**, never copied. The stream
   blob carries no format field, so the old shape is recognised structurally. It is read first,
   followed by `_0.._N`, and the first save after an upgrade writes only the new tail — so the
@@ -81,7 +91,11 @@ stops the two keepers choosing differently and makes the seal test deterministic
 
 - [ ] A core helper implements segmentation over an injected `get`/`set`/`del`/`keys` port, and is
       reachable from `@etherfold/fs` (core's `exports` map is only `.` and `./package.json`, so
-      `index.ts` must re-export it). That export line is published surface: **ship a changeset.**
+      `index.ts` must re-export it). That export line is published surface: **ship a changeset**, and
+      scope it to `@etherfold/core` and `@etherfold/fs` only. The sibling task ships its own for
+      `@etherfold/browser`, whose persisted layout it changes; do not try to describe that here,
+      since it lands after this one. (`packages/fs/src/utils/fs.ts` is NOT re-exported from
+      `packages/fs/src/index.ts`, so adding `keys` to it is not published surface.)
 - [ ] `keepStreamOnFile` is implemented on the helper and `packages/fs/src/utils/fs.ts` gains `keys`.
 - [ ] **Append cost is asserted as WORK, not wall-clock**, at a module-level mock of `node:fs` behind
       `packages/fs/src/utils/fs.ts`. Assert the CEILING: no save writes more than one tail plus its
@@ -109,7 +123,12 @@ stops the two keepers choosing differently and makes the seal test deterministic
       what makes that true rather than luck.
 - [ ] **`clear` removes everything**: clear a multi-segment stream, confirm the next `fetchFrom`
       returns nothing and no orphan survives.
-- [ ] **A gap in the ordinals is REFUSED** rather than replayed as a shorter stream.
+- [ ] **A gap in the ordinals is REFUSED AND THE REMAINDER CLEARED** rather than replayed as a
+      shorter stream — and specifically NOT thrown: assert that after a gap is introduced, the next
+      `fetchFrom` returns undefined (or an empty stream) rather than raising, so `indexer.ts` takes
+      its clear branch and re-indexes. An interrupted `clear` is the designed-for case here: the fs
+      `clear` is N `unlinkSync` calls and is not atomic, so a half-cleared stream is reachable in
+      normal operation, not just in a fault-injection test.
 - [ ] **The migration**: write a stream in the shipped blob format, read it with the new code, assert
       NO re-fetch. Separately, a legacy blob whose raw half a `logValues` projection dropped is
       CLEARED, per ADR-0034's mandate — clearing a stream that cannot be re-read is correct, and what
@@ -174,8 +193,9 @@ answers a strictly better question than a range over the events a segment happen
 touch `packages/browser` — the browser keeper is the sibling task's file.
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (the
-seal threshold you pick and why; how the legacy shape is recognised structurally; what exactly a
-contiguity refusal throws). That block is the ONE sanctioned channel for build-time rationale and the
+seal threshold you pick and why; how the legacy shape is recognised structurally; exactly what a
+contiguity refusal does and how it is logged). That block is the ONE sanctioned channel for
+build-time rationale and the
 runner transcribes it into the done record. Do NOT write the done record, the commit message or the
 PR body yourself, and do NOT open an observation note for decisions. If a choice meets the ADR gate
 (hard to reverse + surprising without context + a real trade-off), also write it as an ADR in

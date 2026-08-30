@@ -169,3 +169,15 @@ Promotion wall-clock in ms, per engine.
 | key-label-unbatched | 4x | 4000 | no-sharing | 31 | 31 | 696 | 1535 | 1033 |
 | value-label | 4x | 4000 | no-sharing | 31 | 31 | 1190 | 2098 | 1625 |
 | value-label+pointer | 4x | 4000 | no-sharing | 31 | 31 | 655 | 1211 | 904 |
+| key-label | 8x | 1000 | whole-stream | 0 | 0 | 25 | 19 | 5 |
+| key-label-unbatched | 8x | 1000 | whole-stream | 0 | 0 | 22 | 16 | 3 |
+| value-label | 8x | 1000 | whole-stream | 0 | 0 | 521 | 974 | 308 |
+| value-label+pointer | 8x | 1000 | whole-stream | 0 | 0 | 12 | 19 | 3 |
+| key-label | 8x | 1000 | partial-graft | 125 | 125 | 1400 | 1321 | 640 |
+| key-label-unbatched | 8x | 1000 | partial-graft | 125 | 125 | 863 | 1720 | 819 |
+| value-label | 8x | 1000 | partial-graft | 125 | 125 | 1958 | 2686 | 1174 |
+| value-label+pointer | 8x | 1000 | partial-graft | 125 | 125 | 1379 | 1374 | 573 |
+| key-label | 8x | 1000 | no-sharing | 250 | 250 | 3105 | 2485 | 1445 |
+| key-label-unbatched | 8x | 1000 | no-sharing | 250 | 250 | 1804 | 3473 | 1774 |
+| value-label | 8x | 1000 | no-sharing | 250 | 250 | 4129 | 4669 | 2059 |
+| value-label+pointer | 8x | 1000 | no-sharing | 250 | 250 | 2880 | 2498 | 1402 |

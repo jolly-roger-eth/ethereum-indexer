@@ -139,9 +139,17 @@ the literal implementation.
 Which case applies is decided by the invalidation verdict, not chosen:
 
 - **whole-stream** (a processor-only change, a decode-only change: the topic set is unchanged, so
-  every log the successor needs is already stored). It fetches NOTHING, reads the live stream, and
-  writes nothing until promotion. The most common case by far, since an ABI is regenerated more often
-  than it is meaningfully changed.
+  every log the successor needs is already stored). It re-fetches NO HISTORY and re-folds from the
+  live stream. The most common case by far, since an ABI is regenerated more often than it is
+  meaningfully changed.
+
+  > **Superseded in one detail by the spec.** This bullet originally read "it fetches NOTHING and
+  > writes nothing until promotion", which was true of option B, where the successor was a pure
+  > reader over the live stream. The spec chose ONE successor mechanism instead of two, so the
+  > successor is an ordinary indexer that follows the head itself: it re-fetches no HISTORY, but it
+  > does fetch the head-following TAIL (the doubling this note already records as acceptable) and it
+  > does write its own staging segments. See `a-reconfigure-is-not-an-outage`, which states the price
+  > and why it was worth one mechanism.
 - **partial graft** (an event added or edited below the cursor). Reuses below the graft point,
   re-fetches above it.
 - **no sharing** (a changed address, a new contract: these land in the block-0 skeleton entry, so

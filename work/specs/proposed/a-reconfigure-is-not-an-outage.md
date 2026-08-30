@@ -62,21 +62,65 @@ live entries       stream_<name>_<chainId>_live_<seq>
 staging entries    stream_<name>_<chainId>_staging_<seq>
 
 staging reads      gen = staging OR (gen = live AND seq <= N)
-promotion          delete  gen = live AND seq > N
-                   rename  gen = staging  ->  gen = live
+promotion          1. delete  gen = live AND seq > N
+                   2. rename  gen = staging  ->  gen = live
 ```
 
-**`N` is a segment SEQUENCE, not a block, and it is FIXED when the successor is created.** It is the
-highest live segment whose embedded `lastSync.lastToBlock` is below the `invalidFromBlock` the
-verdict reported: the graft point rounded DOWN to a segment boundary. Nothing new has to be recorded
-to compute it, because every segment already carries the `lastSync` current when it was written,
-which is an atomic snapshot of the scanned extent at that boundary.
+**The two steps of promotion are ORDERED, and the order is a crash-safety requirement rather than a
+presentation choice.** Promotion mutates many keys and cannot be atomic on either keeper, so what
+matters is what an interrupted promotion leaves behind.
+
+Delete FIRST. A crash then leaves live `0..N` plus surviving `staging` entries: the live ordinals
+have a GAP above `N`, which the prerequisite's contiguity refusal already detects, and staging is
+still intact, so the promotion is simply re-run. Rename first is the trap: it leaves the renamed
+entries sitting on top of the OLD live segments above `N`, the ordinals are CONTIGUOUS so no refusal
+fires, and the cursor — read from the tail — is the retired generation's, sitting ahead of what the
+new generation actually folded. That is silent wrong state, which is the failure class this design
+refuses everywhere else.
+
+A restart that finds BOTH labels present therefore means an interrupted promotion, and the recovery
+is to re-run it from step 1, not to guess which generation was meant to win.
+
+**`N` is a segment SEQUENCE, not a block; it is FIXED when the successor is created; and it is always
+a SEALED segment.** It is the highest SEALED live segment whose embedded `lastSync.lastToBlock` is
+below the `invalidFromBlock` the STREAM verdict reported: the graft point rounded DOWN to a sealed
+boundary. Nothing new has to be recorded to compute it, because every segment already carries the
+`lastSync` current when it was written, which is an atomic snapshot of the scanned extent at that
+boundary.
+
+**Sealed is not a detail, it is what makes the shared prefix stable.** The OPEN tail is rewritten on
+every save — that is exactly how the prerequisite makes an append cost the batch — so a graft point
+landing on the tail would share a segment that keeps growing underneath the successor. Two things
+would then break at promotion: the live tail would carry events appended AFTER the graft point that
+promotion is supposed to drop, and the successor would have re-fetched that same range into its own
+staging segments, so the promoted stream would hold both copies and a replay would double-fold them.
+Sealed segments are immutable, so restricting `N` to one removes the whole class.
+
+**Creating a successor SEALS the live tail, which costs no write.** A segment is sealed exactly when
+it stops being the highest ordinal, so "seal the tail" means the live generation's next save opens a
+new segment rather than appending to the old one. `N` is therefore the segment that was open at
+creation, available immediately, and nothing is written to seal it. (A stream with no segments at all
+yet has no `N`, so the successor backfills — the same path as the no-sharing case, and correct, since
+there is nothing to reuse.)
+
+**`N` comes from the STREAM verdict; the STATE verdict decides only that a successor is NEEDED.**
+`sourceInvalidationOf` returns TWO verdicts, `{state, stream}`, each with its own
+`invalidFromBlock`, and they answer different questions: `hash` covers the DECODING shape while
+`streamHash` is what the FILTER is built from. Conflating them mis-files the most valuable case. A
+decode-only change — a renamed non-indexed parameter — moves `hash` but not `streamHash`, so the
+STATE is invalid from that block while the STREAM stays wholly valid. Read from the state half it
+would force a backfill from that block; read from the stream half it is whole-stream sharing with no
+re-fetch at all, which is what it actually is. The existing `streamMatches` helper already draws this
+line in `indexer.ts`, and its comment states the rule: raw logs under a topic-and-address filter are
+reusable whenever that filter did not GROW.
 
 **Each generation writes only under its OWN label, so there are two writers over one keyspace and
 their key sets are disjoint.** Neither can clobber the other, and no coordination rule is needed to
 say so. The live generation keeps appending `live` segments the whole time; the successor appends
-`staging` segments; the live entries at or below `N`, which both read, are immutable because nothing
-in this system ever rewrites a segment.
+`staging` segments; and the live entries at or below `N`, which both read, are immutable because `N`
+is a SEALED boundary and a sealed segment is never rewritten. (The OPEN tail IS rewritten on every
+save — that is how the prerequisite makes an append cost the batch — which is exactly why `N` may
+never be it. See the sealing rule above.)
 
 **Staging numbers its segments from `N + 1`.** It can, because the label already separates the two
 key spaces. So promotion is a rename that keeps the sequence number, and the promoted stream is
@@ -171,17 +215,20 @@ and it writes to a label nobody else touches.
 The three sharing cases are then not three mechanisms but three values of `N`, and which one applies
 is decided by the verdict rather than chosen:
 
-- **whole-stream** — a processor-only or decode-only change. The topic set is unchanged, so every log
-  the successor needs is already stored and nothing below the cursor is invalid: `N` is the live tail
-  at creation. The successor re-fetches NO history; it re-folds the whole stream and then follows the
-  head itself. This is the most common case by far, since an ABI is regenerated far more often than
-  it is meaningfully changed.
-- **partial graft** — an event added or edited below the cursor. `N` is the last segment boundary
-  beneath `invalidFromBlock`; the successor re-fetches from that boundary's `lastToBlock` upward.
-  Bounded by how far back the boundary sits, not by the length of the history.
-- **no sharing** — a changed address or a new contract. These land in the block-0 skeleton entry, so
-  `invalidFromBlock` is 0, `N` selects no live entries, and the successor backfills the whole history
-  into staging. The rare case, and the only one that genuinely pays twice.
+- **whole-stream** — a processor-only or decode-only change. The STREAM verdict is wholly valid (the
+  topic set is unchanged, so every log the successor needs is already stored), so `N` is the segment
+  that was open at creation, just sealed. The successor re-fetches NO history; it re-folds the whole
+  stream and then follows the head itself. This is the most common case by far, since an ABI is
+  regenerated far more often than it is meaningfully changed, and it is the case a state-verdict
+  reading would wrongly demote to a partial graft.
+- **partial graft** — an event added or edited below the cursor, changing the FILTER. `N` is the last
+  sealed boundary beneath the stream verdict's `invalidFromBlock`; the successor re-fetches from that
+  boundary's cursor upward. Bounded by how far back the boundary sits, not by the length of the
+  history.
+- **no sharing** — a changed address or a new contract. These land in the block-0 skeleton entry,
+  whose `hash` and `streamHash` are the SAME value, so both verdicts are invalid from block 0, `N`
+  selects no live entries, and the successor backfills the whole history into staging. The rare case,
+  and the only one that genuinely pays twice.
 - An event added ABOVE the cursor creates no generation at all: `sourceInvalidationOf` already calls
   it free.
 
@@ -333,15 +380,35 @@ both and is reported on both, which is accurate rather than duplicated; a consum
 once can compare the existing `id: ErrorCode`. No `scope` field is added, because two ids already
 disambiguate what one would.
 
-**`ReconfigureOutcome.stateDiscarded` is a published API this design falsifies, and it is owned
-here.** Under a successor neither `updateIndexer` nor `updateProcessor` discards anything: the live
-generation keeps its state throughout, so the flag collapses to a per-verb constant — `reset` always
-discards, the two update verbs never do — and stops distinguishing the thing it was added to
-distinguish. That is a DELETION SWEEP, not a detail: the reconfigure outcome must grow a shape that
-says what actually happened (a successor was created, the verdict was a no-op, or `reset` discarded),
-and every reference must be migrated by the task that changes it. There are **36** across three
-trees: `packages/core` (11), `packages/browser` (23) and `examples/browser-reference` (2). A spec
-that left this unnamed would have the first task to trip over it rewrite the corpus by guess.
+**The verdict must become a PUBLISHED, ACTIONABLE answer, and today it is neither.** This is the
+load-bearing plumbing the rest of the design assumes, so it is named rather than left to be
+discovered:
+
+- `sourceInvalidationOf` is INTERNAL. `packages/core/src/index.ts` re-exports only `ReorgCause` and
+  `ReorgDetection` from that module, and core's `exports` map is `.` plus `./package.json`, so
+  `packages/browser` cannot reach it. The container lives browser-side, so the verdict has to cross
+  that boundary: a new published core surface, and a changeset.
+- `invalidFromBlock` is COMPUTED AND THROWN AWAY. `updateIndexer` builds the verdict from private
+  `sourceHashes`, `streamConfigHash` and `lastSync.context`, takes `resetNeeded = !state.valid`, and
+  the code says outright that "the block each half names is carried no further than the log line".
+  `N` is exactly that block, so it has to be carried out instead of logged.
+- The verb must be able to REPORT without DISCARDING. `updateIndexer` currently decides and then
+  performs the discard itself. Under this design the container decides, so the core verb has to
+  offer the verdict and let the caller act.
+
+**`ReconfigureOutcome.stateDiscarded` is the published API this falsifies, and the two changes are
+ONE landable because the replacement shape IS the verdict.** Under a successor neither
+`updateIndexer` nor `updateProcessor` discards anything: the live generation keeps its state
+throughout, so the flag collapses to a per-verb constant — `reset` always discards, the two update
+verbs never do — and stops distinguishing the thing it was added to distinguish. The outcome must
+grow a shape that says what actually happened (a successor was created and from which graft point,
+the verdict was a no-op, or `reset` discarded).
+
+That is a DELETION SWEEP and every reference must be migrated by the task that changes the shape.
+There are **38**: `packages/core` (11), `packages/browser` (23), `examples/browser-reference` (2),
+and — easily missed because it is not code — **`docs/guide/indexing-in-a-browser-app/index.md` (2)**,
+where a whole subsection instructs readers to branch on `{stateDiscarded: boolean}` from all three
+verbs. Left out of the fence, the guide keeps teaching an API this design falsifies.
 
 ## Testing Decisions
 
@@ -357,10 +424,25 @@ that left this unnamed would have the first task to trip over it rewrite the cor
 - **The live generation's entries at or below `N` are byte-identical** before and after a catch-up,
   which is the immutability half of the same guard.
 - **A whole-stream reconfigure re-fetches NO history**: asserted on the ranges the node was asked
-  for, which must all lie above the graft boundary's `lastToBlock`. This is the sharing test and it
-  is the most common reconfigure.
-- **A partial graft re-fetches only above its boundary**, asserted on the ranges the node was asked
-  for, with `N` landing on the last segment boundary BENEATH `invalidFromBlock` and never above it.
+  for, none of which may start below **segment `N`'s `latestBlock - finality`**. State the floor that
+  way and not as "above `N`'s `lastToBlock`", which is false by construction: `getFromBlock` returns
+  `min(lastToBlock + 1, latestBlock - finality)`, so a graft taken at the head starts the successor's
+  first range a full `finality` (default 17) blocks BELOW `N`'s `lastToBlock`. A builder held to the
+  wrong floor would satisfy it by adding back the finality clamp this design rejects. This is the
+  sharing test and it is the most common reconfigure.
+- **A partial graft re-fetches only above its boundary**, under the same floor, with `N` landing on
+  the last SEALED boundary BENEATH the STREAM verdict's `invalidFromBlock` and never above it.
+- **A decode-only change is whole-stream sharing, not a partial graft**: a renamed non-indexed
+  parameter moves `hash` but not `streamHash`, and the successor must re-fetch no history at all.
+  This is the guard against reading `N` off the state verdict.
+- **`N` is never the open tail**: after a successor is created, the live generation's next save opens
+  a new segment, and no write ever targets segment `N` again. This is what makes the shared prefix
+  stable, and without it the promoted stream would carry the live tail's post-graft events beside the
+  successor's own copy of the same range.
+- **An interrupted promotion is detectable and re-runnable**: crashing between the delete and the
+  rename leaves a GAP in the live ordinals that the contiguity refusal catches, with staging intact,
+  and re-running promotion completes it. Asserted by interrupting at the seam, since the rename-first
+  order this rules out would leave a contiguous, silently-wrong stream.
 - **Promotion leaves ONE contiguous live generation**: after promoting, every key is `live`, the
   sequence numbers are contiguous from 0, no `staging` key survives, and the superseded live entries
   above `N` are gone.
@@ -399,29 +481,45 @@ that left this unnamed would have the first task to trip over it rewrite the cor
 
 ## Tasking note
 
-This cuts into FIVE separable landables, which a tasker should follow rather than treating it as one
-body of work. Cutting them together would produce one task nobody can review.
+This cuts into FIVE separable landables. Cutting them together would produce one task nobody can
+review.
 
-1. **The labelled stream.** The key layout, the graft-bounded staging read, and promotion as rename
-   plus delete, in the shared segmentation helper the prerequisite establishes plus both keepers. It
-   is buildable and testable on its own (write both labels, read with a bound, promote, assert one
-   contiguous live generation) and it is the piece the spike measured. Everything else depends on it.
-2. **The generation container plus promotion** — the live/successor pair, the indirect handle, the
-   promotion policy knob. The core of the spec.
-3. **The `createIndexerState` factory migration** — `storeFactory`, `keepStateFactory`, and passing
-   the processor factory instead of its result. BREAKING and mostly mechanical. The footprint is
-   larger than it looks and must be owned by the batch that changes the signature: **40 call sites**
-   outside `dist/`, of which **31 are under `packages/browser/test/`** (`dispose` 3,
-   `invalidation` 2, `liveReload` 8, `processorKinds` 10, `reconfigure` 2, `setupIndexing` 2,
-   `txInclusion` 4), plus `packages/browser/browser/workload.ts`, plus **FIVE** example apps
-   (`web-demo`, `event-processor-nfts`, `browser-reference`, `basic`, `mud`) and the README usage
-   block. The examples and the README are the PUBLIC face of the change.
-4. **The `stateDiscarded` deletion sweep** — 36 references across `packages/core`,
-   `packages/browser` and `examples/browser-reference`.
+1. **The labelled stream.** The key layout, the sealed graft bound `N`, the graft-bounded staging
+   read, and promotion as delete-then-rename, in the shared segmentation helper the prerequisite
+   establishes plus both keepers. Buildable and testable on its own (write both labels, read with a
+   bound, promote, assert one contiguous live generation; interrupt between the two steps and assert
+   the gap is caught) and it is the piece the spike measured. Everything else depends on it.
+2. **The verdict becomes a published, actionable answer, and `ReconfigureOutcome` grows the shape
+   that replaces `stateDiscarded`.** Core-side: publish what the container needs from
+   `sourceInvalidationOf` (which half, and `invalidFromBlock`), let the reconfigure verbs report
+   without discarding, and add the changeset. Then the sweep: **38** `stateDiscarded` references —
+   `packages/core` (11), `packages/browser` (23), `examples/browser-reference` (2),
+   `docs/guide/indexing-in-a-browser-app/index.md` (2). One landable and not two, because the
+   replacement shape IS the verdict, so splitting them would land a shape change with no consumer or
+   a consumer with no shape.
+3. **The generation container plus promotion** — the live/successor pair, the indirect handle, the
+   promotion policy knob. The core of the spec. `blockedBy` (1) and (2).
+4. **The `createIndexerState` factory migration** — `storeFactory`, `keepStateFactory`, and passing
+   the processor factory instead of its result. BREAKING and mostly mechanical, and its footprint is
+   larger than it looks. **37 call sites** outside `dist/`: **31 under `packages/browser/test/`**
+   (`dispose` 3, `invalidation` 2, `liveReload` 8, `processorKinds` 10, `reconfigure` 2,
+   `setupIndexing` 2, `txInclusion` 4), `packages/browser/browser/workload.ts` (1), and **FIVE**
+   example apps at one each (`web-demo`, `event-processor-nfts`, `browser-reference`, `basic`,
+   `mud` — `basic` and `mud` show the exact `fromJSProcessor(processor)()` trailing-`()` this
+   deletes). Four more edit sites are NOT call sites and are unowned unless named here: the README
+   usage block, the two JSDoc examples in `packages/browser/src/IndexerState.ts`, the JSDoc in
+   `packages/browser/src/storage/state-store/BrowserStateStore.ts`, and the `createIndexerState`
+   prose in `CONTEXT.md`. The examples, the README and the guide are the PUBLIC face of the change.
 5. **`SyncingState` growing its `successor` block.**
 
-(3) and (4) are migrations with a large file footprint and little judgement; (1), (2) and (5) carry
+(2) and (4) are migrations with a large file footprint and little judgement; (1), (3) and (5) carry
 the design.
+
+**Serialise (3), (4) and (5) with `blockedBy`: they all edit `packages/browser/src/IndexerState.ts`.**
+`SyncingState` is declared in it, `createIndexerState` is declared in it, three `stateDiscarded`
+references live in it, and the container is what it returns. Cut in parallel they conflict on one
+file, which the runner will not auto-resolve. A workable order is (1) and (2) in parallel, then (4)
+(the signature), then (3) (the container inside it), then (5).
 
 One existing test reaches into the stream key directly and the label breaks it:
 `packages/browser/test/invalidation.test.ts` does `get(stream_<tag>_<chainId>)` and rewrites
