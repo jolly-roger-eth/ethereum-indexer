@@ -139,30 +139,45 @@ the original. Each generation materialises its own state by re-folding from the 
 full state each, linearly. Two covers the reconfigure case; N buys rollback and A/B at N times the
 state storage and can be added later without redesign.
 
-**THE GRAFT POINT IS RETIRED.** It is kept below only as history, because it survived three drafts
-and a reader will wonder. Its purpose was to mark where a successor starts so a shared PREFIX stays
-beneath the reorg window. Neither half survives: partial prefix sharing was declared inexpressible
-(segments are ordinal-keyed, so no segment prefix corresponds to a block prefix), and under the
-one-writer rule a successor either reads the WHOLE live stream or builds its own from the source's
-start block. There is no boundary in either case, so there is nothing to clamp and nothing to
-protect. The paragraphs below are superseded.
+**The graft point is REAL, and it works by reference over FINAL segments.** A previous draft retired
+it, on the grounds that segments are ordinal-keyed so no segment prefix corresponds to a block
+prefix. That is true in general and FALSE for the region that matters, which is the whole point:
 
-> _Superseded._ **The graft point is clamped to the finality DEPTH, not to a finalized head.** There is no
+- Reorgs never reach below `latestBlock - finality`; the indexer re-fetches from exactly there every
+  round.
+- So once a segment's recorded `max` is under that horizon it is FINAL, and no later segment can
+  ever contain a lower block. Since `latest` only grows, a final segment stays final.
+- Below the horizon, therefore, ordinal order and block order DO agree, and the segments covering
+  blocks `[0, N)` are selectable by the ranges `appending-to-the-stream-costs-the-batch` records.
+
+So a successor grafting at N shares every segment whose `max < N` **by reference**: no copy, no
+re-fetch. At most a couple of segments STRADDLE N, and only those are filtered or their range
+re-fetched. That is a local metadata scan against a network backfill of the whole prefix, and
+`eth_getLogs` is the most constrained call this system makes.
+
+**Which is why the clamp exists, and it is NOT vestigial.** The graft point must sit below the
+finality horizon, because that is exactly what makes the prefix segments final, hence stable, hence
+addressable by block. The draft that retired the graft point also called the clamp purposeless; it
+had the causality backwards. The clamp is the precondition, not a leftover.
+
+**Two costs, named rather than glossed.** Final segments can still OVERLAP each other, because a
+reorg that struck while they were unconfirmed leaves a later segment re-carrying those numbers, so
+selection is by range intersection and not a binary search. And a shared segment now has TWO
+referents, so retiring a generation must not delete segments the other still points at: a successor's
+stream is "a reference to a prefix, plus its own segments", and that lifetime rule is the real
+complexity this buys with the saved backfill.
+
+**The graft point is clamped to the finality DEPTH, not to a finalized head.** There is no
 chain-reported finalized block in the core; there is a configured `finality` and `getFromBlock`
 computing `latest - finality`. A pending generation starts from the block its source first differs
 at, clamped down to that head. Clamping DOWNWARD is the safe direction, costing redundant fetching
 and losing nothing.
 
-**Reorgs are handled per generation, independently**, and with the graft point retired this is
-simply true of both generations over their whole range rather than "above" anything. In the sharing
-case the successor sees the live generation's retractions through the stream it is reading, exactly
-as a rebuild does today; in the re-fetching case it derives its own from its own fetches. Each is
-internally consistent and both converge.
-
-> _Superseded (graft point retired)._ Above the graft point each follows the head and
-processes reorgs itself. They may briefly disagree; each is internally consistent and both converge.
-The clamp above is what keeps the shared prefix beneath the reorg window, so no reorg can invalidate
-bytes both depend on.
+**Reorgs are handled per generation, independently.** ABOVE the graft point each generation follows
+the head and processes reorgs itself; they may briefly disagree, each is internally consistent, and
+both converge. BELOW it there is nothing to disagree about, because the clamp keeps the shared prefix
+beneath the reorg window, so no reorg can invalidate bytes both generations depend on. That is the
+same argument as the clamp's, seen from the reorg side.
 
 **Prefix sharing is TOTAL for the common cases, and absent only in the rare one.** An earlier draft
 said the opposite, having weighted the rarest case. Ranked by how often a real DEPLOYMENT (in this
@@ -175,28 +190,32 @@ repo's existing sense, an installation) actually reconfigures:
   so again the entire stream is valid and only the fold is redone.
 - **An event added ABOVE the cursor** creates no generation at all: `sourceInvalidationOf` already
   calls it free.
-- **An event added or edited BELOW the cursor** is the case that shares NOTHING partial, and an
-  earlier draft claimed otherwise. `appending-to-the-stream-costs-the-batch` keys segments by ORDINAL
-  precisely because a later segment can hold lower block numbers, so there is no segment prefix
-  corresponding to a BLOCK prefix and "share everything beneath block N" is not expressible against
-  that shape. This case therefore re-fetches, exactly as the skeleton case below does. Getting a
-  partial share would need per-segment block bounds, which the storage spec deliberately does not
-  deliver.
-- **A changed `address` or a new contract** lands in the block-0 SKELETON entry, so nothing is
-  shared. This is the rare case, not the representative one.
+- **An event added or edited BELOW the cursor** shares PARTIALLY, by grafting at that event's
+  `firstBlock`. Every final segment beneath the graft point is shared by reference, the couple that
+  straddle it are filtered, and only blocks above it are re-fetched. This case went through two wrong
+  descriptions before landing here: first that it shared a prefix trivially (it does not, segments
+  are ordinal-keyed), then that it shared nothing at all (it does, because final segments record
+  their block ranges and cannot be reordered by a later reorg).
+- **A changed `address` or a new contract** lands in the block-0 SKELETON entry, so the graft point
+  is 0 and nothing is shared. This is the rare case, not the representative one, and it is the only
+  one that re-fetches a whole history.
 
 So the cases that create a generation mostly share the WHOLE stream, and the expensive work is
 re-folding rather than re-fetching.
 
-The fetch cost follows directly, and an earlier draft got it wrong in BOTH directions. In the SHARING
-cases the successor fetches **nothing at all** — not even a doubled tail — because it reads the live
-stream, which the live generation is still appending to. There is no doubled `eth_getLogs` in the
-case that matters most. In the RE-FETCHING cases it is a full doubled backfill, not a doubled tail:
-an event added below the cursor, a changed address or a new contract shares
-nothing, so its successor DOES re-fetch the history while the live generation keeps following the
-head. An earlier draft asserted the bound unconditionally, which was true only for the two cases it
-happened to rank first. The doubled backfill is accepted for the re-fetching cases, since the
-alternative is the outage this spec exists to remove, but it should be stated rather than implied.
+The fetch cost follows directly, and it is now THREE cases rather than the two an earlier draft
+assumed:
+
+- **Whole-stream sharing** (processor-only, decode-only): the successor fetches **nothing at all**,
+  not even a doubled tail, because it reads the live stream the live generation is still appending
+  to. There is no doubled `eth_getLogs` in the case that matters most.
+- **Partial sharing at a graft point** (an event added or edited below the cursor): it re-fetches
+  only from the graft point up, sharing every final segment beneath it by reference. Bounded by how
+  far back the boundary sits, not by the length of the history.
+- **No sharing** (a changed address, a new contract): a full doubled backfill, since the block-0
+  skeleton entry moved and nothing beneath is valid. Accepted, because the alternative is the outage
+  this spec exists to remove, but it is the one case that genuinely pays twice and it should be
+  stated rather than implied.
 
 **The no-outage value does not depend on sharing at all**: the live generation keeps answering
 regardless. Sharing decides how expensive catching up is, not whether reads survive.
@@ -212,18 +231,20 @@ paying the quadratic append, and that a live stream being read by a successor mu
 wholesale underneath it on every save. Both are properties of the append-only shape. A successor
 against today's single blob would be reading a value that is replaced in full on every batch.
 
-**Filter and lineage provenance is a STORAGE change and is NOT owned here.** A shared stream is
-decode-neutral but not filter-neutral: absence of a log means something only against the filter its
-range was fetched under, and above the graft point two generations fetch under different filters, so
-shared segments would need per-segment filter and lineage provenance.
+**No filter or lineage provenance is needed, and the graft point is WHY.** A stream is
+decode-neutral but not filter-neutral: the absence of a log means something only against the filter
+its range was fetched under. That looks like it should force per-segment filter provenance on any
+shared segment, and two earlier drafts concluded so.
 
-That is a change to the stream's read seam, which `appending-to-the-stream-costs-the-batch`
-deliberately pins as UNCHANGED. Parking it in this browser-scoped spec was a category error: it would
-have two specs re-shaping one interface with nothing ordering them.
+It does not, because of what a graft point IS. The graft point is the block at which the two sources
+first differ, so BELOW it the two generations want identical filters, by construction. A shared
+segment beneath the graft point was therefore fetched under exactly the filter its new reader would
+have used. ABOVE the graft point nothing is shared at all: the successor fetches that range itself.
 
-It is named here as a prerequisite for any FUTURE partial sharing, and it is owned by NEITHER spec
-today. That costs nothing, because under the one-writer rule below no provenance is required: a
-successor either reads a stream it never writes, or writes a stream nobody else reads.
+So provenance is unnecessary in both directions rather than merely deferred, and this spec re-shapes
+no part of `ExistingStream`, which
+`appending-to-the-stream-costs-the-batch` pins as unchanged. What it does consume is the per-segment
+BLOCK RANGE that spec records, which is metadata rather than a seam change.
 
 **Reads do NOT carry generation identity, and the handle FOLLOWS promotion.** An earlier draft had a
 story for a reader knowing which generation answered it, and an open question about whether that
@@ -396,8 +417,10 @@ inferred:
    The container chooses which shape a generation gets: the read-only view for a sharing case, a
    generation-keyed stream for a re-fetching one.
 
-With those, no per-segment lineage attribution and no filter provenance is needed: a stream is either
-read by a successor that never writes it, or written by a successor nobody else reads.
+With those, a stream is either read by a successor that never writes it, or written by a successor
+nobody else reads. Combined with the graft-point argument above (below the boundary the filters agree
+by construction), that is why no per-segment lineage attribution and no filter provenance is required
+anywhere in this design.
 
 **`SyncingState` grows an optional `successor` block, and the live fields stay flat.** Nesting both
 under `live` and `successor` was considered and rejected as a category error: the record mixes
@@ -466,7 +489,12 @@ surface here (that is the separate ingest-server spec).
   against the two-writer clobber.
 - **A reorg during catch-up** is handled per generation: in the sharing case the successor sees the
   live generation's retractions through the stream it reads, and in the re-fetching case it derives
-  its own. Both converge. (This replaces a clamp test; the graft point is retired.)
+  its own. Both converge.
+- **The clamp**: a graft point inside the unconfirmed window is clamped DOWN to the finality horizon
+  rather than accepted, since a prefix that could still be reorged cannot be shared by reference.
+- **Partial sharing at a graft point re-fetches only above it**: asserted on the ranges the node was
+  asked for, with the final segments beneath the boundary shared by reference and the straddling ones
+  filtered.
 - **The sharing case fetches NOTHING**: asserted on the ranges the node was asked for while a
   successor catches up after a processor-only change. Zero, not merely fewer.
 - **A successor never writes the live stream before promotion**: the live stream's keys are
@@ -513,11 +541,12 @@ a tasker should follow rather than treating it as one body of work:
 (2) and (3) are migrations with a large file footprint and little judgement; (1) and (4) carry the
 design. Cutting them together would produce one task nobody can review.
 
-Note also what is NOT in this list: per-segment filter and lineage provenance is owned by NEITHER
-spec, and under the one-writer rule nothing here needs it. This spec therefore re-shapes NO part of
-`ExistingStream`, which leaves `the-stream-stores-only-what-the-node-said` as the only sibling
-touching that seam, so the two dependents of the storage spec do not contend and need no ordering
-between them.
+Note also what is NOT in this list: per-segment filter and lineage provenance, which this design does
+not need at all (below a graft point the two generations want identical filters by construction, and
+above it nothing is shared). This spec therefore re-shapes NO part of `ExistingStream`, which leaves
+`the-stream-stores-only-what-the-node-said` as the only sibling touching that seam, so the two
+dependents of the storage spec do not contend and need no ordering between them. What this spec does
+CONSUME from its prerequisite is the per-segment block range, which is metadata and not a seam.
 
 ## Out of Scope
 

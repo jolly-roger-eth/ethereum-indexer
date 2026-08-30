@@ -97,6 +97,29 @@ string is already built) and not cheaply available on IndexedDB (structured-clon
 exposed), so naming the unit is what stops the two keepers choosing differently and makes the seal
 test deterministic.
 
+**Each segment RECORDS its block range as metadata, while its KEY stays ordinal.** The two are not in
+tension and the distinction is the whole point. The key must be ordinal, because a reorg re-appends
+retractions at their original block numbers and then continues lower, so block ranges overlap and
+cannot key anything. But each segment still knows which blocks it happens to contain, and recording
+that `{min, max}` at write time costs one comparison over a batch already in hand.
+
+It is recorded HERE, in the spec that writes segments, for a forward-compatibility reason that is
+cheap now and expensive later: a range cannot be added retroactively without READING every existing
+segment, so omitting it would turn a later optimisation into a migration. This spec builds nothing on
+it.
+
+What it keeps reachable is real. Reorgs never reach below `latestBlock - finality` (the indexer
+re-fetches from exactly there each round), so once a segment's `max` is under that horizon it is
+FINAL and no later segment can ever hold a lower block. Below the horizon, ordinal order and block
+order agree, and a consumer can select the segments covering blocks `[0, N)` by their recorded
+ranges. That is what lets `a-reconfigure-is-not-an-outage` share a prefix by REFERENCE instead of
+copying or re-fetching it.
+
+One caveat to record with it: final segments can still OVERLAP one another, because a reorg that
+happened while they were unconfirmed leaves a later segment re-carrying those block numbers. So
+selection is "take the segments whose range intersects `[0, N)`", not a binary search. Cheap, since
+this is metadata over few segments, but it is not a clean ordering and should not be assumed to be.
+
 **Presence is the TAIL, never a segment count.** `fetchFrom` must keep returning a DEFINED result
 for a stream that has been saved to but holds no events, because today an empty first save writes
 `{lastSync, eventStream: []}` and a defined result is what stops `indexer.ts` taking its clear
@@ -247,6 +270,10 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   and it fails loudly under a bare prefix filter.
 - **The cursor comes from the tail**: a stream with several sealed segments resumes from the highest
   ordinal's `lastSync`, never a sealed one's stale copy.
+- **Every segment carries its block range**, including one written across a reorg, where the range
+  covers the re-appended retractions at their original numbers. This is the metadata a later
+  by-reference share selects on, and it is asserted here because it cannot be backfilled later
+  without reading every segment.
 - **A sealed segment is never rewritten** (no write targets its key again) and is **readable by its
   own key** without reading the others.
 - **`fetchFrom` returns a DEFINED result for a stream saved with no events**, which is the guard
