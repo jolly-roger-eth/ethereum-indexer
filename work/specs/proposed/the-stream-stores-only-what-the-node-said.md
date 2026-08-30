@@ -73,6 +73,8 @@ it needs a changeset.
 3. As a developer whose ABI changed only in how it decodes, I want the cached stream reused without
    re-fetching a block. (Already true today via ADR-0034's `reparse`; this makes it structural
    rather than a workaround, and that is the honest framing.)
+4. As a developer upgrading, I want segments written before this change to keep working untouched,
+   so adopting a stricter stored type costs me no rebuild.
 
 ## Implementation Decisions
 
@@ -111,6 +113,26 @@ types now refuse. Its one real consumer is `packages/core/test/streamFixture.tes
 discriminator. That was considered and rejected: it preserves the ambiguity the type exists to
 remove.
 
+**`logValues` must be decided explicitly, and it is the case where a raw-only event is EMPTY.** This
+paragraph was dropped when the original spec was split and is restored here because it is exactly
+this spec's problem. `logValues` is a PARSE-time projection applied in `LogEventFetcher.parse`, so it
+trims what the live processor receives AND what gets stored, and it can drop `topics` or `data`. That
+is the one case `reparse` returns `undefined` for, and why the indexer must detect a stream it cannot
+re-read and clear it.
+
+Under raw-only the interaction gets sharper: an event whose raw half was projected away has NOTHING
+left, where before it at least carried `args`. So this spec must state whether the fetch path still
+projects for the processor while storage keeps the raw log, or whether a `logValues` projection that
+drops `topics`/`data` is refused outright when a `keepStream` is configured. Changing what handlers
+receive silently would be the worse outcome of the two.
+
+**Existing segments keep their decoded halves, and that is tolerated on READ.** After this lands,
+segments already written by `appending-to-the-stream-costs-the-batch` still hold `args` and
+`eventName` forever. Runtime is unaffected, since `reparse` discards and re-derives them anyway. But
+the type would then describe something untrue of the bytes on disk, so say which it governs: the
+stored type governs WRITES from here on, reads tolerate a decoded half and ignore it, and no
+rewriting migration is performed. Pin that with a test rather than leaving it to be discovered.
+
 ## Testing Decisions
 
 - **The refusal is a TYPE claim and needs a type test.** Assert it under `pnpm typecheck` with
@@ -125,6 +147,10 @@ remove.
   which is the change itself.
 - **The `lastSync` strip does not mutate**: the object handed to the state keeper still carries its
   unconfirmed window after a stream save.
+- **A segment written before this change still replays**, carrying a decoded half that is ignored
+  rather than refused, which is the upgrade guard for story 4.
+- **A `logValues` projection that drops the raw half** behaves as decided above, and the decision is
+  asserted either way rather than left to the first task.
 
 ## Out of Scope
 

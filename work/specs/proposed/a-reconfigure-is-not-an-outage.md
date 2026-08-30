@@ -55,7 +55,7 @@ UI reading the store sees it emptied and refilled. The operator's only lever is 
 
 ADR-0033 and ADR-0034 shrank how OFTEN this happens. They did not change what happens when it does,
 and the remaining cases are the ones that matter: a new event below the cursor, a changed address, a
-new contract, and (per open question 1) a processor upgrade.
+new contract, and a processor upgrade.
 
 The mechanism is not more invalidation cleverness. It is that **an indexer should hold more than one
 generation at a time**, which is what The Graph does: a new generation syncs alongside the old one
@@ -161,13 +161,18 @@ repo's existing sense, an installation) actually reconfigures:
   so again the entire stream is valid and only the fold is redone.
 - **An event added ABOVE the cursor** creates no generation at all: `sourceInvalidationOf` already
   calls it free.
-- **An event added or edited BELOW the cursor** grafts at that event's `firstBlock` and shares
-  everything beneath it.
+- **An event added or edited BELOW the cursor** is the case that shares NOTHING partial, and an
+  earlier draft claimed otherwise. `appending-to-the-stream-costs-the-batch` keys segments by ORDINAL
+  precisely because a later segment can hold lower block numbers, so there is no segment prefix
+  corresponding to a BLOCK prefix and "share everything beneath block N" is not expressible against
+  that shape. This case therefore re-fetches, exactly as the skeleton case below does. Getting a
+  partial share would need per-segment block bounds, which the storage spec deliberately does not
+  deliver.
 - **A changed `address` or a new contract** lands in the block-0 SKELETON entry, so the graft point
   is 0 and nothing is shared. This is the rare case, not the representative one.
 
 So the cases that create a generation mostly share the WHOLE stream, and the expensive work is
-re-folding rather than re-fetching. That also bounds open question 3: the pending generation does
+re-folding rather than re-fetching. That also bounds the doubled-fetch cost: the pending generation does
 not re-fetch history, so the doubled `eth_getLogs` is only the tail both generations follow while
 one is pending, never a doubled backfill.
 
@@ -180,10 +185,17 @@ build sharing; THIS spec owns that, and it is why the prerequisite is declared i
 not only in prose. Without it the stream is one blob rewritten per append, there is no prefix to
 point at, and every pending generation copies the whole history.
 
-**Filter provenance is this spec's problem.** A raw-only stream is decode-neutral but not
-filter-neutral: absence of a log means something only against the filter its range was fetched under,
-and above the graft point the two generations fetch under different filters. Shared segments
-therefore need per-segment filter provenance, owned here.
+**Filter and lineage provenance is a STORAGE change and is NOT owned here.** A shared stream is
+decode-neutral but not filter-neutral: absence of a log means something only against the filter its
+range was fetched under, and above the graft point two generations fetch under different filters, so
+shared segments would need per-segment filter and lineage provenance.
+
+That is a change to the stream's read seam, which `appending-to-the-stream-costs-the-batch`
+deliberately pins as UNCHANGED. Parking it in this browser-scoped spec was a category error: it would
+have two specs re-shaping one interface with nothing ordering them. It is named here as a
+prerequisite for any FUTURE partial sharing and owned by neither spec today, which is why the
+sharing this spec relies on is whole-stream sharing only (the two representative cases), never a
+partial prefix.
 
 **Reads do NOT carry generation identity, and the handle FOLLOWS promotion.** An earlier draft had a
 story for a reader knowing which generation answered it, and an open question about whether that
@@ -210,7 +222,7 @@ Note the word, because an earlier draft got it wrong. The live generation is not
 a successor catches up: supersession is precisely the decision promotion makes and has NOT yet made.
 Marking the live state superseded would encode a verdict nobody has reached, and would be false
 outright if the operator inspects the successor and rejects it. Until promotion the live generation
-is simply LIVE and the pending one is a CANDIDATE.
+is simply LIVE and the pending one is its SUCCESSOR.
 
 Two alternatives were considered and rejected, and the reasoning is the load-bearing part.
 
@@ -412,6 +424,27 @@ surface here (that is the separate ingest-server spec).
 - **A `streamConfig`-only change** produces a live and a successor that do NOT collide, which is the
   regression guard for the `ProcessorContext` hole: that context cannot distinguish them, so the
   generation must come from the container.
+
+## Tasking note
+
+This is the largest of the four specs in this family and it cuts into FOUR separable landables, which
+a tasker should follow rather than treating it as one body of work:
+
+1. **The generation container plus promotion** (the live/successor pair, the indirect handle, the
+   promotion policy knob). The core of the spec.
+2. **The `createIndexerState` factory migration**, which is BREAKING and mostly mechanical: about 28
+   call sites under `packages/browser/test`, the browser harness, four example apps and the README.
+3. **The `stateDiscarded` deletion sweep**, roughly 26 assertions plus the browser consumers.
+4. **`SyncingState` growing its `successor` block.**
+
+(2) and (3) are migrations with a large file footprint and little judgement; (1) and (4) carry the
+design. Cutting them together would produce one task nobody can review.
+
+Note also what is NOT in this list: per-segment filter and lineage provenance moved OUT of this spec,
+because it is a change to the stream's read seam. That leaves
+`the-stream-stores-only-what-the-node-said` as the only sibling re-shaping `ExistingStream`, so the
+two dependents of the storage spec no longer contend for one interface and need no ordering between
+them.
 
 ## Out of Scope
 

@@ -28,6 +28,8 @@ needsAnswers: true
    server. So the fix may belong in the core primitive both runtimes share rather than in
    `@etherfold/server`.
 
+<!-- /open-questions -->
+
 ## Problem Statement
 
 The ingest server hosts a processor and blanks it on a context change, with no story for what its

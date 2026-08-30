@@ -58,8 +58,36 @@ segment can hold LOWER block numbers, no segment can be skipped on a block bound
 order, concatenate, apply the existing `blockNumber >= fromBlock` filter. A spec implying segments
 make READS cheaper would promise what the reorg model forbids.
 
-**`lastSync` moves to its own small mutable key**, so an append does not rewrite it, and so the
-empty-batch branch above stops rewriting the history to record a cursor.
+**A save writes exactly ONE key, and `lastSync` rides in the OPEN TAIL segment.** An earlier draft
+gave `lastSync` its own key, which quietly turned one write into two and destroyed an atomicity the
+current code has by construction. Both orders are wrong: writing the segment first leaves the cursor
+BEHIND its events, so a rebuild replays them and then re-fetches from the stale `lastToBlock` and
+appends duplicates; writing `lastSync` first leaves the cursor AHEAD, so a lost segment is never
+replayed. Today one `set` makes the two agree and a crash cannot separate them.
+
+So the shape is an append-only log with an OPEN TAIL:
+
+- the newest segment is OPEN and carries both its events and the `lastSync` current after them;
+- a save appends to the open tail, which is ONE write, bounded by the tail's size and never by the
+  history;
+- the tail is SEALED when it exceeds a size threshold, and the next save starts a new one;
+- **a sealed segment is immutable forever.**
+
+This is what makes the empty-batch case cheap without needing a rule against empty segments: a save
+with no events rewrites only the open tail to move its cursor, which is bounded, rather than
+rewriting the whole history as it does today.
+
+**Presence is the TAIL, never a segment count.** `fetchFrom` must keep returning a DEFINED result
+for a stream that has been saved to but holds no events, because today an empty first save writes
+`{lastSync, eventStream: []}` and a defined result is what stops `indexer.ts` taking its clear
+branch. A tail exists as soon as anything has been saved, so presence is the tail's existence.
+
+**Sealed segments are immutable and independently readable**, and both halves are stated so a test
+can FAIL them. Immutability is observable at the write seam: no write ever targets a sealed
+segment's key. Independent readability means any sealed segment is readable BY ITS OWN KEY without
+reading the others, which is the criterion that bites where "addressable" would not, since any keyed
+store satisfies being nameable. These are REQUIREMENTS here, not aspirations: a later design that
+wants to share a prefix by reference has nothing to point at without them.
 
 ## User Stories
 
@@ -73,6 +101,8 @@ empty-batch branch above stops rewriting the history to record a cursor.
    and visibly, so upgrading costs nothing I can notice and nothing I cannot explain.
 6. As a developer clearing a stream, I want ALL of it gone, so no fragment survives to be replayed
    into a later rebuild.
+7. As a maintainer, I want a sealed segment never rewritten and readable on its own, so a later
+   design can refer to a prefix instead of copying it, without this spec having to build that.
 
 ## Implementation Decisions
 
@@ -106,25 +136,53 @@ was lost, and "some of the stream" replayed as if it were "the stream" is the sa
 failure class the reorg model and `SuspectedTruncationError` already refuse. Detect the gap and
 clear the remainder rather than replaying it.
 
-**The migration is structural, because there is no marker.** The stream blob carries no format field
-(unlike the fixture's `format: 2`), so the new code must recognise the old single-blob shape by
-structure and migrate on first write. Where ADR-0034 already MANDATES clearing (a legacy blob whose
+**The migration is structural, because there is no marker, and it must be READ as well as written.**
+The stream blob carries no format field (unlike the fixture's `format: 2`), so the new code must
+recognise the old single-blob shape by structure. `fetchFrom` READS the legacy shape and migrates on
+first write; without the read half the first load returns `undefined`, `indexer.ts` takes its clear
+branch, and the user silently loses a cached history, which is exactly what story 5 forbids. The
+rebuild story 5 asks to be VISIBLE also needs an owner: a clear or a migration should say so through
+the existing logger rather than happening in silence. Where ADR-0034 already MANDATES clearing (a legacy blob whose
 raw half a `logValues` projection dropped, so it cannot be re-read), that mandate WINS: clearing a
 stream that cannot be re-read is correct and is not a silent clear. What is forbidden is clearing a
 READABLE stream merely because its shape is old.
 
 **Segment size follows the batch, with one caveat.** The `streamNotYetSaved` accumulator buffers
-across failed saves, so a segment is whatever was buffered at that save, not necessarily one batch.
-A save with zero events must not mint an empty segment.
+across failed saves, so what lands in the tail at a given save is whatever was buffered then, not
+necessarily one batch. Sealing is by size threshold, so this affects when a seal happens and nothing
+else.
+
+**Both keepers share their namespace, and a naive scan or clear will eat the neighbours.** The fs
+keeper's `storage(folder)` is the SAME folder `keepStateOnFile` writes into, so a segment scan and a
+`clear` must filter on the stream key prefix or a stream clear deletes the state blob. And on the
+browser side, `idb-keyval`'s `clear()` wipes the WHOLE store rather than one stream's keys, so it is
+listed among the available exports above as a capability, NOT as the implementation of
+`ExistingStream.clear`. Use `keys` plus `delMany` over the filtered prefix.
+
+**One existing test reaches into the stream key directly** and segmentation breaks it:
+`packages/browser/test/invalidation.test.ts` does `get(stream_<tag>_<chainId>)`, asserts it is
+defined, and rewrites `lastSync` in place. It is also the closest prior art for the migration test.
+Name it in the task so it is updated deliberately rather than patched blind on a red gate.
 
 ## Testing Decisions
 
 - **The append-cost claim is the headline and must be measured as WORK, not wall-clock.** Assert on
   bytes or events serialised per save: the tenth append costs about what the first did. Wall-clock
   would be flaky on a loaded machine (ADR-0032) and `fake-indexeddb` is itself quadratic, so it
-  cannot be the yardstick. The seam does not exist yet: instrument the write util behind `OnFile`
-  and the `set` behind `OnIndexedDB`, and NAME that seam in the task rather than leaving a builder
-  to invent one.
+  cannot be the yardstick.
+
+  The seam does not exist and this spec CHOOSES it rather than leaving a builder to invent one: use
+  MODULE-LEVEL mocking of `node:fs` behind `packages/fs/src/utils/fs.ts` and of `idb-keyval`'s `set`
+  behind `OnIndexedDB`. The alternative, an injected optional writer, was rejected because it widens
+  `keepStreamOnFile`/`keepStreamOnIndexedDB`, which is published surface, and would contradict this
+  spec's no-published-type promise and pull in a changeset.
+
+- **A save writes exactly ONE key**, asserted at the same instrumented seam. This is the atomicity
+  guard: it is what stops a crash separating the cursor from its events.
+- **A sealed segment is never rewritten** (no write targets its key again) and is **readable by its
+  own key** without reading the others.
+- **`fetchFrom` returns a DEFINED result for a stream saved with no events**, which is the guard
+  against `indexer.ts` taking its clear branch on an empty-but-present stream.
 - **A save with no events costs nothing proportional to history**, which is the empty-batch branch.
 - **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events, same
   order. This spec changes no event shape, so this is a strict equality test.
@@ -147,7 +205,10 @@ A save with zero events must not mint an empty segment.
   corresponding to a BLOCK prefix.
 - **Per-segment filter or lineage provenance**, which any sharing design needs and which changes the
   read seam this spec pins as unchanged.
-- **Pruning or retention of segments.**
+- **Pruning or retention of segments.** A NAMED follow-up rather than a silent omission: nothing owns
+  it today, and `a-reconfigure-is-not-an-outage` requires reclaiming a replaced generation's storage,
+  which is segment deletion by another name. Whoever needs it first should spec it against this
+  shape.
 
 ## Further Notes
 
