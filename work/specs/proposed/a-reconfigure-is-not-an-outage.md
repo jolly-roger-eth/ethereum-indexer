@@ -139,13 +139,27 @@ the original. Each generation materialises its own state by re-folding from the 
 full state each, linearly. Two covers the reconfigure case; N buys rollback and A/B at N times the
 state storage and can be added later without redesign.
 
-**The graft point is clamped to the finality DEPTH, not to a finalized head.** There is no
+**THE GRAFT POINT IS RETIRED.** It is kept below only as history, because it survived three drafts
+and a reader will wonder. Its purpose was to mark where a successor starts so a shared PREFIX stays
+beneath the reorg window. Neither half survives: partial prefix sharing was declared inexpressible
+(segments are ordinal-keyed, so no segment prefix corresponds to a block prefix), and under the
+one-writer rule a successor either reads the WHOLE live stream or builds its own from the source's
+start block. There is no boundary in either case, so there is nothing to clamp and nothing to
+protect. The paragraphs below are superseded.
+
+> _Superseded._ **The graft point is clamped to the finality DEPTH, not to a finalized head.** There is no
 chain-reported finalized block in the core; there is a configured `finality` and `getFromBlock`
 computing `latest - finality`. A pending generation starts from the block its source first differs
 at, clamped down to that head. Clamping DOWNWARD is the safe direction, costing redundant fetching
 and losing nothing.
 
-**Reorgs are handled per generation, independently.** Above the graft point each follows the head and
+**Reorgs are handled per generation, independently**, and with the graft point retired this is
+simply true of both generations over their whole range rather than "above" anything. In the sharing
+case the successor sees the live generation's retractions through the stream it is reading, exactly
+as a rebuild does today; in the re-fetching case it derives its own from its own fetches. Each is
+internally consistent and both converge.
+
+> _Superseded (graft point retired)._ Above the graft point each follows the head and
 processes reorgs itself. They may briefly disagree; each is internally consistent and both converge.
 The clamp above is what keeps the shared prefix beneath the reorg window, so no reorg can invalidate
 bytes both depend on.
@@ -168,14 +182,17 @@ repo's existing sense, an installation) actually reconfigures:
   that shape. This case therefore re-fetches, exactly as the skeleton case below does. Getting a
   partial share would need per-segment block bounds, which the storage spec deliberately does not
   deliver.
-- **A changed `address` or a new contract** lands in the block-0 SKELETON entry, so the graft point
-  is 0 and nothing is shared. This is the rare case, not the representative one.
+- **A changed `address` or a new contract** lands in the block-0 SKELETON entry, so nothing is
+  shared. This is the rare case, not the representative one.
 
 So the cases that create a generation mostly share the WHOLE stream, and the expensive work is
-re-folding rather than re-fetching. That also bounds the doubled-fetch cost: the pending generation does
-not re-fetch history, so the doubled `eth_getLogs` is only the tail both generations follow while
-one is pending, never a doubled backfill — in the SHARING cases. That bound does not cover the
-re-fetching cases: an event added below the cursor, a changed address or a new contract shares
+re-folding rather than re-fetching.
+
+The fetch cost follows directly, and an earlier draft got it wrong in BOTH directions. In the SHARING
+cases the successor fetches **nothing at all** — not even a doubled tail — because it reads the live
+stream, which the live generation is still appending to. There is no doubled `eth_getLogs` in the
+case that matters most. In the RE-FETCHING cases it is a full doubled backfill, not a doubled tail:
+an event added below the cursor, a changed address or a new contract shares
 nothing, so its successor DOES re-fetch the history while the live generation keeps following the
 head. An earlier draft asserted the bound unconditionally, which was true only for the two cases it
 happened to rank first. The doubled backfill is accepted for the re-fetching cases, since the
@@ -338,30 +355,49 @@ old estimate would not have owned them.
 
 **What is shared and what is not.** These are two different stores and conflating them is easy:
 
-- the **stream** (`keepStream`) IS shared, and that is the point of the whole design: the successor
-  reads the existing prefix instead of re-fetching it;
-- the **state store** CANNOT be shared. It is the materialised fold, two generations have different
-  folds by definition, and `StateStore` has no fork verb. Each generation materialises its own, and
-  that is what the factory mints.
+- the **stream** (`keepStream`) is shared IN THE SHARING CASES ONLY, and read-only: the successor
+  reads the whole live stream instead of re-fetching it, and writes nothing to it until promotion.
+  In the re-fetching cases nothing is shared and the successor gets its own generation-keyed stream.
+  (An earlier draft said flatly that the stream IS shared, which is true of neither the re-fetching
+  cases nor of the write direction.)
+- the **state store** CANNOT be shared, ever. It is the materialised fold, two generations have
+  different folds by definition, and `StateStore` has no fork verb. Each generation materialises its
+  own, and that is what the factory mints.
 
-**A successor NEVER writes to the live generation's stream.** This is the rule that makes sharing
-work at all, and an earlier draft had both generations writing one stream, which has no defined
-semantics: `appending-to-the-stream-costs-the-batch` puts `lastSync` inside a single OPEN TAIL, so
-two writers with two different cursors would clobber each other's position. Nothing owned that, and
-nothing should have to.
+**Every stream has exactly ONE WRITER AT A TIME, and that writer is the LIVE generation.** An earlier
+draft said "one writer for its whole life", which is both stronger than needed and impossible: it
+left promotion undefined, since in the sharing case the successor has written nothing and must take
+over the stream it becomes responsible for. The invariant that actually holds is per-moment, and the
+writer changes exactly at promotion.
 
-The two cases resolve separately and neither needs a shared writer:
+What each case drives, fetches and writes, stated per case because an earlier draft left it to be
+inferred:
 
-- **The sharing cases** (a processor-only change, a decode-only change) need NO new fetching at all,
-  because every topic is already in the stream. The successor is therefore a pure READER of the live
-  stream: it re-folds from it and writes nothing. One writer, one cursor, no contention.
+- **The sharing cases** (a processor-only change, a decode-only change). Every topic the successor
+  needs is already in the live stream, so it FETCHES NOTHING. It drives its own
+  `EthereumIndexer` over the live stream as a READER, re-folding into its own state store, and it
+  keeps reading as the live generation appends. At promotion it takes over writing that same stream
+  and the retired generation stops. The stream is continuous and never had two writers.
 - **The re-fetching cases** (an event added or edited below the cursor, a changed address, a new
-  contract) share nothing anyway, per the ranked list above. The successor builds its OWN stream from
-  scratch, keyed by its own generation, and owns it outright.
+  contract). The successor shares nothing, per the ranked list above, so it fetches a full backfill
+  into its OWN stream, keyed by its generation, which nobody else reads or writes. At promotion that
+  stream becomes the live one and the retired generation's stream is deleted whole.
 
-So there is no two-writer stream, no per-segment lineage attribution, and no filter provenance
-needed: a stream has exactly one writer for its whole life. On promotion the successor's stream (if
-it built one) becomes the live one, and the retired generation's storage is reclaimed with it.
+**Two mechanisms this requires, neither of which exists today:**
+
+1. **A read-only stream view.** `EthereumIndexer` calls `keepStream.saveNewEvents` UNCONDITIONALLY on
+   every save, so "a pure reader" is not expressible by simply not writing. The sharing-case
+   successor is given an `ExistingStream` whose `saveNewEvents` is a no-op over the live stream's
+   keys. Without this the successor would write into the live tail and clobber its cursor, which is
+   the exact hazard this rule exists to prevent.
+2. **A `streamFactory: (generation) => ExistingStream`**, alongside `storeFactory` and
+   `keepStateFactory`. `keepStream` is a single injected instance keyed `stream_<name>_<chainId>`
+   with no generation in the key, so a re-fetching successor currently has nowhere to put its stream.
+   The container chooses which shape a generation gets: the read-only view for a sharing case, a
+   generation-keyed stream for a re-fetching one.
+
+With those, no per-segment lineage attribution and no filter provenance is needed: a stream is either
+read by a successor that never writes it, or written by a successor nobody else reads.
 
 **`SyncingState` grows an optional `successor` block, and the live fields stay flat.** Nesting both
 under `live` and `successor` was considered and rejected as a category error: the record mixes
@@ -428,8 +464,16 @@ surface here (that is the separate ingest-server spec).
 - **A successor never writes the live stream**: after a sharing-case reconfigure, the live stream's
   keys are byte-identical to what they were, while the successor's state is built. This is the guard
   against the two-writer clobber.
-- **The clamp**: a graft point inside the unconfirmed window is clamped rather than accepted, and a
-  reorg above the graft point is handled per generation.
+- **A reorg during catch-up** is handled per generation: in the sharing case the successor sees the
+  live generation's retractions through the stream it reads, and in the re-fetching case it derives
+  its own. Both converge. (This replaces a clamp test; the graft point is retired.)
+- **The sharing case fetches NOTHING**: asserted on the ranges the node was asked for while a
+  successor catches up after a processor-only change. Zero, not merely fewer.
+- **A successor never writes the live stream before promotion**: the live stream's keys are
+  byte-identical across a sharing-case catch-up, which is the guard the read-only view exists to
+  provide.
+- **Promotion transfers the writer**: after promotion the newly-live generation appends to that same
+  stream and the retired one stops, with no gap and no second writer at any moment.
 - **Identity**: an event appended above the cursor does NOT create a pending generation, which is the
   regression guard for ADR-0034's headline.
 - **A processor-only change re-fetches NOTHING**, asserted on the ranges the node was asked for. It
@@ -460,7 +504,8 @@ a tasker should follow rather than treating it as one body of work:
 
 1. **The generation container plus promotion** (the live/successor pair, the indirect handle, the
    promotion policy knob). The core of the spec.
-2. **The `createIndexerState` factory migration**, which is BREAKING and mostly mechanical: about 28
+2. **The `createIndexerState` factory migration**, covering `storeFactory`, `keepStateFactory` AND
+   `streamFactory` plus the read-only stream view, which is BREAKING and mostly mechanical: about 28
    call sites under `packages/browser/test`, the browser harness, four example apps and the README.
 3. **The `stateDiscarded` deletion sweep**, roughly 26 assertions plus the browser consumers.
 4. **`SyncingState` growing its `successor` block.**

@@ -82,7 +82,15 @@ when it is no longer the highest ordinal, so sealing happens implicitly the mome
 opens a new one, and a reader tells by enumeration. Nothing is ever written INTO a segment to mark
 it sealed, which is what keeps both the one-write claim and immutability true. Every sealed segment
 still carries the `lastSync` that was current when it was written, and those are STALE: the cursor is
-read from the highest ordinal only, or a reader picking a lower one silently rewinds.
+read from the tail only, or a reader picking a lower one silently rewinds.
+
+**The TAIL is the highest ordinal segment, OR the adopted legacy key when no ordinal exists.** This
+sentence is load-bearing and its absence would have failed this spec's own migration test. Between
+adopting a legacy blob (below) and the first new save there are NO ordinal segments at all, so a
+tail defined purely as "the highest ordinal" would not exist: presence would read false, the cursor
+would be unread, and `indexer.ts` would clear a perfectly good cached history, which is exactly what
+story 5 forbids. The adopted legacy key is therefore the tail until `_0` is opened, at which point
+it becomes sealed like any other.
 
 The seal threshold is counted in **EVENTS**, not bytes. Bytes are natural on the filesystem (the JSON
 string is already built) and not cheaply available on IndexedDB (structured-clone size is not
@@ -178,6 +186,14 @@ re-implement the same prose twice and drift. Put the rules in an internal core h
 over a `get`/`set`/`del`/`keys` port, and let each keeper supply the port. That also gives the
 module-mocking seam below one place to bite.
 
+One consequence to accept deliberately: core's `exports` map is only `.` and `./package.json`, so a
+helper under `src/internal/` is unreachable from `packages/fs` and `packages/browser` unless
+`index.ts` re-exports it. So "internal" here means convention rather than unreachability, and the
+export line is published surface that needs a changeset. That is a real cost against this spec's
+no-published-type promise, accepted because the alternative is two keepers drifting on the rules that
+ARE this change. Dependency direction is otherwise clean: both keepers already import
+`@etherfold/core`, and core imports neither.
+
 **Segment size follows the batch, with one caveat.** The `streamNotYetSaved` accumulator buffers
 across failed saves, so what lands in the tail at a given save is whatever was buffered then, not
 necessarily one batch. Sealing is by size threshold, so this affects when a seal happens and nothing
@@ -257,10 +273,10 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   corresponding to a BLOCK prefix.
 - **Per-segment filter or lineage provenance**, which any sharing design needs and which changes the
   read seam this spec pins as unchanged.
-- **Pruning or retention of segments.** A NAMED follow-up rather than a silent omission: nothing owns
-  it today, and `a-reconfigure-is-not-an-outage` requires reclaiming a replaced generation's storage,
-  which is segment deletion by another name. Whoever needs it first should spec it against this
-  shape.
+- **Pruning or retention of segments within a live stream.** A NAMED follow-up rather than a silent
+  omission, and genuinely unowned. Note it is NOT required by `a-reconfigure-is-not-an-outage`, which
+  an earlier draft claimed: under that spec's one-writer rule, reclaiming a retired generation means
+  deleting a WHOLE stream through `ExistingStream.clear`, not pruning segments out of a live one.
 
 ## Further Notes
 

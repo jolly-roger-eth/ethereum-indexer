@@ -129,11 +129,22 @@ STORED stops being projected. The alternative, refusing a projection that drops 
 whenever a `keepStream` is configured, was rejected because it turns a storage-size knob into a
 constraint on what handlers can be written against.
 
-This is a real simplification rather than a trade: it removes the `reparse`-returns-`undefined` case
-entirely, and with it the whole "detect a stream that cannot be re-read and clear it" branch, since
-a stored event now always carries what decoding needs. It does give up the storage saving `logValues`
-offered on the stream, which is consistent with this spec's position that size is not the case for
-the change.
+This simplifies FUTURE writes and must not be overstated. It removes the `reparse`-returns-`undefined`
+case for every event written from here on, since such an event always carries what decoding needs.
+It does NOT remove the detect-and-clear branch: streams already on disk were written under today's
+projecting parse, carry no raw half, and are exactly what ADR-0034's mandated clearing protects.
+`appending-to-the-stream-costs-the-batch` keeps that mandate and TESTS it, so a builder reading this
+spec must not delete a guard its sibling just landed. Scope: the branch stays, and becomes
+unreachable for new writes rather than removable.
+
+It does give up the storage saving `logValues` offered on the stream, which is consistent with this
+spec's position that size is not the case for the change.
+
+**Relocating the projection is WORK, and is named here rather than assumed.** `logValues` is applied
+inside `LogEventFetcher.parse`, which trims the object that reaches BOTH the processor and storage.
+Making it processor-facing only means the projection moves off the object that gets stored, so
+`parse` stops being the single place it happens. That is a real change to the fetch path, not a
+configuration flip.
 
 **Existing segments keep their decoded halves, and that is tolerated on READ.** After this lands,
 segments already written by `appending-to-the-stream-costs-the-batch` still hold `args` and
