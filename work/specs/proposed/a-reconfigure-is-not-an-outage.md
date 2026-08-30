@@ -1,7 +1,7 @@
 ---
-title: 'A reconfigure of an INDEXER is not an outage: the live generation serves while the candidate catches up'
+title: 'A reconfigure in the BROWSER is not a blank app: the live generation serves while its successor catches up'
 slug: a-reconfigure-is-not-an-outage
-taskedAfter: [the-stream-is-what-the-node-said-appended-once]
+taskedAfter: [appending-to-the-stream-costs-the-batch]
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -24,25 +24,25 @@ taskedAfter: [the-stream-is-what-the-node-said-appended-once]
 > head-following TAIL, never the history. And **reads do NOT carry generation identity**; the
 > question dissolved rather than needing an answer.
 
-> **SCOPE: wherever a PROCESSOR and its state live.** An earlier draft scoped this to "the browser
-> and the CLI" and excluded `@etherfold/server` because it never constructs an indexer. The first
-> half of that is true and the conclusion was false, so the scope is restated:
+> **SCOPE: the BROWSER runtime and the core engine. Nothing else.** Cut down after four review
+> rounds, in which every remaining defect was a boundary claim about a runtime this spec had not
+> opened. The history is worth keeping so it is not re-litigated:
 >
-> - **The browser** (`createIndexerState`) is the primary runtime, and the one whose container,
->   handle and `SyncingState` this spec details.
-> - **The ingest server DOES host a processor.** `createServer` takes an injected `getIngestion`, and
->   the ingest path calls `processor.clear()` on a changed source, config or processor version,
->   which is precisely the blanking reconfigure this spec exists to remove; its 501 body reads "this
->   server hosts no processor: pass getIngestion". So the generation mechanism applies there too, at
->   the ingestion seam, and that is where stories 1 and 2 are delivered.
-> - **The CLI is NOT a runtime for these stories.** It is a one-shot `indexToTip` batch with ZERO
->   `updateProcessor` or `updateIndexer` call sites: it never reconfigures and serves reads to
->   nobody. Its `serve` verb lazily imports the platform server, which is the ingest server above.
->   So there is no CLI `promote` verb, and naming one would name a surface that does not exist.
+> - **The browser** (`createIndexerState`) is the runtime. Its container, its indirect handle and its
+>   `SyncingState` are what this spec details.
+> - **The CLI is not a runtime for this.** It is a one-shot `indexToTip` batch with ZERO
+>   `updateProcessor` or `updateIndexer` call sites: it never reconfigures, serves reads to nobody,
+>   and exits. Its `serve` verb lazily imports the platform server. An earlier draft gave it a
+>   `promote` verb; there is no long-running drive to hang one on, so that surface was invented and
+>   is removed.
+> - **The ingest server is a SEPARATE SPEC**, not an exclusion.
+>   `work/specs/proposed/an-ingest-server-reconfigure-is-not-a-blackout.md` owns it. An earlier draft
+>   excluded it on the false premise that it has no processor; it injects one via `getIngestion` and
+>   `StreamBuilder` calls `processor.clear()` on a changed context. That is a real outage with a real
+>   mechanism, and it deserves its own spec rather than a paragraph here.
 >
-> Still OUT of scope and genuinely separate: the ingest server's own STORED emission-stream table
-> (ADR-0006) keeping two lineages and switching which its queries read. That is the storage half,
-> a different mechanism and a different model, and it is a separate spec.
+> Because the server moved out, the operator-facing stories moved with it. What remains here is the
+> browser story: a reconfigure should not blank the app.
 
 ## Problem Statement
 
@@ -70,11 +70,10 @@ PENDING one, which is catching up and answers nobody.
 - The pending generation builds its own state, re-folding from the stream, re-fetching only what its
   source needs and the stream does not already hold.
 - Reads are served by the live generation throughout.
-- **Promotion** makes the candidate live. It is a POLICY knob, not a property of the runtime:
-  automatic on catch-up, or manual. Manual suits a production drive, where someone wants to look
-  before readers move; automatic suits a browser app and equally a DEV drive, where iterating on a
-  processor and hand-promoting after every edit would be absurd. So the axis is the ENVIRONMENT, not
-  the runtime, and it is one knob with defaults.
+- **Promotion** makes the successor live. It is a POLICY knob whose axis is the ENVIRONMENT:
+  automatic on catch-up (the browser default, and what a DEV iterating on a processor wants, since
+  hand-promoting after every edit would be absurd) or manual (for an app that wants to look before
+  its readers move). One knob, with a default.
 - Reconfiguring again while one is pending REPLACES the pending one. Two, never three.
 
 ## Identity, which is not digest equality
@@ -112,23 +111,24 @@ Identity resting on the verdict rather than on hash equality keeps that exposure
 
 ## User Stories
 
-1. As an operator, I want to change the source OR the processor without my server going dark.
-2. As an operator, I want to promote deliberately, after seeing the pending generation has caught up.
-3. As a browser user, I want the app to keep rendering while the new generation builds, and switch
-   when it is ready.
-4. As a browser developer, I want to turn the auto-switch off and show catch-up progress instead.
+1. As a browser user, I want the app to keep rendering while a new generation builds, instead of
+   going blank, and to switch when it is ready.
+2. As a browser developer, I want to change the source OR the processor without blanking my app.
+3. As a browser developer, I want to turn the auto-switch off and show catch-up progress instead.
+4. As an app author, I want to know that a successor generation exists and how far it has caught up,
+   so I decide whether to render, dim or hide the live state, since only I know whether my
+   reconfigure made the old answers wrong or merely incomplete.
 5. As a reader holding a state handle across a promotion ON THE ENTITIES PATH, I want it to keep
    answering from the generation that is now live, so holding a reference is never a way to be
    silently stale. (On the js-object path the published value is a plain object replaced wholesale,
-   so a holder of the OLD reference is stale exactly as it is today; that is unchanged by this spec
-   and is not regressed by it.)
-6. As an operator, I want a reconfigure the invalidation verdict calls a no-op to cost nothing.
-7. As an operator reconfiguring twice, I want the second to replace the first pending generation.
-8. As an operator, I want a generation whose stream is unavailable to fall back to a full re-index,
+   so a holder of the OLD reference is stale exactly as it is today; unchanged by this spec and not
+   regressed by it.)
+6. As a developer, I want a reconfigure the invalidation verdict calls a no-op to cost nothing.
+7. As a developer reconfiguring twice, I want the second to replace the first pending generation.
+8. As a developer, I want a generation whose stream is unavailable to fall back to a full re-index,
    which is today's behaviour, so the feature degrades rather than breaks.
-9. As an app author, I want to know that a candidate generation exists and how far it has caught up,
-   so I decide whether to render, dim or hide the live state, since only I know whether my
-   reconfigure made the old answers wrong or merely incomplete.
+9. As a DEV iterating on a processor, I want promotion to happen automatically, rather than
+   hand-promoting after every edit.
 
 ## Implementation Decisions
 
@@ -174,7 +174,7 @@ one is pending, never a doubled backfill.
 **The no-outage value does not depend on sharing at all**: the live generation keeps answering
 regardless. Sharing decides how expensive catching up is, not whether reads survive.
 
-**Prerequisite: `the-stream-is-what-the-node-said-appended-once`.** That spec now delivers segments
+**Prerequisite: `appending-to-the-stream-costs-the-batch`.** That spec now delivers segments
 that are IMMUTABLE and ADDRESSABLE, which is what a prefix reference needs. It deliberately does not
 build sharing; THIS spec owns that, and it is why the prerequisite is declared in `taskedAfter` and
 not only in prose. Without it the stream is one blob rewritten per append, there is no prefix to
@@ -203,13 +203,13 @@ rode on the handle or on every read return. Both are dropped, because the questi
   transparent to every holder, and the entire staleness class disappears instead of being made
   detectable.
 
-**The live generation KEEPS INDEXING while a candidate is pending, and the only signal a consumer
-gets is that a candidate EXISTS and how far along it is.**
+**The live generation KEEPS INDEXING while a successor is pending, and the only signal a consumer
+gets is that a successor EXISTS and how far along it is.**
 
 Note the word, because an earlier draft got it wrong. The live generation is not "superseded" while
-a candidate catches up: supersession is precisely the decision promotion makes and has NOT yet made.
+a successor catches up: supersession is precisely the decision promotion makes and has NOT yet made.
 Marking the live state superseded would encode a verdict nobody has reached, and would be false
-outright if the operator inspects the candidate and rejects it. Until promotion the live generation
+outright if the operator inspects the successor and rejects it. Until promotion the live generation
 is simply LIVE and the pending one is a CANDIDATE.
 
 Two alternatives were considered and rejected, and the reasoning is the load-bearing part.
@@ -231,13 +231,13 @@ merely INCOMPLETE, and everything it says is still true; after a renamed paramet
 `sourceInvalidationOf` can say what moved, never whether the old answers are now lies. So there is
 no safe default, and a second indexer mode would only relocate the guess.
 
-Instead the live state keeps being served, and the consumer is told **a candidate exists and how far
+Instead the live state keeps being served, and the consumer is told **a successor exists and how far
 it has caught up**. The app then renders, dims, banners or hides, because the app author is the only
 party who knows which of the three cases above they are in. One mechanism, no discard mode, and the
 presentation decision sits where the information is rather than as a branch inside the indexer.
 
-**That signal is not a second thing to publish.** Catch-up progress and the existence of a candidate
-are the SAME fact: if progress is being reported, a candidate exists. So it collapses into open
+**That signal is not a second thing to publish.** Catch-up progress and the existence of a successor
+are the SAME fact: if progress is being reported, a successor exists. So it collapses into open
 question 2 rather than adding surface, and there is no flag on the live generation at all.
 
 Worth noting how little the app needs. It does not need the indexer to CHARACTERISE anything,
@@ -285,7 +285,7 @@ both halves and is corrected here**, because the mistake is instructive:
   regressing story 6.
 - **`ProcessorContext` is not that triple.** Its `config` is the PROCESSOR config, whereas
   `ContextIdentifier.config` is the `streamConfigHash`. So the stream config is absent entirely, and
-  `updateIndexer` changing only `streamConfig` would produce a live and a candidate with
+  `updateIndexer` changing only `streamConfig` would produce a live and a successor with
   byte-identical `ProcessorContext` colliding on one key — the clobber
   `work/notes/observations/keepstate-storage-id-omits-the-processor-version.md` warns about.
 
@@ -295,7 +295,7 @@ resource, and the container supplies the generation because it is the only thing
 The generation argument belongs on the STATE factory and not on the processor factory. It is
 load-bearing there: the store name must be both STABLE across sessions (or a reload finds no data)
 and DISTINCT per generation (two IndexedDB stores sharing a `databaseName` are one store by that
-store's own documentation, so a candidate would fold into the live generation's rows). Deriving it
+store's own documentation, so a successor would fold into the live generation's rows). Deriving it
 from the generation is what satisfies both at once.
 
 The live generation is built through the same path at init, so there is one construction path rather
@@ -315,30 +315,30 @@ old estimate would not have owned them.
 
 **What is shared and what is not.** These are two different stores and conflating them is easy:
 
-- the **stream** (`keepStream`) IS shared, and that is the point of the whole design: the candidate
+- the **stream** (`keepStream`) IS shared, and that is the point of the whole design: the successor
   reads the existing prefix instead of re-fetching it;
 - the **state store** CANNOT be shared. It is the materialised fold, two generations have different
   folds by definition, and `StateStore` has no fork verb. Each generation materialises its own, and
   that is what the factory mints.
 
 Sharing the stream has a consequence this spec owns: both generations also WRITE to it, under
-DIFFERENT filters, since the candidate may need topics the live generation never requested. So a
+DIFFERENT filters, since the successor may need topics the live generation never requested. So a
 shared stream needs segments attributable to a LINEAGE as well as to a filter, or the live
 generation replays events it never asked for and decodes them as errors. The prerequisite spec
 delivers immutable, independently readable segments; attributing them is owned here.
 
-**`SyncingState` grows an optional `candidate` block, and the live fields stay flat.** Nesting both
-under `live` and `candidate` was considered and rejected as a category error: the record mixes
+**`SyncingState` grows an optional `successor` block, and the live fields stay flat.** Nesting both
+under `live` and `successor` was considered and rejected as a category error: the record mixes
 provider-level facts (`waitingForProvider`), policy (`autoIndexing`) and per-generation facts
 (`lastSync`, `catchingUp`, `fetchingLogs`, `processingFetchedLogs`, `loading`, `numRequests`), so a
 uniform nesting would assert that the provider is per-generation, which is false. Leaving the live
-fields flat also means no existing consumer changes, and the common case (no candidate) is expressed
-as absence. `syncPercentage` already rides on `lastSync`, so a candidate's progress comes along
+fields flat also means no existing consumer changes, and the common case (no successor) is expressed
+as absence. `syncPercentage` already rides on `lastSync`, so a successor's progress comes along
 inside its own `lastSync` rather than needing a new field.
 
-**An error is reported on every generation it actually breaks.** The candidate carries its own
-`error`. A candidate-only failure (a processor that throws on replay, a decode error while
-backfilling) sets `candidate.error` alone, which is exactly the signal an operator needs before
+**An error is reported on every generation it actually breaks.** The successor carries its own
+`error`. A successor-only failure (a processor that throws on replay, a decode error while
+backfilling) sets `successor.error` alone, which is exactly the signal an operator needs before
 promoting. A shared failure (the provider is down, and both generations use the same provider)
 breaks both and is therefore reported on both; that is accurate rather than duplicated, and a
 consumer wanting to say it once can compare the existing `id: ErrorCode`. No `scope` field is added,
@@ -369,15 +369,15 @@ deliberately: it discards the pending generation as well as the live one, and it
 that clears the STREAM, which under sharing is the prefix a pending generation may be folding from,
 so it must not run while a pending generation depends on it.
 
-**A container owns the live-plus-candidate pair.** `EthereumIndexer` holds exactly one processor,
-one `lastSync` and one `keepStream` key, so it cannot hold both. With the factory above, a candidate
+**A container owns the live-plus-successor pair.** `EthereumIndexer` holds exactly one processor,
+one `lastSync` and one `keepStream` key, so it cannot hold both. With the factory above, a successor
 is a full second stack (its own `EthereumIndexer`, processor and state store), and the container is
 what `createIndexerState` returns: it holds the pair, publishes the indirect handle, owns promotion,
 and is what `SyncingState` describes.
 
-`promote` is therefore a method on that container: a UI action in the browser, and on the server an
-admin-side call wherever `getIngestion` is wired, since that is where the server's processor lives.
-There is no CLI verb, because the CLI never reconfigures.
+`promote` is therefore a method on that container, reached as a UI action. There is exactly ONE home
+for it. There is no CLI verb (the CLI never reconfigures and has no long-running drive) and no server
+surface here (that is the separate ingest-server spec).
 
 ## Testing Decisions
 
@@ -398,18 +398,18 @@ There is no CLI verb, because the CLI never reconfigures.
   which is the regression guard for the silent-staleness the indirect handle exists to remove.
 - **The reconfigure outcome** says what happened under a pending generation, and every existing
   assertion on `stateDiscarded` is migrated rather than left inverted.
-- **The live generation keeps advancing** while a candidate is pending: its cursor moves and it
+- **The live generation keeps advancing** while a successor is pending: its cursor moves and it
   processes a reorg in its own unconfirmed window. This is the regression guard against freezing it
   and stranding a tail it could never correct.
-- **A candidate's progress is visible** for as long as one is pending, and stops being reported at
-  promotion, because after promotion there is no candidate.
-- **A candidate-only failure** sets `candidate.error` while the top-level one stays clear; a shared
+- **A successor's progress is visible** for as long as one is pending, and stops being reported at
+  promotion, because after promotion there is no successor.
+- **A successor-only failure** sets `successor.error` while the top-level one stays clear; a shared
   provider failure sets BOTH, carrying the same `ErrorCode`.
-- **The state factory is called per generation** on BOTH paths, and a candidate's state is distinct
+- **The state factory is called per generation** on BOTH paths, and a successor's state is distinct
   from the live one's: a write to one is not visible in the other, which is the guard against the
   same-`databaseName` collision. The name is also STABLE across a reload for the same generation, so
   a restart finds its data rather than minting a third store.
-- **A `streamConfig`-only change** produces a live and a candidate that do NOT collide, which is the
+- **A `streamConfig`-only change** produces a live and a successor that do NOT collide, which is the
   regression guard for the `ProcessorContext` hole: that context cannot distinguish them, so the
   generation must come from the container.
 
