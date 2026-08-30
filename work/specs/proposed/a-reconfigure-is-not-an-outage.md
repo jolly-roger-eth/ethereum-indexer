@@ -94,6 +94,27 @@ not, that sequence is already promoted, so skip it. Then delete live above `K`, 
 live entries the retired generation had beyond the promoted range. Re-running the whole thing any
 number of times reaches the same state.
 
+**BOTH GENERATIONS STOP WRITING for the duration of the promotion, and that window is the ONE time
+the disjoint-key-sets rule does not hold.** Everywhere else the two writers cannot collide because
+each owns a label; during promotion the entries are CHANGING label, so for that window they are not
+disjoint and the invariant has to be bought with quiescence instead. Nothing else in this design
+needs a lock, which is why the exception is worth naming rather than assuming.
+
+Without it, and remembering that automatic promotion fires exactly when the successor has REACHED the
+live cursor, so the two tails are adjacent at precisely that moment:
+
+- a live save landing mid-promotion rewrites its open tail `live_M`. With `M <= K` that overwrites an
+  entry step 1 has just promoted, replacing successor content with retired-generation content at a
+  contiguous ordinal, which no refusal can see. With `M = K+1` it recreates a live entry above `K`
+  after the trim removed it, so the cursor — read from the tail — becomes the retired generation's.
+- a successor save landing after the marker is deleted writes `staging_K+1`, which the next load
+  reads as both-labels-present-with-no-marker, that is, as a pending successor that does not exist.
+
+So: quiesce both writers before the marker is written, awaiting any in-flight save; run the
+promotion; dispose the retired generation; and let the newly-live generation resume only after the
+marker is deleted, writing under its new label. `reset` already carries a must-not-run-concurrently
+rule for the same class of reason.
+
 **The marker has a LIFETIME, and a stale one is dangerous.** It is not a segment and does not match
 the anchored segment pattern, so nothing sweeps it by accident:
 
@@ -177,12 +198,16 @@ line in `indexer.ts`, and its comment states the rule: raw logs under a topic-an
 reusable whenever that filter did not GROW.
 
 **Each generation writes only under its OWN label, so there are two writers over one keyspace and
-their key sets are disjoint.** Neither can clobber the other, and no coordination rule is needed to
-say so. The live generation keeps appending `live` segments the whole time; the successor appends
-`staging` segments; and the live entries at or below `N`, which both read, are immutable because `N`
-is a SEALED boundary and a sealed segment is never rewritten. (The OPEN tail IS rewritten on every
-save — that is how the prerequisite makes an append cost the batch — which is exactly why `N` may
-never be it. See the sealing rule above.)
+their key sets are disjoint FOR AS LONG AS BOTH GENERATIONS EXIST.** Neither can clobber the other,
+and no coordination rule is needed to say so. The live generation keeps appending `live` segments the
+whole time; the successor appends `staging` segments; and the live entries at or below `N`, which
+both read, are immutable because `N` is a SEALED boundary and a sealed segment is never rewritten.
+(The OPEN tail IS rewritten on every save — that is how the prerequisite makes an append cost the
+batch — which is exactly why `N` may never be it. See the sealing rule above.)
+
+The qualifier is load-bearing: disjointness holds while there are two generations, and PROMOTION is
+the moment entries change label, so it is the one window where it does not. That window is bought
+with quiescence rather than with a rule about labels — see the promotion section.
 
 **Staging numbers its segments from `N + 1`.** It can, because the label already separates the two
 key spaces. So promotion is a rename that keeps the sequence number, and the promoted stream is
@@ -519,6 +544,15 @@ verbs. Left out of the fence, the guide keeps teaching an API this design falsif
 - **A stale marker never truncates a stream**: clear the stream with a marker present, confirm the
   marker is gone; and separately, a marker whose sequences correspond to nothing present is discarded
   at load rather than acted on.
+- **Neither generation writes during a promotion**: a save attempted on either side while a promotion
+  is in flight does not land inside it. The case that bites is a live save at `M <= K`, which would
+  otherwise overwrite a just-promoted entry at a contiguous ordinal, where nothing can detect it.
+- **The key migration is asserted for BOTH shapes, and the mapping SHIFTS.** Write a stream in the
+  prerequisite's shape INCLUDING an adopted label-less legacy key plus `_0.._N`, upgrade, and assert
+  the legacy segment becomes `_live_0`, `_k` becomes `_live_<k+1>`, no segment is lost, the replay is
+  identical to before the upgrade, and NO re-fetch happens. Assert the label-less case specifically:
+  it is the one that fails SILENTLY, since without it presence still reads true and only the earliest
+  segment goes missing. Re-running the migration changes nothing.
 - **A decode-only change is whole-stream sharing, not a partial graft**: a renamed non-indexed
   parameter moves `hash` but not `streamHash`, and the successor must re-fetch no history at all.
   This is the guard against reading `N` off the state verdict.
@@ -593,12 +627,26 @@ review.
      result that is simply missing the EARLIEST segment. Partial history replayed as whole, which is
      the failure class this set refuses everywhere.
 
-   Both are migrated by RENAME to `_live_<seq>`, the legacy key taking the lowest sequence, ahead of
-   every existing ordinal. Renaming rather than adopting-in-place is a deliberate departure from the
-   prerequisite, and it is affordable for exactly the reason the spike measured: a rename moves no
-   payload. The prerequisite avoided a migration because COPYING would have meant two writes and a
-   crash window between them; a rename has neither. Order the write before the delete so a crash
-   leaves both keys and the migration re-runs harmlessly, and have the reader prefer the labelled one.
+   Both are migrated by RENAME to `_live_<seq>`, and the mapping must SHIFT rather than be the
+   identity, which is the part that is easy to get wrong and clobbers a segment when it is:
+
+   ```
+   stream_<name>_<chainId>          ->  stream_<name>_<chainId>_live_000000
+   stream_<name>_<chainId>_<k>      ->  stream_<name>_<chainId>_live_<k+1>
+   ```
+
+   The shift is forced. Under the prerequisite the legacy key is adopted as the earliest sealed
+   segment and is followed by `_0`, so it sits BENEATH ordinal zero and there is no free slot under
+   `_0` for it to take. Mapping ordinals identically and sending the legacy key to `_live_0` as well
+   would write two segments to one key and silently lose one of them — the exact partial-history
+   failure this clause exists to close. Migrate from the highest ordinal DOWNWARD so no rename lands
+   on a key still occupied.
+
+   Renaming rather than adopting-in-place is a deliberate departure from the prerequisite, and it is
+   affordable for exactly the reason the spike measured: a rename moves no payload. The prerequisite
+   avoided a migration because COPYING would have meant two writes and a crash window between them; a
+   rename has neither. Order each write before its delete so a crash leaves both keys and the
+   migration re-runs harmlessly, and have the reader prefer the labelled one.
 2. **The verdict becomes a published, actionable answer, and `ReconfigureOutcome` grows the shape
    that replaces `stateDiscarded`.** Core-side: publish what the container needs from
    `sourceInvalidationOf` (which half, and `invalidFromBlock`, from which `N` is DERIVED — `N` itself
