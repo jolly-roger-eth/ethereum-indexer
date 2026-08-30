@@ -1,0 +1,3679 @@
+{
+  "project": "firefox",
+  "ranAt": "2026-08-30T16:12:58.461Z",
+  "note": "ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on.",
+  "rows": [
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 4,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 302
+        },
+        {
+          "label": "setup-append",
+          "ms": 153
+        },
+        {
+          "label": "promote",
+          "ms": 4
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 4,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 215
+        },
+        {
+          "label": "setup-append",
+          "ms": 145
+        },
+        {
+          "label": "promote",
+          "ms": 4
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 111,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 210
+        },
+        {
+          "label": "setup-append",
+          "ms": 152
+        },
+        {
+          "label": "promote",
+          "ms": 111
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 184
+        },
+        {
+          "label": "setup-append",
+          "ms": 150
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516108,
+          "storeOps": 4,
+          "ms": 136,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 232
+        },
+        {
+          "label": "setup-append",
+          "ms": 219
+        },
+        {
+          "label": "promote",
+          "ms": 136
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516108,
+          "storeOps": 252,
+          "ms": 209,
+          "storeOpsObserved": 252
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 185
+        },
+        {
+          "label": "setup-append",
+          "ms": 224
+        },
+        {
+          "label": "promote",
+          "ms": 209
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516927,
+          "storeOps": 3,
+          "ms": 284,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 166
+        },
+        {
+          "label": "setup-append",
+          "ms": 222
+        },
+        {
+          "label": "promote",
+          "ms": 284
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516927,
+          "storeOps": 3,
+          "ms": 133,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 164
+        },
+        {
+          "label": "setup-append",
+          "ms": 235
+        },
+        {
+          "label": "promote",
+          "ms": 133
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16899219,
+          "storeOps": 4,
+          "ms": 262,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 201
+        },
+        {
+          "label": "setup-append",
+          "ms": 319
+        },
+        {
+          "label": "promote",
+          "ms": 262
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16899219,
+          "storeOps": 500,
+          "ms": 398,
+          "storeOpsObserved": 500
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 196
+        },
+        {
+          "label": "setup-append",
+          "ms": 285
+        },
+        {
+          "label": "promote",
+          "ms": 398
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16900844,
+          "storeOps": 3,
+          "ms": 503,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 150
+        },
+        {
+          "label": "setup-append",
+          "ms": 285
+        },
+        {
+          "label": "promote",
+          "ms": 503
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16900844,
+          "storeOps": 3,
+          "ms": 259,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 148
+        },
+        {
+          "label": "setup-append",
+          "ms": 271
+        },
+        {
+          "label": "promote",
+          "ms": 259
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 179
+        },
+        {
+          "label": "setup-append",
+          "ms": 154
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 196
+        },
+        {
+          "label": "setup-append",
+          "ms": 160
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 105,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 192
+        },
+        {
+          "label": "setup-append",
+          "ms": 155
+        },
+        {
+          "label": "promote",
+          "ms": 105
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 184
+        },
+        {
+          "label": "setup-append",
+          "ms": 155
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371025,
+          "storeOps": 4,
+          "ms": 134,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 179
+        },
+        {
+          "label": "setup-append",
+          "ms": 233
+        },
+        {
+          "label": "promote",
+          "ms": 134
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371025,
+          "storeOps": 64,
+          "ms": 219,
+          "storeOpsObserved": 64
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 267
+        },
+        {
+          "label": "setup-append",
+          "ms": 223
+        },
+        {
+          "label": "promote",
+          "ms": 219
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371233,
+          "storeOps": 3,
+          "ms": 354,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 339
+        },
+        {
+          "label": "setup-append",
+          "ms": 235
+        },
+        {
+          "label": "promote",
+          "ms": 354
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371233,
+          "storeOps": 3,
+          "ms": 129,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 254
+        },
+        {
+          "label": "setup-append",
+          "ms": 220
+        },
+        {
+          "label": "promote",
+          "ms": 129
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477076,
+          "storeOps": 4,
+          "ms": 255,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 146
+        },
+        {
+          "label": "setup-append",
+          "ms": 297
+        },
+        {
+          "label": "promote",
+          "ms": 255
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477076,
+          "storeOps": 124,
+          "ms": 370,
+          "storeOpsObserved": 124
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 189
+        },
+        {
+          "label": "setup-append",
+          "ms": 300
+        },
+        {
+          "label": "promote",
+          "ms": 370
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477479,
+          "storeOps": 3,
+          "ms": 455,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 184
+        },
+        {
+          "label": "setup-append",
+          "ms": 284
+        },
+        {
+          "label": "promote",
+          "ms": 455
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477479,
+          "storeOps": 3,
+          "ms": 243,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 148
+        },
+        {
+          "label": "setup-append",
+          "ms": 293
+        },
+        {
+          "label": "promote",
+          "ms": 243
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 4,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 168
+        },
+        {
+          "label": "setup-append",
+          "ms": 180
+        },
+        {
+          "label": "promote",
+          "ms": 4
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 176
+        },
+        {
+          "label": "setup-append",
+          "ms": 181
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 125,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 175
+        },
+        {
+          "label": "setup-append",
+          "ms": 177
+        },
+        {
+          "label": "promote",
+          "ms": 125
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 1,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 189
+        },
+        {
+          "label": "setup-append",
+          "ms": 173
+        },
+        {
+          "label": "promote",
+          "ms": 1
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368433,
+          "storeOps": 4,
+          "ms": 162,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 219
+        },
+        {
+          "label": "setup-append",
+          "ms": 262
+        },
+        {
+          "label": "promote",
+          "ms": 162
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368433,
+          "storeOps": 16,
+          "ms": 201,
+          "storeOpsObserved": 16
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 244
+        },
+        {
+          "label": "setup-append",
+          "ms": 273
+        },
+        {
+          "label": "promote",
+          "ms": 201
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368485,
+          "storeOps": 3,
+          "ms": 322,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 151
+        },
+        {
+          "label": "setup-append",
+          "ms": 269
+        },
+        {
+          "label": "promote",
+          "ms": 322
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368485,
+          "storeOps": 3,
+          "ms": 151,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 149
+        },
+        {
+          "label": "setup-append",
+          "ms": 249
+        },
+        {
+          "label": "promote",
+          "ms": 151
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14856978,
+          "storeOps": 4,
+          "ms": 268,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 177
+        },
+        {
+          "label": "setup-append",
+          "ms": 328
+        },
+        {
+          "label": "promote",
+          "ms": 268
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14856978,
+          "storeOps": 28,
+          "ms": 326,
+          "storeOpsObserved": 28
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 192
+        },
+        {
+          "label": "setup-append",
+          "ms": 325
+        },
+        {
+          "label": "promote",
+          "ms": 326
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14857069,
+          "storeOps": 3,
+          "ms": 501,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 176
+        },
+        {
+          "label": "setup-append",
+          "ms": 329
+        },
+        {
+          "label": "promote",
+          "ms": 501
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14857069,
+          "storeOps": 3,
+          "ms": 279,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 152
+        },
+        {
+          "label": "setup-append",
+          "ms": 350
+        },
+        {
+          "label": "promote",
+          "ms": 279
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 16,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 220
+        },
+        {
+          "label": "setup-append",
+          "ms": 579
+        },
+        {
+          "label": "promote",
+          "ms": 16
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 15,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 191
+        },
+        {
+          "label": "setup-append",
+          "ms": 558
+        },
+        {
+          "label": "promote",
+          "ms": 15
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 460,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 189
+        },
+        {
+          "label": "setup-append",
+          "ms": 552
+        },
+        {
+          "label": "promote",
+          "ms": 460
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 9,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 193
+        },
+        {
+          "label": "setup-append",
+          "ms": 581
+        },
+        {
+          "label": "promote",
+          "ms": 9
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34020314,
+          "storeOps": 4,
+          "ms": 543,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 185
+        },
+        {
+          "label": "setup-append",
+          "ms": 878
+        },
+        {
+          "label": "promote",
+          "ms": 543
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34020314,
+          "storeOps": 1004,
+          "ms": 883,
+          "storeOpsObserved": 1004
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 180
+        },
+        {
+          "label": "setup-append",
+          "ms": 839
+        },
+        {
+          "label": "promote",
+          "ms": 883
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34023577,
+          "storeOps": 3,
+          "ms": 1321,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 184
+        },
+        {
+          "label": "setup-append",
+          "ms": 861
+        },
+        {
+          "label": "promote",
+          "ms": 1321
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34023577,
+          "storeOps": 3,
+          "ms": 1807,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 193
+        },
+        {
+          "label": "setup-append",
+          "ms": 901
+        },
+        {
+          "label": "promote",
+          "ms": 1807
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 67996611,
+          "storeOps": 4,
+          "ms": 1233,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 390
+        },
+        {
+          "label": "setup-append",
+          "ms": 1345
+        },
+        {
+          "label": "promote",
+          "ms": 1233
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 67996611,
+          "storeOps": 2004,
+          "ms": 1841,
+          "storeOpsObserved": 2004
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 192
+        },
+        {
+          "label": "setup-append",
+          "ms": 1200
+        },
+        {
+          "label": "promote",
+          "ms": 1841
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 68003124,
+          "storeOps": 3,
+          "ms": 2250,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 187
+        },
+        {
+          "label": "setup-append",
+          "ms": 1178
+        },
+        {
+          "label": "promote",
+          "ms": 2250
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 68003124,
+          "storeOps": 3,
+          "ms": 1190,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 186
+        },
+        {
+          "label": "setup-append",
+          "ms": 1182
+        },
+        {
+          "label": "promote",
+          "ms": 1190
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 15,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 191
+        },
+        {
+          "label": "setup-append",
+          "ms": 606
+        },
+        {
+          "label": "promote",
+          "ms": 15
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 10,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 191
+        },
+        {
+          "label": "setup-append",
+          "ms": 606
+        },
+        {
+          "label": "promote",
+          "ms": 10
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 423,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 202
+        },
+        {
+          "label": "setup-append",
+          "ms": 574
+        },
+        {
+          "label": "promote",
+          "ms": 423
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 7,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 192
+        },
+        {
+          "label": "setup-append",
+          "ms": 585
+        },
+        {
+          "label": "promote",
+          "ms": 7
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33844588,
+          "storeOps": 4,
+          "ms": 593,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 264
+        },
+        {
+          "label": "setup-append",
+          "ms": 831
+        },
+        {
+          "label": "promote",
+          "ms": 593
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33844588,
+          "storeOps": 252,
+          "ms": 779,
+          "storeOpsObserved": 252
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 201
+        },
+        {
+          "label": "setup-append",
+          "ms": 896
+        },
+        {
+          "label": "promote",
+          "ms": 779
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33845407,
+          "storeOps": 3,
+          "ms": 1311,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 197
+        },
+        {
+          "label": "setup-append",
+          "ms": 898
+        },
+        {
+          "label": "promote",
+          "ms": 1311
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33845407,
+          "storeOps": 3,
+          "ms": 684,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 195
+        },
+        {
+          "label": "setup-append",
+          "ms": 929
+        },
+        {
+          "label": "promote",
+          "ms": 684
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67513556,
+          "storeOps": 4,
+          "ms": 1161,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 234
+        },
+        {
+          "label": "setup-append",
+          "ms": 1215
+        },
+        {
+          "label": "promote",
+          "ms": 1161
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67513556,
+          "storeOps": 500,
+          "ms": 1681,
+          "storeOpsObserved": 500
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 195
+        },
+        {
+          "label": "setup-append",
+          "ms": 1187
+        },
+        {
+          "label": "promote",
+          "ms": 1681
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67515181,
+          "storeOps": 3,
+          "ms": 2098,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 208
+        },
+        {
+          "label": "setup-append",
+          "ms": 1153
+        },
+        {
+          "label": "promote",
+          "ms": 2098
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67515181,
+          "storeOps": 3,
+          "ms": 1092,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 207
+        },
+        {
+          "label": "setup-append",
+          "ms": 1168
+        },
+        {
+          "label": "promote",
+          "ms": 1092
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 1,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 211
+        },
+        {
+          "label": "setup-append",
+          "ms": 691
+        },
+        {
+          "label": "promote",
+          "ms": 1
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 211
+        },
+        {
+          "label": "setup-append",
+          "ms": 737
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 436,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 217
+        },
+        {
+          "label": "setup-append",
+          "ms": 695
+        },
+        {
+          "label": "promote",
+          "ms": 436
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 1,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 224
+        },
+        {
+          "label": "setup-append",
+          "ms": 707
+        },
+        {
+          "label": "promote",
+          "ms": 1
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299415,
+          "storeOps": 4,
+          "ms": 670,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 224
+        },
+        {
+          "label": "setup-append",
+          "ms": 1058
+        },
+        {
+          "label": "promote",
+          "ms": 670
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299415,
+          "storeOps": 64,
+          "ms": 766,
+          "storeOpsObserved": 64
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 207
+        },
+        {
+          "label": "setup-append",
+          "ms": 1050
+        },
+        {
+          "label": "promote",
+          "ms": 766
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299623,
+          "storeOps": 3,
+          "ms": 1343,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 206
+        },
+        {
+          "label": "setup-append",
+          "ms": 1025
+        },
+        {
+          "label": "promote",
+          "ms": 1343
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299623,
+          "storeOps": 3,
+          "ms": 585,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 230
+        },
+        {
+          "label": "setup-append",
+          "ms": 1068
+        },
+        {
+          "label": "promote",
+          "ms": 585
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878338,
+          "storeOps": 4,
+          "ms": 1257,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 204
+        },
+        {
+          "label": "setup-append",
+          "ms": 1363
+        },
+        {
+          "label": "promote",
+          "ms": 1257
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878338,
+          "storeOps": 124,
+          "ms": 1535,
+          "storeOpsObserved": 124
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 209
+        },
+        {
+          "label": "setup-append",
+          "ms": 1352
+        },
+        {
+          "label": "promote",
+          "ms": 1535
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878741,
+          "storeOps": 3,
+          "ms": 2098,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 218
+        },
+        {
+          "label": "setup-append",
+          "ms": 1355
+        },
+        {
+          "label": "promote",
+          "ms": 2098
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "firefox",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878741,
+          "storeOps": 3,
+          "ms": 1211,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 221
+        },
+        {
+          "label": "setup-append",
+          "ms": 1369
+        },
+        {
+          "label": "promote",
+          "ms": 1211
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

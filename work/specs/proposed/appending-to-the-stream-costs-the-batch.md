@@ -97,28 +97,22 @@ string is already built) and not cheaply available on IndexedDB (structured-clon
 exposed), so naming the unit is what stops the two keepers choosing differently and makes the seal
 test deterministic.
 
-**Each segment RECORDS its block range as metadata, while its KEY stays ordinal.** The two are not in
-tension and the distinction is the whole point. The key must be ordinal, because a reorg re-appends
-retractions at their original block numbers and then continues lower, so block ranges overlap and
-cannot key anything. But each segment still knows which blocks it happens to contain, and recording
-that `{min, max}` at write time costs one comparison over a batch already in hand.
+**No per-segment block RANGE is recorded, because the `lastSync` already in every segment is
+strictly better.** A draft added a `{min, max}` per segment so a later design could select the
+segments covering blocks `[0, N)`. It is unnecessary, and the reason is not that segments are
+unorderable by block (below the finality horizon they are): it is that the datum is already there.
 
-It is recorded HERE, in the spec that writes segments, for a forward-compatibility reason that is
-cheap now and expensive later: a range cannot be added retroactively without READING every existing
-segment, so omitting it would turn a later optimisation into a migration. This spec builds nothing on
-it.
+Every segment carries the `lastSync` current when it was written, and `lastSync.lastToBlock` is the
+block the stream had been scanned to at that boundary. That is an atomic snapshot at EVERY segment
+boundary, delivered by the one-write rule above rather than by new metadata.
 
-What it keeps reachable is real. Reorgs never reach below `latestBlock - finality` (the indexer
-re-fetches from exactly there each round), so once a segment's `max` is under that horizon it is
-FINAL and no later segment can ever hold a lower block. Below the horizon, ordinal order and block
-order agree, and a consumer can select the segments covering blocks `[0, N)` by their recorded
-ranges. That is what lets `a-reconfigure-is-not-an-outage` share a prefix by REFERENCE instead of
-copying or re-fetching it.
+It also answers a strictly better question than a range of the events would. A `{min, max}` over the
+events a segment happens to CONTAIN says where events landed; `lastToBlock` says how far the stream
+was SCANNED. Those differ whenever a range yielded no events, which is most ranges, and it is the
+scanned extent a graft point needs: "everything through this segment covers `[0, lastToBlock]`" is
+the claim, and an event-derived range cannot make it.
 
-One caveat to record with it: final segments can still OVERLAP one another, because a reorg that
-happened while they were unconfirmed leaves a later segment re-carrying those block numbers. So
-selection is "take the segments whose range intersects `[0, N)`", not a binary search. Cheap, since
-this is metadata over few segments, but it is not a clean ordering and should not be assumed to be.
+So there is no forward-compatibility debt to pre-pay here, which was the whole argument for adding it.
 
 **Presence is the TAIL, never a segment count.** `fetchFrom` must keep returning a DEFINED result
 for a stream that has been saved to but holds no events, because today an empty first save writes
@@ -130,7 +124,8 @@ can FAIL them. Immutability is observable at the write seam: no write ever targe
 segment's key. Independent readability means any sealed segment is readable BY ITS OWN KEY without
 reading the others, which is the criterion that bites where "addressable" would not, since any keyed
 store satisfies being nameable. These are REQUIREMENTS here, not aspirations: a later design that
-wants to share a prefix by reference has nothing to point at without them.
+wants a second reader over a prefix of this stream, while this stream keeps being appended to, has
+nothing to stand on without them. `a-reconfigure-is-not-an-outage` is that design.
 
 ## User Stories
 
@@ -270,10 +265,6 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   and it fails loudly under a bare prefix filter.
 - **The cursor comes from the tail**: a stream with several sealed segments resumes from the highest
   ordinal's `lastSync`, never a sealed one's stale copy.
-- **Every segment carries its block range**, including one written across a reorg, where the range
-  covers the re-appended retractions at their original numbers. This is the metadata a later
-  by-reference share selects on, and it is asserted here because it cannot be backfilled later
-  without reading every segment.
 - **A sealed segment is never rewritten** (no write targets its key again) and is **readable by its
   own key** without reading the others.
 - **`fetchFrom` returns a DEFINED result for a stream saved with no events**, which is the guard
@@ -295,15 +286,20 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   `taskedAfter` this. This spec deliberately changes NO published type, which is what makes it
   small.
 - **Sharing segments between two streams.** Immutability and independent readability are delivered
-  here, so a later design has something to point at. Note what that does NOT give it: segments are
-  ordinal-keyed and a later segment can hold lower blocks, so there is no segment prefix
-  corresponding to a BLOCK prefix.
+  here, so a later design has something to build on. State the limit PRECISELY, because the loose
+  form of it is false: segments are ordinal-keyed and a later segment can hold lower blocks, so an
+  arbitrary segment prefix does not correspond to a BLOCK prefix. That holds only WITHIN the
+  unconfirmed window. Below `latestBlock - finality` no reorg can reach, so no later segment can
+  ever carry a lower block and ordinal order and block order agree there. A design reading this as
+  the flat claim "segments are never block-ordered" would be generalising past the region the
+  premise holds in.
 - **Per-segment filter or lineage provenance**, which any sharing design needs and which changes the
   read seam this spec pins as unchanged.
 - **Pruning or retention of segments within a live stream.** A NAMED follow-up rather than a silent
-  omission, and genuinely unowned. Note it is NOT required by `a-reconfigure-is-not-an-outage`, which
-  an earlier draft claimed: under that spec's one-writer rule, reclaiming a retired generation means
-  deleting a WHOLE stream through `ExistingStream.clear`, not pruning segments out of a live one.
+  omission, and genuinely unowned. It is NOT required by `a-reconfigure-is-not-an-outage`: under that
+  spec every entry carries a generation label, so reclaiming a retired generation is deleting the
+  entries under one label, which is a delete by key and not a retention policy over a generation that
+  is still being read.
 
 ## Further Notes
 

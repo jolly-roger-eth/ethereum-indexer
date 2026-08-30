@@ -1,0 +1,138 @@
+---
+title: 'The browser stream keeper appends in segments, on the same core helper'
+slug: the-browser-stream-keeper-appends-in-segments
+spec: appending-to-the-stream-costs-the-batch
+blockedBy: [segment-the-stream-behind-one-core-helper]
+covers: [2]
+---
+
+## What to build
+
+Put `keepStreamOnIndexedDB` on the segmentation helper that
+`segment-the-stream-behind-one-core-helper` builds, so a save on the browser stops structured-cloning
+the entire history.
+
+This is the SECOND independent implementation of one contract, not a second design. Every rule —
+ordinal keys, the open tail carrying `lastSync`, one write per save, sealing by not being the highest
+ordinal any more, the anchored enumeration, the contiguity refusal, legacy adoption in place, the
+cursor from the tail, presence as the tail — lives in the helper. This task supplies the **port** and
+proves the contract holds on IndexedDB.
+
+`packages/browser/src/storage/stream/OnIndexedDB.ts` today reads the whole stream, concatenates and
+writes it all back on every `saveNewEvents`, which is a full structured-clone of the accumulated
+history per index cycle. It imports only `get`/`set`/`del` from `idb-keyval`.
+
+**The substrate facts this rests on**, checked rather than assumed:
+
+- `idb-keyval` (6.2.4) ships `keys`, `getMany`, `setMany`, `delMany`, `entries`, `values`, `update`
+  and `clear` alongside `get`/`set`/`del`. The keeper imports only three of them. So the belief that
+  the browser keeper cannot enumerate is FALSE — it was inferred from an import line.
+- `delMany` is ONE transaction, so a segmented `clear` is atomic.
+- `idb-keyval`'s `clear()` wipes the **WHOLE store**, not one stream's keys. It is available as a
+  capability and is NOT the implementation of `ExistingStream.clear`. Use `keys` plus `delMany` over
+  the anchored match.
+
+**One existing test reaches into the stream key directly and this breaks it.**
+`packages/browser/test/invalidation.test.ts` does `get(stream_<tag>_<chainId>)`, asserts it is
+defined, and rewrites `lastSync` in place. Update it DELIBERATELY — it is also the closest prior art
+for the migration test — rather than patching it blind on a red gate.
+
+## Acceptance criteria
+
+- [ ] `keepStreamOnIndexedDB` is implemented on the core segmentation helper, supplying a
+      `get`/`set`/`del`/`keys` port over `idb-keyval`. No segmentation rule is re-implemented here.
+- [ ] **No full structured-clone of the history on a save**, asserted as WORK at a module-level mock
+      of `idb-keyval`'s `set` behind `OnIndexedDB`: assert the CEILING — no save writes more than one
+      tail plus its batch, and the 100th append costs no more than the 10th at the same tail phase.
+      Wall-clock cannot be the yardstick here: `fake-indexeddb` is itself quadratic, and ADR-0032
+      rules out wall-clock on a loaded machine.
+- [ ] **A save writes exactly ONE key** in the steady state, including the first save after a legacy
+      adoption.
+- [ ] **A save with no new events** costs nothing proportional to history.
+- [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
+      same order, strict equality.
+- [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events, which is what stops
+      `indexer.ts` taking its clear branch.
+- [ ] **The cursor comes from the tail**, never a sealed segment's stale `lastSync`.
+- [ ] **A sealed segment is never rewritten** and is **readable by its own key**.
+- [ ] **Replay across a reorg** returns retractions in APPEND order.
+- [ ] **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where
+      `clear` on one leaves the other intact. This fails loudly under a bare prefix filter.
+- [ ] **`clear` removes every segment of ITS stream and nothing else** — via `keys` + `delMany` over
+      the anchored match, never `idb-keyval`'s store-wide `clear()`. A test asserts an unrelated key
+      in the same store survives.
+- [ ] **A gap in the ordinals is REFUSED** rather than replayed as a shorter stream.
+- [ ] **The migration**: write a stream in the shipped blob format, read it with the new code, assert
+      NO re-fetch; and separately, a legacy blob with a dropped raw half is cleared per ADR-0034.
+- [ ] `packages/browser/test/invalidation.test.ts` is updated deliberately for the new key layout and
+      still asserts what it was written to assert.
+- [ ] The behaviours above hold identically on BOTH keepers — this is the round-trip check that the
+      two independent implementations of one contract really agree.
+- [ ] `pnpm build && pnpm typecheck && pnpm test` green.
+
+## Blocked by
+
+- `segment-the-stream-behind-one-core-helper` — it builds the helper this task consumes and exports
+  it from `@etherfold/core`. Also serialised on purpose: that task owns core's `index.ts` and the
+  changeset, so this one does not contend for either.
+
+## Prompt
+
+Read `work/specs/proposed/appending-to-the-stream-costs-the-batch.md` in full first, and read the
+helper that `segment-the-stream-behind-one-core-helper` landed. Your job is to supply a port and
+prove the contract, NOT to re-derive the rules.
+
+FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED): does
+it still match the code in `work/tasks/done/`, the relevant ADRs, and the task it depends on? In
+particular, read the `## Decisions` block in
+`work/tasks/done/segment-the-stream-behind-one-core-helper.md` — the seal threshold, how the legacy
+shape is recognised, and what a contiguity refusal throws were all chosen there, and this task must
+match them rather than pick again. If the helper landed with a different port shape than this task
+assumes, do NOT build on the stale premise: route to needs-attention with the discrepancy
+(WORK-CONTRACT.md, "Drift is a needs-attention signal").
+
+**Where to look.** `packages/browser/src/storage/stream/OnIndexedDB.ts` is the file. Its sibling
+implementation is `packages/fs/src/storage/stream/OnFile.ts`, already on the helper. The consumer is
+`packages/core/src/indexer.ts`. `packages/browser/test/invalidation.test.ts` is the test that reaches
+into the stream key and must be updated.
+
+**Domain vocabulary** is the helper's: a *segment* is one stored batch plus the `lastSync` current
+after it; the *tail* is the open, highest-ordinal segment (or the adopted legacy key when no ordinal
+exists yet); everything below is *sealed* and immutable. The stored stream is an *emission stream*,
+so a later segment can hold LOWER block numbers and no segment may be skipped on a block bound.
+
+**The two hazards specific to this substrate:**
+
+- `idb-keyval`'s `clear()` wipes the WHOLE store. Using it for `ExistingStream.clear` would destroy
+  every other stream and every other keeper's rows in that store. Use `keys` + `delMany` over the
+  anchored match.
+- The anchored match matters MORE here than the rules make it look: stream keys are
+  `stream_<name>_<chainId>`, so a bare `startsWith` filter for chain `1` also matches every chain-`10`
+  key. That is silent cross-chain data corruption, and same-name-different-chain is the designed-for
+  case, since `chainId` is in the key precisely so one tag can serve many chains.
+
+**Tests must not touch the real environment.** IndexedDB tests run against `fake-indexeddb`; make
+sure nothing writes to a real profile or shared store, and assert unrelated keys in the same store
+survive a `clear`.
+
+**Scope fence.** Do NOT change the helper (that is the sibling task's file, and a change there means
+this task found drift — surface it rather than editing). Do NOT make the stream raw-only — that is
+`the-stream-stores-only-what-the-node-said`. Do NOT add per-segment block-range metadata. Do NOT touch
+core's `index.ts` or add a changeset; the sibling task owns both.
+
+RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (how
+you mocked `idb-keyval`'s `set` for the cost assertion; anything the port had to do that the fs port
+did not). That block is the ONE sanctioned channel for build-time rationale and the runner
+transcribes it into the done record. Do NOT write the done record, the commit message or the PR body
+yourself, and do NOT open an observation note for decisions.
+
+---
+
+### Claiming this task
+
+```sh
+dorfl claim the-browser-stream-keeper-appends-in-segments --arbiter origin
+git fetch origin && git switch -c work/the-browser-stream-keeper-appends-in-segments origin/main
+# on completion, in the work branch's PR/merge:
+git mv work/tasks/ready/the-browser-stream-keeper-appends-in-segments.md work/tasks/done/the-browser-stream-keeper-appends-in-segments.md
+```

@@ -1,0 +1,3679 @@
+{
+  "project": "webkit",
+  "ranAt": "2026-08-30T16:14:50.627Z",
+  "note": "ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on.",
+  "rows": [
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 217
+        },
+        {
+          "label": "setup-append",
+          "ms": 150
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 215
+        },
+        {
+          "label": "setup-append",
+          "ms": 136
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 52,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 190
+        },
+        {
+          "label": "setup-append",
+          "ms": 133
+        },
+        {
+          "label": "promote",
+          "ms": 52
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 1,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 178
+        },
+        {
+          "label": "setup-append",
+          "ms": 129
+        },
+        {
+          "label": "promote",
+          "ms": 1
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516108,
+          "storeOps": 4,
+          "ms": 80,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 159
+        },
+        {
+          "label": "setup-append",
+          "ms": 190
+        },
+        {
+          "label": "promote",
+          "ms": 80
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516108,
+          "storeOps": 252,
+          "ms": 158,
+          "storeOpsObserved": 252
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 162
+        },
+        {
+          "label": "setup-append",
+          "ms": 186
+        },
+        {
+          "label": "promote",
+          "ms": 158
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516927,
+          "storeOps": 3,
+          "ms": 163,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 174
+        },
+        {
+          "label": "setup-append",
+          "ms": 180
+        },
+        {
+          "label": "promote",
+          "ms": 163
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 8516927,
+          "storeOps": 3,
+          "ms": 77,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 165
+        },
+        {
+          "label": "setup-append",
+          "ms": 205
+        },
+        {
+          "label": "promote",
+          "ms": 77
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16899219,
+          "storeOps": 4,
+          "ms": 183,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 169
+        },
+        {
+          "label": "setup-append",
+          "ms": 249
+        },
+        {
+          "label": "promote",
+          "ms": 183
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16899219,
+          "storeOps": 500,
+          "ms": 320,
+          "storeOpsObserved": 500
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 156
+        },
+        {
+          "label": "setup-append",
+          "ms": 248
+        },
+        {
+          "label": "promote",
+          "ms": 320
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16900844,
+          "storeOps": 3,
+          "ms": 255,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 206
+        },
+        {
+          "label": "setup-append",
+          "ms": 282
+        },
+        {
+          "label": "promote",
+          "ms": 255
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 17032608,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 16900844,
+          "storeOps": 3,
+          "ms": 169,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 234
+        },
+        {
+          "label": "setup-append",
+          "ms": 272
+        },
+        {
+          "label": "promote",
+          "ms": 169
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 145
+        },
+        {
+          "label": "setup-append",
+          "ms": 117
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 216
+        },
+        {
+          "label": "setup-append",
+          "ms": 118
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 56,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 150
+        },
+        {
+          "label": "setup-append",
+          "ms": 113
+        },
+        {
+          "label": "promote",
+          "ms": 56
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 1,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 156
+        },
+        {
+          "label": "setup-append",
+          "ms": 105
+        },
+        {
+          "label": "promote",
+          "ms": 1
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371025,
+          "storeOps": 4,
+          "ms": 100,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 187
+        },
+        {
+          "label": "setup-append",
+          "ms": 172
+        },
+        {
+          "label": "promote",
+          "ms": 100
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371025,
+          "storeOps": 64,
+          "ms": 107,
+          "storeOpsObserved": 64
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 172
+        },
+        {
+          "label": "setup-append",
+          "ms": 171
+        },
+        {
+          "label": "promote",
+          "ms": 107
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371233,
+          "storeOps": 3,
+          "ms": 160,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 156
+        },
+        {
+          "label": "setup-append",
+          "ms": 155
+        },
+        {
+          "label": "promote",
+          "ms": 160
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 8371233,
+          "storeOps": 3,
+          "ms": 80,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 172
+        },
+        {
+          "label": "setup-append",
+          "ms": 169
+        },
+        {
+          "label": "promote",
+          "ms": 80
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477076,
+          "storeOps": 4,
+          "ms": 150,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 165
+        },
+        {
+          "label": "setup-append",
+          "ms": 243
+        },
+        {
+          "label": "promote",
+          "ms": 150
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477076,
+          "storeOps": 124,
+          "ms": 197,
+          "storeOpsObserved": 124
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 193
+        },
+        {
+          "label": "setup-append",
+          "ms": 224
+        },
+        {
+          "label": "promote",
+          "ms": 197
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477479,
+          "storeOps": 3,
+          "ms": 216,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 178
+        },
+        {
+          "label": "setup-append",
+          "ms": 221
+        },
+        {
+          "label": "promote",
+          "ms": 216
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 17012304,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 16477479,
+          "storeOps": 3,
+          "ms": 170,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 173
+        },
+        {
+          "label": "setup-append",
+          "ms": 193
+        },
+        {
+          "label": "promote",
+          "ms": 170
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 163
+        },
+        {
+          "label": "setup-append",
+          "ms": 117
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 177
+        },
+        {
+          "label": "setup-append",
+          "ms": 115
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 45,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 178
+        },
+        {
+          "label": "setup-append",
+          "ms": 121
+        },
+        {
+          "label": "promote",
+          "ms": 45
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 8,
+          "staging": 0
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 165
+        },
+        {
+          "label": "setup-append",
+          "ms": 113
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368433,
+          "storeOps": 4,
+          "ms": 71,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 164
+        },
+        {
+          "label": "setup-append",
+          "ms": 157
+        },
+        {
+          "label": "promote",
+          "ms": 71
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368433,
+          "storeOps": 16,
+          "ms": 95,
+          "storeOpsObserved": 16
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 174
+        },
+        {
+          "label": "setup-append",
+          "ms": 204
+        },
+        {
+          "label": "promote",
+          "ms": 95
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368485,
+          "storeOps": 3,
+          "ms": 146,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 161
+        },
+        {
+          "label": "setup-append",
+          "ms": 154
+        },
+        {
+          "label": "promote",
+          "ms": 146
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 8,
+          "staging": 4
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 4,
+          "metadataRenames": 0,
+          "deletes": 4,
+          "payloadBytesMoved": 8368485,
+          "storeOps": 3,
+          "ms": 73,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 161
+        },
+        {
+          "label": "setup-append",
+          "ms": 149
+        },
+        {
+          "label": "promote",
+          "ms": 73
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14856978,
+          "storeOps": 4,
+          "ms": 157,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 174
+        },
+        {
+          "label": "setup-append",
+          "ms": 210
+        },
+        {
+          "label": "promote",
+          "ms": 157
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14856978,
+          "storeOps": 28,
+          "ms": 159,
+          "storeOpsObserved": 28
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 166
+        },
+        {
+          "label": "setup-append",
+          "ms": 210
+        },
+        {
+          "label": "promote",
+          "ms": 159
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14857069,
+          "storeOps": 3,
+          "ms": 209,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 178
+        },
+        {
+          "label": "setup-append",
+          "ms": 272
+        },
+        {
+          "label": "promote",
+          "ms": 209
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "1x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 8,
+          "staging": 7
+        },
+        "streamBytes": 17007120,
+        "promotion": {
+          "payloadsRewritten": 7,
+          "metadataRenames": 0,
+          "deletes": 7,
+          "payloadBytesMoved": 14857069,
+          "storeOps": 3,
+          "ms": 129,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 8,
+        "expectedReadOrderLength": 8,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 166
+        },
+        {
+          "label": "setup-append",
+          "ms": 208
+        },
+        {
+          "label": "promote",
+          "ms": 129
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 4,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 178
+        },
+        {
+          "label": "setup-append",
+          "ms": 527
+        },
+        {
+          "label": "promote",
+          "ms": 4
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 4,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 200
+        },
+        {
+          "label": "setup-append",
+          "ms": 520
+        },
+        {
+          "label": "promote",
+          "ms": 4
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 166,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 214
+        },
+        {
+          "label": "setup-append",
+          "ms": 527
+        },
+        {
+          "label": "promote",
+          "ms": 166
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 502,
+          "staging": 0
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 185
+        },
+        {
+          "label": "setup-append",
+          "ms": 511
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34020314,
+          "storeOps": 4,
+          "ms": 328,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 196
+        },
+        {
+          "label": "setup-append",
+          "ms": 769
+        },
+        {
+          "label": "promote",
+          "ms": 328
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34020314,
+          "storeOps": 1004,
+          "ms": 603,
+          "storeOpsObserved": 1004
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 175
+        },
+        {
+          "label": "setup-append",
+          "ms": 745
+        },
+        {
+          "label": "promote",
+          "ms": 603
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34023577,
+          "storeOps": 3,
+          "ms": 642,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 215
+        },
+        {
+          "label": "setup-append",
+          "ms": 785
+        },
+        {
+          "label": "promote",
+          "ms": 642
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 502,
+          "staging": 251
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 251,
+          "metadataRenames": 0,
+          "deletes": 251,
+          "payloadBytesMoved": 34023577,
+          "storeOps": 3,
+          "ms": 310,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 182
+        },
+        {
+          "label": "setup-append",
+          "ms": 765
+        },
+        {
+          "label": "promote",
+          "ms": 310
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 67996611,
+          "storeOps": 4,
+          "ms": 680,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 186
+        },
+        {
+          "label": "setup-append",
+          "ms": 1024
+        },
+        {
+          "label": "promote",
+          "ms": 680
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 67996611,
+          "storeOps": 2004,
+          "ms": 1264,
+          "storeOpsObserved": 2004
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 189
+        },
+        {
+          "label": "setup-append",
+          "ms": 1001
+        },
+        {
+          "label": "promote",
+          "ms": 1264
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 68003124,
+          "storeOps": 3,
+          "ms": 1235,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 181
+        },
+        {
+          "label": "setup-append",
+          "ms": 996
+        },
+        {
+          "label": "promote",
+          "ms": 1235
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 250,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 502,
+          "staging": 501
+        },
+        "streamBytes": 68130000,
+        "promotion": {
+          "payloadsRewritten": 501,
+          "metadataRenames": 0,
+          "deletes": 501,
+          "payloadBytesMoved": 68003124,
+          "storeOps": 3,
+          "ms": 743,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 502,
+        "expectedReadOrderLength": 502,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 182
+        },
+        {
+          "label": "setup-append",
+          "ms": 1030
+        },
+        {
+          "label": "promote",
+          "ms": 743
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 144
+        },
+        {
+          "label": "setup-append",
+          "ms": 463
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 222
+        },
+        {
+          "label": "setup-append",
+          "ms": 451
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 147,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 208
+        },
+        {
+          "label": "setup-append",
+          "ms": 471
+        },
+        {
+          "label": "promote",
+          "ms": 147
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 126,
+          "staging": 0
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 148
+        },
+        {
+          "label": "setup-append",
+          "ms": 430
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33844588,
+          "storeOps": 4,
+          "ms": 282,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 161
+        },
+        {
+          "label": "setup-append",
+          "ms": 624
+        },
+        {
+          "label": "promote",
+          "ms": 282
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33844588,
+          "storeOps": 252,
+          "ms": 396,
+          "storeOpsObserved": 252
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 151
+        },
+        {
+          "label": "setup-append",
+          "ms": 623
+        },
+        {
+          "label": "promote",
+          "ms": 396
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33845407,
+          "storeOps": 3,
+          "ms": 663,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 152
+        },
+        {
+          "label": "setup-append",
+          "ms": 638
+        },
+        {
+          "label": "promote",
+          "ms": 663
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 126,
+          "staging": 63
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 63,
+          "metadataRenames": 0,
+          "deletes": 63,
+          "payloadBytesMoved": 33845407,
+          "storeOps": 3,
+          "ms": 265,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 167
+        },
+        {
+          "label": "setup-append",
+          "ms": 606
+        },
+        {
+          "label": "promote",
+          "ms": 265
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67513556,
+          "storeOps": 4,
+          "ms": 619,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 162
+        },
+        {
+          "label": "setup-append",
+          "ms": 792
+        },
+        {
+          "label": "promote",
+          "ms": 619
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67513556,
+          "storeOps": 500,
+          "ms": 757,
+          "storeOpsObserved": 500
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 166
+        },
+        {
+          "label": "setup-append",
+          "ms": 783
+        },
+        {
+          "label": "promote",
+          "ms": 757
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67515181,
+          "storeOps": 3,
+          "ms": 1073,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 152
+        },
+        {
+          "label": "setup-append",
+          "ms": 797
+        },
+        {
+          "label": "promote",
+          "ms": 1073
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 1000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 126,
+          "staging": 125
+        },
+        "streamBytes": 68048784,
+        "promotion": {
+          "payloadsRewritten": 125,
+          "metadataRenames": 0,
+          "deletes": 125,
+          "payloadBytesMoved": 67515181,
+          "storeOps": 3,
+          "ms": 559,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 126,
+        "expectedReadOrderLength": 126,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 141
+        },
+        {
+          "label": "setup-append",
+          "ms": 793
+        },
+        {
+          "label": "promote",
+          "ms": 559
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 3,
+          "storeOpsObserved": 1
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 235
+        },
+        {
+          "label": "setup-append",
+          "ms": 540
+        },
+        {
+          "label": "promote",
+          "ms": 3
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 262
+        },
+        {
+          "label": "setup-append",
+          "ms": 524
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 214,
+          "storeOpsObserved": 2
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 228
+        },
+        {
+          "label": "setup-append",
+          "ms": 522
+        },
+        {
+          "label": "promote",
+          "ms": 214
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "whole-stream",
+        "segments": {
+          "live": 32,
+          "staging": 0
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 0,
+          "metadataRenames": 0,
+          "deletes": 0,
+          "payloadBytesMoved": 0,
+          "storeOps": 0,
+          "ms": 2,
+          "storeOpsObserved": 0
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 255
+        },
+        {
+          "label": "setup-append",
+          "ms": 511
+        },
+        {
+          "label": "promote",
+          "ms": 2
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299415,
+          "storeOps": 4,
+          "ms": 433,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 275
+        },
+        {
+          "label": "setup-append",
+          "ms": 792
+        },
+        {
+          "label": "promote",
+          "ms": 433
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299415,
+          "storeOps": 64,
+          "ms": 528,
+          "storeOpsObserved": 64
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 364
+        },
+        {
+          "label": "setup-append",
+          "ms": 758
+        },
+        {
+          "label": "promote",
+          "ms": 528
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299623,
+          "storeOps": 3,
+          "ms": 610,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 411
+        },
+        {
+          "label": "setup-append",
+          "ms": 731
+        },
+        {
+          "label": "promote",
+          "ms": 610
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "partial-graft",
+        "segments": {
+          "live": 32,
+          "staging": 16
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 16,
+          "metadataRenames": 0,
+          "deletes": 16,
+          "payloadBytesMoved": 33299623,
+          "storeOps": 3,
+          "ms": 466,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 228
+        },
+        {
+          "label": "setup-append",
+          "ms": 804
+        },
+        {
+          "label": "promote",
+          "ms": 466
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878338,
+          "storeOps": 4,
+          "ms": 879,
+          "storeOpsObserved": 4
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 301
+        },
+        {
+          "label": "setup-append",
+          "ms": 989
+        },
+        {
+          "label": "promote",
+          "ms": 879
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "key-label-unbatched",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "key-label-unbatched",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878338,
+          "storeOps": 124,
+          "ms": 1033,
+          "storeOpsObserved": 124
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 316
+        },
+        {
+          "label": "setup-append",
+          "ms": 966
+        },
+        {
+          "label": "promote",
+          "ms": 1033
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878741,
+          "storeOps": 3,
+          "ms": 1625,
+          "storeOpsObserved": 5
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 246
+        },
+        {
+          "label": "setup-append",
+          "ms": 1059
+        },
+        {
+          "label": "promote",
+          "ms": 1625
+        }
+      ],
+      "errors": []
+    },
+    {
+      "project": "webkit",
+      "arm": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      },
+      "results": {
+        "arm": "value-label+pointer",
+        "size": "4x",
+        "sealAfter": 4000,
+        "sharingCase": "no-sharing",
+        "segments": {
+          "live": 32,
+          "staging": 31
+        },
+        "streamBytes": 68028480,
+        "promotion": {
+          "payloadsRewritten": 31,
+          "metadataRenames": 0,
+          "deletes": 31,
+          "payloadBytesMoved": 65878741,
+          "storeOps": 3,
+          "ms": 904,
+          "storeOpsObserved": 3
+        },
+        "readOrderLength": 32,
+        "expectedReadOrderLength": 32,
+        "readOrderCorrect": true
+      },
+      "timings": [
+        {
+          "label": "build-workload",
+          "ms": 384
+        },
+        {
+          "label": "setup-append",
+          "ms": 1013
+        },
+        {
+          "label": "promote",
+          "ms": 904
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

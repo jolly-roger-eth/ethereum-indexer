@@ -1,0 +1,21 @@
+{
+	"name": "spike-promotion-cost-of-a-two-label-stream",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"description": "Evidence for work/notes/findings/promotion-cost-of-a-two-label-stream.md: what does promoting a staging generation cost in a KV store, and does putting the label in the KEY rather than the VALUE change it?",
+	"scripts": {
+		"fs": "tsx run/measure-fs.ts",
+		"browser": "playwright test",
+		"summarise": "tsx run/summarise.ts",
+		"all": "npm run fs && npm run browser && npm run summarise"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.60.0",
+		"@types/node": "^22.0.0",
+		"idb-keyval": "^6.2.4",
+		"playwright-browser-harness": "^0.3.0",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.0"
+	}
+}

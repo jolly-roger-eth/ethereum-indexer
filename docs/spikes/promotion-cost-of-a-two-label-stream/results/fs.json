@@ -1,0 +1,2363 @@
+{
+  "ranAt": "2026-08-30T16:08:09.840Z",
+  "env": {
+    "node": "v24.13.1",
+    "platform": "linux",
+    "arch": "x64",
+    "cpus": "AMD Ryzen 7 PRO 6850U with Radeon Graphics",
+    "dirRoot": "/home/wighawag/.cache/etherfold-promotion-spike",
+    "dirIsTmpfs": false
+  },
+  "note": "ms is wall-clock on a loaded machine and is the WEAKER number; the work metrics (renames, rewrites, bytes) are what the finding rests on.",
+  "rows": [
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 126,
+        "staging": 0
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.8357530000000111
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 126,
+        "staging": 0
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 67.40230500000001
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 126,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 17034246,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 126,
+        "staging": 0
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.2725029999999151
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 126,
+        "staging": 63
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 63,
+        "deletes": 63,
+        "payloadBytesMoved": 0,
+        "storeOps": 126,
+        "ms": 3.8785199999999804
+      },
+      "syscalls": {
+        "renames": 63,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 63,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 126,
+        "staging": 63
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 63,
+        "metadataRenames": 0,
+        "deletes": 63,
+        "payloadBytesMoved": 8516927,
+        "storeOps": 189,
+        "ms": 197.64566200000002
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 252,
+        "writes": 63,
+        "unlinks": 63,
+        "bytesRead": 34068478,
+        "bytesWritten": 8516927
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 126,
+        "staging": 63
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 63,
+        "metadataRenames": 0,
+        "deletes": 63,
+        "payloadBytesMoved": 8516927,
+        "storeOps": 189,
+        "ms": 79.02720599999998
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 63,
+        "writes": 63,
+        "unlinks": 63,
+        "bytesRead": 8517116,
+        "bytesWritten": 8516927
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 126,
+        "staging": 125
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 125,
+        "deletes": 125,
+        "payloadBytesMoved": 0,
+        "storeOps": 250,
+        "ms": 6.4026309999999285
+      },
+      "syscalls": {
+        "renames": 125,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 125,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 126,
+        "staging": 125
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 125,
+        "metadataRenames": 0,
+        "deletes": 125,
+        "payloadBytesMoved": 16900844,
+        "storeOps": 375,
+        "ms": 811.7301920000002
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 376,
+        "writes": 125,
+        "unlinks": 125,
+        "bytesRead": 50836684,
+        "bytesWritten": 16900844
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 126,
+        "staging": 125
+      },
+      "streamBytes": 17032608,
+      "promotion": {
+        "payloadsRewritten": 125,
+        "metadataRenames": 0,
+        "deletes": 125,
+        "payloadBytesMoved": 16900844,
+        "storeOps": 375,
+        "ms": 154.0070770000002
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 125,
+        "writes": 125,
+        "unlinks": 125,
+        "bytesRead": 16901219,
+        "bytesWritten": 16900844
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 32,
+        "staging": 0
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.13129699999990407
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 32,
+        "staging": 0
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 52.68690000000015
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 32,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 17012720,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 32,
+        "staging": 0
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.08073200000035285
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 32,
+        "staging": 16
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 16,
+        "deletes": 16,
+        "payloadBytesMoved": 0,
+        "storeOps": 32,
+        "ms": 2.1587429999999586
+      },
+      "syscalls": {
+        "renames": 16,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 16,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 32,
+        "staging": 16
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 16,
+        "metadataRenames": 0,
+        "deletes": 16,
+        "payloadBytesMoved": 8371233,
+        "storeOps": 48,
+        "ms": 153.65076899999985
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 64,
+        "writes": 16,
+        "unlinks": 16,
+        "bytesRead": 33755282,
+        "bytesWritten": 8371233
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 32,
+        "staging": 16
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 16,
+        "metadataRenames": 0,
+        "deletes": 16,
+        "payloadBytesMoved": 8371233,
+        "storeOps": 48,
+        "ms": 71.41073300000016
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 16,
+        "writes": 16,
+        "unlinks": 16,
+        "bytesRead": 8371281,
+        "bytesWritten": 8371233
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 32,
+        "staging": 31
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 31,
+        "deletes": 31,
+        "payloadBytesMoved": 0,
+        "storeOps": 62,
+        "ms": 3.7161739999996826
+      },
+      "syscalls": {
+        "renames": 31,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 31,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 32,
+        "staging": 31
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 31,
+        "metadataRenames": 0,
+        "deletes": 31,
+        "payloadBytesMoved": 16477479,
+        "storeOps": 93,
+        "ms": 255.191957
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 94,
+        "writes": 31,
+        "unlinks": 31,
+        "bytesRead": 49967864,
+        "bytesWritten": 16477479
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 32,
+        "staging": 31
+      },
+      "streamBytes": 17012304,
+      "promotion": {
+        "payloadsRewritten": 31,
+        "metadataRenames": 0,
+        "deletes": 31,
+        "payloadBytesMoved": 16477479,
+        "storeOps": 93,
+        "ms": 129.96163100000012
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 31,
+        "writes": 31,
+        "unlinks": 31,
+        "bytesRead": 16477572,
+        "bytesWritten": 16477479
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 8,
+        "staging": 0
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.09116100000028382
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 8,
+        "staging": 0
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 49.73014500000045
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 8,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 17007224,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 8,
+        "staging": 0
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.06033399999978428
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 8,
+        "staging": 4
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 4,
+        "deletes": 4,
+        "payloadBytesMoved": 0,
+        "storeOps": 8,
+        "ms": 1.6237459999993007
+      },
+      "syscalls": {
+        "renames": 4,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 4,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 8,
+        "staging": 4
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 4,
+        "metadataRenames": 0,
+        "deletes": 4,
+        "payloadBytesMoved": 8368485,
+        "storeOps": 12,
+        "ms": 147.1854829999993
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 16,
+        "writes": 4,
+        "unlinks": 4,
+        "bytesRead": 33744218,
+        "bytesWritten": 8368485
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 8,
+        "staging": 4
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 4,
+        "metadataRenames": 0,
+        "deletes": 4,
+        "payloadBytesMoved": 8368485,
+        "storeOps": 12,
+        "ms": 71.90550600000006
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 4,
+        "writes": 4,
+        "unlinks": 4,
+        "bytesRead": 8368497,
+        "bytesWritten": 8368485
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 8,
+        "staging": 7
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 7,
+        "deletes": 7,
+        "payloadBytesMoved": 0,
+        "storeOps": 14,
+        "ms": 2.8500249999997322
+      },
+      "syscalls": {
+        "renames": 7,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 7,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 8,
+        "staging": 7
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 7,
+        "metadataRenames": 0,
+        "deletes": 7,
+        "payloadBytesMoved": 14857069,
+        "storeOps": 21,
+        "ms": 228.94023099999959
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 22,
+        "writes": 7,
+        "unlinks": 7,
+        "bytesRead": 46721404,
+        "bytesWritten": 14857069
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "1x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 8,
+        "staging": 7
+      },
+      "streamBytes": 17007120,
+      "promotion": {
+        "payloadsRewritten": 7,
+        "metadataRenames": 0,
+        "deletes": 7,
+        "payloadBytesMoved": 14857069,
+        "storeOps": 21,
+        "ms": 131.56203800000003
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 7,
+        "writes": 7,
+        "unlinks": 7,
+        "bytesRead": 14857090,
+        "bytesWritten": 14857069
+      },
+      "readOrderLength": 8
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 502,
+        "staging": 0
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.8557610000007116
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 502,
+        "staging": 0
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 264.36275000000023
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 502,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 68136526,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 502,
+        "staging": 0
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.5679790000012872
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 502,
+        "staging": 251
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 251,
+        "deletes": 251,
+        "payloadBytesMoved": 0,
+        "storeOps": 502,
+        "ms": 13.898321000000578
+      },
+      "syscalls": {
+        "renames": 251,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 251,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 502,
+        "staging": 251
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 251,
+        "metadataRenames": 0,
+        "deletes": 251,
+        "payloadBytesMoved": 34023577,
+        "storeOps": 753,
+        "ms": 1439.2864609999997
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 1004,
+        "writes": 251,
+        "unlinks": 251,
+        "bytesRead": 136185186,
+        "bytesWritten": 34023577
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 502,
+        "staging": 251
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 251,
+        "metadataRenames": 0,
+        "deletes": 251,
+        "payloadBytesMoved": 34023577,
+        "storeOps": 753,
+        "ms": 309.92053699999997
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 251,
+        "writes": 251,
+        "unlinks": 251,
+        "bytesRead": 34024330,
+        "bytesWritten": 34023577
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 502,
+        "staging": 501
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 501,
+        "deletes": 501,
+        "payloadBytesMoved": 0,
+        "storeOps": 1002,
+        "ms": 27.515414999999848
+      },
+      "syscalls": {
+        "renames": 501,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 501,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 502,
+        "staging": 501
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 501,
+        "metadataRenames": 0,
+        "deletes": 501,
+        "payloadBytesMoved": 68003124,
+        "storeOps": 1503,
+        "ms": 1855.4905800000015
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 1504,
+        "writes": 501,
+        "unlinks": 501,
+        "bytesRead": 204145780,
+        "bytesWritten": 68003124
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 502,
+        "staging": 501
+      },
+      "streamBytes": 68130000,
+      "promotion": {
+        "payloadsRewritten": 501,
+        "metadataRenames": 0,
+        "deletes": 501,
+        "payloadBytesMoved": 68003124,
+        "storeOps": 1503,
+        "ms": 627.1690269999999
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 501,
+        "writes": 501,
+        "unlinks": 501,
+        "bytesRead": 68004627,
+        "bytesWritten": 68003124
+      },
+      "readOrderLength": 502
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 126,
+        "staging": 0
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.26161299999876064
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 126,
+        "staging": 0
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 259.020913999997
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 126,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 68050422,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 126,
+        "staging": 0
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.16532100000040373
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 126,
+        "staging": 63
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 63,
+        "deletes": 63,
+        "payloadBytesMoved": 0,
+        "storeOps": 126,
+        "ms": 8.951721999997972
+      },
+      "syscalls": {
+        "renames": 63,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 63,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 126,
+        "staging": 63
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 63,
+        "metadataRenames": 0,
+        "deletes": 63,
+        "payloadBytesMoved": 33845407,
+        "storeOps": 189,
+        "ms": 681.6937440000002
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 252,
+        "writes": 63,
+        "unlinks": 63,
+        "bytesRead": 135741614,
+        "bytesWritten": 33845407
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 126,
+        "staging": 63
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 63,
+        "metadataRenames": 0,
+        "deletes": 63,
+        "payloadBytesMoved": 33845407,
+        "storeOps": 189,
+        "ms": 275.8078150000001
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 63,
+        "writes": 63,
+        "unlinks": 63,
+        "bytesRead": 33845596,
+        "bytesWritten": 33845407
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 126,
+        "staging": 125
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 125,
+        "deletes": 125,
+        "payloadBytesMoved": 0,
+        "storeOps": 250,
+        "ms": 12.296207999999751
+      },
+      "syscalls": {
+        "renames": 125,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 125,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 126,
+        "staging": 125
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 125,
+        "metadataRenames": 0,
+        "deletes": 125,
+        "payloadBytesMoved": 67515181,
+        "storeOps": 375,
+        "ms": 1215.3415260000002
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 376,
+        "writes": 125,
+        "unlinks": 125,
+        "bytesRead": 203081534,
+        "bytesWritten": 67515181
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 126,
+        "staging": 125
+      },
+      "streamBytes": 68048784,
+      "promotion": {
+        "payloadsRewritten": 125,
+        "metadataRenames": 0,
+        "deletes": 125,
+        "payloadBytesMoved": 67515181,
+        "storeOps": 375,
+        "ms": 547.5104539999993
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 125,
+        "writes": 125,
+        "unlinks": 125,
+        "bytesRead": 67515556,
+        "bytesWritten": 67515181
+      },
+      "readOrderLength": 126
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 32,
+        "staging": 0
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.2616329999982554
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 32,
+        "staging": 0
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 252.7082130000017
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 32,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 68028896,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 32,
+        "staging": 0
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.0991360000007262
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 32,
+        "staging": 16
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 16,
+        "deletes": 16,
+        "payloadBytesMoved": 0,
+        "storeOps": 32,
+        "ms": 6.404096000002028
+      },
+      "syscalls": {
+        "renames": 16,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 16,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 32,
+        "staging": 16
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 16,
+        "metadataRenames": 0,
+        "deletes": 16,
+        "payloadBytesMoved": 33299623,
+        "storeOps": 48,
+        "ms": 710.9934870000034
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 64,
+        "writes": 16,
+        "unlinks": 16,
+        "bytesRead": 134628238,
+        "bytesWritten": 33299623
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 32,
+        "staging": 16
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 16,
+        "metadataRenames": 0,
+        "deletes": 16,
+        "payloadBytesMoved": 33299623,
+        "storeOps": 48,
+        "ms": 285.24519200000213
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 16,
+        "writes": 16,
+        "unlinks": 16,
+        "bytesRead": 33299671,
+        "bytesWritten": 33299623
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 32,
+        "staging": 31
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 31,
+        "deletes": 31,
+        "payloadBytesMoved": 0,
+        "storeOps": 62,
+        "ms": 13.330075999998371
+      },
+      "syscalls": {
+        "renames": 31,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 31,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 32,
+        "staging": 31
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 31,
+        "metadataRenames": 0,
+        "deletes": 31,
+        "payloadBytesMoved": 65878741,
+        "storeOps": 93,
+        "ms": 1080.475781000001
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 94,
+        "writes": 31,
+        "unlinks": 31,
+        "bytesRead": 199786564,
+        "bytesWritten": 65878741
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "4x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 32,
+        "staging": 31
+      },
+      "streamBytes": 68028480,
+      "promotion": {
+        "payloadsRewritten": 31,
+        "metadataRenames": 0,
+        "deletes": 31,
+        "payloadBytesMoved": 65878741,
+        "storeOps": 93,
+        "ms": 582.0975710000057
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 31,
+        "writes": 31,
+        "unlinks": 31,
+        "bytesRead": 65878834,
+        "bytesWritten": 65878741
+      },
+      "readOrderLength": 32
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 1003,
+        "staging": 0
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 1.7302169999966281
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 1003,
+        "staging": 0
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 587.9788279999993
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 1003,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 136272891,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 1003,
+        "staging": 0
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.9173070000033476
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 1003,
+        "staging": 501
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 501,
+        "deletes": 501,
+        "payloadBytesMoved": 0,
+        "storeOps": 1002,
+        "ms": 33.49897200000123
+      },
+      "syscalls": {
+        "renames": 501,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 501,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 1003,
+        "staging": 501
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 501,
+        "metadataRenames": 0,
+        "deletes": 501,
+        "payloadBytesMoved": 68045184,
+        "storeOps": 1503,
+        "ms": 2087.116025999996
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 2005,
+        "writes": 501,
+        "unlinks": 501,
+        "bytesRead": 272366265,
+        "bytesWritten": 68045184
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 1003,
+        "staging": 501
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 501,
+        "metadataRenames": 0,
+        "deletes": 501,
+        "payloadBytesMoved": 68045184,
+        "storeOps": 1503,
+        "ms": 773.0556520000027
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 501,
+        "writes": 501,
+        "unlinks": 501,
+        "bytesRead": 68046687,
+        "bytesWritten": 68045184
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 1003,
+        "staging": 1002
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 1002,
+        "deletes": 1002,
+        "payloadBytesMoved": 0,
+        "storeOps": 2004,
+        "ms": 40.495247999999265
+      },
+      "syscalls": {
+        "renames": 1002,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 1002,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 1003,
+        "staging": 1002
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 1002,
+        "metadataRenames": 0,
+        "deletes": 1002,
+        "payloadBytesMoved": 136139489,
+        "storeOps": 3006,
+        "ms": 3933.723721000002
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 3007,
+        "writes": 1002,
+        "unlinks": 1002,
+        "bytesRead": 408557881,
+        "bytesWritten": 136139489
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 250,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 1003,
+        "staging": 1002
+      },
+      "streamBytes": 136259852,
+      "promotion": {
+        "payloadsRewritten": 1002,
+        "metadataRenames": 0,
+        "deletes": 1002,
+        "payloadBytesMoved": 136139489,
+        "storeOps": 3006,
+        "ms": 1474.169759999997
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 1002,
+        "writes": 1002,
+        "unlinks": 1002,
+        "bytesRead": 136142495,
+        "bytesWritten": 136139489
+      },
+      "readOrderLength": 1003
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 251,
+        "staging": 0
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.7273299999942537
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 251,
+        "staging": 0
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 820.1352380000026
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 251,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 136100683,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 251,
+        "staging": 0
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 2.77526600001147
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 251,
+        "staging": 125
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 125,
+        "deletes": 125,
+        "payloadBytesMoved": 0,
+        "storeOps": 250,
+        "ms": 19.540586000002804
+      },
+      "syscalls": {
+        "renames": 125,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 125,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 251,
+        "staging": 125
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 125,
+        "metadataRenames": 0,
+        "deletes": 125,
+        "payloadBytesMoved": 67690828,
+        "storeOps": 375,
+        "ms": 2381.125641999999
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 501,
+        "writes": 125,
+        "unlinks": 125,
+        "bytesRead": 271483089,
+        "bytesWritten": 67690828
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 251,
+        "staging": 125
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 125,
+        "metadataRenames": 0,
+        "deletes": 125,
+        "payloadBytesMoved": 67690828,
+        "storeOps": 375,
+        "ms": 566.2127239999973
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 125,
+        "writes": 125,
+        "unlinks": 125,
+        "bytesRead": 67691203,
+        "bytesWritten": 67690828
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 251,
+        "staging": 250
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 250,
+        "deletes": 250,
+        "payloadBytesMoved": 0,
+        "storeOps": 500,
+        "ms": 17.912813000002643
+      },
+      "syscalls": {
+        "renames": 250,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 250,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 251,
+        "staging": 250
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 250,
+        "metadataRenames": 0,
+        "deletes": 250,
+        "payloadBytesMoved": 135565442,
+        "storeOps": 750,
+        "ms": 2747.384075000009
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 751,
+        "writes": 250,
+        "unlinks": 250,
+        "bytesRead": 407233067,
+        "bytesWritten": 135565442
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 1000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 251,
+        "staging": 250
+      },
+      "streamBytes": 136097420,
+      "promotion": {
+        "payloadsRewritten": 250,
+        "metadataRenames": 0,
+        "deletes": 250,
+        "payloadBytesMoved": 135565442,
+        "storeOps": 750,
+        "ms": 1829.4072429999942
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 250,
+        "writes": 250,
+        "unlinks": 250,
+        "bytesRead": 135566192,
+        "bytesWritten": 135565442
+      },
+      "readOrderLength": 251
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 63,
+        "staging": 0
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.3841030000039609
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 63,
+        "staging": 0
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 600.9295859999984
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 63,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 136057631,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "whole-stream",
+      "segments": {
+        "live": 63,
+        "staging": 0
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 0,
+        "deletes": 0,
+        "payloadBytesMoved": 0,
+        "storeOps": 0,
+        "ms": 0.13223899999866262
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 0,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 63,
+        "staging": 31
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 31,
+        "deletes": 31,
+        "payloadBytesMoved": 0,
+        "storeOps": 62,
+        "ms": 11.350265000000945
+      },
+      "syscalls": {
+        "renames": 31,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 31,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 63,
+        "staging": 31
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 31,
+        "metadataRenames": 0,
+        "deletes": 31,
+        "payloadBytesMoved": 66595102,
+        "storeOps": 93,
+        "ms": 1462.9096949999948
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 125,
+        "writes": 31,
+        "unlinks": 31,
+        "bytesRead": 269248021,
+        "bytesWritten": 66595102
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "partial-graft",
+      "segments": {
+        "live": 63,
+        "staging": 31
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 31,
+        "metadataRenames": 0,
+        "deletes": 31,
+        "payloadBytesMoved": 66595102,
+        "storeOps": 93,
+        "ms": 573.3403059999982
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 31,
+        "writes": 31,
+        "unlinks": 31,
+        "bytesRead": 66595195,
+        "bytesWritten": 66595102
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "key-label",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 63,
+        "staging": 62
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 0,
+        "metadataRenames": 62,
+        "deletes": 62,
+        "payloadBytesMoved": 0,
+        "storeOps": 124,
+        "ms": 30.015109999993
+      },
+      "syscalls": {
+        "renames": 62,
+        "reads": 0,
+        "writes": 0,
+        "unlinks": 62,
+        "bytesRead": 0,
+        "bytesWritten": 0
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 63,
+        "staging": 62
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 62,
+        "metadataRenames": 0,
+        "deletes": 62,
+        "payloadBytesMoved": 133907476,
+        "storeOps": 186,
+        "ms": 3318.0367740000074
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 187,
+        "writes": 62,
+        "unlinks": 62,
+        "bytesRead": 403872955,
+        "bytesWritten": 133907476
+      },
+      "readOrderLength": 63
+    },
+    {
+      "substrate": "fs",
+      "layout": "value-label+pointer",
+      "size": "8x",
+      "sealAfter": 4000,
+      "sharingCase": "no-sharing",
+      "segments": {
+        "live": 63,
+        "staging": 62
+      },
+      "streamBytes": 136056812,
+      "promotion": {
+        "payloadsRewritten": 62,
+        "metadataRenames": 0,
+        "deletes": 62,
+        "payloadBytesMoved": 133907476,
+        "storeOps": 186,
+        "ms": 1347.3463210000045
+      },
+      "syscalls": {
+        "renames": 0,
+        "reads": 62,
+        "writes": 62,
+        "unlinks": 62,
+        "bytesRead": 133907662,
+        "bytesWritten": 133907476
+      },
+      "readOrderLength": 63
+    }
+  ]
+}

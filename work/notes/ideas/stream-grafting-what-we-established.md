@@ -147,18 +147,30 @@ Which case applies is decided by the invalidation verdict, not chosen:
 - **no sharing** (a changed address, a new contract: these land in the block-0 skeleton entry, so
   nothing below is valid). A full backfill.
 
+## ANSWERED: the promotion cost
+
+The promotion cost was the open question here and it is now MEASURED, not argued:
+`work/notes/findings/promotion-cost-of-a-two-label-stream.md`, evidence in
+`docs/spikes/promotion-cost-of-a-two-label-stream`.
+
+**Put the label in the KEY.** The short version, with the reasoning in the finding:
+
+- **IndexedDB does not decide the question; the filesystem does.** IndexedDB has no rename, so a
+  key-label relabel there is the same read-plus-write a value-label rewrite costs, and the two
+  measure the same on all three engines. On the filesystem a key-label promotion writes NO segment
+  bytes at all (250 renames, 18 ms over a 136 MB stream) against 135.6 MB and 1.8 s for a value label.
+- **A value label cannot be found without reading the values it is in**, so even the whole-stream
+  case — which relabels nothing and should be free — costs a full deserialise of the history (820 ms
+  on the filesystem) unless a separate boundary pointer is added, which is a second source of truth
+  of exactly the kind `appending-to-the-stream-costs-the-batch` already rejected.
+- **A value label also forces a HOLE in the ordinal space**, because with one key space staging must
+  append after the live TAIL rather than from the graft point, so promotion leaves a gap that the
+  contiguity refusal reads as a lost fragment.
+- **Promotion cost does not constrain the design on either keeper.** It is bounded by what STAGING
+  WROTE, which is nothing in the most common case, and in the worst case it is under one percent of
+  the backfill that produced it.
+
 ## What is still OPEN
-
-**The promotion cost in a KV store, and it should be a SPIKE not an argument.** On the server the
-UPDATE is cheap and indexed. In IndexedDB and on the filesystem there is no bulk update, so promotion
-rewrites each staging entry. The cost is proportional to what STAGING WROTE (nothing at all in the
-whole-stream case; the backfill it just did in the no-sharing case), and because segments batch
-events it is per-segment rather than per-event.
-
-The detail that decides it: **if the label lives in the KEY**, a relabel is a rename, cheap on the
-filesystem and a read-plus-write on IndexedDB; **if it lives in the VALUE**, it is a rewrite either
-way. Measure it. `docs/spikes/sqlite-in-the-browser` is the prior art for how this repo measures
-storage questions, and it already has structured-clone numbers.
 
 **Whether the unconfirmed window must be stored per boundary or can be reconstructed.** Storing it in
 every segment is wasteful and cannot be pruned (segments are immutable). Reconstructing it from the
@@ -182,8 +194,15 @@ Four in `work/specs/proposed/`:
 ## What a fresh context should do next
 
 1. Read this note first; it is the accumulated context.
-2. Spike the promotion cost (key-label versus value-label, fs and IndexedDB). It decides the design.
-3. Revert the block-range metadata from `appending`, which restores it to its approved state.
-4. Rewrite `a-reconfigure` against option D, stating ONE design with no archaeology; point at this
-   note for the rejected alternatives.
-5. Then task `appending`, which is independent of all of the above.
+2. ~~Spike the promotion cost.~~ **DONE** — see ANSWERED above and the finding.
+3. ~~Revert the block-range metadata from `appending`.~~ **DONE** — it now records positively why the
+   `lastSync` already in every segment answers a strictly better question than a `{min, max}` would.
+4. ~~Rewrite `a-reconfigure` against option D.~~ **DONE** — it now states the two-label design once,
+   and points here for the alternatives. The rewrite removed the read-only stream view, the
+   one-writer rule, the generation-keyed stream and the finality clamp, each of which existed only to
+   serve option B.
+5. ~~Task `appending`.~~ **DONE** — two tasks in `work/tasks/backlog/`, awaiting promotion.
+
+What is left, in order: promote and land the two `appending` tasks; settle the unconfirmed-window
+question above by a build rather than more prose; and open the ingest server, which is still an
+honest stub.

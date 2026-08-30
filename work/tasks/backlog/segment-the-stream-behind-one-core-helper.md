@@ -1,0 +1,193 @@
+---
+title: 'Segment the stream behind one core helper, and put the fs keeper on it'
+slug: segment-the-stream-behind-one-core-helper
+spec: appending-to-the-stream-costs-the-batch
+blockedBy: []
+covers: [1, 3, 4, 5, 6, 7]
+---
+
+## What to build
+
+The stream stops being one blob rewritten in full on every append, and becomes an **append-only log
+of segments** whose rules live in ONE core helper that both keepers consume. This task builds the
+helper and puts the **filesystem** keeper on it end-to-end; the browser keeper follows in
+`the-browser-stream-keeper-appends-in-segments`.
+
+Today `keepStreamOnFile` reads the entire accumulated stream, concatenates, and serialises all of it
+back on every `saveNewEvents`. `save` runs once per index cycle, so a backfill is QUADRATIC, and the
+empty-batch branch pays the same cost purely to move `lastSync`.
+
+The shape to build:
+
+- **An append-only log with an OPEN TAIL.** The newest segment is OPEN and carries both its events
+  and the `lastSync` current after them. A save appends to the open tail: ONE write, bounded by the
+  tail plus its batch, never by the history. The tail is SEALED when it exceeds a size threshold and
+  the next save opens a new one. A sealed segment is immutable forever.
+- **ONE write per save, always.** `lastSync` rides IN the tail rather than getting its own key. Two
+  keys would let a crash separate the cursor from its events in either direction: cursor behind
+  means a rebuild replays them and then re-fetches from a stale `lastToBlock` and appends
+  duplicates; cursor ahead means a lost segment is never replayed. Today one `set` makes them agree
+  by construction and that must survive.
+- **Sealing is not a write.** A segment is sealed exactly when it is no longer the highest ordinal,
+  so it happens implicitly when the next save opens a new one, and a reader tells by enumeration.
+  Nothing is ever written INTO a segment to mark it sealed, which is what keeps both the one-write
+  claim and immutability true.
+- **The cursor is read from the TAIL alone.** Every sealed segment still carries the `lastSync` that
+  was current when it was written, and those are STALE; a reader picking a lower one silently
+  rewinds.
+- **Keys are ORDINAL, and the read stays a full ordered scan.** The stored stream is an EMISSION
+  stream: on a reorg the indexer re-appends superseded events at their ORIGINAL `blockNumber` flagged
+  `removed`, then continues at LOWER block numbers. So block ranges overlap and cannot key or order
+  anything, and no segment can be skipped on a block bound. `fetchFrom(source, fromBlock)` KEEPS its
+  signature and semantics: read every segment in ordinal order, concatenate, apply the existing
+  `blockNumber >= fromBlock` filter.
+- **Enumeration is ANCHORED, never a bare prefix.** Stream keys are `stream_<name>_<chainId>`, so
+  with an ordinal appended the chain-`1` prefix `stream_tag_1` is ALSO a prefix of every chain-`10`
+  key (`stream_tag_10_0`). Match `^stream_<name>_<chainId>_(\d+)$` — full prefix, separator, and a
+  remainder that parses as an ordinal.
+- **A gap in the ordinals is REFUSED, not tolerated.** A missing fragment replayed as if it were the
+  whole stream is the same silent-absence failure `SuspectedTruncationError` already refuses.
+- **The legacy blob is ADOPTED IN PLACE as the earliest sealed segment**, never copied. The stream
+  blob carries no format field, so the old shape is recognised structurally. It is read first,
+  followed by `_0.._N`, and the first save after an upgrade writes only the new tail — so the
+  one-write rule holds THROUGH the migration rather than being suspended for it.
+- **The TAIL is the highest ordinal segment, OR the adopted legacy key when no ordinal exists.**
+  Load-bearing: between adopting a legacy blob and the first new save there are NO ordinal segments,
+  so a tail defined purely as "the highest ordinal" would not exist, presence would read false, and
+  `indexer.ts` would clear a perfectly good cached history.
+- **Presence is the TAIL, never a segment count.** `fetchFrom` must keep returning a DEFINED result
+  for a stream saved to but holding no events, because a defined result is what stops `indexer.ts`
+  taking its clear branch.
+- **`clear` removes ALL of it.** It deletes a single storage id today; with N segment keys a naive
+  port orphans every segment but one, after which the next save appends beside a dead prefix and the
+  next `fetchFrom` concatenates it into the replay — wrong state, SILENTLY. It is called from five
+  paths in `indexer.ts`.
+
+**Put the rules in ONE internal core helper parameterised over a `get`/`set`/`del`/`keys` port**, and
+let the keeper supply the port. Ordinal naming, the anchored match, the contiguity refusal, the seal
+decision, legacy adoption and cursor selection are identical for both keepers and are the whole
+substance of this change; a helper per keeper would re-implement the same prose twice and drift.
+
+**Enumerate; do not add a head pointer.** A head is a second thing that can disagree with the
+segments and cannot detect a partial clear — a head saying N over segments that are gone reads as
+holes, whereas enumerating the ordinals and checking CONTIGUITY turns a silent truncation into a
+refusal. `packages/fs/src/utils/fs.ts` is our file and is a `readdir` away from `keys`.
+
+**The seal threshold is counted in EVENTS, not bytes.** Bytes are natural on the filesystem but not
+cheaply available on IndexedDB (structured-clone size is not exposed), so naming the unit is what
+stops the two keepers choosing differently and makes the seal test deterministic.
+
+## Acceptance criteria
+
+- [ ] A core helper implements segmentation over an injected `get`/`set`/`del`/`keys` port, and is
+      reachable from `@etherfold/fs` (core's `exports` map is only `.` and `./package.json`, so
+      `index.ts` must re-export it). That export line is published surface: **ship a changeset.**
+- [ ] `keepStreamOnFile` is implemented on the helper and `packages/fs/src/utils/fs.ts` gains `keys`.
+- [ ] **Append cost is asserted as WORK, not wall-clock**, at a module-level mock of `node:fs` behind
+      `packages/fs/src/utils/fs.ts`. Assert the CEILING: no save writes more than one tail plus its
+      batch, and the 100th append costs no more than the 10th at the same tail phase. (Asserting the
+      tenth equals the first is false by design — a tail absorbs several batches before sealing.)
+      Wall-clock would be flaky on a loaded machine, per ADR-0032.
+- [ ] **A save writes exactly ONE key** in the steady state, asserted at the same instrumented seam,
+      INCLUDING the first save after a legacy adoption. This is the atomicity guard.
+- [ ] **A save with no new events** costs nothing proportional to history (it rewrites only the open
+      tail to move the cursor).
+- [ ] **The cursor comes from the tail**: a stream with several sealed segments resumes from the
+      highest ordinal's `lastSync`, never a sealed one's stale copy.
+- [ ] **A sealed segment is never rewritten** (no write ever targets its key again) and is **readable
+      by its own key** without reading the others.
+- [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
+      same order. Strict equality — this task changes no event shape.
+- [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events.
+- [ ] **Replay across a reorg** returns retractions in APPEND order, so a rebuild sees what the live
+      run saw.
+- [ ] **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where
+      `clear` on one leaves the other intact and its replay unpolluted. This fails loudly under a
+      bare prefix filter.
+- [ ] **The fs keeper shares its folder with `keepStateOnFile`** (state keys are `<name>_<chainId>`);
+      a test asserts a `clear` on the stream leaves state keys untouched. The anchored pattern is
+      what makes that true rather than luck.
+- [ ] **`clear` removes everything**: clear a multi-segment stream, confirm the next `fetchFrom`
+      returns nothing and no orphan survives.
+- [ ] **A gap in the ordinals is REFUSED** rather than replayed as a shorter stream.
+- [ ] **The migration**: write a stream in the shipped blob format, read it with the new code, assert
+      NO re-fetch. Separately, a legacy blob whose raw half a `logValues` projection dropped is
+      CLEARED, per ADR-0034's mandate — clearing a stream that cannot be re-read is correct, and what
+      is forbidden is clearing a READABLE stream merely because its shape is old.
+- [ ] A clear or a migration says so through the existing logger rather than happening in silence.
+- [ ] `pnpm build && pnpm typecheck && pnpm test` green.
+
+## Blocked by
+
+- None — can start immediately.
+
+## Prompt
+
+Read `work/specs/proposed/appending-to-the-stream-costs-the-batch.md` in full first: it is the source
+spec and carries the reasoning behind every rule above, including why several tempting alternatives
+are wrong.
+
+FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED): does
+it still match the code in `work/tasks/done/`, the relevant ADRs, and the tasks it depends on? If a
+dependency landed differently than this task assumes, or an ADR superseded an assumption here, do NOT
+build on the stale premise — route the task to needs-attention with the discrepancy as the reason
+(WORK-CONTRACT.md, "Drift is a needs-attention signal"). Building on a stale task produces
+wrong-but-compiling work.
+
+**Where to look.** The two keepers are `packages/fs/src/storage/stream/OnFile.ts` and
+`packages/browser/src/storage/stream/OnIndexedDB.ts` — read both even though you only change the
+first, because the helper you write has to serve both and the browser one lands in the sibling task
+`the-browser-stream-keeper-appends-in-segments`. The port they sit on is
+`packages/fs/src/utils/fs.ts`. The consumer is `packages/core/src/indexer.ts` (five `clear` call
+sites, and the branch that clears when `fetchFrom` returns undefined). The reorg re-append is in
+`packages/core/src/internal/engine/utils.ts`. Prior art for a keeper test is
+`packages/fs/test/keepStateOnFile.test.ts`.
+
+**Domain vocabulary.** A *segment* is one stored batch of events plus the `lastSync` current after
+them. The *tail* is the open, highest-ordinal segment (or the adopted legacy key when no ordinal
+exists yet); everything below it is *sealed* and immutable. The stored stream is an *emission
+stream*: it records what the indexer emitted, including retractions, not a block-ordered history.
+
+**The constraints that are easy to get wrong**, each of which has a criterion above:
+
+- Segments are keyed by ORDINAL, and the READ is still a full ordered scan. Segmentation is a
+  WRITE-path optimisation only. A later segment can hold LOWER block numbers, so no segment may be
+  skipped on a block bound. Do not make reads cheaper; the reorg model forbids it.
+- ADR-0006 is relevant for its ORDERING argument ONLY: `(blockNumber, logIndex)` is neither unique
+  nor monotonic over an emission stream, so it cannot key one. Its `seq` is a SERVER concept for
+  query cursors. Do NOT invent a per-event sequence client-side, and do not import ADR-0006's two
+  views, cursor validation or compaction into a cache that has none of those problems.
+- One write per save. If you find yourself writing two keys, re-read the atomicity argument.
+- Enumerate with an ANCHORED regex. A `startsWith` on the storage id is a silent cross-chain data
+  corruption, not a style preference.
+
+**Tests must not touch the real environment.** Point every keeper at a temp/scratch folder and assert
+no real home/config path is written. The module-level `node:fs` mock behind `packages/fs/src/utils/fs.ts`
+is the instrumented seam the cost assertions use, and it is CHOSEN by the spec deliberately: the
+alternative (an injected optional writer) would widen `keepStreamOnFile`, which is published surface,
+and contradict this spec's no-published-type promise.
+
+**Scope fence.** Do NOT make the stream raw-only — that is `the-stream-stores-only-what-the-node-said`
+and it is a breaking public API change. Do NOT add per-segment block-range metadata: the `lastSync`
+already in every segment carries `lastToBlock`, which is the scanned extent at that boundary and
+answers a strictly better question than a range over the events a segment happens to contain. Do NOT
+touch `packages/browser` — the browser keeper is the sibling task's file.
+
+RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (the
+seal threshold you pick and why; how the legacy shape is recognised structurally; what exactly a
+contiguity refusal throws). That block is the ONE sanctioned channel for build-time rationale and the
+runner transcribes it into the done record. Do NOT write the done record, the commit message or the
+PR body yourself, and do NOT open an observation note for decisions. If a choice meets the ADR gate
+(hard to reverse + surprising without context + a real trade-off), also write it as an ADR in
+`docs/adr/` and name it in the block.
+
+---
+
+### Claiming this task
+
+```sh
+dorfl claim segment-the-stream-behind-one-core-helper --arbiter origin
+git fetch origin && git switch -c work/segment-the-stream-behind-one-core-helper origin/main
+# on completion, in the work branch's PR/merge:
+git mv work/tasks/ready/segment-the-stream-behind-one-core-helper.md work/tasks/done/segment-the-stream-behind-one-core-helper.md
+```
