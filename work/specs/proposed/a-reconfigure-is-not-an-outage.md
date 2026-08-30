@@ -1,8 +1,7 @@
 ---
-title: 'A reconfigure is not an outage: the live deployment serves while the pending one catches up'
+title: 'A reconfigure of an INDEXER is not an outage: the live deployment serves while the candidate catches up'
 slug: a-reconfigure-is-not-an-outage
 taskedAfter: [the-stream-is-what-the-node-said-appended-once]
-needsAnswers: true
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -19,22 +18,16 @@ needsAnswers: true
 > head-following TAIL, never the history. And **reads do NOT carry deployment identity**; the
 > question dissolved rather than needing an answer.
 
-<!-- open-questions -->
-
-## Open questions
-
-1. **Who allocates the pending deployment's store, and therefore where does the indirect handle
-   live?** These are ONE question, not two, which is why `needsAnswers` is back. `createIndexerState`
-   takes ONE pre-built processor with its store already bound, so the answer changes the PUBLIC
-   surface of `createIndexerState` and decides the handle's shape: if the pending deployment is a
-   second `EntityEventProcessor`, the indirection must sit in a layer ABOVE it; if it is a swappable
-   store inside one processor, it is close to a getter in `view.ts`. At least three shapes exist (a
-   store-factory option, a processor factory, or the browser package building it). Answer this before
-   tasking, or the first task picks the public API by accident.
-2. **What shape does `SyncingState` grow?** It is a single flat record with one `lastSync` and one
-   `syncPercentage`, and it must express a pending CANDIDATE's catch-up progress (stories 3, 4 and
-   9). One signal, not two: reporting progress is what tells a consumer a candidate exists. This is
-   published surface.
+> **SCOPE: this spec covers the INDEXER runtimes** (the browser, via `createIndexerState`, and the
+> CLI, which constructs an `EthereumIndexer` directly). It does NOT cover `@etherfold/server`. That
+> was checked rather than assumed: `createServer` mounts a status API and an INGEST API, knows only
+> `RemoteSQL`, and never constructs an indexer; it receives `WireBatch`es over HTTP. So it has no
+> processor, no `SyncingState` and no deployments in this sense. A reconfigure THERE means the
+> fetcher's source or processor changed and a differently-shaped feed starts arriving, and the
+> question becomes whether the ingest server keeps two lineages of its emission-stream table
+> (ADR-0006) and switches which one its queries read. Same vocabulary, different mechanism,
+> different storage model, different promotion surface. It is a separate spec and is deliberately
+> not attempted here.
 
 ## Problem Statement
 
@@ -63,10 +56,10 @@ PENDING one, which is catching up and answers nobody.
   source needs and the stream does not already hold.
 - Reads are served by the live deployment throughout.
 - **Promotion** makes the candidate live. It is a POLICY knob, not a property of the runtime:
-  automatic on catch-up, or manual. Manual suits a production server, where someone wants to look
-  before readers move; automatic suits a browser app and equally a DEV server, where iterating on a
-  processor and hand-promoting after every edit would be absurd. Defaults follow the runtime;
-  the knob is one knob.
+  automatic on catch-up, or manual. Manual suits a production drive, where someone wants to look
+  before readers move; automatic suits a browser app and equally a DEV drive, where iterating on a
+  processor and hand-promoting after every edit would be absurd. So the axis is the ENVIRONMENT, not
+  the runtime, and it is one knob with defaults.
 - Reconfiguring again while one is pending REPLACES the pending one. Two, never three.
 
 ## Identity, which is not digest equality
@@ -237,10 +230,50 @@ the runtime: production wants manual, development wants automatic, and that is a
 server as of a browser. Two concrete browser gaps remain, and the reactive shape is not one of them
 (the root store replaces its value wholesale):
 
-- `createIndexerState` receives ONE pre-built processor with its store already bound, so nothing
-  currently owns allocating the pending deployment's store;
-- `SyncingState` is a single flat record with one `lastSync` and one `syncPercentage`, which cannot
-  express pending catch-up progress, which stories 3 and 4 require.
+**`createIndexerState` takes a deployment-scoped processor FACTORY, not a processor instance.** It
+currently receives ONE pre-built processor with its store already bound, so nothing can allocate a
+candidate's store. The factory is `(context: {deployment}) => IndexerStateProcessor`, and the
+argument is not decoration: on the entities path a no-argument factory would close over one store
+name and hand every deployment the SAME store, and two IndexedDB stores sharing a `databaseName`
+are one store by that store's own documentation, so the candidate would fold into the live
+deployment's rows. The live deployment is built by the same factory at init, so there is one
+construction path rather than two, and `updateProcessor` takes a factory for the same reason.
+
+This is a BREAKING change to the most-used entry point in `@etherfold/browser`, accepted
+deliberately: it is the only shape that also answers `updateIndexer`, where the app supplies nothing
+new and something must still mint a store. Roughly a dozen internal call sites, nine of them tests
+and the browser harness.
+
+**What is shared and what is not.** These are two different stores and conflating them is easy:
+
+- the **stream** (`keepStream`) IS shared, and that is the point of the whole design: the candidate
+  reads the existing prefix instead of re-fetching it;
+- the **state store** CANNOT be shared. It is the materialised fold, two deployments have different
+  folds by definition, and `StateStore` has no fork verb. Each deployment materialises its own, and
+  that is what the factory mints.
+
+Sharing the stream has a consequence this spec owns: both deployments also WRITE to it, under
+DIFFERENT filters, since the candidate may need topics the live deployment never requested. So a
+shared stream needs segments attributable to a LINEAGE as well as to a filter, or the live
+deployment replays events it never asked for and decodes them as errors. The prerequisite spec
+delivers immutable, independently readable segments; attributing them is owned here.
+
+**`SyncingState` grows an optional `candidate` block, and the live fields stay flat.** Nesting both
+under `live` and `candidate` was considered and rejected as a category error: the record mixes
+provider-level facts (`waitingForProvider`), policy (`autoIndexing`) and per-deployment facts
+(`lastSync`, `catchingUp`, `fetchingLogs`, `processingFetchedLogs`, `loading`, `numRequests`), so a
+uniform nesting would assert that the provider is per-deployment, which is false. Leaving the live
+fields flat also means no existing consumer changes, and the common case (no candidate) is expressed
+as absence. `syncPercentage` already rides on `lastSync`, so a candidate's progress comes along
+inside its own `lastSync` rather than needing a new field.
+
+**An error is reported on every deployment it actually breaks.** The candidate carries its own
+`error`. A candidate-only failure (a processor that throws on replay, a decode error while
+backfilling) sets `candidate.error` alone, which is exactly the signal an operator needs before
+promoting. A shared failure (the provider is down, and both deployments use the same provider)
+breaks both and is therefore reported on both; that is accurate rather than duplicated, and a
+consumer wanting to say it once can compare the existing `id: ErrorCode`. No `scope` field is added,
+because two ids already disambiguate what one would.
 
 **Promotion is a step, not a blend.** The cursor jumps. Interpolating would serve a state neither
 deployment ever had.
@@ -267,11 +300,16 @@ deliberately: it discards the pending deployment as well as the live one, and it
 that clears the STREAM, which under sharing is the prefix a pending deployment may be folding from,
 so it must not run while a pending deployment depends on it.
 
-**No object owns the live-plus-pending pair today, and something must.** `EthereumIndexer` holds
-exactly one processor, one `lastSync` and one `keepStream` key. The spec does not decide whether a
-pending deployment is a second `EthereumIndexer` or a container above it, because open question 1
-decides it. Server-side `promote` also needs a named surface (an indexer method, or an admin
-endpoint on `@etherfold/server`), and it has none.
+**A container owns the live-plus-candidate pair.** `EthereumIndexer` holds exactly one processor,
+one `lastSync` and one `keepStream` key, so it cannot hold both. With the factory above, a candidate
+is a full second stack (its own `EthereumIndexer`, processor and state store), and the container is
+what `createIndexerState` returns: it holds the pair, publishes the indirect handle, owns promotion,
+and is what `SyncingState` describes.
+
+`promote` is therefore a method on that container, reachable wherever it is: a UI action in the
+browser, and in the CLI a verb on the drive. There is no `@etherfold/server` surface, because the
+server is out of scope per the note at the top; it never constructs an indexer and has no candidate
+to promote.
 
 ## Testing Decisions
 
@@ -297,6 +335,11 @@ endpoint on `@etherfold/server`), and it has none.
   and stranding a tail it could never correct.
 - **A candidate's progress is visible** for as long as one is pending, and stops being reported at
   promotion, because after promotion there is no candidate.
+- **A candidate-only failure** sets `candidate.error` while the top-level one stays clear; a shared
+  provider failure sets BOTH, carrying the same `ErrorCode`.
+- **The factory is called per deployment**, and a candidate's state store is distinct from the live
+  one's: a write to one is not visible in the other, which is the guard against the
+  same-`databaseName` collision.
 
 ## Out of Scope
 
