@@ -62,19 +62,47 @@ live entries       stream_<name>_<chainId>_live_<seq>
 staging entries    stream_<name>_<chainId>_staging_<seq>
 
 staging reads      gen = staging OR (gen = live AND seq <= N)
-promotion          1. delete  gen = live AND seq > N
-                   2. rename  gen = staging  ->  gen = live
+promotion          delete the superseded live entries, relabel staging to live
+                   (journalled and per-sequence -- see below, the naive form loses data)
 ```
 
 **Promotion is a multi-key mutation that cannot be atomic on either keeper, so it is JOURNALLED and
-ORDERED.** A single `promoting` marker record is written before step 1 and deleted after step 2.
+ORDERED.** A single `promoting` marker record is written before any key is touched and deleted only
+once the promotion has completed.
 
 ```
-promotion   0. write   marker {graftAt: N}
-            1. delete  gen = live AND seq > N
-            2. rename  gen = staging  ->  gen = live
+promotion   0. write   marker {graftAt: N, throughSeq: K}   // K = highest staging seq
+            1. for s in N+1..K:  delete live_s if staging_s exists; rename staging_s -> live_s
+            2. delete  gen = live AND seq > K
             3. delete  marker
 ```
+
+**Recovery is PER-SEQUENCE, and the marker must carry `K` for that to be possible.** The obvious
+formulation — delete every live entry above `N`, then rename everything staging — is NOT re-runnable,
+and the way it fails is silent and deterministic rather than unlucky. Once step 1 has promoted even
+one entry, that entry is INDISTINGUISHABLE from an old live one, because relabelling deliberately
+leaves no record of which generation wrote it (that is the property that stops a chain forming). So a
+recovery that re-issued a blanket "delete live above `N`" would delete the entries it had just
+promoted, and they no longer exist under `staging` to promote again. A crash after the renames but
+before the marker is deleted would wipe the whole promoted stream above `N`, leaving live `0..N`
+under a state store folded to `K`: state ahead of stream, which is the silent-history condition this
+set refuses everywhere else.
+
+The per-sequence form is genuinely idempotent, and the test is presence of `staging_s`. If it exists,
+that sequence has not been promoted yet, so delete `live_s` (absent is a no-op) and rename. If it does
+not, that sequence is already promoted, so skip it. Then delete live above `K`, which removes any old
+live entries the retired generation had beyond the promoted range. Re-running the whole thing any
+number of times reaches the same state.
+
+**The marker has a LIFETIME, and a stale one is dangerous.** It is not a segment and does not match
+the anchored segment pattern, so nothing sweeps it by accident:
+
+- every path that clears the stream deletes the marker in the same operation — `ExistingStream.clear`
+  and `reset` both — because a marker outliving the stream it describes would, on the next load,
+  delete live entries above a graft point belonging to a stream that no longer exists;
+- a load finding a marker whose `graftAt`/`throughSeq` do not correspond to anything present
+  DISCARDS THE MARKER rather than acting on it, and says so through the logger. The marker is a
+  journal of an operation, so a journal referring to nothing is spent, not a command.
 
 **The marker exists because BOTH LABELS PRESENT is the ORDINARY state of a pending successor, not a
 signal of anything.** A browser tab reloads mid-catch-up constantly — story 9 is a developer
@@ -82,24 +110,25 @@ iterating on a processor — so a rule that read both labels as an interrupted p
 a half-folded successor on every refresh, which is precisely the rewind this spec exists to prevent.
 The marker is what distinguishes the two, and its ABSENCE is the common case.
 
-On load: marker present means re-run promotion from step 1, which is IDEMPOTENT (deleting an
-already-deleted range and renaming an already-renamed entry are both no-ops). Marker absent with both
-labels present means a pending successor; resume it.
+On load: marker present means re-run the promotion from step 1 in the per-sequence form above, which
+is idempotent for the reason given there — the presence of `staging_s` says whether that sequence has
+been promoted yet. Marker absent with both labels present means a pending successor; resume it.
 
 **This is a JOURNAL, not the head pointer `appending-to-the-stream-costs-the-batch` rejected**, and
 the distinction is worth stating because the shapes rhyme. A head pointer is consulted on every READ
 to determine the stream's structure, so it is a second source of truth that can disagree with the
-segments. The marker is consulted only at LOAD, describes an operation rather than a structure, is
-absent in the steady state, and its resolution is to re-run an idempotent operation rather than to
-trust it about what exists. It is also written once per PROMOTION, not per save, so it does not touch
-the one-write-per-save rule.
+segments. The marker is consulted only at LOAD, describes an OPERATION rather than a structure, is
+absent in the steady state, and is never TRUSTED about what exists — recovery tests for each
+`staging_s` and acts on what it finds, which is why a marker referring to nothing can simply be
+discarded instead of believed. It is also written once per PROMOTION, not per save, so it does not
+touch the one-write-per-save rule.
 
-**Delete before rename, even with the marker.** Rename-first leaves the renamed entries sitting on
-top of the OLD live segments above `N` with CONTIGUOUS ordinals, so if the marker were ever lost the
-state would be undetectable and the cursor — read from the tail — would be the retired generation's,
-ahead of what the new generation folded. Delete-first degrades to a bounded, self-healing loss
-instead: the prerequisite clears from the gap upward and KEEPS the prefix, which for a
-partially-completed step 1 is exactly what step 1 was doing.
+**Within each sequence, delete before rename.** Doing the rename first would leave the promoted entry
+on top of the old live one at the same sequence, which on a keyed store is either a collision or a
+silent overwrite of the entry the delete was supposed to remove deliberately. Deleting first also
+means a crash between the two leaves a one-segment hole, which the prerequisite's contiguity rule
+handles by clearing from the gap upward and KEEPING the prefix — and staging still holds that
+sequence, so recovery promotes it.
 
 **A successor RESUMES across a reload rather than being dropped.** It has to: the no-sharing case is
 a full backfill, and discarding it on a refresh would make the feature useless in the browser it is
@@ -481,10 +510,15 @@ verbs. Left out of the fence, the guide keeps teaching an API this design falsif
 - **A reload mid-catch-up RESUMES the successor** rather than promoting it or dropping it: both
   labels present with no promotion marker is a pending successor. This is the guard against a browser
   refresh promoting a half-folded generation.
-- **An interrupted promotion is completed, not guessed**: with the marker present, re-running
-  promotion from step 1 reaches the same end state, and re-running it twice more changes nothing.
-  Assert idempotence, and assert that a crash after step 1 but before step 2 does NOT leave the live
-  generation truncated once recovery has run.
+- **An interrupted promotion is completed, not guessed, from EVERY interruption point.** Assert
+  recovery from a crash at each of: before step 1, part-way through step 1 (some sequences promoted,
+  some not), after step 1 but before step 2, and after step 2 but before the marker is deleted. All
+  five must reach the identical end state, and re-running recovery again must change nothing. The
+  after-the-renames case is the one that a blanket "delete live above `N`" gets catastrophically
+  wrong, so it is the test that earns its place.
+- **A stale marker never truncates a stream**: clear the stream with a marker present, confirm the
+  marker is gone; and separately, a marker whose sequences correspond to nothing present is discarded
+  at load rather than acted on.
 - **A decode-only change is whole-stream sharing, not a partial graft**: a renamed non-indexed
   parameter moves `hash` but not `streamHash`, and the successor must re-fetch no history at all.
   This is the guard against reading `N` off the state verdict.
@@ -538,20 +572,33 @@ This cuts into FIVE separable landables. Cutting them together would produce one
 review.
 
 1. **The labelled stream.** The key layout, the sealed graft bound `N`, the graft-bounded staging
-   read, and journalled promotion (marker, delete, rename, clear marker), in the shared segmentation
+   read, and journalled per-sequence promotion (marker carrying `N` and `K`, per-sequence
+   delete-then-rename, trim above `K`, clear marker), plus marker cleanup on `clear`/`reset`, in the
+   shared segmentation
    helper the prerequisite establishes plus both keepers. Buildable and testable on its own (write
    both labels, read with a bound, promote, assert one contiguous live generation; interrupt at each
    step and assert recovery reaches the same end state) and it is the piece the spike measured.
    Everything else depends on it.
 
-   **It also OWNS the key migration, which is otherwise unowned and would silently wipe every cached
-   history.** The prerequisite leaves users holding `stream_<name>_<chainId>_<ordinal>` (plus
-   possibly the adopted legacy key with no ordinal at all). This spec's anchored match is
-   `stream_<name>_<chainId>_live_<seq>`, which matches NEITHER, so without a migration the first load
-   after upgrading reads the stream as absent and `indexer.ts` clears and re-indexes — exactly the
-   silent loss the prerequisite's story 5 forbids and its legacy-adoption rule was written to
-   prevent. Existing unlabelled ordinals are ADOPTED AS `live` at their existing sequence numbers,
-   by the same in-place, nothing-is-copied rule the prerequisite uses for the legacy blob.
+   **It also OWNS the key migration, which is otherwise unowned and would silently lose history.**
+   The prerequisite leaves users holding `stream_<name>_<chainId>_<ordinal>` AND, for anyone who came
+   from a release before it, the adopted legacy key `stream_<name>_<chainId>` with no ordinal at all.
+   This spec's anchored match is `stream_<name>_<chainId>_live_<seq>`, which matches NEITHER. Both
+   shapes must be migrated, and they fail DIFFERENTLY if they are not, which is why both are named:
+
+   - **Unlabelled ordinals**, unmigrated, make the whole stream unmatchable, so the first load reads
+     it as absent and `indexer.ts` clears and re-indexes. Loud and total.
+   - **The label-less legacy key**, unmigrated, is far worse because it is SILENT: the ordinals still
+     match, so presence reads true and `indexer.ts` does NOT clear, and `fetchFrom` returns a defined
+     result that is simply missing the EARLIEST segment. Partial history replayed as whole, which is
+     the failure class this set refuses everywhere.
+
+   Both are migrated by RENAME to `_live_<seq>`, the legacy key taking the lowest sequence, ahead of
+   every existing ordinal. Renaming rather than adopting-in-place is a deliberate departure from the
+   prerequisite, and it is affordable for exactly the reason the spike measured: a rename moves no
+   payload. The prerequisite avoided a migration because COPYING would have meant two writes and a
+   crash window between them; a rename has neither. Order the write before the delete so a crash
+   leaves both keys and the migration re-runs harmlessly, and have the reader prefer the labelled one.
 2. **The verdict becomes a published, actionable answer, and `ReconfigureOutcome` grows the shape
    that replaces `stateDiscarded`.** Core-side: publish what the container needs from
    `sourceInvalidationOf` (which half, and `invalidFromBlock`, from which `N` is DERIVED — `N` itself

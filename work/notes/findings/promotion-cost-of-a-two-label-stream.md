@@ -57,11 +57,19 @@ identical work**, and that is reproducible to the byte rather than being a timin
 | arm | payloads rewritten | bytes moved | deletes | store ops |
 | --- | --- | --- | --- | --- |
 | key-label | 250 | 135,562,192 | 250 | 4 |
-| value-label+pointer | 250 | 135,562,192 | 250 | 3 |
+| value-label+pointer | 250 | 135,565,442 | 250 | 3 |
 
-Same count, the same byte total to the last byte, and the same deletes, on chromium, firefox AND
-webkit. The entire difference is **one batched delete operation**, because a rename has to remove the
-old key and a rewrite lands on the same one. There is nothing there for a timing to distinguish.
+Identical counts and identical deletes, on chromium, firefox AND webkit, with the same byte totals
+reproduced exactly on every engine. The two differences are both structural and both tiny:
+
+- **one batched delete operation**, because a rename has to remove the old key and a rewrite lands on
+  the same one;
+- **3,250 bytes**, which is 0.002% and is not noise — it is 13 bytes per segment across 250 segments,
+  the length of `"gen":"live",`. The value label costs slightly MORE bytes precisely because the
+  label is in the bytes. A pleasing confirmation that the arms are doing what they claim, and the
+  wrong direction for value-label.
+
+There is nothing else there for a timing to distinguish.
 
 The timings agree and are worth nothing more than that. On this machine the run-to-run spread at `8x`
 EXCEEDED the gap between the arms several times over — one webkit `no-sharing` promotion measured
@@ -155,9 +163,9 @@ definition a case where the successor just performed a FULL BACKFILL of that his
 That comparator is an ESTIMATE and is labelled one: this spike never measured a backfill, and "an
 `eth_getLogs` backfill of 136 MB takes minutes" is a judgement about the most rate-limited call this
 system makes, not a number from `results/`. The comparator the harness DOES record is the local
-write: at `4x no-sharing` the setup append of live plus staging is 582 / 1215 / 792 ms against a
-key-label promotion of 1636 / 1161 / 619 ms, so on IndexedDB promotion is roughly the same order as
-locally writing the staging it promotes — expected, since a relabel there is `get`+`set`+`del`
+write: at `4x no-sharing`, seal 1,000, the setup append of live plus staging is 664 / 1720 / 1269 ms
+against a key-label promotion of 1580 / 1761 / 1372 ms, so on IndexedDB promotion is the same order
+as locally writing the staging it promotes — expected, since a relabel there is `get`+`set`+`del`
 against one `set`. The claim rests on the RPC fetch dominating both, which is safe but is reasoning,
 not arithmetic over a measured ratio.
 
