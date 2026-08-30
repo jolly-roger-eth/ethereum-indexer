@@ -174,16 +174,26 @@ repo's existing sense, an installation) actually reconfigures:
 So the cases that create a generation mostly share the WHOLE stream, and the expensive work is
 re-folding rather than re-fetching. That also bounds the doubled-fetch cost: the pending generation does
 not re-fetch history, so the doubled `eth_getLogs` is only the tail both generations follow while
-one is pending, never a doubled backfill.
+one is pending, never a doubled backfill — in the SHARING cases. That bound does not cover the
+re-fetching cases: an event added below the cursor, a changed address or a new contract shares
+nothing, so its successor DOES re-fetch the history while the live generation keeps following the
+head. An earlier draft asserted the bound unconditionally, which was true only for the two cases it
+happened to rank first. The doubled backfill is accepted for the re-fetching cases, since the
+alternative is the outage this spec exists to remove, but it should be stated rather than implied.
 
 **The no-outage value does not depend on sharing at all**: the live generation keeps answering
 regardless. Sharing decides how expensive catching up is, not whether reads survive.
 
-**Prerequisite: `appending-to-the-stream-costs-the-batch`.** That spec now delivers segments
-that are IMMUTABLE and ADDRESSABLE, which is what a prefix reference needs. It deliberately does not
-build sharing; THIS spec owns that, and it is why the prerequisite is declared in `taskedAfter` and
-not only in prose. Without it the stream is one blob rewritten per append, there is no prefix to
-point at, and every pending generation copies the whole history.
+**Prerequisite: `appending-to-the-stream-costs-the-batch`, and the reason is the WRITE path, not a
+prefix reference.** An earlier draft said that spec delivers segments that are immutable and
+addressable so a prefix can be pointed at. That rationale is stale twice over: it delivers
+independently READABLE segments (it says outright that "addressable" would not bite), and under the
+one-writer rule below this spec never points at a prefix at all.
+
+The real dependency is that a successor building its OWN stream must be able to write one without
+paying the quadratic append, and that a live stream being read by a successor must not be rewritten
+wholesale underneath it on every save. Both are properties of the append-only shape. A successor
+against today's single blob would be reading a value that is replaced in full on every batch.
 
 **Filter and lineage provenance is a STORAGE change and is NOT owned here.** A shared stream is
 decode-neutral but not filter-neutral: absence of a log means something only against the filter its
@@ -192,10 +202,11 @@ shared segments would need per-segment filter and lineage provenance.
 
 That is a change to the stream's read seam, which `appending-to-the-stream-costs-the-batch`
 deliberately pins as UNCHANGED. Parking it in this browser-scoped spec was a category error: it would
-have two specs re-shaping one interface with nothing ordering them. It is named here as a
-prerequisite for any FUTURE partial sharing and owned by neither spec today, which is why the
-sharing this spec relies on is whole-stream sharing only (the two representative cases), never a
-partial prefix.
+have two specs re-shaping one interface with nothing ordering them.
+
+It is named here as a prerequisite for any FUTURE partial sharing, and it is owned by NEITHER spec
+today. That costs nothing, because under the one-writer rule below no provenance is required: a
+successor either reads a stream it never writes, or writes a stream nobody else reads.
 
 **Reads do NOT carry generation identity, and the handle FOLLOWS promotion.** An earlier draft had a
 story for a reader knowing which generation answered it, and an open question about whether that
@@ -333,11 +344,24 @@ old estimate would not have owned them.
   folds by definition, and `StateStore` has no fork verb. Each generation materialises its own, and
   that is what the factory mints.
 
-Sharing the stream has a consequence this spec owns: both generations also WRITE to it, under
-DIFFERENT filters, since the successor may need topics the live generation never requested. So a
-shared stream needs segments attributable to a LINEAGE as well as to a filter, or the live
-generation replays events it never asked for and decodes them as errors. The prerequisite spec
-delivers immutable, independently readable segments; attributing them is owned here.
+**A successor NEVER writes to the live generation's stream.** This is the rule that makes sharing
+work at all, and an earlier draft had both generations writing one stream, which has no defined
+semantics: `appending-to-the-stream-costs-the-batch` puts `lastSync` inside a single OPEN TAIL, so
+two writers with two different cursors would clobber each other's position. Nothing owned that, and
+nothing should have to.
+
+The two cases resolve separately and neither needs a shared writer:
+
+- **The sharing cases** (a processor-only change, a decode-only change) need NO new fetching at all,
+  because every topic is already in the stream. The successor is therefore a pure READER of the live
+  stream: it re-folds from it and writes nothing. One writer, one cursor, no contention.
+- **The re-fetching cases** (an event added or edited below the cursor, a changed address, a new
+  contract) share nothing anyway, per the ranked list above. The successor builds its OWN stream from
+  scratch, keyed by its own generation, and owns it outright.
+
+So there is no two-writer stream, no per-segment lineage attribution, and no filter provenance
+needed: a stream has exactly one writer for its whole life. On promotion the successor's stream (if
+it built one) becomes the live one, and the retired generation's storage is reclaimed with it.
 
 **`SyncingState` grows an optional `successor` block, and the live fields stay flat.** Nesting both
 under `live` and `successor` was considered and rejected as a category error: the record mixes
@@ -398,8 +422,12 @@ surface here (that is the separate ingest-server spec).
   promotion. Assert on the ANSWERS, since reads do not report identity.
 - **The no-op claim** asserts on ranges fetched AND on state discarded, the pair ADR-0034
   established, since neither alone separates a resume from a rebuild.
-- **Replacement**: reconfiguring twice leaves exactly two generations and reclaims the first pending
-  one's storage.
+- **Replacement**: reconfiguring twice leaves exactly two generations, and the first successor's
+  storage is reclaimed whole — its state store, and its own stream if it built one. Nothing is
+  reclaimed from the LIVE generation's stream, which is the one-writer rule stated as a test.
+- **A successor never writes the live stream**: after a sharing-case reconfigure, the live stream's
+  keys are byte-identical to what they were, while the successor's state is built. This is the guard
+  against the two-writer clobber.
 - **The clamp**: a graft point inside the unconfirmed window is clamped rather than accepted, and a
   reorg above the graft point is handled per generation.
 - **Identity**: an event appended above the cursor does NOT create a pending generation, which is the
@@ -440,18 +468,23 @@ a tasker should follow rather than treating it as one body of work:
 (2) and (3) are migrations with a large file footprint and little judgement; (1) and (4) carry the
 design. Cutting them together would produce one task nobody can review.
 
-Note also what is NOT in this list: per-segment filter and lineage provenance moved OUT of this spec,
-because it is a change to the stream's read seam. That leaves
-`the-stream-stores-only-what-the-node-said` as the only sibling re-shaping `ExistingStream`, so the
-two dependents of the storage spec no longer contend for one interface and need no ordering between
-them.
+Note also what is NOT in this list: per-segment filter and lineage provenance is owned by NEITHER
+spec, and under the one-writer rule nothing here needs it. This spec therefore re-shapes NO part of
+`ExistingStream`, which leaves `the-stream-stores-only-what-the-node-said` as the only sibling
+touching that seam, so the two dependents of the storage spec do not contend and need no ordering
+between them.
 
 ## Out of Scope
 
 - **N generations**, rollback, A/B. Reachable later at linear storage cost.
 - **Sharing state between generations.** Not available; each re-folds.
 - **Smoothing the promotion step.**
-- **Segment pruning**, which belongs with the storage spec.
+- **Pruning of SEALED SEGMENTS WITHIN one stream.** Genuinely unowned, and this spec does not need
+  it: under the one-writer rule a successor either wrote its own stream (which it owns whole, and
+  which is deleted outright when that generation is retired) or wrote none at all. So reclamation
+  here is deleting a whole stream and a whole state store, which `ExistingStream.clear` and the state
+  store already do. Pruning older segments of a stream that is still live is a separate want, and
+  neither spec claims it.
 
 ## Further Notes
 

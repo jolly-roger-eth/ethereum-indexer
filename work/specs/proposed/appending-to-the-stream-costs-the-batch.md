@@ -77,6 +77,18 @@ This is what makes the empty-batch case cheap without needing a rule against emp
 with no events rewrites only the open tail to move its cursor, which is bounded, rather than
 rewriting the whole history as it does today.
 
+**Sealing is not a write, and the cursor is read from the TAIL alone.** A segment is SEALED exactly
+when it is no longer the highest ordinal, so sealing happens implicitly the moment the next save
+opens a new one, and a reader tells by enumeration. Nothing is ever written INTO a segment to mark
+it sealed, which is what keeps both the one-write claim and immutability true. Every sealed segment
+still carries the `lastSync` that was current when it was written, and those are STALE: the cursor is
+read from the highest ordinal only, or a reader picking a lower one silently rewinds.
+
+The seal threshold is counted in **EVENTS**, not bytes. Bytes are natural on the filesystem (the JSON
+string is already built) and not cheaply available on IndexedDB (structured-clone size is not
+exposed), so naming the unit is what stops the two keepers choosing differently and makes the seal
+test deterministic.
+
 **Presence is the TAIL, never a segment count.** `fetchFrom` must keep returning a DEFINED result
 for a stream that has been saved to but holds no events, because today an empty first save writes
 `{lastSync, eventStream: []}` and a defined result is what stops `indexer.ts` taking its clear
@@ -91,8 +103,11 @@ wants to share a prefix by reference has nothing to point at without them.
 
 ## User Stories
 
-1. As a developer doing a long backfill, I want appending batch N to cost the same as appending
-   batch 1, so a large history does not slow its own ingestion.
+1. As a developer doing a long backfill, I want the cost of a save to be bounded by a FIXED CEILING
+   that does not grow with my history, so a large history does not slow its own ingestion. (Not
+   "every append costs the same": a save rewrites the open tail, so it costs at most one tail plus
+   its batch. That is constant in history, which is the whole claim, and it is what the title means
+   by costing the batch rather than the history.)
 2. As a browser user, I do not want a full structured-clone of my entire history on every save.
 3. As a developer, I want a save with no new events to cost nothing proportional to my history.
 4. As a developer replaying a reorged history, I want retractions to come back in the order they were
@@ -136,28 +151,55 @@ was lost, and "some of the stream" replayed as if it were "the stream" is the sa
 failure class the reorg model and `SuspectedTruncationError` already refuse. Detect the gap and
 clear the remainder rather than replaying it.
 
-**The migration is structural, because there is no marker, and it must be READ as well as written.**
-The stream blob carries no format field (unlike the fixture's `format: 2`), so the new code must
-recognise the old single-blob shape by structure. `fetchFrom` READS the legacy shape and migrates on
-first write; without the read half the first load returns `undefined`, `indexer.ts` takes its clear
-branch, and the user silently loses a cached history, which is exactly what story 5 forbids. The
-rebuild story 5 asks to be VISIBLE also needs an owner: a clear or a migration should say so through
-the existing logger rather than happening in silence. Where ADR-0034 already MANDATES clearing (a legacy blob whose
+**The migration ADOPTS the legacy key as a sealed segment rather than rewriting it.** The stream blob
+carries no format field (unlike the fixture's `format: 2`), so the old single-blob shape is
+recognised structurally. But a migration that COPIED it into segments would need two writes, and the
+crash window between them is exactly the cursor-ahead/cursor-behind hazard the open tail exists to
+close — and a reader finding BOTH shapes would have no defined behaviour, double-counting the prefix
+or dropping it.
+
+So the legacy key `stream_<name>_<chainId>` (no ordinal) is ADOPTED IN PLACE as the earliest sealed
+segment: never rewritten, read first, and followed by `_0.._N`. Nothing is copied, the first save
+after an upgrade writes only the new tail, and the one-write rule holds through the migration rather
+than being suspended for it. `clear` removes it along with the ordinals. Its `lastSync` is stale like
+any sealed segment's, so the cursor still comes from the tail.
+
+The rebuild story 5 asks to be VISIBLE needs an owner too: a clear or a migration should say so
+through the existing logger rather than happening in silence. Where ADR-0034 already MANDATES clearing (a legacy blob whose
 raw half a `logValues` projection dropped, so it cannot be re-read), that mandate WINS: clearing a
 stream that cannot be re-read is correct and is not a silent clear. What is forbidden is clearing a
 READABLE stream merely because its shape is old.
+
+**The segmentation rules live in ONE place, not in each keeper.** Ordinal naming, the anchored match,
+the contiguity refusal, the seal decision, legacy adoption and cursor selection are identical for
+both keepers and are the whole substance of this change. `OnFile` and `OnIndexedDB` are independent
+implementations of `ExistingStream` in different packages, so a task cut per keeper would
+re-implement the same prose twice and drift. Put the rules in an internal core helper parameterised
+over a `get`/`set`/`del`/`keys` port, and let each keeper supply the port. That also gives the
+module-mocking seam below one place to bite.
 
 **Segment size follows the batch, with one caveat.** The `streamNotYetSaved` accumulator buffers
 across failed saves, so what lands in the tail at a given save is whatever was buffered then, not
 necessarily one batch. Sealing is by size threshold, so this affects when a seal happens and nothing
 else.
 
-**Both keepers share their namespace, and a naive scan or clear will eat the neighbours.** The fs
-keeper's `storage(folder)` is the SAME folder `keepStateOnFile` writes into, so a segment scan and a
-`clear` must filter on the stream key prefix or a stream clear deletes the state blob. And on the
-browser side, `idb-keyval`'s `clear()` wipes the WHOLE store rather than one stream's keys, so it is
-listed among the available exports above as a capability, NOT as the implementation of
-`ExistingStream.clear`. Use `keys` plus `delMany` over the filtered prefix.
+**Enumeration must match an ANCHORED pattern, not a prefix, because a bare prefix collides across
+CHAINS.** Stream keys are `stream_<name>_<chainId>`, so with segments appended as `_<ordinal>` the
+prefix for chain `1` (`stream_tag_1`) is ALSO a prefix of every key of chain `10`
+(`stream_tag_10_0`). Same name, different chain is the designed-for case, since `chainId` is in the
+key precisely so one tag can serve many chains. A `startsWith` filter would therefore have a chain-1
+`clear` delete chain-10 segments, and a chain-1 `fetchFrom` concatenate chain-10 events into the
+replay: silent wrong state, which is the failure class this spec refuses everywhere else.
+
+So enumeration matches `^stream_<name>_<chainId>_(\d+)$` — the full prefix, the ordinal separator,
+and a remainder that parses as an ordinal. Never a bare `startsWith` on the storage id.
+
+**The two keepers also share their namespace with other keepers.** The fs keeper's `storage(folder)`
+is the SAME folder `keepStateOnFile` writes into. The state key is `<name>_<chainId>`, which the
+anchored pattern above already excludes, but the anchoring is what makes that true rather than luck.
+On the browser side, `idb-keyval`'s `clear()` wipes the WHOLE store rather than one stream's keys, so
+it is listed among the available exports as a capability and NOT as the implementation of
+`ExistingStream.clear`. Use `keys` plus `delMany` over the anchored match.
 
 **One existing test reaches into the stream key directly** and segmentation breaks it:
 `packages/browser/test/invalidation.test.ts` does `get(stream_<tag>_<chainId>)`, asserts it is
@@ -177,8 +219,18 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   `keepStreamOnFile`/`keepStreamOnIndexedDB`, which is published surface, and would contradict this
   spec's no-published-type promise and pull in a changeset.
 
-- **A save writes exactly ONE key**, asserted at the same instrumented seam. This is the atomicity
-  guard: it is what stops a crash separating the cursor from its events.
+  Assert the CEILING, not equality: no save writes more than one tail plus its batch, and the 100th
+  append costs no more than the 10th at the same tail phase. Asserting the tenth equals the first is
+  false by design, since a tail absorbs several batches before sealing.
+
+- **A save writes exactly ONE key** in the steady state, asserted at the same instrumented seam, and
+  that INCLUDES the first save after a legacy adoption, which is the case a copying migration would
+  have broken. This is the atomicity guard: it stops a crash separating the cursor from its events.
+- **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where a
+  `clear` on one leaves the other intact and its replay unpolluted. This is the anchored-match guard
+  and it fails loudly under a bare prefix filter.
+- **The cursor comes from the tail**: a stream with several sealed segments resumes from the highest
+  ordinal's `lastSync`, never a sealed one's stale copy.
 - **A sealed segment is never rewritten** (no write targets its key again) and is **readable by its
   own key** without reading the others.
 - **`fetchFrom` returns a DEFINED result for a stream saved with no events**, which is the guard

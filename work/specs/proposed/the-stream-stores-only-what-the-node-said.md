@@ -121,10 +121,19 @@ is the one case `reparse` returns `undefined` for, and why the indexer must dete
 re-read and clear it.
 
 Under raw-only the interaction gets sharper: an event whose raw half was projected away has NOTHING
-left, where before it at least carried `args`. So this spec must state whether the fetch path still
-projects for the processor while storage keeps the raw log, or whether a `logValues` projection that
-drops `topics`/`data` is refused outright when a `keepStream` is configured. Changing what handlers
-receive silently would be the worse outcome of the two.
+left, where before it at least carried `args`.
+
+**Decided: `logValues` is a PROCESSOR-facing projection only, and storage always keeps the raw log.**
+What handlers receive is unchanged, so nothing silently changes for an existing processor; what gets
+STORED stops being projected. The alternative, refusing a projection that drops `topics`/`data`
+whenever a `keepStream` is configured, was rejected because it turns a storage-size knob into a
+constraint on what handlers can be written against.
+
+This is a real simplification rather than a trade: it removes the `reparse`-returns-`undefined` case
+entirely, and with it the whole "detect a stream that cannot be re-read and clear it" branch, since
+a stored event now always carries what decoding needs. It does give up the storage saving `logValues`
+offered on the stream, which is consistent with this spec's position that size is not the case for
+the change.
 
 **Existing segments keep their decoded halves, and that is tolerated on READ.** After this lands,
 segments already written by `appending-to-the-stream-costs-the-batch` still hold `args` and
@@ -149,8 +158,9 @@ rewriting migration is performed. Pin that with a test rather than leaving it to
   unconfirmed window after a stream save.
 - **A segment written before this change still replays**, carrying a decoded half that is ignored
   rather than refused, which is the upgrade guard for story 4.
-- **A `logValues` projection that drops the raw half** behaves as decided above, and the decision is
-  asserted either way rather than left to the first task.
+- **A `logValues` projection that drops `topics`/`data`** still trims what the PROCESSOR receives
+  while the stored event keeps its raw log, and that stream replays cleanly. This is the assertion
+  that the `reparse`-returns-`undefined` branch is now unreachable rather than merely unlikely.
 
 ## Out of Scope
 
