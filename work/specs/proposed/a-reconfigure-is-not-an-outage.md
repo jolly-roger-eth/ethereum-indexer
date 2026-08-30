@@ -230,19 +230,41 @@ the runtime: production wants manual, development wants automatic, and that is a
 server as of a browser. Two concrete browser gaps remain, and the reactive shape is not one of them
 (the root store replaces its value wholesale):
 
-**`createIndexerState` takes a deployment-scoped processor FACTORY, not a processor instance.** It
-currently receives ONE pre-built processor with its store already bound, so nothing can allocate a
-candidate's store. The factory is `(context: {deployment}) => IndexerStateProcessor`, and the
-argument is not decoration: on the entities path a no-argument factory would close over one store
-name and hand every deployment the SAME store, and two IndexedDB stores sharing a `databaseName`
-are one store by that store's own documentation, so the candidate would fold into the live
-deployment's rows. The live deployment is built by the same factory at init, so there is one
-construction path rather than two, and `updateProcessor` takes a factory for the same reason.
+**`createIndexerState` stops EAGERLY INVOKING the processor factory that already exists, and gains a
+per-deployment factory for the state-holding resource.**
 
-This is a BREAKING change to the most-used entry point in `@etherfold/browser`, accepted
-deliberately: it is the only shape that also answers `updateIndexer`, where the app supplies nothing
-new and something must still mint a store. Roughly a dozen internal call sites, nine of them tests
-and the browser harness.
+The processor factory is NOT a new concept and must not be re-invented. It is already the
+convention, in both flavours, and the entities one already takes exactly the right argument:
+
+- `fromJSProcessor(def)` returns `() => JSObjectEventProcessor`, exported by every example as
+  `createProcessor`;
+- `fromEntityProcessor(def, options)` returns `(store: StateStore) => EntityEventProcessor`.
+
+What apps do today is invoke it at the CALL SITE and hand in the result:
+`fromJSProcessor(processor)()`, or `fromEntityProcessor(tokenProcessor)(store)`. So
+`createIndexerState` receives an already-bound instance and cannot build a second one.
+
+The change is therefore to pass the factory rather than its result, and to add the piece that is
+genuinely missing: a factory for the resource that HOLDS STATE, which is what must differ per
+deployment.
+
+- **entities**: `processor: (store) => Processor` is unchanged, plus `storeFactory: (deployment) =>
+  StateStore`.
+- **js-object**: `processor: () => Processor` is unchanged, plus a per-deployment `keepState`
+  factory, since that path keeps its state through `keepState` rather than a store.
+
+The deployment argument belongs on the STATE factory, not on the processor factory, and it is
+load-bearing there: the store name must be both STABLE across sessions (or a reload finds no data)
+and DISTINCT per deployment (two IndexedDB stores sharing a `databaseName` are one store by that
+store's own documentation, so a candidate would fold into the live deployment's rows). Deriving it
+from the deployment is what satisfies both at once.
+
+The live deployment is built through the same path at init, so there is one construction path rather
+than two, and `updateProcessor` takes a factory for the same reason.
+
+This is a breaking change to `createIndexerState`, accepted deliberately, but a much smaller one
+than it first appeared: for most call sites it is deleting the trailing `()` and supplying a state
+factory. Roughly a dozen internal call sites, nine of them tests and the browser harness.
 
 **What is shared and what is not.** These are two different stores and conflating them is easy:
 
@@ -337,9 +359,10 @@ to promote.
   promotion, because after promotion there is no candidate.
 - **A candidate-only failure** sets `candidate.error` while the top-level one stays clear; a shared
   provider failure sets BOTH, carrying the same `ErrorCode`.
-- **The factory is called per deployment**, and a candidate's state store is distinct from the live
+- **The state factory is called per deployment**, and a candidate's store is distinct from the live
   one's: a write to one is not visible in the other, which is the guard against the
-  same-`databaseName` collision.
+  same-`databaseName` collision. A store name is also STABLE across a reload for the same
+  deployment, so a restart finds its data rather than minting a third store.
 
 ## Out of Scope
 
