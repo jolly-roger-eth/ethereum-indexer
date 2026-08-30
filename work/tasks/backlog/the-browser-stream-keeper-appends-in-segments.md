@@ -68,9 +68,10 @@ for the migration test — rather than patching it blind on a red gate.
 - [ ] **`clear` removes every segment of ITS stream and nothing else** — via `keys` + `delMany` over
       the anchored match, never `idb-keyval`'s store-wide `clear()`. A test asserts an unrelated key
       in the same store survives.
-- [ ] **A gap in the ordinals is REFUSED AND THE REMAINDER CLEARED**, not thrown — matching whatever
-      the helper landed, and asserted here too because `indexer.ts` has no `try`/`catch` around
-      `fetchFrom`, so a throw would leave the browser indexer permanently unloadable.
+- [ ] **A gap in the ordinals CLEARS FROM THE GAP UPWARD AND KEEPS THE PREFIX**, not thrown and not a
+      whole-stream wipe — matching the helper, and asserted here too because `indexer.ts` has no
+      `try`/`catch` around `fetchFrom`, so a throw would leave the browser indexer permanently
+      unloadable, and because a whole-stream wipe would silently discard a good prefix.
 - [ ] **The migration**: write a stream in the shipped blob format, read it with the new code, assert
       NO re-fetch; and separately, a legacy blob with a dropped raw half is cleared per ADR-0034.
 - [ ] `packages/browser/test/invalidation.test.ts` is updated deliberately for the new key layout and
@@ -101,8 +102,9 @@ FIRST, check this task against current reality (it is a launch snapshot and may 
 it still match the code in `work/tasks/done/`, the relevant ADRs, and the task it depends on? In
 particular, read the `## Decisions` block in
 `work/tasks/done/segment-the-stream-behind-one-core-helper.md` — the seal threshold, how the legacy
-shape is recognised, and what a contiguity refusal throws were all chosen there, and this task must
-match them rather than pick again. If the helper landed with a different port shape than this task
+shape is recognised, and exactly what a contiguity refusal DOES (it clears from the gap upward and
+keeps the prefix; it does not throw and does not wipe the stream) were all chosen there, and this
+task must match them rather than pick again. If the helper landed with a different port shape than this task
 assumes, do NOT build on the stale premise: route to needs-attention with the discrepancy
 (WORK-CONTRACT.md, "Drift is a needs-attention signal").
 

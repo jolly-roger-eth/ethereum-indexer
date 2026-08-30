@@ -1,10 +1,13 @@
 {
   "project": "chromium",
-  "ranAt": "2026-08-30T16:38:24.217Z",
-  "note": "ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on. Rows are merged across runs by (arm, size, seal, case).",
+  "ranAt": "2026-08-30T17:12:02.445Z",
+  "note": "ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on. Rows are merged across runs by (arm, size, seal, case); each row carries its own ranAt and harnessSha, so rows measured by different versions of the harness are distinguishable.",
+  "harnessSha": "c3cbcce11f15",
   "rows": [
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:00:31.889Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 250,
@@ -31,7 +34,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 3.4000000059604645,
+          "ms": 94,
           "storeOpsObserved": 1
         },
         "readOrderLength": 126,
@@ -41,21 +44,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 109.40000000596046
+          "ms": 1008.5
         },
         {
           "label": "setup-append",
-          "ms": 69.7000000178814
+          "ms": 1275.5
         },
         {
           "label": "promote",
-          "ms": 3.4000000059604645
+          "ms": 94
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:00:40.225Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 250,
@@ -82,7 +87,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 2.9000000059604645,
+          "ms": 84.59999999403954,
           "storeOpsObserved": 0
         },
         "readOrderLength": 126,
@@ -92,21 +97,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 107.40000000596046
+          "ms": 1131.4000000059605
         },
         {
           "label": "setup-append",
-          "ms": 69.2000000178814
+          "ms": 1027.0999999940395
         },
         {
           "label": "promote",
-          "ms": 2.9000000059604645
+          "ms": 84.59999999403954
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:00:51.186Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 250,
@@ -133,7 +140,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 66.7000000178814,
+          "ms": 738.4000000059605,
           "storeOpsObserved": 2
         },
         "readOrderLength": 126,
@@ -143,21 +150,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 105.5
+          "ms": 1024.0999999940395
         },
         {
           "label": "setup-append",
-          "ms": 65.40000000596046
+          "ms": 538.9000000059605
         },
         {
           "label": "promote",
-          "ms": 66.7000000178814
+          "ms": 738.4000000059605
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:01:03.185Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 250,
@@ -184,7 +193,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 1.699999988079071,
+          "ms": 126.69999998807907,
           "storeOpsObserved": 0
         },
         "readOrderLength": 126,
@@ -194,21 +203,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 106.60000002384186
+          "ms": 1270.5
         },
         {
           "label": "setup-append",
-          "ms": 65.09999999403954
+          "ms": 1517
         },
         {
           "label": "promote",
-          "ms": 1.699999988079071
+          "ms": 126.69999998807907
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:01:14.634Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 250,
@@ -235,7 +246,7 @@
           "deletes": 63,
           "payloadBytesMoved": 8516108,
           "storeOps": 4,
-          "ms": 116.7000000178814,
+          "ms": 897.7000000178814,
           "storeOpsObserved": 4
         },
         "readOrderLength": 126,
@@ -245,21 +256,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 104.90000000596046
+          "ms": 1248.7000000178814
         },
         {
           "label": "setup-append",
-          "ms": 101
+          "ms": 737.7000000178814
         },
         {
           "label": "promote",
-          "ms": 116.7000000178814
+          "ms": 897.7000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:01:25.708Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 250,
@@ -286,7 +299,7 @@
           "deletes": 63,
           "payloadBytesMoved": 8516108,
           "storeOps": 252,
-          "ms": 119.40000000596046,
+          "ms": 1008.8999999761581,
           "storeOpsObserved": 252
         },
         "readOrderLength": 126,
@@ -296,21 +309,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 109.60000002384186
+          "ms": 1211.5999999940395
         },
         {
           "label": "setup-append",
-          "ms": 97
+          "ms": 1182.4000000059605
         },
         {
           "label": "promote",
-          "ms": 119.40000000596046
+          "ms": 1008.8999999761581
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:01:38.520Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 250,
@@ -337,7 +352,7 @@
           "deletes": 63,
           "payloadBytesMoved": 8516927,
           "storeOps": 3,
-          "ms": 203.40000000596046,
+          "ms": 2511.800000011921,
           "storeOpsObserved": 5
         },
         "readOrderLength": 126,
@@ -347,21 +362,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 104.89999997615814
+          "ms": 1040.300000011921
         },
         {
           "label": "setup-append",
-          "ms": 103.7999999821186
+          "ms": 1196.1000000238419
         },
         {
           "label": "promote",
-          "ms": 203.40000000596046
+          "ms": 2511.800000011921
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:01:46.938Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 250,
@@ -388,7 +405,7 @@
           "deletes": 63,
           "payloadBytesMoved": 8516927,
           "storeOps": 3,
-          "ms": 103,
+          "ms": 717.6999999880791,
           "storeOpsObserved": 3
         },
         "readOrderLength": 126,
@@ -398,21 +415,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 107.7000000178814
+          "ms": 1043.2999999821186
         },
         {
           "label": "setup-append",
-          "ms": 96.5
+          "ms": 939.3999999761581
         },
         {
           "label": "promote",
-          "ms": 103
+          "ms": 717.6999999880791
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:02:21.854Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 250,
@@ -439,7 +458,7 @@
           "deletes": 125,
           "payloadBytesMoved": 16899219,
           "storeOps": 4,
-          "ms": 253.7999999821186,
+          "ms": 2455.100000023842,
           "storeOpsObserved": 4
         },
         "readOrderLength": 126,
@@ -449,21 +468,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 108.30000001192093
+          "ms": 1320.800000011921
         },
         {
           "label": "setup-append",
-          "ms": 129.90000000596046
+          "ms": 944.7999999821186
         },
         {
           "label": "promote",
-          "ms": 253.7999999821186
+          "ms": 2455.100000023842
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:02:40.447Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 250,
@@ -490,7 +511,7 @@
           "deletes": 125,
           "payloadBytesMoved": 16899219,
           "storeOps": 500,
-          "ms": 226.09999999403954,
+          "ms": 1932.699999988079,
           "storeOpsObserved": 500
         },
         "readOrderLength": 126,
@@ -500,21 +521,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 107
+          "ms": 1248.800000011921
         },
         {
           "label": "setup-append",
-          "ms": 129.09999999403954
+          "ms": 1878.4000000059605
         },
         {
           "label": "promote",
-          "ms": 226.09999999403954
+          "ms": 1932.699999988079
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:02:59.034Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 250,
@@ -541,7 +564,7 @@
           "deletes": 125,
           "payloadBytesMoved": 16900844,
           "storeOps": 3,
-          "ms": 372.5,
+          "ms": 4381.300000011921,
           "storeOpsObserved": 5
         },
         "readOrderLength": 126,
@@ -551,21 +574,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 107
+          "ms": 1336.800000011921
         },
         {
           "label": "setup-append",
-          "ms": 131.89999997615814
+          "ms": 2082.5
         },
         {
           "label": "promote",
-          "ms": 372.5
+          "ms": 4381.300000011921
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:03:13.216Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 250,
@@ -592,7 +617,7 @@
           "deletes": 125,
           "payloadBytesMoved": 16900844,
           "storeOps": 3,
-          "ms": 230.80000001192093,
+          "ms": 2145.800000011921,
           "storeOpsObserved": 3
         },
         "readOrderLength": 126,
@@ -602,21 +627,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 107.09999999403954
+          "ms": 1148.7000000178814
         },
         {
           "label": "setup-append",
-          "ms": 134.90000000596046
+          "ms": 1549.800000011921
         },
         {
           "label": "promote",
-          "ms": 230.80000001192093
+          "ms": 2145.800000011921
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:03:22.285Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 1000,
@@ -643,7 +670,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 2.9000000059604645,
+          "ms": 91.2999999821186,
           "storeOpsObserved": 1
         },
         "readOrderLength": 32,
@@ -653,21 +680,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 106.80000001192093
+          "ms": 1229.800000011921
         },
         {
           "label": "setup-append",
-          "ms": 52.599999994039536
+          "ms": 1077.0999999940395
         },
         {
           "label": "promote",
-          "ms": 2.9000000059604645
+          "ms": 91.2999999821186
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:03:32.272Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 1000,
@@ -694,7 +723,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 2.5999999940395355,
+          "ms": 83.2000000178814,
           "storeOpsObserved": 0
         },
         "readOrderLength": 32,
@@ -704,21 +733,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 105.59999999403954
+          "ms": 1280.4000000059605
         },
         {
           "label": "setup-append",
-          "ms": 51.599999994039536
+          "ms": 882.1999999880791
         },
         {
           "label": "promote",
-          "ms": 2.5999999940395355
+          "ms": 83.2000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:03:44.266Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 1000,
@@ -745,7 +776,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 71.90000000596046,
+          "ms": 747.5,
           "storeOpsObserved": 2
         },
         "readOrderLength": 32,
@@ -755,21 +786,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 108.19999998807907
+          "ms": 1177.7000000178814
         },
         {
           "label": "setup-append",
-          "ms": 49.5
+          "ms": 514.6999999880791
         },
         {
           "label": "promote",
-          "ms": 71.90000000596046
+          "ms": 747.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:03:53.134Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 1000,
@@ -796,7 +829,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 1.600000023841858,
+          "ms": 72.80000001192093,
           "storeOpsObserved": 0
         },
         "readOrderLength": 32,
@@ -806,21 +839,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 108.09999999403954
+          "ms": 1230.199999988079
         },
         {
           "label": "setup-append",
-          "ms": 52.79999998211861
+          "ms": 1051.800000011921
         },
         {
           "label": "promote",
-          "ms": 1.600000023841858
+          "ms": 72.80000001192093
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:04:04.379Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 1000,
@@ -847,7 +882,7 @@
           "deletes": 16,
           "payloadBytesMoved": 8371025,
           "storeOps": 4,
-          "ms": 88.59999999403954,
+          "ms": 1045.699999988079,
           "storeOpsObserved": 4
         },
         "readOrderLength": 32,
@@ -857,21 +892,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 108.40000000596046
+          "ms": 1448.5
         },
         {
           "label": "setup-append",
-          "ms": 73.80000001192093
+          "ms": 826
         },
         {
           "label": "promote",
-          "ms": 88.59999999403954
+          "ms": 1045.699999988079
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:04:16.257Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 1000,
@@ -898,7 +935,7 @@
           "deletes": 16,
           "payloadBytesMoved": 8371025,
           "storeOps": 64,
-          "ms": 101.30000001192093,
+          "ms": 821.5,
           "storeOpsObserved": 64
         },
         "readOrderLength": 32,
@@ -908,21 +945,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 109.39999997615814
+          "ms": 1537.699999988079
         },
         {
           "label": "setup-append",
-          "ms": 74.69999998807907
+          "ms": 1395.4000000059605
         },
         {
           "label": "promote",
-          "ms": 101.30000001192093
+          "ms": 821.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:05:00.276Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 1000,
@@ -949,7 +988,7 @@
           "deletes": 16,
           "payloadBytesMoved": 8371233,
           "storeOps": 3,
-          "ms": 182.90000000596046,
+          "ms": 2911.699999988079,
           "storeOpsObserved": 5
         },
         "readOrderLength": 32,
@@ -959,21 +998,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 107.30000001192093
+          "ms": 1117.2000000178814
         },
         {
           "label": "setup-append",
-          "ms": 73.80000001192093
+          "ms": 597.2999999821186
         },
         {
           "label": "promote",
-          "ms": 182.90000000596046
+          "ms": 2911.699999988079
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:05:12.767Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 1000,
@@ -1000,7 +1041,7 @@
           "deletes": 16,
           "payloadBytesMoved": 8371233,
           "storeOps": 3,
-          "ms": 84.2000000178814,
+          "ms": 606.2999999821186,
           "storeOpsObserved": 3
         },
         "readOrderLength": 32,
@@ -1010,21 +1051,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 111.7000000178814
+          "ms": 1408.7999999821186
         },
         {
           "label": "setup-append",
-          "ms": 71.59999999403954
+          "ms": 856.3000000119209
         },
         {
           "label": "promote",
-          "ms": 84.2000000178814
+          "ms": 606.2999999821186
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:05:26.290Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 1000,
@@ -1051,7 +1094,7 @@
           "deletes": 31,
           "payloadBytesMoved": 16477076,
           "storeOps": 4,
-          "ms": 189.90000000596046,
+          "ms": 2155.7999999821186,
           "storeOpsObserved": 4
         },
         "readOrderLength": 32,
@@ -1061,21 +1104,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 107.90000000596046
+          "ms": 1071.699999988079
         },
         {
           "label": "setup-append",
-          "ms": 102.60000002384186
+          "ms": 1389.4000000059605
         },
         {
           "label": "promote",
-          "ms": 189.90000000596046
+          "ms": 2155.7999999821186
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:05:36.774Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 1000,
@@ -1102,7 +1147,7 @@
           "deletes": 31,
           "payloadBytesMoved": 16477076,
           "storeOps": 124,
-          "ms": 190.2000000178814,
+          "ms": 1389.699999988079,
           "storeOpsObserved": 124
         },
         "readOrderLength": 32,
@@ -1112,21 +1157,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 110.09999999403954
+          "ms": 1140.699999988079
         },
         {
           "label": "setup-append",
-          "ms": 95.19999998807907
+          "ms": 841.4000000059605
         },
         {
           "label": "promote",
-          "ms": 190.2000000178814
+          "ms": 1389.699999988079
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:05:52.556Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 1000,
@@ -1153,7 +1200,7 @@
           "deletes": 31,
           "payloadBytesMoved": 16477479,
           "storeOps": 3,
-          "ms": 308.90000000596046,
+          "ms": 4013.5,
           "storeOpsObserved": 5
         },
         "readOrderLength": 32,
@@ -1163,21 +1210,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 111.19999998807907
+          "ms": 1188.699999988079
         },
         {
           "label": "setup-append",
-          "ms": 96.09999999403954
+          "ms": 1684.300000011921
         },
         {
           "label": "promote",
-          "ms": 308.90000000596046
+          "ms": 4013.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:06:07.184Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 1000,
@@ -1204,7 +1253,7 @@
           "deletes": 31,
           "payloadBytesMoved": 16477479,
           "storeOps": 3,
-          "ms": 181.2999999821186,
+          "ms": 2507.0999999940395,
           "storeOpsObserved": 3
         },
         "readOrderLength": 32,
@@ -1214,21 +1263,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 108.5
+          "ms": 1307.199999988079
         },
         {
           "label": "setup-append",
-          "ms": 100.10000002384186
+          "ms": 2037.0999999940395
         },
         {
           "label": "promote",
-          "ms": 181.2999999821186
+          "ms": 2507.0999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:06:19.044Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 4000,
@@ -1255,7 +1306,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 0.9000000059604645,
+          "ms": 103.19999998807907,
           "storeOpsObserved": 1
         },
         "readOrderLength": 8,
@@ -1265,21 +1316,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 111.30000001192093
+          "ms": 1202.3999999761581
         },
         {
           "label": "setup-append",
-          "ms": 77
+          "ms": 1381.9000000059605
         },
         {
           "label": "promote",
-          "ms": 0.9000000059604645
+          "ms": 103.19999998807907
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:07:00.626Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 4000,
@@ -1306,7 +1359,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 0.699999988079071,
+          "ms": 71.80000001192093,
           "storeOpsObserved": 0
         },
         "readOrderLength": 8,
@@ -1316,21 +1369,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 108.80000001192093
+          "ms": 1572.2999999821186
         },
         {
           "label": "setup-append",
-          "ms": 76.40000000596046
+          "ms": 656.4000000059605
         },
         {
           "label": "promote",
-          "ms": 0.699999988079071
+          "ms": 71.80000001192093
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:07:13.150Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 4000,
@@ -1357,7 +1412,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 69.89999997615814,
+          "ms": 963,
           "storeOpsObserved": 2
         },
         "readOrderLength": 8,
@@ -1367,21 +1422,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 111.80000001192093
+          "ms": 1533.9000000059605
         },
         {
           "label": "setup-append",
-          "ms": 80
+          "ms": 926.0999999940395
         },
         {
           "label": "promote",
-          "ms": 69.89999997615814
+          "ms": 963
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:07:22.466Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 4000,
@@ -1408,7 +1465,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 1.0999999940395355,
+          "ms": 115,
           "storeOpsObserved": 0
         },
         "readOrderLength": 8,
@@ -1418,21 +1475,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 110.09999999403954
+          "ms": 1212.2000000178814
         },
         {
           "label": "setup-append",
-          "ms": 79.7999999821186
+          "ms": 635.1000000238419
         },
         {
           "label": "promote",
-          "ms": 1.0999999940395355
+          "ms": 115
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:07:32.267Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 4000,
@@ -1459,7 +1518,7 @@
           "deletes": 4,
           "payloadBytesMoved": 8368433,
           "storeOps": 4,
-          "ms": 82,
+          "ms": 875.6999999880791,
           "storeOpsObserved": 4
         },
         "readOrderLength": 8,
@@ -1469,21 +1528,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 106.90000000596046
+          "ms": 1009.1000000238419
         },
         {
           "label": "setup-append",
-          "ms": 110.10000002384186
+          "ms": 819.0999999940395
         },
         {
           "label": "promote",
-          "ms": 82
+          "ms": 875.6999999880791
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:07:43.284Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 4000,
@@ -1510,7 +1571,7 @@
           "deletes": 4,
           "payloadBytesMoved": 8368433,
           "storeOps": 16,
-          "ms": 84.59999999403954,
+          "ms": 854.5999999940395,
           "storeOpsObserved": 16
         },
         "readOrderLength": 8,
@@ -1520,21 +1581,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 111
+          "ms": 1208.2999999821186
         },
         {
           "label": "setup-append",
-          "ms": 110.69999998807907
+          "ms": 1343.0999999940395
         },
         {
           "label": "promote",
-          "ms": 84.59999999403954
+          "ms": 854.5999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:07:58.698Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 4000,
@@ -1561,7 +1624,7 @@
           "deletes": 4,
           "payloadBytesMoved": 8368485,
           "storeOps": 3,
-          "ms": 192.2999999821186,
+          "ms": 3024.4000000059605,
           "storeOpsObserved": 5
         },
         "readOrderLength": 8,
@@ -1571,21 +1634,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 106.69999998807907
+          "ms": 1575.0999999940395
         },
         {
           "label": "setup-append",
-          "ms": 117.5
+          "ms": 1509.5999999940395
         },
         {
           "label": "promote",
-          "ms": 192.2999999821186
+          "ms": 3024.4000000059605
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:08:08.349Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 4000,
@@ -1612,7 +1677,7 @@
           "deletes": 4,
           "payloadBytesMoved": 8368485,
           "storeOps": 3,
-          "ms": 81.80000001192093,
+          "ms": 1037.1000000238419,
           "storeOpsObserved": 3
         },
         "readOrderLength": 8,
@@ -1622,21 +1687,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 113.40000000596046
+          "ms": 1240.800000011921
         },
         {
           "label": "setup-append",
-          "ms": 112.7999999821186
+          "ms": 1098.800000011921
         },
         {
           "label": "promote",
-          "ms": 81.80000001192093
+          "ms": 1037.1000000238419
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:08:17.671Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "1x",
       "sealAfter": 4000,
@@ -1663,7 +1730,7 @@
           "deletes": 7,
           "payloadBytesMoved": 14856978,
           "storeOps": 4,
-          "ms": 154.89999997615814,
+          "ms": 1357.5,
           "storeOpsObserved": 4
         },
         "readOrderLength": 8,
@@ -1673,21 +1740,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 109.19999998807907
+          "ms": 1104.300000011921
         },
         {
           "label": "setup-append",
-          "ms": 141
+          "ms": 2239.199999988079
         },
         {
           "label": "promote",
-          "ms": 154.89999997615814
+          "ms": 1357.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:08:24.022Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "1x",
       "sealAfter": 4000,
@@ -1714,7 +1783,7 @@
           "deletes": 7,
           "payloadBytesMoved": 14856978,
           "storeOps": 28,
-          "ms": 145.7999999821186,
+          "ms": 1397.800000011921,
           "storeOpsObserved": 28
         },
         "readOrderLength": 8,
@@ -1724,21 +1793,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 109.5
+          "ms": 536
         },
         {
           "label": "setup-append",
-          "ms": 139.30000001192093
+          "ms": 920.8000000119209
         },
         {
           "label": "promote",
-          "ms": 145.7999999821186
+          "ms": 1397.800000011921
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:08:35.859Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "1x",
       "sealAfter": 4000,
@@ -1765,7 +1836,7 @@
           "deletes": 7,
           "payloadBytesMoved": 14857069,
           "storeOps": 3,
-          "ms": 282.90000000596046,
+          "ms": 2827.2999999821186,
           "storeOpsObserved": 5
         },
         "readOrderLength": 8,
@@ -1775,21 +1846,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 108.80000001192093
+          "ms": 885.1999999880791
         },
         {
           "label": "setup-append",
-          "ms": 143.90000000596046
+          "ms": 1199.0999999940395
         },
         {
           "label": "promote",
-          "ms": 282.90000000596046
+          "ms": 2827.2999999821186
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:08:41.454Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "1x",
       "sealAfter": 4000,
@@ -1816,7 +1889,7 @@
           "deletes": 7,
           "payloadBytesMoved": 14857069,
           "storeOps": 3,
-          "ms": 150.09999999403954,
+          "ms": 956.6999999880791,
           "storeOpsObserved": 3
         },
         "readOrderLength": 8,
@@ -1826,21 +1899,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 111.5
+          "ms": 537.5
         },
         {
           "label": "setup-append",
-          "ms": 144.59999999403954
+          "ms": 728.8000000119209
         },
         {
           "label": "promote",
-          "ms": 150.09999999403954
+          "ms": 956.6999999880791
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:08:53.410Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 250,
@@ -1867,7 +1942,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 12.299999982118607,
+          "ms": 112,
           "storeOpsObserved": 1
         },
         "readOrderLength": 502,
@@ -1877,21 +1952,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 112
+          "ms": 1167.300000011921
         },
         {
           "label": "setup-append",
-          "ms": 291.2000000178814
+          "ms": 1807.7999999821186
         },
         {
           "label": "promote",
-          "ms": 12.299999982118607
+          "ms": 112
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:09:39.244Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 250,
@@ -1918,7 +1995,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 12.5,
+          "ms": 138.7000000178814,
           "storeOpsObserved": 0
         },
         "readOrderLength": 502,
@@ -1928,21 +2005,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 115.89999997615814
+          "ms": 926.4000000059605
         },
         {
           "label": "setup-append",
-          "ms": 285.69999998807907
+          "ms": 2008.699999988079
         },
         {
           "label": "promote",
-          "ms": 12.5
+          "ms": 138.7000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:09:56.058Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 250,
@@ -1969,7 +2048,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 264.2999999821186,
+          "ms": 1390,
           "storeOpsObserved": 2
         },
         "readOrderLength": 502,
@@ -1979,21 +2058,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.59999999403954
+          "ms": 604.8000000119209
         },
         {
           "label": "setup-append",
-          "ms": 295.09999999403954
+          "ms": 1843.300000011921
         },
         {
           "label": "promote",
-          "ms": 264.2999999821186
+          "ms": 1390
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:01.065Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 250,
@@ -2020,7 +2101,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 7.699999988079071,
+          "ms": 70.7999999821186,
           "storeOpsObserved": 0
         },
         "readOrderLength": 502,
@@ -2030,21 +2111,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 116.19999998807907
+          "ms": 503.19999998807907
         },
         {
           "label": "setup-append",
-          "ms": 295.59999999403954
+          "ms": 1282.300000011921
         },
         {
           "label": "promote",
-          "ms": 7.699999988079071
+          "ms": 70.7999999821186
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:14.850Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 250,
@@ -2071,7 +2154,7 @@
           "deletes": 251,
           "payloadBytesMoved": 34020314,
           "storeOps": 4,
-          "ms": 863.5999999940395,
+          "ms": 4919.5,
           "storeOpsObserved": 4
         },
         "readOrderLength": 502,
@@ -2081,21 +2164,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.69999998807907
+          "ms": 585.5
         },
         {
           "label": "setup-append",
-          "ms": 584.1999999880791
+          "ms": 1920.9000000059605
         },
         {
           "label": "promote",
-          "ms": 863.5999999940395
+          "ms": 4919.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:19.404Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 250,
@@ -2122,7 +2207,7 @@
           "deletes": 251,
           "payloadBytesMoved": 34020314,
           "storeOps": 1004,
-          "ms": 510.80000001192093,
+          "ms": 1036.7000000178814,
           "storeOpsObserved": 1004
         },
         "readOrderLength": 502,
@@ -2132,21 +2217,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 112.90000000596046
+          "ms": 283.7999999821186
         },
         {
           "label": "setup-append",
-          "ms": 551.5999999940395
+          "ms": 985.8000000119209
         },
         {
           "label": "promote",
-          "ms": 510.80000001192093
+          "ms": 1036.7000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:22.450Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 250,
@@ -2173,7 +2260,7 @@
           "deletes": 251,
           "payloadBytesMoved": 34023577,
           "storeOps": 3,
-          "ms": 1086.2999999821186,
+          "ms": 1307.699999988079,
           "storeOpsObserved": 5
         },
         "readOrderLength": 502,
@@ -2183,21 +2270,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 118.69999998807907
+          "ms": 138.90000000596046
         },
         {
           "label": "setup-append",
-          "ms": 572.7999999821186
+          "ms": 657.0999999940395
         },
         {
           "label": "promote",
-          "ms": 1086.2999999821186
+          "ms": 1307.699999988079
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:24.315Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 250,
@@ -2224,7 +2313,7 @@
           "deletes": 251,
           "payloadBytesMoved": 34023577,
           "storeOps": 3,
-          "ms": 733.0999999940395,
+          "ms": 857.0999999940395,
           "storeOpsObserved": 3
         },
         "readOrderLength": 502,
@@ -2234,21 +2323,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 115.7999999821186
+          "ms": 136
         },
         {
           "label": "setup-append",
-          "ms": 550.2999999821186
+          "ms": 675.1999999880791
         },
         {
           "label": "promote",
-          "ms": 733.0999999940395
+          "ms": 857.0999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:27.224Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 250,
@@ -2275,7 +2366,7 @@
           "deletes": 501,
           "payloadBytesMoved": 67996611,
           "storeOps": 4,
-          "ms": 1357,
+          "ms": 1595,
           "storeOpsObserved": 4
         },
         "readOrderLength": 502,
@@ -2285,21 +2376,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 115.69999998807907
+          "ms": 122.19999998807907
         },
         {
           "label": "setup-append",
-          "ms": 854.4000000059605
+          "ms": 973.9000000059605
         },
         {
           "label": "promote",
-          "ms": 1357
+          "ms": 1595
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:29.871Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 250,
@@ -2326,7 +2419,7 @@
           "deletes": 501,
           "payloadBytesMoved": 67996611,
           "storeOps": 2004,
-          "ms": 924.2000000178814,
+          "ms": 1223,
           "storeOpsObserved": 2004
         },
         "readOrderLength": 502,
@@ -2336,21 +2429,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 115.40000000596046
+          "ms": 136
         },
         {
           "label": "setup-append",
-          "ms": 894
+          "ms": 1051.4000000059605
         },
         {
           "label": "promote",
-          "ms": 924.2000000178814
+          "ms": 1223
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:33.393Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 250,
@@ -2377,7 +2472,7 @@
           "deletes": 501,
           "payloadBytesMoved": 68003124,
           "storeOps": 3,
-          "ms": 1595.300000011921,
+          "ms": 1834.4000000059605,
           "storeOpsObserved": 5
         },
         "readOrderLength": 502,
@@ -2387,21 +2482,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 118.59999999403954
+          "ms": 135.69999998807907
         },
         {
           "label": "setup-append",
-          "ms": 873.0999999940395
+          "ms": 1083.7999999821186
         },
         {
           "label": "promote",
-          "ms": 1595.300000011921
+          "ms": 1834.4000000059605
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:36.397Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 250,
@@ -2428,7 +2525,7 @@
           "deletes": 501,
           "payloadBytesMoved": 68003124,
           "storeOps": 3,
-          "ms": 1155.699999988079,
+          "ms": 1424.5,
           "storeOpsObserved": 3
         },
         "readOrderLength": 502,
@@ -2438,21 +2535,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 116
+          "ms": 125.80000001192093
         },
         {
           "label": "setup-append",
-          "ms": 917.3000000119209
+          "ms": 1239.0999999940395
         },
         {
           "label": "promote",
-          "ms": 1155.699999988079
+          "ms": 1424.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:37.029Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 1000,
@@ -2479,7 +2578,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 11.900000005960464,
+          "ms": 15,
           "storeOpsObserved": 1
         },
         "readOrderLength": 126,
@@ -2489,21 +2588,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 122.59999999403954
+          "ms": 128.69999998807907
         },
         {
           "label": "setup-append",
-          "ms": 221
+          "ms": 262.09999999403954
         },
         {
           "label": "promote",
-          "ms": 11.900000005960464
+          "ms": 15
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:37.666Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 1000,
@@ -2530,7 +2631,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 11.300000011920929,
+          "ms": 15.699999988079071,
           "storeOpsObserved": 0
         },
         "readOrderLength": 126,
@@ -2540,21 +2641,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 115.09999999403954
+          "ms": 123.80000001192093
         },
         {
           "label": "setup-append",
-          "ms": 219.5
+          "ms": 253
         },
         {
           "label": "promote",
-          "ms": 11.300000011920929
+          "ms": 15.699999988079071
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:38.913Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 1000,
@@ -2581,7 +2684,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 259.90000000596046,
+          "ms": 295.5,
           "storeOpsObserved": 2
         },
         "readOrderLength": 126,
@@ -2591,21 +2694,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.59999999403954
+          "ms": 160
         },
         {
           "label": "setup-append",
-          "ms": 217.40000000596046
+          "ms": 275.2000000178814
         },
         {
           "label": "promote",
-          "ms": 259.90000000596046
+          "ms": 295.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:39.580Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 1000,
@@ -2632,7 +2737,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 6.0999999940395355,
+          "ms": 7.9000000059604645,
           "storeOpsObserved": 0
         },
         "readOrderLength": 126,
@@ -2642,21 +2747,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.69999998807907
+          "ms": 144.5
         },
         {
           "label": "setup-append",
-          "ms": 231.59999999403954
+          "ms": 283.40000000596046
         },
         {
           "label": "promote",
-          "ms": 6.0999999940395355
+          "ms": 7.9000000059604645
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:41.210Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 1000,
@@ -2683,7 +2790,7 @@
           "deletes": 63,
           "payloadBytesMoved": 33844588,
           "storeOps": 4,
-          "ms": 607.5999999940395,
+          "ms": 743.2000000178814,
           "storeOpsObserved": 4
         },
         "readOrderLength": 126,
@@ -2693,21 +2800,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 114.19999998807907
+          "ms": 137.09999999403954
         },
         {
           "label": "setup-append",
-          "ms": 383.2999999821186
+          "ms": 433.19999998807907
         },
         {
           "label": "promote",
-          "ms": 607.5999999940395
+          "ms": 743.2000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:42.717Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 1000,
@@ -2734,7 +2843,7 @@
           "deletes": 63,
           "payloadBytesMoved": 33844588,
           "storeOps": 252,
-          "ms": 429,
+          "ms": 599.5999999940395,
           "storeOpsObserved": 252
         },
         "readOrderLength": 126,
@@ -2744,21 +2853,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 118.69999998807907
+          "ms": 145.30000001192093
         },
         {
           "label": "setup-append",
-          "ms": 384.59999999403954
+          "ms": 495.59999999403954
         },
         {
           "label": "promote",
-          "ms": 429
+          "ms": 599.5999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:44.947Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 1000,
@@ -2785,7 +2896,7 @@
           "deletes": 63,
           "payloadBytesMoved": 33845407,
           "storeOps": 3,
-          "ms": 947.7000000178814,
+          "ms": 1099.9000000059605,
           "storeOpsObserved": 5
         },
         "readOrderLength": 126,
@@ -2795,21 +2906,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.09999999403954
+          "ms": 132
         },
         {
           "label": "setup-append",
-          "ms": 393.80000001192093
+          "ms": 479.59999999403954
         },
         {
           "label": "promote",
-          "ms": 947.7000000178814
+          "ms": 1099.9000000059605
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:46.416Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 1000,
@@ -2836,7 +2949,7 @@
           "deletes": 63,
           "payloadBytesMoved": 33845407,
           "storeOps": 3,
-          "ms": 602.8000000119209,
+          "ms": 691.7000000178814,
           "storeOpsObserved": 3
         },
         "readOrderLength": 126,
@@ -2846,21 +2959,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 118.30000001192093
+          "ms": 127.10000002384186
         },
         {
           "label": "setup-append",
-          "ms": 381.09999999403954
+          "ms": 424.59999999403954
         },
         {
           "label": "promote",
-          "ms": 602.8000000119209
+          "ms": 691.7000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:49.005Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 1000,
@@ -2887,7 +3002,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67513556,
           "storeOps": 4,
-          "ms": 1636.0999999940395,
+          "ms": 1579.5999999940395,
           "storeOpsObserved": 4
         },
         "readOrderLength": 126,
@@ -2897,21 +3012,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 121.90000000596046
+          "ms": 137.30000001192093
         },
         {
           "label": "setup-append",
-          "ms": 581.8000000119209
+          "ms": 663.6000000238419
         },
         {
           "label": "promote",
-          "ms": 1636.0999999940395
+          "ms": 1579.5999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:50.956Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 1000,
@@ -2938,7 +3055,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67513556,
           "storeOps": 500,
-          "ms": 834.5999999940395,
+          "ms": 981.7000000178814,
           "storeOpsObserved": 500
         },
         "readOrderLength": 126,
@@ -2948,21 +3065,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.5
+          "ms": 130.40000000596046
         },
         {
           "label": "setup-append",
-          "ms": 607.7999999821186
+          "ms": 601.8999999761581
         },
         {
           "label": "promote",
-          "ms": 834.5999999940395
+          "ms": 981.7000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:54.485Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 1000,
@@ -2989,7 +3108,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67515181,
           "storeOps": 3,
-          "ms": 1834.2000000178814,
+          "ms": 2041.7999999821186,
           "storeOpsObserved": 5
         },
         "readOrderLength": 126,
@@ -2999,21 +3118,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 114.5
+          "ms": 138.19999998807907
         },
         {
           "label": "setup-append",
-          "ms": 575.1999999880791
+          "ms": 628.5999999940395
         },
         {
           "label": "promote",
-          "ms": 1834.2000000178814
+          "ms": 2041.7999999821186
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:57.202Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 1000,
@@ -3040,7 +3161,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67515181,
           "storeOps": 3,
-          "ms": 1379.5,
+          "ms": 1505.699999988079,
           "storeOpsObserved": 3
         },
         "readOrderLength": 126,
@@ -3050,21 +3171,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.30000001192093
+          "ms": 152.69999998807907
         },
         {
           "label": "setup-append",
-          "ms": 585.4000000059605
+          "ms": 682.5
         },
         {
           "label": "promote",
-          "ms": 1379.5
+          "ms": 1505.699999988079
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:57.912Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 4000,
@@ -3091,7 +3214,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 1.0999999940395355,
+          "ms": 1,
           "storeOpsObserved": 1
         },
         "readOrderLength": 32,
@@ -3101,21 +3224,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.60000002384186
+          "ms": 135
         },
         {
           "label": "setup-append",
-          "ms": 315
+          "ms": 335.30000001192093
         },
         {
           "label": "promote",
-          "ms": 1.0999999940395355
+          "ms": 1
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:10:58.626Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 4000,
@@ -3142,7 +3267,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 0.9000000059604645,
+          "ms": 0.8999999761581421,
           "storeOpsObserved": 0
         },
         "readOrderLength": 32,
@@ -3152,21 +3277,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 116
+          "ms": 142.19999998807907
         },
         {
           "label": "setup-append",
-          "ms": 305.09999999403954
+          "ms": 333.09999999403954
         },
         {
           "label": "promote",
-          "ms": 0.9000000059604645
+          "ms": 0.8999999761581421
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:00.078Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 4000,
@@ -3193,7 +3320,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 293.5,
+          "ms": 345.39999997615814,
           "storeOpsObserved": 2
         },
         "readOrderLength": 32,
@@ -3203,21 +3330,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.40000000596046
+          "ms": 142.90000000596046
         },
         {
           "label": "setup-append",
-          "ms": 303.10000002384186
+          "ms": 334.60000002384186
         },
         {
           "label": "promote",
-          "ms": 293.5
+          "ms": 345.39999997615814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:00.929Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 4000,
@@ -3244,7 +3373,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 0.5999999940395355,
+          "ms": 0.800000011920929,
           "storeOpsObserved": 0
         },
         "readOrderLength": 32,
@@ -3254,21 +3383,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 119
+          "ms": 129.80000001192093
         },
         {
           "label": "setup-append",
-          "ms": 301.19999998807907
+          "ms": 357.09999999403954
         },
         {
           "label": "promote",
-          "ms": 0.5999999940395355
+          "ms": 0.800000011920929
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:02.208Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 4000,
@@ -3295,7 +3426,7 @@
           "deletes": 16,
           "payloadBytesMoved": 33299415,
           "storeOps": 4,
-          "ms": 355,
+          "ms": 411.59999999403954,
           "storeOpsObserved": 4
         },
         "readOrderLength": 32,
@@ -3305,21 +3436,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 115.69999998807907
+          "ms": 132.40000000596046
         },
         {
           "label": "setup-append",
-          "ms": 438.90000000596046
+          "ms": 527.1000000238419
         },
         {
           "label": "promote",
-          "ms": 355
+          "ms": 411.59999999403954
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:03.520Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 4000,
@@ -3346,7 +3479,7 @@
           "deletes": 16,
           "payloadBytesMoved": 33299415,
           "storeOps": 64,
-          "ms": 374.80000001192093,
+          "ms": 412.5,
           "storeOpsObserved": 64
         },
         "readOrderLength": 32,
@@ -3356,21 +3489,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 117.40000000596046
+          "ms": 141
         },
         {
           "label": "setup-append",
-          "ms": 457.80000001192093
+          "ms": 509.2000000178814
         },
         {
           "label": "promote",
-          "ms": 374.80000001192093
+          "ms": 412.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:05.618Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 4000,
@@ -3397,7 +3532,7 @@
           "deletes": 16,
           "payloadBytesMoved": 33299623,
           "storeOps": 3,
-          "ms": 743.1000000238419,
+          "ms": 849.5999999940395,
           "storeOpsObserved": 5
         },
         "readOrderLength": 32,
@@ -3407,21 +3542,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 118.09999999403954
+          "ms": 131.09999999403954
         },
         {
           "label": "setup-append",
-          "ms": 458.7999999821186
+          "ms": 486.90000000596046
         },
         {
           "label": "promote",
-          "ms": 743.1000000238419
+          "ms": 849.5999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:06.863Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 4000,
@@ -3448,7 +3585,7 @@
           "deletes": 16,
           "payloadBytesMoved": 33299623,
           "storeOps": 3,
-          "ms": 357.69999998807907,
+          "ms": 410.30000001192093,
           "storeOpsObserved": 3
         },
         "readOrderLength": 32,
@@ -3458,21 +3595,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 118.60000002384186
+          "ms": 128.10000002384186
         },
         {
           "label": "setup-append",
-          "ms": 458.40000000596046
+          "ms": 481.09999999403954
         },
         {
           "label": "promote",
-          "ms": 357.69999998807907
+          "ms": 410.30000001192093
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:08.564Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "4x",
       "sealAfter": 4000,
@@ -3499,7 +3638,7 @@
           "deletes": 31,
           "payloadBytesMoved": 65878338,
           "storeOps": 4,
-          "ms": 669.5,
+          "ms": 708.1000000238419,
           "storeOpsObserved": 4
         },
         "readOrderLength": 32,
@@ -3509,21 +3648,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 118.2000000178814
+          "ms": 128.7000000178814
         },
         {
           "label": "setup-append",
-          "ms": 587.1000000238419
+          "ms": 654.0999999940395
         },
         {
           "label": "promote",
-          "ms": 669.5
+          "ms": 708.1000000238419
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:10.296Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "4x",
       "sealAfter": 4000,
@@ -3550,7 +3691,7 @@
           "deletes": 31,
           "payloadBytesMoved": 65878338,
           "storeOps": 124,
-          "ms": 695.5,
+          "ms": 760.1999999880791,
           "storeOpsObserved": 124
         },
         "readOrderLength": 32,
@@ -3560,21 +3701,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 119.19999998807907
+          "ms": 131.09999999403954
         },
         {
           "label": "setup-append",
-          "ms": 593.2999999821186
+          "ms": 627.3999999761581
         },
         {
           "label": "promote",
-          "ms": 695.5
+          "ms": 760.1999999880791
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:12.818Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "4x",
       "sealAfter": 4000,
@@ -3601,7 +3744,7 @@
           "deletes": 31,
           "payloadBytesMoved": 65878741,
           "storeOps": 3,
-          "ms": 1189.5999999940395,
+          "ms": 1249.2000000178814,
           "storeOpsObserved": 5
         },
         "readOrderLength": 32,
@@ -3611,21 +3754,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 123.59999999403954
+          "ms": 134.40000000596046
         },
         {
           "label": "setup-append",
-          "ms": 595.5999999940395
+          "ms": 658.8999999761581
         },
         {
           "label": "promote",
-          "ms": 1189.5999999940395
+          "ms": 1249.2000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:14.558Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "4x",
       "sealAfter": 4000,
@@ -3652,7 +3797,7 @@
           "deletes": 31,
           "payloadBytesMoved": 65878741,
           "storeOps": 3,
-          "ms": 655,
+          "ms": 769.7000000178814,
           "storeOpsObserved": 3
         },
         "readOrderLength": 32,
@@ -3662,21 +3807,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 121.09999999403954
+          "ms": 126.40000000596046
         },
         {
           "label": "setup-append",
-          "ms": 597.2000000178814
+          "ms": 636.8000000119209
         },
         {
           "label": "promote",
-          "ms": 655
+          "ms": 769.7000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:17.190Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "8x",
       "sealAfter": 1000,
@@ -3703,7 +3850,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 25.099999994039536,
+          "ms": 26.599999994039536,
           "storeOpsObserved": 1
         },
         "readOrderLength": 251,
@@ -3713,21 +3860,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 138.09999999403954
+          "ms": 145.69999998807907
         },
         {
           "label": "setup-append",
-          "ms": 621.3999999761581
+          "ms": 690.0999999940395
         },
         {
           "label": "promote",
-          "ms": 25.099999994039536
+          "ms": 26.599999994039536
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:18.410Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "8x",
       "sealAfter": 1000,
@@ -3754,7 +3903,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 21.69999998807907,
+          "ms": 28.399999976158142,
           "storeOpsObserved": 0
         },
         "readOrderLength": 251,
@@ -3764,21 +3913,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 137.2000000178814
+          "ms": 156.09999999403954
         },
         {
           "label": "setup-append",
-          "ms": 600.8000000119209
+          "ms": 656
         },
         {
           "label": "promote",
-          "ms": 21.69999998807907
+          "ms": 28.399999976158142
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:20.778Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "8x",
       "sealAfter": 1000,
@@ -3805,7 +3956,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 520.5999999940395,
+          "ms": 655,
           "storeOpsObserved": 2
         },
         "readOrderLength": 251,
@@ -3815,21 +3966,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 139.09999999403954
+          "ms": 160.10000002384186
         },
         {
           "label": "setup-append",
-          "ms": 614.9000000059605
+          "ms": 650.1000000238419
         },
         {
           "label": "promote",
-          "ms": 520.5999999940395
+          "ms": 655
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:21.925Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "8x",
       "sealAfter": 1000,
@@ -3856,7 +4009,7 @@
           "deletes": 0,
           "payloadBytesMoved": 0,
           "storeOps": 0,
-          "ms": 12.199999988079071,
+          "ms": 14.300000011920929,
           "storeOpsObserved": 0
         },
         "readOrderLength": 251,
@@ -3866,21 +4019,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 161.09999999403954
+          "ms": 144.80000001192093
         },
         {
           "label": "setup-append",
-          "ms": 604.3000000119209
+          "ms": 646.4000000059605
         },
         {
           "label": "promote",
-          "ms": 12.199999988079071
+          "ms": 14.300000011920929
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:25.168Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "8x",
       "sealAfter": 1000,
@@ -3907,7 +4062,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67689203,
           "storeOps": 4,
-          "ms": 1399.800000011921,
+          "ms": 1506.699999988079,
           "storeOpsObserved": 4
         },
         "readOrderLength": 251,
@@ -3917,21 +4072,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 140
+          "ms": 152.10000002384186
         },
         {
           "label": "setup-append",
-          "ms": 1132.0999999940395
+          "ms": 1228.199999988079
         },
         {
           "label": "promote",
-          "ms": 1399.800000011921
+          "ms": 1506.699999988079
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:27.936Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "8x",
       "sealAfter": 1000,
@@ -3958,7 +4115,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67689203,
           "storeOps": 500,
-          "ms": 862.5,
+          "ms": 996.2000000178814,
           "storeOpsObserved": 500
         },
         "readOrderLength": 251,
@@ -3968,21 +4125,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 142.39999997615814
+          "ms": 146.5
         },
         {
           "label": "setup-append",
-          "ms": 997.7999999821186
+          "ms": 1251.9000000059605
         },
         {
           "label": "promote",
-          "ms": 862.5
+          "ms": 996.2000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:32.579Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "8x",
       "sealAfter": 1000,
@@ -4009,7 +4168,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67690828,
           "storeOps": 3,
-          "ms": 1958.300000011921,
+          "ms": 2097.5999999940395,
           "storeOpsObserved": 5
         },
         "readOrderLength": 251,
@@ -4019,21 +4178,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 142.30000001192093
+          "ms": 164
         },
         {
           "label": "setup-append",
-          "ms": 1137.5
+          "ms": 1208.199999988079
         },
         {
           "label": "promote",
-          "ms": 1958.300000011921
+          "ms": 2097.5999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:36.019Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "8x",
       "sealAfter": 1000,
@@ -4060,7 +4221,7 @@
           "deletes": 125,
           "payloadBytesMoved": 67690828,
           "storeOps": 3,
-          "ms": 1378.7000000178814,
+          "ms": 1153.2000000178814,
           "storeOpsObserved": 3
         },
         "readOrderLength": 251,
@@ -4070,21 +4231,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 145.7000000178814
+          "ms": 155.7999999821186
         },
         {
           "label": "setup-append",
-          "ms": 1147.199999988079
+          "ms": 1367.5
         },
         {
           "label": "promote",
-          "ms": 1378.7000000178814
+          "ms": 1153.2000000178814
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:41.498Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label",
       "size": "8x",
       "sealAfter": 1000,
@@ -4111,7 +4274,7 @@
           "deletes": 250,
           "payloadBytesMoved": 135562192,
           "storeOps": 4,
-          "ms": 3105.4000000059605,
+          "ms": 3319.5,
           "storeOpsObserved": 4
         },
         "readOrderLength": 251,
@@ -4121,21 +4284,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 140.59999999403954
+          "ms": 163.5
         },
         {
           "label": "setup-append",
-          "ms": 1496.5
+          "ms": 1595.800000011921
         },
         {
           "label": "promote",
-          "ms": 3105.4000000059605
+          "ms": 3319.5
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:45.494Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "key-label-unbatched",
       "size": "8x",
       "sealAfter": 1000,
@@ -4162,7 +4327,7 @@
           "deletes": 250,
           "payloadBytesMoved": 135562192,
           "storeOps": 1000,
-          "ms": 1804,
+          "ms": 1912.0999999940395,
           "storeOpsObserved": 1000
         },
         "readOrderLength": 251,
@@ -4172,21 +4337,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 142.69999998807907
+          "ms": 147.19999998807907
         },
         {
           "label": "setup-append",
-          "ms": 1544.2000000178814
+          "ms": 1554.699999988079
         },
         {
           "label": "promote",
-          "ms": 1804
+          "ms": 1912.0999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:11:53.235Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label",
       "size": "8x",
       "sealAfter": 1000,
@@ -4213,7 +4380,7 @@
           "deletes": 250,
           "payloadBytesMoved": 135565442,
           "storeOps": 3,
-          "ms": 4128.5,
+          "ms": 4548.0999999940395,
           "storeOpsObserved": 5
         },
         "readOrderLength": 251,
@@ -4223,21 +4390,23 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 142.7000000178814
+          "ms": 147.40000000596046
         },
         {
           "label": "setup-append",
-          "ms": 1827.5999999940395
+          "ms": 1552.699999988079
         },
         {
           "label": "promote",
-          "ms": 4128.5
+          "ms": 4548.0999999940395
         }
       ],
       "errors": []
     },
     {
       "project": "chromium",
+      "ranAt": "2026-08-30T17:12:02.177Z",
+      "harnessSha": "c3cbcce11f15",
       "arm": "value-label+pointer",
       "size": "8x",
       "sealAfter": 1000,
@@ -4264,7 +4433,7 @@
           "deletes": 250,
           "payloadBytesMoved": 135565442,
           "storeOps": 3,
-          "ms": 2880.4000000059605,
+          "ms": 5821.800000011921,
           "storeOpsObserved": 3
         },
         "readOrderLength": 251,
@@ -4274,15 +4443,15 @@
       "timings": [
         {
           "label": "build-workload",
-          "ms": 145
+          "ms": 155.90000000596046
         },
         {
           "label": "setup-append",
-          "ms": 1552.5
+          "ms": 1844.5999999940395
         },
         {
           "label": "promote",
-          "ms": 2880.4000000059605
+          "ms": 5821.800000011921
         }
       ],
       "errors": []

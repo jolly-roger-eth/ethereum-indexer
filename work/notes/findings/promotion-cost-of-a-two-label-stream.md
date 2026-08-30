@@ -24,9 +24,12 @@ value, a rewrite either way". That is right, and it is not the useful part of th
 
 ## What was measured
 
-The captured launched game (`stratagems-alpha1`, 31,332 real logs, 23.2 MB of JSON) repeated to
-`4x` and `8x`, cut into segments at seal thresholds of 250 / 1,000 / 4,000 events, promoted under
-each layout, on both keepers. The three sharing cases decide how much staging wrote: `whole-stream`
+The captured launched game (`stratagems-alpha1`, 31,332 real logs) repeated to `4x` and `8x`, cut
+into segments at seal thresholds of 250 / 1,000 / 4,000 events, promoted under each layout, on both
+keepers. Two sizes are quoted for that fixture and they are not the same quantity: the fixture FILE
+is 23.2 MB of JSON (it also carries `provenance`, `source` and `lastSync`), while the SEGMENT PAYLOAD
+— the events, which is what a promotion moves — is 17.0 MB at `1x` and so 136.1 MB at `8x`. Every
+"136 MB stream" below is the payload figure. The three sharing cases decide how much staging wrote: `whole-stream`
 (a processor-only or decode-only change) writes nothing, `partial-graft` writes above the boundary,
 `no-sharing` (a changed address, a new contract) writes everything.
 
@@ -47,20 +50,26 @@ an epoch counter. So these numbers bound value-label, not every conceivable auxi
 ### 1. IndexedDB does not decide the question. The filesystem does.
 
 IndexedDB has no rename, so a key-label relabel there is `get` + `set` + `del` — the same
-structured-clone round trip a value-label rewrite costs. Measured, the two are the same number, on
-all three engines and at every size (promotion ms, seal 1,000, chromium / firefox / webkit):
+structured-clone round trip a value-label rewrite costs. They are not merely close: **they do
+identical work**, and that is reproducible to the byte rather than being a timing observation
+(`8x`, seal 1,000, promoting a 136 MB history):
 
-| case | staging | key-label | value-label+pointer |
-| --- | --- | --- | --- |
-| partial-graft `4x` | 33.8 MB | 608 / 593 / 282 | 603 / 684 / 265 |
-| no-sharing `4x` | 67.5 MB | 1636 / 1161 / 619 | 1380 / 1092 / 559 |
-| partial-graft `8x` | 67.7 MB | 1400 / 1321 / 640 | 1379 / 1374 / 573 |
-| no-sharing `8x` | 135.6 MB | 3105 / 2485 / 1445 | 2880 / 2498 / 1402 |
+| arm | payloads rewritten | bytes moved | deletes | store ops |
+| --- | --- | --- | --- | --- |
+| key-label | 250 | 135,562,192 | 250 | 4 |
+| value-label+pointer | 250 | 135,562,192 | 250 | 3 |
 
-Within noise of each other, and the `8x` rows matter because they are the same 136 MB history the
-filesystem table below uses, so the two substrates are being compared on one workload. The browser
-cannot prefer either layout, and anyone arguing the choice from IndexedDB is arguing from the
-substrate that has no opinion.
+Same count, the same byte total to the last byte, and the same deletes, on chromium, firefox AND
+webkit. The entire difference is **one batched delete operation**, because a rename has to remove the
+old key and a rewrite lands on the same one. There is nothing there for a timing to distinguish.
+
+The timings agree and are worth nothing more than that. On this machine the run-to-run spread at `8x`
+EXCEEDED the gap between the arms several times over — one webkit `no-sharing` promotion measured
+1.4 s in a quiet run and 60 s in a back-to-back sweep, with byte-identical counters — so no ranking
+between these two arms should be read out of any wall-clock number here, in either direction.
+
+So the browser cannot prefer either layout, and anyone arguing the choice from IndexedDB is arguing
+from the substrate that has no opinion.
 
 The filesystem does have one, and it is not marginal. Over a 136 MB stream (`8x`, seal 1,000), on
 ext4:
@@ -108,10 +117,22 @@ This was not anticipated and it is the sharpest of the results. If the label liv
 discovering which entries are staging requires DESERIALISING EVERY ENTRY — including in the case
 where the answer is "none".
 
-The `whole-stream` case relabels nothing, deletes nothing and should be free. Measured without a
-boundary pointer, on the same 136 MB stream: **820 ms on the filesystem** and **308–974 ms on
-IndexedDB** across the three engines, to discover that there was nothing to do. Against **1 ms** and
-**5–25 ms** for a key label — a 20x to 50x penalty, consistent on every engine.
+The `whole-stream` case relabels nothing, deletes nothing and should be free.
+
+On the FILESYSTEM this is measured as work, and the work is the whole history: promoting a 136 MB
+stream with a value label READS **136.1 MB** and writes nothing, taking **820 ms** to establish that
+there was nothing to do. A key label reads 0 bytes and takes **1 ms**.
+
+On IndexedDB only the timing is available, because structured-clone size is not exposed — the same
+constraint that makes `appending-to-the-stream-costs-the-batch` count its seal threshold in events
+rather than bytes. There the value label takes **0.7–2.1 s** against **6–27 ms** for the key label,
+which is one to two orders of magnitude and holds in the same direction on all three engines across
+every run, including the noisy ones. The op counters corroborate the mechanism: the value-label arm
+issues extra whole-store reads that neither other arm does.
+
+This is the one place a wall-clock number carries weight, and it does so only because the effect is
+larger than the noise by more than an order of magnitude, and because the filesystem measures the
+same thing as exact bytes.
 
 That case is the MOST COMMON reconfigure there is (a processor change; an ABI is regenerated far more
 often than it is meaningfully changed), so a value label puts its worst relative cost exactly where
@@ -125,9 +146,11 @@ enumeration: a pointer over missing segments reads as a hole rather than as the 
 
 ### 4. Promotion is dwarfed by the work that produced it, in every case
 
-The worst case measured is `no-sharing` over a 136 MB history: a key-label promotion is 18 ms on the
-filesystem, and 1.4–3.1 s on IndexedDB. But `no-sharing` is by definition a case where the successor
-just performed a FULL BACKFILL of that history over `eth_getLogs`.
+The worst case measured is `no-sharing` over a 136 MB history: a key-label promotion is **18 ms and
+0 bytes written** on the filesystem, and on IndexedDB it moves 135.6 MB in 4 store operations, which
+took between 1.4 s and 60 s depending on how loaded the machine was. But `no-sharing` is by
+definition a case where the successor just performed a FULL BACKFILL of that history over
+`eth_getLogs`.
 
 That comparator is an ESTIMATE and is labelled one: this spike never measured a backfill, and "an
 `eth_getLogs` backfill of 136 MB takes minutes" is a judgement about the most rate-limited call this
@@ -149,13 +172,16 @@ happens most.**
 ### 5. Batching neither decides nor rescues anything on IndexedDB
 
 `idb-keyval` ships `getMany`/`setMany`/`delMany`, which collapse a promotion into three transactions
-instead of three per segment. Measured against the unbatched form, the results are inconsistent
-across engines and within the same order of magnitude either way — at `4x no-sharing`, batching was
-1,636 ms vs 835 ms unbatched on chromium but 1,161 ms vs 1,681 ms on firefox; at `8x no-sharing`,
-3,105 vs 1,804 on chromium and 2,485 vs 3,473 on firefox. The cost is the structured clone, not the
-per-transaction floor, so no batching strategy changes the answer. (These are single samples of a
-wall-clock number and must not be read as a ranking; the point is only that no arrangement of the
-same reads and writes escapes the clone.)
+instead of three per segment — a 250x reduction in store operations at `8x no-sharing` (4 against
+1,000), which is the largest structural difference any arm in this spike has. It does not show up as
+a consistent win: across runs and engines the batched and unbatched forms trade places and stay
+within the same order of magnitude, well inside the run-to-run spread documented above.
+
+That is the point, and the op counter is what makes it meaningful rather than inconclusive: cutting
+the transaction count by 250x does not move the cost, so the cost is the STRUCTURED CLONE and not the
+per-transaction floor. No arrangement of the same reads and writes escapes the clone, so batching is
+an implementation preference here and not a lever on this decision. (No ranking between the two forms
+should be read out of these timings.)
 
 ### 6. A value label forces a HOLE in the ordinal space
 

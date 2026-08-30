@@ -174,8 +174,30 @@ missing segments is not. An earlier draft had this backwards.
 
 **A partial or interrupted clear is REFUSED, not tolerated.** A gap in the ordinals means a fragment
 was lost, and "some of the stream" replayed as if it were "the stream" is the same silent-absence
-failure class the reorg model and `SuspectedTruncationError` already refuse. Detect the gap and
-clear the remainder rather than replaying it.
+failure class the reorg model and `SuspectedTruncationError` already refuse.
+
+**"The remainder" is the segments AT AND ABOVE the gap, and the contiguous PREFIX BENEATH IT
+SURVIVES.** Say which, because the two readings differ by an entire cached history and the
+destructive one is the intuitive one. On finding a hole at ordinal `k`, delete `k` and everything
+above it and KEEP `0..k-1`.
+
+The prefix is safe to keep for the reason the open tail exists: every segment carries the `lastSync`
+current when it was written, so segment `k-1` is self-describing, and the cursor read from it is the
+real scanned extent of what survived. So the stream resumes from that boundary and re-fetches the
+rest, which is a bounded loss instead of a whole re-index. Nothing is replayed as if it were
+complete, which is the whole point of the refusal: the truncated tail is DISCARDED, not trusted, and
+the cursor comes from the surviving tail rather than from a stale higher one.
+
+Clearing the WHOLE stream instead would be wrong twice. It throws away a perfectly good prefix, which
+is exactly the cost story 5 says an upgrade must not have. And on the state-kept path it is
+UNDETECTABLE: `indexer.ts` only clears there when `streamMatches` fails, so a `fetchFrom` returning
+undefined leaves the state cursor untouched and the next save writes a stream covering only from now
+on, which a later state discard then replays as if it were the whole history. A surviving,
+self-describing prefix is defined, so that path keeps working as written.
+
+**Contiguity means NO HOLES, not "starts at ordinal 0."** After a legacy adoption the earliest
+segment is the legacy key rather than `_0`, and a later design may number a segment run from
+somewhere other than zero, so a start-at-zero rule would refuse healthy streams.
 
 **The migration ADOPTS the legacy key as a sealed segment rather than rewriting it.** The stream blob
 carries no format field (unlike the fixture's `format: 2`), so the old single-blob shape is

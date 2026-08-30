@@ -45,18 +45,34 @@ The shape to build:
   with an ordinal appended the chain-`1` prefix `stream_tag_1` is ALSO a prefix of every chain-`10`
   key (`stream_tag_10_0`). Match `^stream_<name>_<chainId>_(\d+)$` — full prefix, separator, and a
   remainder that parses as an ordinal.
-- **A gap in the ordinals is REFUSED, and the refusal CLEARS THE REMAINDER — it does not throw.** A
-  missing fragment replayed as if it were the whole stream is a silent-absence failure and must not
-  happen. But the recovery is to DROP the stream, not to raise: `indexer.ts` calls
-  `keepStream.fetchFrom` with no `try`/`catch` anywhere in that method, so a throw escapes `load()`,
-  and the browser wrapper only records an error and rethrows without clearing. Every subsequent load
-  would throw again and the indexer would be permanently unloadable, with no recovery path a user
-  could reach — for a LOCAL CACHE whose correct recovery is simply to re-fetch. Clearing is also the
-  idiom already in that method: it calls `keepStream.clear(this.source)` on a stream whose context no
-  longer matches and on one whose raw half was dropped. Note this is why the
-  `SuspectedTruncationError` analogy does NOT extend to the action: that is a live NODE fetch where
-  retrying or narrowing is the recovery; a corrupt local cache has none but discard. So: detect the
-  gap, clear the remainder, log it, and let the indexer re-index.
+- **A gap in the ordinals is REFUSED, the refusal CLEARS FROM THE GAP UPWARD, and the PREFIX BENEATH
+  SURVIVES. It does not throw and it does not clear the whole stream.** Both halves are load-bearing
+  and both are easy to get wrong:
+
+  - **Not a throw.** `indexer.ts` calls `keepStream.fetchFrom` with no `try`/`catch` anywhere in that
+    method, so a throw escapes `load()`, and the browser wrapper only records `FAILED_TO_LOAD` and
+    rethrows without clearing. Every subsequent load would throw again and the indexer would be
+    permanently unloadable, with no recovery a user could reach — for a LOCAL CACHE whose correct
+    recovery is simply to re-fetch. This is why the `SuspectedTruncationError` analogy does NOT
+    extend to the ACTION: that is a live NODE fetch, where retrying or narrowing is the recovery.
+
+    There is a PRE-EXISTING hazard on the neighbouring path that this task does not create and does
+    not have to fix, but must not make worse: on the state-kept branch, `indexer.ts` clears the
+    stream when `streamMatches` fails while the state survives, and a stream cleared with the state
+    intact is later replayed by the fresh-sync path as if it were the whole history. Keeping the
+    prefix (below) means this task never enlarges that window. If you find yourself widening it,
+    surface it rather than absorbing it.
+  - **Not the whole stream.** On a hole at ordinal `k`, delete `k` and above and KEEP `0..k-1`.
+    Segment `k-1` carries its own `lastSync`, so the surviving prefix is self-describing and the
+    stream resumes from that boundary. Clearing everything would throw away a good prefix (story 5
+    says an upgrade must cost nothing the user notices) and, on the state-kept path, would be
+    SILENT: `indexer.ts` only clears there when `streamMatches` fails, so an undefined `fetchFrom`
+    leaves the state cursor untouched and the next save writes a stream covering only from now on,
+    which a later state discard replays as if it were the whole history.
+
+  Nothing is replayed as if it were complete either way — the truncated tail is DISCARDED and the
+  cursor comes from the surviving tail, never a stale higher one. Log it. Contiguity means NO HOLES,
+  not "starts at ordinal 0": after a legacy adoption the earliest segment is the legacy key.
 - **The legacy blob is ADOPTED IN PLACE as the earliest sealed segment**, never copied. The stream
   blob carries no format field, so the old shape is recognised structurally. It is read first,
   followed by `_0.._N`, and the first save after an upgrade writes only the new tail — so the
@@ -123,12 +139,17 @@ stops the two keepers choosing differently and makes the seal test deterministic
       what makes that true rather than luck.
 - [ ] **`clear` removes everything**: clear a multi-segment stream, confirm the next `fetchFrom`
       returns nothing and no orphan survives.
-- [ ] **A gap in the ordinals is REFUSED AND THE REMAINDER CLEARED** rather than replayed as a
-      shorter stream — and specifically NOT thrown: assert that after a gap is introduced, the next
-      `fetchFrom` returns undefined (or an empty stream) rather than raising, so `indexer.ts` takes
-      its clear branch and re-indexes. An interrupted `clear` is the designed-for case here: the fs
-      `clear` is N `unlinkSync` calls and is not atomic, so a half-cleared stream is reachable in
-      normal operation, not just in a fault-injection test.
+- [ ] **A gap in the ordinals CLEARS FROM THE GAP UPWARD AND KEEPS THE PREFIX**, rather than being
+      replayed as a shorter stream, thrown, or resolved by wiping the stream. Assert all three: after
+      punching a hole at ordinal `k`, (a) nothing raises, (b) `fetchFrom` returns a DEFINED result
+      whose events are exactly those of segments `0..k-1`, and (c) the resumed cursor is segment
+      `k-1`'s `lastSync`, not a stale higher one. An interrupted `clear` is the designed-for case: the
+      fs `clear` is N `unlinkSync` calls and is not atomic, so a half-cleared stream is reachable in
+      normal operation, not only under fault injection.
+- [ ] **A gap does NOT wipe a healthy prefix**, asserted as the paired negative: a stream with a hole
+      near its tail still answers from everything beneath the hole after the refusal has run.
+      Contiguity means no holes, NOT "starts at ordinal 0" — assert that an adopted legacy stream
+      followed by `_0.._N` is accepted rather than refused for not starting at `_0`.
 - [ ] **The migration**: write a stream in the shipped blob format, read it with the new code, assert
       NO re-fetch. Separately, a legacy blob whose raw half a `logValues` projection dropped is
       CLEARED, per ADR-0034's mandate — clearing a stream that cannot be re-read is correct, and what

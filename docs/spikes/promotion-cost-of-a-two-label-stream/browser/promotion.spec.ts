@@ -16,6 +16,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import * as crypto from 'node:crypto';
 import {test, expect} from '@playwright/test';
 import {mountHarness} from 'playwright-browser-harness';
 
@@ -26,6 +27,23 @@ const FIXTURE = path.join(
 	HERE,
 	'../../../../packages/conformance-workload-stratagems/fixtures/stratagems-alpha1.stream.json.gz',
 );
+
+/**
+ * A digest of the code that produced a row.
+ *
+ * Rows are merged across runs, so a row must say WHICH harness measured it:
+ * editing the measured code and re-running only one size would otherwise leave
+ * stale rows sitting under a fresh top-level `ranAt` with nothing to show it.
+ */
+const HARNESS_SHA = crypto
+	.createHash('sha256')
+	.update(
+		[CUT, path.join(HERE, '../src/layouts.ts'), path.join(HERE, '../src/workload.ts')]
+			.map((f) => fs.readFileSync(f, 'utf-8'))
+			.join('\0'),
+	)
+	.digest('hex')
+	.slice(0, 12);
 
 const SIZES = (process.env.SPIKE_SIZES ?? '1x,4x').split(',');
 const SEALS = (process.env.SPIKE_SEAL ?? '250,1000,4000').split(',').map(Number);
@@ -55,7 +73,8 @@ test.afterAll(async ({}, testInfo) => {
 			{
 				project: testInfo.project.name,
 				ranAt: new Date().toISOString(),
-				note: 'ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on. Rows are merged across runs by (arm, size, seal, case).',
+				note: 'ms is wall-clock; the work metrics (metadataRenames, payloadsRewritten, payloadBytesMoved, storeOps) are what the finding rests on. Rows are merged across runs by (arm, size, seal, case); each row carries its own ranAt and harnessSha, so rows measured by different versions of the harness are distinguishable.',
+				harnessSha: HARNESS_SHA,
 				rows: [...merged.values()],
 			},
 			null,
@@ -78,6 +97,8 @@ for (const size of SIZES) {
 						});
 						collected.push({
 							project: testInfo.project.name,
+							ranAt: new Date().toISOString(),
+							harnessSha: HARNESS_SHA,
 							arm,
 							size,
 							sealAfter,
