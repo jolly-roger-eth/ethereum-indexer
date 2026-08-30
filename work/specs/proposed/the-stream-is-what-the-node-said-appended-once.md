@@ -90,7 +90,7 @@ discovered by whichever task hits it first.
 
 **Segments are immutable and independently readable.** Once written a segment is never edited, and
 any segment can be read BY ITS OWN KEY without reading the others. This spec does not build sharing,
-but it must not preclude it: a later deployment-versioning design needs a prefix that can be
+but it must not preclude it: a later generation design needs a prefix that can be
 referred to rather than copied.
 
 Both halves are stated so they can FAIL a test. Immutability is observable at the write seam (no
