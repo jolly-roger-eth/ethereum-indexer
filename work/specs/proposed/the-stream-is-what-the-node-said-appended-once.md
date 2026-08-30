@@ -68,25 +68,57 @@ is all the ordering needs. Equally, do not import the rest of ADR-0006 (its two 
 validation, its compaction) into a cache that has none of those problems.
 
 **Segments are a WRITE-path optimisation; the read stays a full ordered scan.** This falls out of
-the same reorg fact and must be said plainly, because it is what the previous draft got wrong by
+the same reorg fact and must be said plainly, because it is what an earlier draft got wrong by
 omission. Since a LATER segment can hold LOWER block numbers, no segment can be skipped on a block
 bound. So `fetchFrom(source, fromBlock)` KEEPS its signature and its semantics: read every segment
 in ordinal order, concatenate, apply the existing `blockNumber >= fromBlock` filter. The seam does
 not change and callers do not change; the win is entirely on append. A spec implying segments make
 READS cheaper would be promising what the reorg model forbids.
 
+**A small HEAD key names the segments, because neither keeper can ENUMERATE keys.** This is the
+mechanism the whole design needs and an earlier draft simply omitted. `packages/fs/src/utils/fs.ts`
+exposes `get`/`set`/`del` only, and `OnIndexedDB` imports exactly `get`, `set`, `del` from
+`idb-keyval`. Neither can list what it holds, so "read every segment in ordinal order" and, more
+dangerously, `clear` have nothing to iterate.
+
+So the keeper holds ONE small mutable head key carrying the highest ordinal written (alongside
+`lastSync`, below), and the segments beside it. `fetchFrom` reads the head, then segments `0..N`.
+`clear` reads the head, deletes segments `0..N`, then deletes the head. Ordering matters for crash
+safety: delete the SEGMENTS first and the head last, so an interrupted clear leaves a head naming
+segments that are gone, which reads as empty, rather than a live-looking head over a partially
+deleted stream.
+
+**`clear` is a first-class part of this change, not an afterthought.** `ExistingStream` has THREE
+members and it is the one segmentation breaks: today it deletes a single storage id, and with N
+segment keys a naive port would orphan every segment but the head, after which the next
+`saveNewEvents` appends beside a dead prefix and the next `fetchFrom` concatenates it into the
+replay, producing wrong state silently. It is called from five paths in `indexer.ts`, and both the
+migration below and ADR-0034's mandated clearing rest on it.
+
 **The stream stores only what the node said.** Raw logs plus the reorg flag the indexer derived; no
 `args`, no `eventName`. Decoding happens on read, which is what `reparse` already does transiently
 and what the fetch path pays anyway.
 
-**This needs a NEW stored-event type, and it is a BREAKING change to a published interface.** A
-raw-only event is not a `LogEvent` at all: `LogEvent` is a union of `ParsedLogEvent` (carrying `args`
-and `eventName`) and `LogEventWithParsingFailure` (carrying `decodeError`), so an event with neither
-is a member of neither. `StreamFetcher` and `StreamSaver` are typed `LogEvent[]`, and
-`ExistingStream` is implemented by third parties. So this spec introduces a stored-event type
-(`BaseLogEvent` without the decoded half) and moves the `ExistingStream` seam onto it. That is a
-breaking `@etherfold/core` API change, it needs a changeset, and it is OWNED here rather than
-discovered by whichever task hits it first.
+**This needs a NEW stored-event type, and it must EXCLUDE the decoded half rather than merely omit
+it.** A raw-only event is not a `LogEvent`: that is a union of `ParsedLogEvent` (carrying `args` and
+`eventName`) and `LogEventWithParsingFailure` (carrying `decodeError`), and an event with neither is
+a member of neither. `StreamFetcher` and `StreamSaver` are typed `LogEvent[]` and `ExistingStream`
+is implemented by third parties, so this is a breaking `@etherfold/core` change needing a changeset.
+
+Do NOT reuse `BaseLogEvent` for it. That type already exists, is already exported, and is the
+SUPERTYPE every decoded event extends (`ParsedLogEvent = BaseLogEvent & LogParsedData`). Reusing it
+would re-mean a published type, and it would not enforce anything: a decoded `LogEvent[]` is
+assignable to `BaseLogEvent[]`, because that is what a supertype is, and excess-property checks fire
+only on fresh object literals. A keeper could receive, hold and persist decoded events in silence.
+
+So mint a distinct name (`StoredLogEvent`) whose shape REFUSES the decoded half:
+
+```ts
+type StoredLogEvent<Extra = undefined> = BaseLogEvent<Extra> & {args?: never; eventName?: never; decodeError?: never};
+```
+
+That form rejects a decoded `LogEvent[]` at compile time, which is what makes story 7 deliverable at
+all. It also forces the fixture decision below, and the two cannot be decided separately.
 
 **Segments are immutable and independently readable.** Once written a segment is never edited, and
 any segment can be read BY ITS OWN KEY without reading the others. This spec does not build sharing,
@@ -111,14 +143,15 @@ it.
    and visibly, so upgrading costs nothing I can notice and nothing I cannot explain.
 6. As a developer replaying a reorged history, I want retractions to come back in the order they
    were appended, so a rebuild sees what the live run saw.
-7. As an implementor of `ExistingStream`, I want the stored-event type to SAY it carries no decoded
-   half, so a keeper cannot accidentally persist one and I find out at compile time.
+7. As an implementor of `ExistingStream`, I want the stored-event type to REFUSE a decoded event, so
+   a keeper cannot accidentally persist one and I find out at compile time. (This requires the
+   exclusion form; a supertype would accept one silently.)
 
 ## Implementation Decisions
 
 **Segments over one row per event.** ADR-0006 chose a row per emitted log with a `seq`; that is
 right for a queryable server table. This is a client-side cache read only in bulk, so a segment (a
-batch's worth of events under one key, carrying its `seq` range) keeps appends cheap AND avoids
+batch's worth of events under one key, carrying its ORDINAL) keeps appends cheap AND avoids
 per-event key overhead in IndexedDB. The ORDERING is ADR-0006's; only the granularity differs, and
 that difference is because the access pattern is a full replay rather than a query. Segment size
 follows the batch the indexer already fetches, so it adds no tuning knob.
@@ -129,23 +162,36 @@ Note this is decode-neutrality only: a stream is still relative to the FILTER it
 fetched under, since absence of a log only means something against a filter. That is not solved
 here and any later sharing design must carry filter provenance per segment.
 
+**`reparse` widens to accept the stored type.** It is typed `readonly LogEvent<ABI>[]` and is the
+SOLE consumer of what `fetchFrom` returns, so "decoding happens on read" rests on widening its
+parameter to `StoredLogEvent[]`. Small, but it is the seam that makes the whole change work and it
+should not be discovered mid-build.
+
 **Core strips the decoded half, not each keeper.** `ExistingStream` is a third-party-implementable
 interface with three implementations already; putting the rule in each one would let them drift.
 Strip on the way into `saveNewEvents`, producing NEW OBJECTS: a new array holding the same
 references strips nothing, and those references are the very objects just handed to
-`processor.process`. With the stored-event type above, a keeper that persisted a decoded event no
-longer typechecks, so the rule is enforced rather than merely documented.
+`processor.process`. With the EXCLUSION form above, a keeper that persisted a decoded event no
+longer typechecks, so the rule is enforced rather than merely documented. With a supertype it would
+not be, which is exactly why the exclusion form is required rather than preferred.
 
 Two consequences of the `streamNotYetSaved` accumulator, which buffers across failed saves: a
 segment is whatever was buffered at that save, NOT necessarily one batch, so segment size follows
 the batch only on the happy path; and a save with zero events must not mint an empty segment.
 
-**`lastSync` is stored separately, and story 2 is scoped to the event stream.** `lastSync` rides in
-the same stored value today, is rewritten on every save, and `LastSync.unconfirmedBlocks` holds full
-DECODED events. It STAYS decoded: it is the live reorg window the indexer is actively reasoning
-about rather than a cache of history, and it is bounded by the finality depth. But it must not sit
-inside the append-only segments, or every append would rewrite it and the append-cost claim would be
-false. One small mutable key for `lastSync`; immutable segments for the stream.
+**`lastSync` is stored separately, and its events are stripped too.** `lastSync` rides in the same
+stored value today, is rewritten on every save, and `LastSync.unconfirmedBlocks` holds full DECODED
+events. An earlier draft kept them decoded, reasoning that this is the live reorg window. That is
+wrong for THIS store: the STREAM keeper's stored `lastSync` is never read back as events.
+`promiseToLoad` takes only `lastFromBlock`, `lastToBlock`, `latestBlock` and `context` from it, the
+live reorg window is `this.lastSync` in memory, and `checkTxInclusion` reads only
+`transactionHash`. So storing decoded `args` there would leave the one stale thing in the stream,
+never refreshed by any `reparse`.
+
+The stream keeper therefore stores `lastSync` WITHOUT the events in `unconfirmedBlocks`. It sits on
+its own small mutable key (with the head ordinal), not inside the append-only segments, or every
+append would rewrite it and the append-cost claim would be false. The STATE keeper's own `lastSync`
+is untouched by this spec.
 
 **`logValues` is a PARSE-time projection today**, applied in `LogEventFetcher.parse`, so it trims
 what the live processor receives as well as what is stored. That is why the indexer must detect a
@@ -158,14 +204,18 @@ handlers see.
 DECODED-ONLY with `omittedFields` provenance, which raw-only cannot represent. They are a test
 input, not a cache, and recapturing them at roughly 4x size buys nothing.
 
-Be precise about WHY that is safe, because the obvious phrasing is unbuildable: a fixture reaching
-`promiseToLoad` would be `reparse`d unconditionally, `reparse` returns `undefined` when `topics` or
-`data` is missing, and the indexer would then CLEAR the stream. Nothing wires `replayStream` as
-`keepStream` today, so the two never meet. The rule is therefore that the raw-only stored-event type
-governs the CACHE keepers, and the fixture path is a separate reader not flowing through
-`fetchFrom`. If anything ever wires them together, `ExistingStream` needs an explicit
-already-decoded discriminator; that is not built here and must not be faked by leaving two shapes
-behind one interface.
+Be precise, because "they never meet" is true at RUNTIME and false at the TYPE level, and the
+exclusion form above makes that decisive. Nothing wires `replayStream` as `keepStream` today, so no
+fixture ever reaches `promiseToLoad`. But `replayStream` DECLARES `ExistingStream`, and
+`StreamFixture.eventStream` is `LogEvent[]`, so the moment `ExistingStream` is narrowed to
+`StoredLogEvent[]` the fixture reader stops compiling.
+
+That is not a problem to route around; it is the type system stating something true. A fixture is a
+test INPUT of decoded events, and a cache keeper is a store of what the node said. They are
+different things that have been sharing one interface. So **`replayStream` stops being an
+`ExistingStream`** and gets its own reader type, and the fixture format is untouched. This spec owns
+that split. What it must NOT do is keep both behind one interface with an already-decoded
+discriminator, which is the two-shapes-behind-one-interface outcome it forbids elsewhere.
 
 **The migration is structural, because there is no marker.** The stream blob carries no format
 field (unlike the fixture's `format: 2`), so the new code must recognise the old shape by structure
@@ -184,8 +234,12 @@ is clearing a readable stream merely because its shape is old.
   in the task rather than leaving a builder to invent one.
 - **Round-trip through both cache keepers**, since they are independent implementations of one
   contract and both are wrong in the same way today.
-- **`fetchFrom` still answers exactly what it answers today** for the same `fromBlock`, event for
-  event and in the same order, since the seam is deliberately unchanged.
+- **`fetchFrom` answers the same events in the same order** for the same `fromBlock`: same
+  membership, same ordering, same RAW halves. Not literally event-for-event equal, since it now
+  returns raw-only where it used to return decoded, which is the change itself.
+- **`clear` removes everything**, asserted by clearing a multi-segment stream and confirming the
+  next `fetchFrom` returns nothing: no orphaned segment survives to be concatenated into a later
+  replay.
 - **Independent readability**: a segment is readable by its own key without reading the others, and
   no write ever targets an existing segment key.
 - **Replay across a reorg** is the ordering test: retractions must come back in append order, and a
@@ -199,7 +253,12 @@ is clearing a readable stream merely because its shape is old.
 ## Out of Scope
 
 - **Sharing segments between two streams.** Not built here. But immutability and independent
-  readability ARE delivered here, so the later design has something to point at.
+  readability ARE delivered here, so the later design has something to point at. Note what that does
+  NOT give it: segments are ordinal-keyed and a later segment can hold lower blocks, so there is no
+  segment prefix corresponding to a BLOCK prefix. A design wanting to share everything below block N
+  cannot get it from this shape, and should say so rather than assume it.
+- **Per-segment filter or lineage provenance.** Needed by any sharing design, and it CHANGES the read
+  seam this spec deliberately pins as unchanged. Whoever adds it owns that seam change.
 - **Filter provenance per segment.** Needed by any sharing design; named, not built.
 - **Pruning or retention of segments.**
 - **The wire format.** `WireBatch` keeps shipping decoded events, since the receiving primitive

@@ -24,16 +24,25 @@ taskedAfter: [the-stream-is-what-the-node-said-appended-once]
 > head-following TAIL, never the history. And **reads do NOT carry generation identity**; the
 > question dissolved rather than needing an answer.
 
-> **SCOPE: this spec covers the INDEXER runtimes** (the browser, via `createIndexerState`, and the
-> CLI, which constructs an `EthereumIndexer` directly). It does NOT cover `@etherfold/server`. That
-> was checked rather than assumed: `createServer` mounts a status API and an INGEST API, knows only
-> `RemoteSQL`, and never constructs an indexer; it receives `WireBatch`es over HTTP. So it has no
-> processor, no `SyncingState` and no generations in this sense. A reconfigure THERE means the
-> fetcher's source or processor changed and a differently-shaped feed starts arriving, and the
-> question becomes whether the ingest server keeps two lineages of its emission-stream table
-> (ADR-0006) and switches which one its queries read. Same vocabulary, different mechanism,
-> different storage model, different promotion surface. It is a separate spec and is deliberately
-> not attempted here.
+> **SCOPE: wherever a PROCESSOR and its state live.** An earlier draft scoped this to "the browser
+> and the CLI" and excluded `@etherfold/server` because it never constructs an indexer. The first
+> half of that is true and the conclusion was false, so the scope is restated:
+>
+> - **The browser** (`createIndexerState`) is the primary runtime, and the one whose container,
+>   handle and `SyncingState` this spec details.
+> - **The ingest server DOES host a processor.** `createServer` takes an injected `getIngestion`, and
+>   the ingest path calls `processor.clear()` on a changed source, config or processor version,
+>   which is precisely the blanking reconfigure this spec exists to remove; its 501 body reads "this
+>   server hosts no processor: pass getIngestion". So the generation mechanism applies there too, at
+>   the ingestion seam, and that is where stories 1 and 2 are delivered.
+> - **The CLI is NOT a runtime for these stories.** It is a one-shot `indexToTip` batch with ZERO
+>   `updateProcessor` or `updateIndexer` call sites: it never reconfigures and serves reads to
+>   nobody. Its `serve` verb lazily imports the platform server, which is the ingest server above.
+>   So there is no CLI `promote` verb, and naming one would name a surface that does not exist.
+>
+> Still OUT of scope and genuinely separate: the ingest server's own STORED emission-stream table
+> (ADR-0006) keeping two lineages and switching which its queries read. That is the storage half,
+> a different mechanism and a different model, and it is a separate spec.
 
 ## Problem Statement
 
@@ -81,10 +90,16 @@ both are load-bearing:
   `lastSync.context.source` to the new hashes, so one unchanged state legitimately carries two
   digest sets over time.
 
-So identity is **the invalidation VERDICT plus the `processor` and `config` hashes**: a new
-generation is needed exactly when `sourceInvalidationOf` says something already indexed became
-invalid, or when a hash `ContextIdentifier` tracks separately moved. An unchanged source is a no-op
-because the verdict says nothing changed, not because two digests matched.
+So identity is **the invalidation VERDICT plus the `processor` hash**: a new generation is needed
+exactly when `sourceInvalidationOf` says something already indexed became invalid, or when the
+processor hash moved. An unchanged source is a no-op because the verdict says nothing changed, not
+because two digests matched.
+
+`config` is deliberately NOT in that list, though an earlier draft included it.
+`sourceInvalidationOf` compares `context.config` against the stream config hash FIRST and returns
+both halves invalid on a mismatch, so it is already INSIDE the verdict. Only `processor` is genuinely
+outside, because `sourceInvalidationOf` never reads `context.processor`. Listing config again would
+have a builder write a redundant second comparison.
 
 The `processor` half is not a footnote: a changed processor version hash makes a generation, so all
 three reconfigure entry points route through this. `updateProcessor` creates a pending generation
@@ -251,22 +266,35 @@ What apps do today is invoke it at the CALL SITE and hand in the result:
 `createIndexerState` receives an already-bound instance and cannot build a second one.
 
 The change is therefore to pass the factory rather than its result, and then to make the
-STATE-HOLDING resource differ per generation. That second half is NOT symmetric between the two
-paths, and assuming it was is what an earlier draft got wrong:
+STATE-HOLDING resource differ per generation:
 
 - **entities**: `processor: (store) => Processor` is unchanged, plus `storeFactory: (generation) =>
   StateStore`.
-- **js-object**: `processor: () => Processor` is unchanged, and **no factory is needed at all**. The
-  keeper is ALREADY generation-aware in its interface: `KeepState` is `{fetch, save, clear}` and all
-  three receive a `ProcessorContext`, which is `{source, config?, version}` — the very triple that
-  identifies a generation. `keepStateOnLocalStorage` already derives its key from part of it
-  (`getStorageID(name, context.source.chainId, config)`). What it does NOT include is the
-  generation, so the change is inside the keeper's key derivation, not on `createIndexerState`.
+- **js-object**: `processor: () => Processor` is unchanged, plus `keepStateFactory: (generation) =>
+  KeepState`.
 
-So only the entities path gains a factory, and the generation argument belongs on THAT and not on
-the processor factory. It is load-bearing there: the store name must be both STABLE across sessions
-(or a reload finds no data) and DISTINCT per generation (two IndexedDB stores sharing a
-`databaseName` are one store by that
+An earlier draft claimed the js-object path needed NO factory, because `KeepState`'s three methods
+already receive a `ProcessorContext` and that context identifies a generation. **That was wrong on
+both halves and is corrected here**, because the mistake is instructive:
+
+- **A keeper cannot derive the generation.** Identity is the invalidation VERDICT, and
+  `sourceInvalidationOf` needs the STORED `ContextIdentifier`, which a keeper is never handed; it
+  sees only the CURRENT context. Falling back to hashing `context.source` is exactly the digest
+  equality the Identity section rejects, so an event appended above the cursor would change the key
+  and orphan the live state on the next reload, turning ADR-0034's free case into a full re-index and
+  regressing story 6.
+- **`ProcessorContext` is not that triple.** Its `config` is the PROCESSOR config, whereas
+  `ContextIdentifier.config` is the `streamConfigHash`. So the stream config is absent entirely, and
+  `updateIndexer` changing only `streamConfig` would produce a live and a candidate with
+  byte-identical `ProcessorContext` colliding on one key — the clobber
+  `work/notes/observations/keepstate-storage-id-omits-the-processor-version.md` warns about.
+
+So the two paths ARE symmetric after all: each takes a per-generation factory for its state-holding
+resource, and the container supplies the generation because it is the only thing that knows it.
+
+The generation argument belongs on the STATE factory and not on the processor factory. It is
+load-bearing there: the store name must be both STABLE across sessions (or a reload finds no data)
+and DISTINCT per generation (two IndexedDB stores sharing a `databaseName` are one store by that
 store's own documentation, so a candidate would fold into the live generation's rows). Deriving it
 from the generation is what satisfies both at once.
 
@@ -275,7 +303,15 @@ than two, and `updateProcessor` takes a factory for the same reason.
 
 This is a breaking change to `createIndexerState`, accepted deliberately, but a much smaller one
 than it first appeared: for most call sites it is deleting the trailing `()` and supplying a state
-factory. Roughly a dozen internal call sites, nine of them tests and the browser harness.
+factory.
+
+The migration is larger than an earlier draft's "roughly a dozen" estimate, and the difference
+matters under the file-ownership rule: about 28 `createIndexerState` call sites under
+`packages/browser/test` alone (`dispose`, `txInclusion`, `processorKinds`, `liveReload`,
+`reconfigure`, `setupIndexing`, `invalidation`), plus `packages/browser/browser/workload.ts`, plus
+FOUR example apps (`web-demo`, `event-processor-nfts`, `browser-reference`, `mud`) and the README
+usage block. The examples and the README are the PUBLIC face of the change and a batch cut from the
+old estimate would not have owned them.
 
 **What is shared and what is not.** These are two different stores and conflating them is easy:
 
@@ -339,10 +375,9 @@ is a full second stack (its own `EthereumIndexer`, processor and state store), a
 what `createIndexerState` returns: it holds the pair, publishes the indirect handle, owns promotion,
 and is what `SyncingState` describes.
 
-`promote` is therefore a method on that container, reachable wherever it is: a UI action in the
-browser, and in the CLI a verb on the drive. There is no `@etherfold/server` surface, because the
-server is out of scope per the note at the top; it never constructs an indexer and has no candidate
-to promote.
+`promote` is therefore a method on that container: a UI action in the browser, and on the server an
+admin-side call wherever `getIngestion` is wired, since that is where the server's processor lives.
+There is no CLI verb, because the CLI never reconfigures.
 
 ## Testing Decisions
 
@@ -370,10 +405,13 @@ to promote.
   promotion, because after promotion there is no candidate.
 - **A candidate-only failure** sets `candidate.error` while the top-level one stays clear; a shared
   provider failure sets BOTH, carrying the same `ErrorCode`.
-- **The state factory is called per generation**, and a candidate's store is distinct from the live
-  one's: a write to one is not visible in the other, which is the guard against the
-  same-`databaseName` collision. A store name is also STABLE across a reload for the same
-  generation, so a restart finds its data rather than minting a third store.
+- **The state factory is called per generation** on BOTH paths, and a candidate's state is distinct
+  from the live one's: a write to one is not visible in the other, which is the guard against the
+  same-`databaseName` collision. The name is also STABLE across a reload for the same generation, so
+  a restart finds its data rather than minting a third store.
+- **A `streamConfig`-only change** produces a live and a candidate that do NOT collide, which is the
+  regression guard for the `ProcessorContext` hole: that context cannot distinguish them, so the
+  generation must come from the container.
 
 ## Out of Scope
 
