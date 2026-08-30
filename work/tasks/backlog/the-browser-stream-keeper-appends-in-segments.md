@@ -20,9 +20,9 @@ Put `keepStreamOnIndexedDB` on the segmentation helper that
 the entire history.
 
 This is the SECOND independent implementation of one contract, not a second design. Every rule —
-ordinal keys, the open tail carrying `lastSync`, one write per save, sealing by not being the highest
-ordinal any more, the anchored enumeration, the contiguity refusal, legacy adoption in place, the
-cursor from the tail, presence as the tail — lives in the helper. This task supplies the **port** and
+ordinal keys, the cursor as ONE record per stream committed with its segment, sealing by not being
+the highest ordinal any more, the anchored enumeration, the contiguity refusal, legacy adoption in
+place, presence as the cursor record — lives in the helper. This task supplies the **port** and
 proves the contract holds on IndexedDB.
 
 `packages/browser/src/storage/stream/OnIndexedDB.ts` today reads the whole stream, concatenates and
@@ -53,14 +53,18 @@ for the migration test — rather than patching it blind on a red gate.
       tail plus its batch, and the 100th append costs no more than the 10th at the same tail phase.
       Wall-clock cannot be the yardstick here: `fake-indexeddb` is itself quadratic, and ADR-0032
       rules out wall-clock on a loaded machine.
-- [ ] **A save writes exactly ONE key** in the steady state, including the first save after a legacy
-      adoption.
+- [ ] **The segment and the cursor commit in ONE `readwrite` transaction**, via `idb-keyval`'s
+      `setMany` (verified: it opens one transaction, puts every entry, and awaits
+      `store.transaction`), so a crash can never leave the cursor ahead of its events. Assert it for
+      the first save after a legacy adoption too. This is where IndexedDB is BETTER placed than the
+      filesystem, which has no multi-file transaction and relies on write-order plus orphan discard.
+- [ ] **No stored segment contains a `lastSync`**, asserted by inspection.
 - [ ] **A save with no new events** costs nothing proportional to history.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order, strict equality.
 - [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events, which is what stops
       `indexer.ts` taking its clear branch.
-- [ ] **The cursor comes from the tail**, never a sealed segment's stale `lastSync`.
+- [ ] **The cursor comes from the cursor record**, with no competing copy anywhere.
 - [ ] **A sealed segment is never rewritten** and is **readable by its own key**.
 - [ ] **Replay across a reorg** returns retractions in APPEND order.
 - [ ] **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where
@@ -113,9 +117,9 @@ implementation is `packages/fs/src/storage/stream/OnFile.ts`, already on the hel
 `packages/core/src/indexer.ts`. `packages/browser/test/invalidation.test.ts` is the test that reaches
 into the stream key and must be updated.
 
-**Domain vocabulary** is the helper's: a *segment* is one stored batch plus the `lastSync` current
-after it; the *tail* is the open, highest-ordinal segment (or the adopted legacy key when no ordinal
-exists yet); everything below is *sealed* and immutable. The stored stream is an *emission stream*,
+**Domain vocabulary** is the helper's: a *segment* is one stored batch of EVENTS, and nothing else.
+The *tail* is the open, highest-ordinal segment; everything below it is *sealed* and immutable. The
+*cursor* is ONE record per stream, committed together with the segment it describes. The stored stream is an *emission stream*,
 so a later segment can hold LOWER block numbers and no segment may be skipped on a block bound.
 
 **The two hazards specific to this substrate:**

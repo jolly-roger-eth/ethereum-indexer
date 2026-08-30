@@ -58,12 +58,32 @@ segment can hold LOWER block numbers, no segment can be skipped on a block bound
 order, concatenate, apply the existing `blockNumber >= fromBlock` filter. A spec implying segments
 make READS cheaper would promise what the reorg model forbids.
 
-**A save writes exactly ONE key, and `lastSync` rides in the OPEN TAIL segment.** An earlier draft
-gave `lastSync` its own key, which quietly turned one write into two and destroyed an atomicity the
-current code has by construction. Both orders are wrong: writing the segment first leaves the cursor
-BEHIND its events, so a rebuild replays them and then re-fetches from the stale `lastToBlock` and
-appends duplicates; writing `lastSync` first leaves the cursor AHEAD, so a lost segment is never
-replayed. Today one `set` makes the two agree and a crash cannot separate them.
+**A save COMMITS the segment and the cursor together, and the cursor is ONE record per stream.** The
+requirement is atomicity, not a single key, and the difference matters because a cursor copied into
+every segment is copied waste: `LastSync.unconfirmedBlocks` is `EventBlock[]`, and `EventBlock`
+carries the FULL decoded events of each block (deliberately — retraction needs them), so a
+per-segment copy duplicates up to `finality` blocks of real event data into every sealed segment,
+forever, where nothing ever reads it again.
+
+The asymmetry that makes this safe is that the two failure directions are NOT equal:
+
+- **cursor AHEAD of its events** is unacceptable: a lost segment is never replayed, and the stream
+  silently claims coverage it does not have.
+- **cursor BEHIND its events** is recoverable, PROVIDED the extra segment is discarded rather than
+  kept. Keeping it and re-fetching from the stale `lastToBlock` is what appends duplicates; discarding
+  it and re-fetching is simply a repeated batch.
+
+So the cursor is written LAST and is the COMMIT POINT, and anything above it is an orphan of an
+interrupted save:
+
+- **IndexedDB** has a real multi-key transaction — `setMany` opens one `readwrite` transaction, puts
+  every entry and awaits `store.transaction` — so segment and cursor commit together and neither
+  direction arises.
+- **The filesystem** has no multi-file transaction, so it relies on the ordering plus the orphan rule:
+  write the segment, then write the cursor via a temp file and `rename`, which IS atomic for one file.
+
+Orphan discard is the same shape as the contiguity rule below — drop from the break upward, keep the
+prefix beneath — so this is one recovery discipline rather than two.
 
 So the shape is an append-only log with an OPEN TAIL:
 
@@ -77,20 +97,20 @@ This is what makes the empty-batch case cheap without needing a rule against emp
 with no events rewrites only the open tail to move its cursor, which is bounded, rather than
 rewriting the whole history as it does today.
 
-**Sealing is not a write, and the cursor is read from the TAIL alone.** A segment is SEALED exactly
-when it is no longer the highest ordinal, so sealing happens implicitly the moment the next save
-opens a new one, and a reader tells by enumeration. Nothing is ever written INTO a segment to mark
-it sealed, which is what keeps both the one-write claim and immutability true. Every sealed segment
-still carries the `lastSync` that was current when it was written, and those are STALE: the cursor is
-read from the tail only, or a reader picking a lower one silently rewinds.
+**Sealing is not a write, and the cursor is read from the CURSOR RECORD.** A segment is SEALED
+exactly when it is no longer the highest ordinal, so sealing happens implicitly the moment the next
+save opens a new one, and a reader tells by enumeration. Nothing is ever written INTO a segment to
+mark it sealed, which is what keeps immutability true. Segments hold EVENTS and nothing else; the
+cursor is the stream's own record, so there is no stale copy for a reader to pick by mistake.
 
-**The TAIL is the highest ordinal segment, OR the adopted legacy key when no ordinal exists.** This
-sentence is load-bearing and its absence would have failed this spec's own migration test. Between
-adopting a legacy blob (below) and the first new save there are NO ordinal segments at all, so a
-tail defined purely as "the highest ordinal" would not exist: presence would read false, the cursor
-would be unread, and `indexer.ts` would clear a perfectly good cached history, which is exactly what
-story 5 forbids. The adopted legacy key is therefore the tail until `_0` is opened, at which point
-it becomes sealed like any other.
+**PRESENCE is the CURSOR RECORD, not a segment count and not a tail.** `fetchFrom` must keep
+returning a DEFINED result for a stream that has been saved to but holds no events, because today an
+empty first save writes `{lastSync, eventStream: []}` and a defined result is what stops `indexer.ts`
+taking its clear branch. The cursor record exists as soon as anything has been saved, including a
+save with no events at all, so presence is its existence.
+
+This also carries the migration: adopting a legacy blob writes the cursor record from the `lastSync`
+inside it, so presence reads true from that moment, with no ordinal segments yet in existence.
 
 The seal threshold is counted in **EVENTS**, not bytes. Bytes are natural on the filesystem (the JSON
 string is already built) and not cheaply available on IndexedDB (structured-clone size is not
@@ -102,22 +122,17 @@ strictly better.** A draft added a `{min, max}` per segment so a later design co
 segments covering blocks `[0, N)`. It is unnecessary, and the reason is not that segments are
 unorderable by block (below the finality horizon they are): it is that the datum is already there.
 
-Every segment carries the `lastSync` current when it was written, and `lastSync.lastToBlock` is the
-block the stream had been scanned to at that boundary. That is an atomic snapshot at EVERY segment
-boundary, delivered by the one-write rule above rather than by new metadata.
+The argument for adding it was forward compatibility: a range cannot be added retroactively without
+reading every segment, so a later design wanting to select the segments covering blocks `[0, N)`
+would face a migration. That later design does not exist. `a-reconfigure-is-not-an-outage` gives each
+version its own stream keyed by its FETCH FILTER, so nothing ever selects a block-prefix of somebody
+else's segments, and there is no graft point to select for.
 
-It also answers a strictly better question than a range of the events would. A `{min, max}` over the
-events a segment happens to CONTAIN says where events landed; `lastToBlock` says how far the stream
-was SCANNED. Those differ whenever a range yielded no events, which is most ranges, and it is the
-scanned extent a graft point needs: "everything through this segment covers `[0, lastToBlock]`" is
-the claim, and an event-derived range cannot make it.
-
-So there is no forward-compatibility debt to pre-pay here, which was the whole argument for adding it.
-
-**Presence is the TAIL, never a segment count.** `fetchFrom` must keep returning a DEFINED result
-for a stream that has been saved to but holds no events, because today an empty first save writes
-`{lastSync, eventStream: []}` and a defined result is what stops `indexer.ts` taking its clear
-branch. A tail exists as soon as anything has been saved, so presence is the tail's existence.
+If a future design does want it — the deliberately-deferred optimisation where a new stream reuses an
+old one it is a superset of — note what it would actually need: the SCANNED extent, not a range over
+the events a segment happens to CONTAIN. Those differ whenever a range yielded no events, which is
+most ranges. A `{min, max}` over events would not answer the question anyway, so adding one now would
+pre-pay a debt in the wrong currency.
 
 **Sealed segments are immutable and independently readable**, and both halves are stated so a test
 can FAIL them. Immutability is observable at the write seam: no write ever targets a sealed
@@ -207,10 +222,11 @@ close — and a reader finding BOTH shapes would have no defined behaviour, doub
 or dropping it.
 
 So the legacy key `stream_<name>_<chainId>` (no ordinal) is ADOPTED IN PLACE as the earliest sealed
-segment: never rewritten, read first, and followed by `_0.._N`. Nothing is copied, the first save
-after an upgrade writes only the new tail, and the one-write rule holds through the migration rather
-than being suspended for it. `clear` removes it along with the ordinals. Its `lastSync` is stale like
-any sealed segment's, so the cursor still comes from the tail.
+segment: never rewritten, read first, and followed by `_0.._N`. Nothing is copied, and the adoption
+writes ONE thing — the cursor record, seeded from the `lastSync` inside the legacy blob — so the
+atomic-commit rule holds through the migration rather than being suspended for it. `clear` removes it
+along with the ordinals and the cursor. The `lastSync` still embedded in the legacy blob is ignored
+after adoption; the cursor record is the only cursor.
 
 The rebuild story 5 asks to be VISIBLE needs an owner too: a clear or a migration should say so
 through the existing logger rather than happening in silence. Where ADR-0034 already MANDATES clearing (a legacy blob whose
@@ -279,14 +295,20 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   append costs no more than the 10th at the same tail phase. Asserting the tenth equals the first is
   false by design, since a tail absorbs several batches before sealing.
 
-- **A save writes exactly ONE key** in the steady state, asserted at the same instrumented seam, and
-  that INCLUDES the first save after a legacy adoption, which is the case a copying migration would
-  have broken. This is the atomicity guard: it stops a crash separating the cursor from its events.
+- **A crash never leaves the cursor AHEAD of its events**, asserted by interrupting a save at the
+  instrumented write seam on BOTH keepers, and INCLUDING the first save after a legacy adoption. On
+  IndexedDB assert the segment and cursor commit in one transaction; on the filesystem assert the
+  cursor is written last and that a segment above it is DISCARDED as an orphan on the next load
+  rather than replayed. This is the atomicity guard and it is the reason the cursor is one record.
+- **No stored segment contains a `lastSync`**, asserted by inspection at the storage seam. The cursor
+  lives in its own record, and a segment carrying one is the duplication this spec exists to remove —
+  `unconfirmedBlocks` holds whole blocks WITH their events, so a per-segment copy is expensive and
+  permanent.
 - **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where a
   `clear` on one leaves the other intact and its replay unpolluted. This is the anchored-match guard
   and it fails loudly under a bare prefix filter.
-- **The cursor comes from the tail**: a stream with several sealed segments resumes from the highest
-  ordinal's `lastSync`, never a sealed one's stale copy.
+- **The cursor comes from the cursor record**: a stream with several sealed segments resumes from it,
+  and a reader never has to pick between competing copies because there is only one.
 - **A sealed segment is never rewritten** (no write targets its key again) and is **readable by its
   own key** without reading the others.
 - **`fetchFrom` returns a DEFINED result for a stream saved with no events**, which is the guard
