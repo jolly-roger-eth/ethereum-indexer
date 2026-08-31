@@ -34,8 +34,34 @@ empty-batch branch pays the same cost purely to move `lastSync`.
 - **Enumeration is ANCHORED, never a bare prefix.** Stream keys are `stream_<name>_<chainId>`, so
   with an ordinal appended the chain-`1` prefix is ALSO a prefix of every chain-`10` key
   (`stream_tag_10_0`). Match `^stream_<name>_<chainId>_(\d+)$`.
-- **Presence is the TAIL.** `fetchFrom` must keep returning a DEFINED result for a stream saved to
+- **Presence is "the read-cursor operation returns something".** State it that way and NOT as "the
+  tail", because the other keeper has no tail on two paths that must still read as present: an empty
+  first save writes only a cursor record and no segment, and a legacy adoption writes nothing at all.
+  A tail-shaped presence check reports absent there and `indexer.ts` clears a perfectly good stream.
+  On THIS keeper the read-cursor operation happens to read the tail, which is an implementation of
+  the rule and not the rule. `fetchFrom` must keep returning a DEFINED result for a stream saved to
   but holding no events, because that is what stops `indexer.ts` taking its clear branch.
+
+### The SEGMENT RECORD, which the helper owns and neither keeper may re-shape
+
+The helper reads segments (it concatenates them for `fetchFrom`, and the recovery reads the surviving
+top one), so their encoding cannot be a keeper's private choice even though the CURSOR's placement
+is. Pin it here, because the two keepers describe it differently and only one of them can be right:
+
+- **A segment is `{events, extent}`**, where the extent is the SCANNED extent
+  `{lastFromBlock, lastToBlock, latestBlock}` current after those events. Both keepers write this
+  shape and the helper reads it on both.
+- **The extent is NOT the cursor.** A cursor is a whole `LastSync` (the three block numbers PLUS the
+  `context` PLUS `unconfirmedBlocks`); the extent is the three block numbers only, and it exists so a
+  truncated prefix can say where it got to.
+- **A keeper MAY additionally carry its cursor inside the tail segment record** — that is exactly
+  what the tail strategy is, and it is why this keeper's tail is `{events, extent, lastSync}` while
+  the cursor-record keeper's segments are `{events, extent}` and nothing else. The helper never
+  reads a segment's `lastSync`; it goes through the read-cursor operation for that. So a keeper that
+  stores no cursor in its segments is conforming, not deficient.
+
+That last line is what makes ONE helper serve both keepers. Do not let the tail's extra field leak
+into the helper's read path.
 
 ### The CURSOR CONTRACT — four properties, and they are what the helper enforces
 
@@ -63,6 +89,11 @@ expressible through the keeper-supplied cursor operations, and test the fs one h
   no transaction to need, and no orphan rule.
 - **Sealing EMPTIES the window.** When a save opens segment `N+1` it rewrites segment `N` with
   `unconfirmedBlocks` emptied, KEEPING the three block numbers and the context. That is property 3.
+  **Order: commit the NEW tail first, then seal the old one.** Stated as a rule rather than left
+  implied by the safe-to-fail criterion below. Either order is in fact recoverable —
+  `generateStreamToAppend` rebuilds `unconfirmedBlocks` from the replayed events on every load
+  branch, so no path ever scans off a stripped window — but pinning it makes the interrupt test
+  deterministic.
 - **The narrowness is load-bearing.** Every TRUNCATION PATH — the contiguity refusal keeping a
   prefix, and (later) a paused generation dropping its non-final points — makes a formerly-SEALED
   segment the new tail, and `StreamFetcher` must return a `LastSync` whenever it returns anything.
@@ -83,12 +114,78 @@ expressible through the keeper-supplied cursor operations, and test the fs one h
 **Do NOT hard-code the tail strategy into the helper.** Cursor PLACEMENT is where substrates
 genuinely differ, and a SQL keeper with atomic multi-row updates should be able to hold its cursor in
 its own row and satisfy properties 1 and 2 through its transaction, making 3 vacuous. So the helper
-takes the cursor operations FROM the keeper (commit a segment together with its cursor; read the
-current cursor) and owns only the rules that must not drift. The fs keeper supplies the tail
-implementation of those operations.
+takes the cursor operations FROM the keeper and owns only the rules that must not drift. The fs
+keeper supplies the tail implementation of those operations.
+
+**FIVE keeper operations, and the last two are the ones a first draft omits.** Getting this list
+wrong is what strands
+the sibling keeper, because it may not edit the helper:
+
+1. **commit-segment-with-cursor** — write a segment and make the cursor current, together.
+2. **read-cursor** — the live cursor, or nothing. This is also what PRESENCE is.
+3. **write-cursor-only** — move the cursor with NO segment. The cursor-record keeper needs it for an
+   empty save and the truncation rewrite; on the tail keeper it is a tail rewrite.
+4. **seal-segment** — make the segment at a given ordinal sealed. The helper DECIDES when to seal
+   (the threshold, counted in events); the keeper decides what sealing COSTS. On the tail keeper it
+   rewrites that segment with `unconfirmedBlocks` emptied; on a keeper whose cursor was never in a
+   segment it is a NO-OP, and that is the whole reason it is a keeper operation rather than a helper
+   `set`. A helper that stripped by writing the segment itself would rewrite a key the other keeper
+   asserts is never written again, and that keeper could not fix it without editing the helper.
+5. **clear-cursor** — forget the cursor. Needed because `clear` is enumerate-and-delete over an
+   ANCHORED ordinal pattern, and a cursor held OUTSIDE a segment is deliberately keyed so that
+   pattern REJECTS it. Without this operation a cleared stream keeps a cursor claiming coverage of
+   an empty history, which is the cursor-AHEAD direction property 2 forbids, and it is not
+   self-healing: `indexer.ts:590` finds `streamMatches` still passing, so it does not re-clear, and
+   the next save's `fromBlock` sits BELOW the stale `lastToBlock + 1` so the hole guard does not fire
+   either. The stream then holds head events only while claiming block 0 upward, and the next
+   state discard replays that as if it were whole. This is the repo's own precedent, not a novelty:
+   the `StateStore` cursor port is `readCursor`/`writeCursor`/`clearCursor` for the same reason.
+
+The tail keeper implements clear-cursor as "delete the tail", which its `clear` does anyway, so this
+costs it nothing; it exists so the seam is complete for the keeper that needs it.
+
+**`clear` runs CLEAR-CURSOR FIRST, then deletes the segments.** The two are not one transaction on
+every substrate (on IndexedDB they are a separate cursor write and a `delMany`), so the order is what
+makes the crash-interrupted middle safe. **State the RULE as the PROPERTY, not as an outcome, because
+the outcome differs per keeper and the general phrasing is false on one of them:** an interrupted
+`clear` must never leave a cursor claiming coverage the surviving events lack (the cursor-AHEAD
+direction). Concretely:
+
+- on the CURSOR-RECORD keeper, cursor-first leaves segments with no cursor at all, so presence reads
+  ABSENT and the next load self-heals through `indexer.ts`'s clear branch;
+- on the TAIL keeper, clear-cursor IS deleting the tail, which merely promotes `_N-1` — and a sealed
+  segment still carries its `lastSync` minus the window, so read-cursor returns something and
+  presence stays TRUE. That is NOT absent and must not be asserted as such. It is the ordinary
+  shorter-but-valid prefix this task already documents for an interrupted `clear`, and it is safe
+  because the cursor is BEHIND the events rather than ahead of them.
+
+Segments-first is what is forbidden on both: it leaves a cursor over no events, the non-self-healing
+state clear-cursor exists to prevent. Note the consequence for the honesty of the gap analysis:
+`clear` is now TWO operations on the cursor-record keeper, so "a partial clear cannot happen at all
+there" is no longer true — what is true is that the reachable partial state is the SAFE one.
 
 ### Recovery, and what it must not do
 
+- **The recovery SEQUENCE is the helper's, in this order, because one keeper has a window the other
+  does not.** On finding a hole at `k`: read the surviving top segment (`k-1`) for its EXTENT;
+  compose the recovered cursor from that extent plus the `context` of the cursor read before the
+  recovery, with an EMPTY `unconfirmedBlocks`; **write-cursor-only** that recovered cursor; and only
+  THEN delete `k` and everything above. Deleting first leaves an observable window where the cursor
+  describes segments that are gone, and — worse on the cursor-record keeper — the ordinals are
+  contiguous again afterwards, so the gap can never be re-detected. Carry the `context` FORWARD
+  rather than fabricating one: a segment's extent has no `context`, `LastSync` requires one, and
+  `indexer.ts` reads it through `streamMatches` on both load branches, so a fabricated one CLEARS the
+  very prefix this recovery exists to keep. On the tail keeper the write-cursor-only call is
+  satisfied by the surviving tail already being the cursor, so the sequence is a no-op there and is
+  still the same sequence.
+- **IF NOTHING SURVIVES, the stream is GONE, not empty-but-present.** A gap at ordinal 0 with no
+  adopted legacy segment leaves the recovery no `k-1` to read an extent from. It must then
+  CLEAR-CURSOR, so presence reads FALSE and the next load takes `indexer.ts`'s clear branch — an
+  empty stream is honest where a stream claiming coverage it lacks is not. State this explicitly
+  because the presence rule changed underneath it: when presence was "a tail exists" this case was
+  self-evident, and now that presence is the CURSOR, the cursor-record keeper would otherwise read
+  PRESENT with zero events and a cursor claiming block 0 upward, which is the worst state in this
+  whole design.
 - **A gap in the ordinals is REFUSED, the refusal CLEARS FROM THE GAP UPWARD, and the PREFIX BENEATH
   SURVIVES.** A GAP is a HOLE in the enumerated ordinals (`_0`, `_1`, `_3`), found on load, meaning a
   fragment was lost — replaying what remains as if it were the whole stream is silent wrong state.
@@ -142,12 +239,45 @@ implementation of those operations.
 ## Acceptance criteria
 
 - [ ] A core helper implements segmentation over an injected `get`/`set`/`del`/`delMany`/`keys` port
-      PLUS keeper-supplied cursor operations, so cursor PLACEMENT is not baked in. **THREE operations, not
-      two**: commit-segment-with-cursor, read-cursor, and **write-cursor-only**. The third is not
-      optional — the cursor-record keeper needs it for an empty save (no segment) and for the
-      truncation rewrite (no segment), and a seam without it leaves that keeper unable to satisfy its
-      own criteria inside its scope fence. `keepStreamOnFile` supplies the tail implementation and
-      `packages/fs/src/utils/fs.ts` gains `keys`, `delMany` and an atomic write.
+      PLUS keeper-supplied operations, so cursor PLACEMENT and seal COST are not baked in. **FIVE
+      operations**: commit-segment-with-cursor, read-cursor, **write-cursor-only**, **seal-segment**
+      and **clear-cursor**. The last three are not optional — the cursor-record keeper needs
+      write-cursor-only for an empty save (no segment) and for the truncation rewrite (no segment);
+      seal-segment because a helper-issued segment write would rewrite a key that keeper asserts is
+      never rewritten, while there sealing must cost nothing; and clear-cursor because its cursor is
+      keyed so the anchored ordinal pattern REJECTS it, so enumerate-and-delete cannot reach it. A
+      seam missing any of them leaves that keeper unable to satisfy its own criteria inside its scope
+      fence. `keepStreamOnFile` supplies the tail implementation of all five (seal-segment empties the
+      window; clear-cursor deletes the tail) and `packages/fs/src/utils/fs.ts` gains `keys`, `delMany`
+      and an atomic write.
+- [ ] **The SEGMENT RECORD shape is the HELPER's and is `{events, extent}`**, extent being
+      `{lastFromBlock, lastToBlock, latestBlock}`. The helper never reads a segment's `lastSync`: it
+      reads the cursor through read-cursor. A keeper MAY carry its cursor inside the tail record as
+      well (that is the tail strategy), and a keeper whose segments carry no cursor at all is
+      CONFORMING. Assert the helper's read path works against a segment record with no `lastSync` in
+      it, so the sibling keeper is not blocked by an fs-shaped assumption.
+- [ ] **PRESENCE is the read-cursor operation returning something**, asserted at the helper rather
+      than as "a tail exists": the other keeper reads present with NO segment (an empty first save, an
+      adopted legacy blob), and a tail-shaped check would clear a good stream there.
+- [ ] **`clear` clears the CURSOR FIRST, then the segments**, asserted by interrupting between the
+      two. Assert the PROPERTY, which holds on both keepers — what remains never has a cursor
+      claiming coverage the surviving events lack — and not a single outcome: on THIS keeper
+      clear-cursor deletes the tail and promotes `_N-1`, which still carries a `lastSync`, so the
+      interrupted middle is a shorter VALID prefix (cursor-BEHIND) and presence stays TRUE. Reading
+      ABSENT there would be wrong, and the cursor-record keeper is where ABSENT is the right
+      assertion.
+- [ ] **A recovery that leaves NO segment clear-cursors**, so presence reads FALSE rather than
+      leaving an empty-but-present stream with a cursor claiming block 0 upward.
+- [ ] **`clear` also clears the CURSOR.** Assert that after `clear` the read-cursor operation returns
+      nothing, so presence reads FALSE. This is what stops a stream that was cleared coming back as
+      an empty history with a cursor claiming coverage from block 0 — which `indexer.ts` does not
+      re-clear (`streamMatches` still passes) and the hole guard does not catch (the next
+      `fromBlock` is below the stale `lastToBlock + 1`), so the next state discard replays head-only
+      events as if they were the whole stream.
+- [ ] **The recovery SEQUENCE is asserted in order**: read the surviving top segment's extent,
+      compose the recovered cursor from it plus the PRE-recovery cursor's `context` and an empty
+      window, write-cursor-only, THEN delete from the gap upward. Assert the `context` is carried
+      forward and not fabricated (a fabricated one fails `streamMatches` and clears the kept prefix).
 - [ ] Core's `index.ts` re-exports the helper (core's `exports` map is only `.` and
       `./package.json`), so **ship a changeset**, scoped to `@etherfold/core` and `@etherfold/fs`.
       The sibling ships its own for `@etherfold/browser`.
@@ -186,11 +316,26 @@ implementation of those operations.
       one call with a `clear`, plus dropping the scanned extent from the segment shape.
 - [ ] **`clear` deletes from the HIGHEST ordinal DOWNWARD**, asserted by interrupting it: what remains
       is a contiguous prefix that still reads, not a hole.
+- [ ] **`clear` deletes the ADOPTED LEGACY KEY BY NAME**, not by enumeration. `stream_<name>_<chainId>`
+      carries NO ordinal, so the anchored pattern REJECTS it by construction — the same blind spot as
+      the cursor record, and the second instance of it. Left behind, it survives a `clear`, then reads
+      as a valid tail carrying its own `lastSync`, and `indexer.ts`'s `reset()` (clear the stream,
+      clear the processor, load) replays the stale pre-upgrade prefix into a freshly-cleared
+      processor: story 6 broken SILENTLY, with no crash and no gap to detect. Correspondingly,
+      **clear-cursor means "forget the cursor from EVERY source it can come from"**, which on a keeper
+      whose read-cursor has a legacy fallback includes that blob. Assert a `clear` on an ADOPTED
+      stream leaves nothing and reads absent.
 - [ ] **`clear` removes everything** and no orphan survives; **enumeration does not cross chains**
       (chains `1` and `10` sharing a name, where a `clear` on one leaves the other intact and its
       replay unpolluted); and a `clear` leaves `keepStateOnFile`'s `<name>_<chainId>` keys in the
       SAME folder untouched.
-- [ ] **A sealed segment is never rewritten AFTER its strip** and is **readable by its own key**.
+- [ ] **A sealed segment is never rewritten WHILE IT REMAINS SEALED**, and is **readable by its own
+      key**. Scope it that way rather than as "never again": the truncation path deliberately makes a
+      formerly-sealed segment the new TAIL, which the next save then appends to, so an unscoped
+      immutability assertion and the truncation assertion cannot both pass.
+- [ ] **SEALING goes through the keeper's seal-segment operation**, never a helper-issued write to a
+      segment key. Assert the fs keeper's seal empties the window, and assert the helper issues no
+      segment write of its own at a seal — that is what lets the sibling keeper make sealing free.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order. Strict equality — this task changes no event shape.
 - [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events.
@@ -225,10 +370,14 @@ and the state-kept branch that has no `else`). The reorg re-append is in
 `packages/fs/test/keepStateOnFile.test.ts`; for a capability-style contract, `packages/state-store`'s
 `capabilities.ts` and ADR-0020's conformance suite.
 
-**Domain vocabulary.** A *segment* is one stored batch of events plus the `lastSync` current after
-them. The *tail* is the open, highest-ordinal segment and holds the live cursor; everything below is
-*sealed*, which means its unconfirmed WINDOW has been emptied while the rest of its `lastSync`
-remains. The stored stream is an *emission stream*. A *truncation path* is any path that
+**Domain vocabulary.** A *segment* is one stored batch of events plus the SCANNED EXTENT
+(`{lastFromBlock, lastToBlock, latestBlock}`) current after them; that pair is the helper's record
+shape on every keeper. The *cursor* is a whole `LastSync` (the extent PLUS the `context` PLUS
+`unconfirmedBlocks`) and WHERE it lives is the keeper's own business. On THIS keeper it rides inside
+the open tail, so the *tail* is the highest-ordinal segment and holds the live cursor; everything
+below is *sealed*, which here means its unconfirmed WINDOW has been emptied while the rest of its
+`lastSync` remains. On the sibling keeper the cursor is its own record and no segment holds one at
+all, which is CONFORMING — do not write a helper that assumes otherwise. The stored stream is an *emission stream*. A *truncation path* is any path that
 deliberately leaves a shorter, still-usable stream — today the contiguity refusal, later a paused
 generation — and it is why a sealed segment must still say where the stream got to.
 
@@ -240,7 +389,10 @@ generation — and it is why a sealed segment must still say where the stream go
   client-side, and do not import its two views, cursor validation or compaction.
 - Enumerate with an ANCHORED regex. A `startsWith` on the storage id is silent cross-chain data
   corruption.
-- Do not bake the tail strategy into the helper. Placement is the keeper's.
+- Do not bake the tail strategy into the helper. Placement is the keeper's. Concretely: the helper
+  must not read a segment's `lastSync`, must not define presence as "a tail exists", and must route
+  every cursor move and every seal through the five keeper-supplied operations. The sibling task may not edit the
+  helper, so anything it needs that you did not build strands it.
 
 **Tests must not touch the real environment.** Point every keeper at a temp/scratch folder and assert
 no real home/config path is written. The module-level `node:fs` mock behind
