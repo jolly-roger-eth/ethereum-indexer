@@ -84,7 +84,14 @@ implementation of those operations.
 ### Recovery, and what it must not do
 
 - **A gap in the ordinals is REFUSED, the refusal CLEARS FROM THE GAP UPWARD, and the PREFIX BENEATH
-  SURVIVES.** Not a throw: `indexer.ts` calls `fetchFrom` with no `try`/`catch` in that method and
+  SURVIVES.** A GAP is a HOLE in the enumerated ordinals (`_0`, `_1`, `_3`), found on load, meaning a
+  fragment was lost — replaying what remains as if it were the whole stream is silent wrong state.
+  Be honest about WHEN it happens, because the obvious answer is no longer right: an interrupted
+  `clear` does NOT produce one, since `clear` deletes from the highest ordinal DOWNWARD and so leaves
+  a contiguous prefix, and on IndexedDB `delMany` is one transaction so a partial clear cannot happen
+  at all. What remains are external deletion and CORRUPTION (a segment that fails to parse is treated
+  as a gap at its ordinal). Rare, but the check is nearly free because the ordinals are being
+  enumerated anyway, and the failure it prevents is the worst kind. Not a throw: `indexer.ts` calls `fetchFrom` with no `try`/`catch` in that method and
   the browser wrapper only records `FAILED_TO_LOAD` and rethrows, so a throw makes the indexer
   permanently unloadable — for a LOCAL CACHE whose correct recovery is to re-fetch. Not a whole-stream
   wipe either: that discards a good prefix (story 5) and, on the state-kept path, is SILENT, because
@@ -151,6 +158,8 @@ implementation of those operations.
       nothing raises, `fetchFrom` returns a DEFINED result whose events are exactly `0..k-1`, and the
       resumed cursor is the new tail's. Paired negative: a healthy prefix is not wiped, and an adopted
       legacy stream followed by `_0.._N` is accepted rather than refused for not starting at `_0`.
+      Note an interrupted `clear` is NOT a trigger — deleting downward leaves a contiguous prefix — so
+      induce the gap directly (delete a middle segment, or corrupt one) rather than by half-clearing.
 - [ ] **A TORN segment degrades instead of throwing**: temp-file-plus-rename, a temp name the
       anchored pattern rejects, and a still-unparseable segment treated as a gap.
 - [ ] **A save that would create a HOLE clears instead.**

@@ -284,16 +284,43 @@ seeding.
 **A non-canonical generation may INDEX, or be PAUSED, by configuration.** Indexing costs a duplicated
 head-following fetch; pausing costs nothing and falls behind.
 
-**PAUSING TRUNCATES the generation to a segment boundary below the finality horizon, and reverts its
-state to match.** This is what makes a paused generation safe to keep serving from. A stopped indexer
-otherwise carries an UNCONFIRMED window it can no longer correct: if one of those blocks is reorged
-away it never finds out, and its state permanently contains events from blocks that no longer exist.
-Truncating removes exactly the part that could be wrong.
+**PAUSING CAPS the generation's `toBlock` and lets it DRAIN to a final state. It truncates nothing
+and reverts nothing.** Pause sets `maxToBlock = x` (the generation's current `lastToBlock`); the
+generation keeps polling, fetching nothing above `x` but still re-scanning the reorg window up to it,
+until `x` falls below `latestBlock - finality`. At that point every block it holds is FINAL and it is
+genuinely idle.
 
-Three consequences to build deliberately: truncate to a SEGMENT BOUNDARY rather than rewriting a
-sealed segment; revert the STATE to the same point, or the state is ahead of its stream; and resume
-needs no special validation, because `getFromBlock` re-scans from `lastToBlock - finality` on the
-first round anyway.
+The hazard this addresses is real: a generation that simply STOPS carries an UNCONFIRMED window it
+can no longer correct, so if one of those blocks is reorged away it never finds out and its state
+permanently contains events from blocks that no longer exist. Draining removes the hazard by waiting
+it out instead of by cutting it off.
+
+**It needs no new mechanism, which is the strongest argument for it.** With `toBlock` capped at `x`
+and `lastToBlock = x`, the EXISTING `getFromBlock` (`max(min(lastToBlock + 1, latestBlock - finality),
+0)`) does the whole thing:
+
+- while `latestBlock - finality <= x`, it returns `latestBlock - finality`, so each round re-scans
+  `[latestBlock - finality, x]` — a shrinking window, correcting any reorg that touches what the
+  generation holds;
+- once `latestBlock - finality > x`, it returns `x + 1`, which is ABOVE the capped `toBlock`, so the
+  indexer takes its existing `fromBlock > toBlock` "no new block" branch and fetches nothing.
+
+So a paused generation self-terminates into a no-op poll. Be precise about one thing rather than
+overclaiming it: `unconfirmedBlocks` may still LIST blocks, because the re-add rule compares against
+`lastToBlock` rather than `latestBlock` and `lastToBlock` is frozen. That is cosmetic. Every block it
+lists is below `latestBlock - finality` and therefore final, so nothing it describes can be
+invalidated, and nothing re-fetches to compare against it.
+
+**This is why stories 4 and 10 do not conflict.** A truncating pause would have made them
+contradictory: story 4 wants the pointer moved BACK to restore a generation's answers EXACTLY, while
+a truncating pause changes those answers. Draining preserves them completely — a paused generation
+answers precisely what it answered at pause, minus nothing — so a retired generation can be both
+paused and faithfully revertible.
+
+Three consequences to build deliberately: pause is not INSTANT, it takes up to `finality` blocks of
+continued light polling (head checks plus a shrinking re-scan) before the generation is idle, and a
+consumer should be able to see that draining state; `revertTo` is NOT needed on this path, which
+matters because it is destructive and capability-gated; and resume is simply removing the cap.
 
 ### Multi-project
 
@@ -362,11 +389,17 @@ reconciled or dropped rather than left asking a settled question.
   all still readable after the refusal.
 - **Deleting a generation leaves its stream** if another generation uses it, and reaps the stream when the
   last one goes.
-- **A paused generation is truncated below the finality horizon and its state reverted to match**, so its
-  answers contain nothing a reorg could invalidate. Assert the state cursor and the stream cursor
-  agree after a pause.
-- **A paused generation resumes correctly** across a reorg that happened while it was paused, deriving it
-  from the node on its first round rather than inheriting a stale window.
+- **A paused generation DRAINS to a final state and loses nothing.** Assert: after pause its
+  `toBlock` is capped; it keeps re-scanning the shrinking window and corrects a reorg that strikes at
+  or below the cap; once the cap falls below `latestBlock - finality` it fetches nothing (the
+  existing `fromBlock > toBlock` branch); and its answers at that point are EXACTLY what they were at
+  pause. That last one is the guard that keeps story 10 compatible with story 4, which a truncating
+  pause would have broken.
+- **A paused generation is revertible-to**: move the pointer to it and assert it answers precisely
+  what it answered before, with no re-index and no fetch.
+- **A paused generation resumes correctly**: resume is removing the cap, and a reorg that struck
+  BELOW the cap while it was draining was already corrected; one that struck above it is re-derived
+  on the first uncapped round, since `getFromBlock` re-scans from `latestBlock - finality`.
 - **A handle held across a pointer move** keeps answering, from the newly canonical generation.
 - **A generation's progress is visible** while it is behind, and stops being reported once canonical.
 - **Round-trip through BOTH keepers**, since they are independent implementations of one contract.
