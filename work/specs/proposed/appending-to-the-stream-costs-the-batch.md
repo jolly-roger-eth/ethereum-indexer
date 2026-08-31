@@ -300,7 +300,11 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   IndexedDB assert the segment and cursor commit in one transaction; on the filesystem assert the
   cursor is written last and that a segment above it is DISCARDED as an orphan on the next load
   rather than replayed. This is the atomicity guard and it is the reason the cursor is one record.
-- **No stored segment contains a `lastSync`**, asserted by inspection at the storage seam. The cursor
+- **No stored SEGMENT contains a `lastSync`** — asserted by inspection at the storage seam — **while
+  the CURSOR RECORD carries the whole of it, `unconfirmedBlocks` included.** Assert both halves. The
+  window is IRREPLACEABLE (a reorg makes the old blocks unreachable, so it can never be refetched)
+  and it is fed forward from the STREAM's `lastSync` on the state-discarded/stream-kept path, so a
+  builder trimming it out of the cursor as "waste" would leave that path blind to a reorg. The cursor
   lives in its own record, and a segment carrying one is the duplication this spec exists to remove —
   `unconfirmedBlocks` holds whole blocks WITH their events, so a per-segment copy is expensive and
   permanent.

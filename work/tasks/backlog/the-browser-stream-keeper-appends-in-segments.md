@@ -58,7 +58,8 @@ for the migration test — rather than patching it blind on a red gate.
       `store.transaction`), so a crash can never leave the cursor ahead of its events. Assert it for
       the first save after a legacy adoption too. This is where IndexedDB is BETTER placed than the
       filesystem, which has no multi-file transaction and relies on write-order plus orphan discard.
-- [ ] **No stored segment contains a `lastSync`**, asserted by inspection.
+- [ ] **No stored SEGMENT contains a `lastSync`**, while the CURSOR RECORD carries the whole of it
+      including `unconfirmedBlocks`. Both halves, matching the helper.
 - [ ] **A save with no new events** costs nothing proportional to history.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order, strict equality.

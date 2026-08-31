@@ -157,15 +157,29 @@ Cursor-ahead is the unacceptable failure: it silently skips events that were nev
 Cursor-behind is recoverable, and discarding orphans above the cursor is what makes it so — the same
 shape as the contiguity rule, which clears from the gap upward and keeps the prefix.
 
-**`unconfirmedBlocks` is NOT in the stream at all.** It is state, and the state already persists it:
-the entities path serialises the whole `LastSync` as the opaque cursor string (ADR-0027,
-`processor-entities/src/cursor.ts`, which exists because that window carries BigInt-bearing events).
-So on a normal load the window comes from the state, and on a rebuild it falls out of the replay as a
-by-product of the fold. It is never a separate reconstruction.
+**`unconfirmedBlocks` IS KEPT, in the cursor record, exactly ONCE.** The waste being removed is the
+PER-SEGMENT duplication, not the window itself: with the cursor as one record per stream, keeping the
+window there costs one copy rather than one per sealed segment.
 
-It must NEVER be refetched from the node, and the reason is not cost: after a reorg the old blocks are
-unreachable, so the node returns the NEW chain, which is precisely what a reorg check needs to compare
-AGAINST. Refetching cannot answer the question it would be asked.
+Keeping it is not a convenience, it is REQUIRED, and the reason is that the window is IRREPLACEABLE.
+It must never be refetched from the node — after a reorg the old blocks are unreachable, so the node
+returns the NEW chain, which is precisely what a reorg check needs to compare AGAINST. Refetching
+cannot answer the question it would be asked.
+
+And the stream's own copy is load-bearing on a path that already exists: when the STATE verdict is
+invalid but the STREAM verdict is valid, `indexer.ts` replays the stored stream and feeds the
+STREAM's `lastSync` forward (`feed(replayable, lastSyncFetched)`). On that path the state's copy is
+gone by definition, so a stream that had dropped its window would resume with an empty one and be
+blind to a reorg that struck while it was offline.
+
+So there are two durable copies — the stream's cursor record and the state's cursor (ADR-0027,
+`processor-entities/src/cursor.ts`, which exists precisely because that window carries BigInt-bearing
+events) — and that is DELIBERATE rather than an oversight. Two copies of one small record is the
+right price for data that cannot be re-derived from anywhere. They are written from the same
+`lastSync` object, so they do not drift; where one is missing the other is authoritative.
+
+On a rebuild from the stream the window also falls out of the replay as a by-product of the fold, so
+nothing ever has to RECONSTRUCT it as a separate operation.
 
 ### Generations
 
@@ -175,6 +189,21 @@ AGAINST. Refetching cannot answer the question it would be asked.
 - `maxGenerations` per project, as a TOTAL and not per-stream. Per-stream would let total growth scale
   with stream count, leaving the resource anyone actually cares about — total storage, total state
   stores — unbounded.
+
+**The DEFAULTS differ by runtime, because the reason to RETAIN a generation differs.** On a server or
+the CLI an operator inspects, A/B-tests and reverts, so retention is the point and the cap should be
+generous. In a BROWSER there is usually nothing to revert TO that matters: the app author ships a new
+build, and the user did not choose the reconfigure. So the browser default keeps the previous
+generation only until the new one is promoted, then drops it — which is two generations transiently,
+not N, and bounds browser storage to roughly what it is today rather than to a multiple of it.
+
+**But drop-on-promotion is UNSAFE under the `immediate` policy, and the two knobs must be read
+together.** `immediate` promotes a generation that has caught up to NOTHING, so dropping the previous
+one at that moment discards a complete state in favour of an empty one, with nothing to fall back to
+when the new processor throws on its first event — the exact situation a developer iterating on a
+handler is in constantly. So: drop-on-promotion applies to `on-catch-up` and `manual`, where
+promotion means the successor DEMONSTRATED something. Under `immediate` the previous generation is
+retained until the new one reaches the cursor the old one had at promotion, and only then dropped.
 
 Reaching either cap REFUSES the new generation and names what to delete. It never evicts: eviction picks
 a victim by a policy that cannot know which generation an operator was keeping deliberately, and story 4
