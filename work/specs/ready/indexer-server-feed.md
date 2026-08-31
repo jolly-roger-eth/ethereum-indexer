@@ -41,12 +41,29 @@ views, per-view cursors, the block-hash cursor validation, legal `seq` holes, pa
 default). Three things it does NOT decide are recorded here, because they are decisions about the
 TABLE THIS SPEC CREATES and each is free now and expensive later.
 
-**Every row carries TWO discriminators from the first migration: the INDEXER NAME and the
-GENERATION**, both as COLUMNS, and both structurally part of every read and write — never a field a
-query may omit, never defaulted, on the same hazard class as the cross-chain prefix collision
-anchored enumeration exists to prevent. ADR-0006 supplies only `{source, config}`, which is NOT a
-tenancy key: two named indexers with identical sources (same chain, same contracts, same processor)
-collide on it, which is exactly the isolation test the sibling spec asserts.
+**Every row carries TWO discriminators from the first migration: the INDEXER NAME and the STREAM**,
+both as COLUMNS, and both structurally part of every read and write — never a field a query may omit,
+never defaulted, on the same hazard class as the cross-chain prefix collision anchored enumeration
+exists to prevent.
+
+**The second axis is the STREAM and deliberately NOT the generation, which is the trap here.**
+ADR-0006 keys the STREAM on `{source, config}` and only the STATE on `{source, config, processor}`,
+and closes with the consequence: "A processor-logic change therefore cannot invalidate the stream."
+This table IS the stream. So partitioning it on anything carrying the PROCESSOR would fork the stored
+logs on a processor-only change — duplicating the whole history under a new value, or forcing a read
+that omits a discriminator this spec forbids omitting. That is precisely the case the generation model
+promises is FREE (`a-reconfigure-is-not-an-outage` story 2: change the processor without re-fetching a
+single log; `CONTEXT.md`: two generations may READ one stream, only the one indexing WRITES it), and
+it is what `the-server-and-cli-hold-generations-too` story 8 rebuilds FROM. So the stream column's
+value is the `{source, config}` the route already resolved, and nothing about the processor enters
+this table.
+
+Generations partition the STATE, not the log. That split is ADR-0006's and is left exactly where it
+found it.
+
+What ADR-0006 does NOT supply is the tenancy half: `{source, config}` alone collides for two named
+indexers with identical sources (same chain, same contracts, same processor), which is exactly the
+isolation test the sibling spec asserts. Hence the indexer name beside it.
 
 **Why COLUMNS rather than a table or a schema per partition**, decided here because this spec creates
 the table: neither SQLite nor D1 has schema namespaces, so a schema per generation is not available
@@ -81,55 +98,30 @@ families (`409` resumable, `400` otherwise) are unchanged. The alternative of ca
 envelope was rejected: it would make the wire format carry tenancy and turn a misdirected batch into
 a payload error rather than a routing one.
 
-**The consumer CURSOR is OPAQUE and carries the indexer name, the generation and the position.** Three
+**The consumer CURSOR is OPAQUE and carries the indexer name, the STREAM and the position.** Three
 rules, and the third is the one that cannot be walked back:
 
 - **Opaque to the consumer.** It is a server-encoded string, not structured data a client parses.
   Otherwise its encoding becomes a public contract that can never change, and this cursor is the one
   thing this spec argues is unretrofittable. Same call ADR-0027 made for the internal sync cursor.
-- **The name and the generation are VALIDATED, not used for routing.** The route routes; the cursor's
+- **The name and the stream are VALIDATED, not used for routing.** The route routes; the cursor's
   copies exist so a MISMATCH is refused. A cursor minted for one indexer, presented at another, is a
   refusal rather than a re-interpretation — the read-side twin of `WireContextMismatchError`, which
   carries `{source, config}` in the envelope even though the endpoint already identifies the receiver.
-- **A cursor whose GENERATION is no longer canonical is REFUSED, never silently continued.** `seq`
-  positions in two generations are unrelated, so serving the new one at the old one's number is the
+- **A cursor whose STREAM is no longer the one being served is REFUSED, never silently continued.**
+  `seq` positions in two STREAMS are unrelated, so serving one at the other's number is the
   plausible-wrong-answer class this repo refuses everywhere. The response shape already exists: this
   is ADR-0006's cursor validation one level up, where a no-longer-canonical block hash answers
-  "rewind to fork block F". A no-longer-canonical GENERATION answers with the current one, and the
-  consumer decides what to do (the platform advertises; it does not dictate).
+  "rewind to fork block F".
+- **A GENERATION change does NOT invalidate a cursor, and saying so is the point.** Two generations
+  over one stream read the SAME logs in the SAME `seq` space, so a processor-only change costs a feed
+  consumer nothing — the free case extended to the read side. What changes is the FOLD, which is why
+  the generation is advertised rather than validated: a consumer whose actions depend on the state
+  can pause on it, and one that only relays logs need not. The platform advertises; it does not
+  dictate.
 
-The generation is ALSO surfaced as a plain readable field on every feed response, precisely because
-the cursor is opaque: that field is what a consumer compares across polls to notice a promotion.
-
-**Scope line, so this spec and its sibling do not both build the registry.** THIS spec builds the
-name-keyed registry and both routes, with ONE live wire context per named indexer — which is all its
-own writes need. `the-server-and-cli-hold-generations-too` EXTENDS a registry entry to hold SEVERAL
-live contexts at once, and swaps the one-generation-by-construction rule above for its pointer row, which is what a filter-change successor requires, and makes
-`/{indexer}/ingest/expected-from-block` answer with one entry per live context instead of one. That
-endpoint already returns its `context` alongside the block number, so that is a widening of something
-it does today rather than a new idea.
-
-**The GENERATION column holds an OPAQUE identifier, and at THIS spec's scope its value is ADR-0006's
-existing triple.** The column needs a value on every write, and it must not be defaulted, so say where
-it comes from rather than leaving a builder to invent one:
-
-- **At this scope the identifier is `{source, config, processor}`** — which ADR-0006 ALREADY names as
-  what state is keyed by, so this is not a new derivation. Both halves are in hand at the write site:
-  `source` and `config` are the `WireContext` the route resolved, and `processor` is
-  `getVersionHash()` on the injected processor, which `StreamBuilder.currentLastSync()` already reads
-  on every call for exactly this purpose. Nothing new is computed and nothing is duplicated.
-- **It is OPAQUE to this spec's storage and reads**: a text identifier to partition and compare on,
-  never parsed. That is what lets `a-reconfigure-is-not-an-outage` later REPLACE its composition with
-  the stream-digest-plus-processor-hash identity without touching this table's shape, and it is why
-  this spec needs no `taskedAfter` edge onto that one — importing the derivation would duplicate a
-  definition that must have exactly one home.
-- **At this scope every named indexer has EXACTLY ONE generation, which is therefore canonical by
-  construction.** Say this explicitly, because the feed is specified as serving THE CANONICAL
-  generation and there is no pointer to resolve yet: the pointer row, N generations, and promotion
-  all arrive with `the-server-and-cli-hold-generations-too`. The feed's contract is written so that
-  arrival changes the ANSWER and not the SHAPE — the cursor already carries the generation, and the
-  response already advertises it, so a consumer built against this spec keeps working when a second
-  generation first exists.
+The generation is surfaced as a plain readable field on every feed response, precisely because the
+cursor is opaque: that field is what a consumer compares across polls to notice a promotion.
 
 **Scope line, so this spec and its sibling do not both build the registry.** THIS spec builds the
 name-keyed registry and both routes, with ONE live wire context per named indexer — which is all its
@@ -139,19 +131,31 @@ live contexts at once, and swaps the one-generation-by-construction rule above f
 endpoint already returns its `context` alongside the block number, so that is a widening of something
 it does today rather than a new idea.
 
-**The GENERATION column holds an OPAQUE identifier and this spec does not derive it.** A generation's
-identity (its stream digest plus the processor version hash) is `a-reconfigure-is-not-an-outage`'s,
-and deliberately stays there: the table needs a value to partition on, not the rule that computes it.
-Stated so this spec needs no `taskedAfter` edge onto that one — an opaque column is buildable without
-it, and importing the derivation would duplicate a definition that must have exactly one home.
+**There is NO generation column on this table, and the generation is still ADVERTISED.** The two are
+not in tension, and keeping them apart is what makes a processor-only change free for feed consumers
+too: the LOGS a consumer reads are identical across a processor change (same stream, same `seq`
+space), so nothing about their cursor need move, while the generation that ANSWERED is still reported
+so a consumer whose actions depend on the fold can react. At this spec's scope each named indexer has
+exactly ONE generation, which is canonical by construction; the pointer row, N generations and
+promotion arrive with `the-server-and-cli-hold-generations-too`, and this spec's contract is shaped so
+that arrival changes the ANSWER and not the SHAPE.
+
+Where the advertised value comes from at this scope: `{source, config, processor}`, ADR-0006's state
+key, both halves already in hand at the write site (the resolved wire context, and `getVersionHash()`
+which `StreamBuilder.currentLastSync()` already reads on every call). It is OPAQUE — reported and
+compared, never parsed — so `a-reconfigure-is-not-an-outage` can later replace its composition with
+the stream-digest-plus-processor-hash identity without touching anything here, which is why this spec
+needs no `taskedAfter` edge onto that one.
 
 **The feed SERVES THE CANONICAL generation, and every feed response and cursor ADVERTISES THE
 GENERATION IDENTITY it was answered from.** Decided, and the split of responsibility is the point.
-The PLATFORM's duty stops at advertising: a consumer's `seq` is a position in ONE generation's
-emission stream, the canonical pointer can move underneath it, and the successor's stream has its own
-sequence — so a `seq` that silently changes meaning is exactly the plausible-wrong-answer class this
-repo refuses everywhere. Advertising the identity makes the change DETECTABLE at zero cost, since the
-feed already resolves the pointer to answer at all.
+The PLATFORM's duty stops at advertising. Be precise about what moves and what does not, because the
+loose version of this is wrong: a `seq` is a position in a STREAM, so a promotion to a generation over
+the SAME stream leaves every consumer cursor valid, and only a promotion to a generation on a
+DIFFERENT stream (a filter change) invalidates one — which the cursor's stream component catches as a
+refusal. What advertising buys is the case in between: same logs, different FOLD, which no cursor
+check can see and which a consumer reading state alongside the feed must be told about. It is
+DETECTABLE at zero cost, since the feed already resolves the pointer to answer at all.
 
 What the platform deliberately does NOT do is decide what a consumer should do about it. Pausing,
 re-scanning from the new generation's start, or carrying on are all legitimate and depend on what the

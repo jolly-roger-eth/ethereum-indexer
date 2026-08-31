@@ -107,11 +107,15 @@ keep. Do not port the FILESYSTEM's tail strategy here.
    this spec is `taskedAfter indexer-server-feed`.** `StreamBuilder`'s docstring (not ADR-0006's — an
    ADR has none) says it "does not store the emission stream: that arrives with ADR-0006, in the
    `indexer-server-feed` spec". That spec owns the table; this one consumes it.
-2. ~~**How does a generation partition that table?**~~ **ANSWERED by the spec that owns the table.**
-   `indexer-server-feed` carries both discriminators as COLUMNS in its first migration. A schema per
-   generation is not available (neither SQLite nor D1 has schema namespaces) and a table per
-   generation would push the log table into dynamic DDL, which the server's fixed-schema file
-   deliberately excludes.
+2. ~~**How does a generation partition that table?**~~ **ANSWERED, and the premise was wrong: a
+   generation does NOT partition that table.** `indexer-server-feed` partitions the LOG table on
+   (INDEXER NAME, STREAM), as COLUMNS in its first migration, because ADR-0006 keys the STREAM on
+   `{source, config}` and only the STATE on `{source, config, processor}`. Partitioning the log on
+   anything carrying the processor would fork the stored stream on a processor-only change, which is
+   the case this model promises is free and which story 8 rebuilds FROM. Generations partition the
+   STATE. (Columns rather than a schema or a table per partition: neither SQLite nor D1 has schema
+   namespaces, and a table per partition would push the log table into dynamic DDL that the server's
+   fixed-schema file deliberately excludes.)
 
    **But the KEY SHAPE is not open, and it must be pinned BEFORE `indexer-server-feed` builds the
    table, not here.** `CONTEXT.md` already decides that on this runtime the discriminator is
