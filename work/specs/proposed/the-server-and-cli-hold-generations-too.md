@@ -25,7 +25,7 @@ taskedAfter: [a-reconfigure-is-not-an-outage, indexer-server-feed]
 ## Problem Statement
 
 `a-reconfigure-is-not-an-outage` makes a reconfigure survivable by holding several GENERATIONS and
-moving a canonical pointer. It is specified per PROJECT and per GENERATION rather than per runtime,
+moving a canonical pointer. It is specified per NAMED INDEXER and per GENERATION rather than per runtime,
 deliberately — but every landable that actually RUNS a generation is browser-side, and the two stream
 keepers that exist are the filesystem and IndexedDB.
 
@@ -80,12 +80,12 @@ keep. Do not port the FILESYSTEM's tail strategy here.
 4. As an operator, I want a rebuild in progress to be distinguishable from an empty result, which is
    the same absence-versus-contradiction distinction the reorg model and `SuspectedTruncationError`
    already make.
-5. As an operator running MULTIPLE PROJECTS on one server or CLI, I want them fully isolated, so no
-   query, prefix scan or cap in one project can ever reach another's data.
+5. As an operator running MULTIPLE NAMED INDEXERS on one server or CLI, I want them fully isolated,
+   so no query, prefix scan or cap in one can ever reach another's data.
 6. As a developer, I want the CLI to run exactly what the server runs, so what I test locally is what
    deploys.
-7. As an operator, I want a bound on how many generations a project accumulates, and a loud refusal
-   at the bound rather than a silent eviction.
+7. As an operator, I want a bound on how many generations a named indexer accumulates, and a loud
+   refusal at the bound rather than a silent eviction.
 8. As a maintainer, I want a processor-logic upgrade to rebuild state from the locally stored stream
    rather than from the chain, so an upgrade costs a local scan instead of a full re-index. (From
    `indexer-server-feed`, story 9.)
@@ -107,20 +107,78 @@ keep. Do not port the FILESYSTEM's tail strategy here.
    this spec is `taskedAfter indexer-server-feed`.** `StreamBuilder`'s docstring (not ADR-0006's — an
    ADR has none) says it "does not store the emission stream: that arrives with ADR-0006, in the
    `indexer-server-feed` spec". That spec owns the table; this one consumes it.
-2. **How does a generation partition that table?** A `generation` column with every read filtered on
-   it, a table per generation, or a schema per generation. The same question the browser answered
-   with a key component, and the answer here is a storage-adapter decision that the composite key
-   should keep open.
+2. ~~**How does a generation partition that table?**~~ **ANSWERED by the spec that owns the table.**
+   `indexer-server-feed` carries both discriminators as COLUMNS in its first migration. A schema per
+   generation is not available (neither SQLite nor D1 has schema namespaces) and a table per
+   generation would push the log table into dynamic DDL, which the server's fixed-schema file
+   deliberately excludes.
+
+   **But the KEY SHAPE is not open, and it must be pinned BEFORE `indexer-server-feed` builds the
+   table, not here.** `CONTEXT.md` already decides that on this runtime the discriminator is
+   STRUCTURAL, part of a composite key every read and write takes, never a field a query may omit
+   and never defaulted. `indexer-server-feed` is ungated and auto-taskable and creates that table
+   with no discriminator in it, so tasked first it ships a primary key AND a public feed cursor and
+   route with no tenant — and retrofitting then costs a primary-key rebuild plus a breaking change to
+   a consumer-facing contract. That is the same argument `node-log-api` already makes for its topic
+   columns, and it is stronger here because the DDL is still free (nothing is deployed) while the
+   cursor contract will not be. Recorded as a finding against that spec, not as a question for this
+   one.
 3. **Does the CLI hold several generations, or one?** A long-running `serve` clearly can. A one-shot
    batch arguably should not, and forcing it to would add a pointer read to a path that has no
    reconfigure. If they differ, the difference must be in the HOST rather than in the model.
-4. **Where does `project`'s VALUE come from on a server or CLI?** The browser needs no discriminator
-   (a page is one project) and has none, so this runtime is the first to require one, and nothing
-   supplies it today: `createFileKeepState(folder)` takes no name and `packages/server` has none. Is
-   it a deployment config key, a path segment on the ingest route, or derived from the feed's own
-   identity?
-5. **What replaces `processor.clear()` in `StreamBuilder`, exactly?** It is called on two routes and
-   its removal is the concrete deletion sweep this spec owns.
+   Evidence, checked: `etherfold index` is a one-shot `indexToTip` that exits, and `etherfold serve`
+   lazily imports `@etherfold/platform-nodejs` and runs the same server, so the two verbs are already
+   different HOSTS over shared machinery — which is where the difference would have to live.
+4. ~~**Where does `project`'s VALUE come from on a server or CLI?**~~ **ANSWERED, and the concept was
+   renamed with it.** There is no `project`: the unit is a NAMED INDEXER (`CONTEXT.md`), because once
+   an indexer is one chain and one answer set, a separate tenancy axis above it was a synonym. The
+   NAME arrives on **`upload`**, alongside the source info and the processor, modelled on the
+   thegraph CLI minus its create step. It is supplied by the operator, never defaulted, and refused
+   when absent.
+
+   The value therefore comes from a DEPLOY-TIME manifest rather than a runtime code upload: the
+   server never loads a processor module (`ServerOptions.getIngestion` is injected precisely so an
+   HTTP app never has to), and the Worker host could not anyway, since `loadProcessorModule` is
+   `import()` over a filesystem path. `upload` bundles and DEPLOYS; a host registers the N named
+   indexers it was built with.
+5. ~~**What replaces `processor.clear()` in `StreamBuilder`?**~~ **ANSWERED. The DELETION SWEEP is
+   precise and was never the open part.** There is exactly ONE call site, in the private `currentLastSync()`, reached
+   from BOTH public methods (`expectedFromBlock()` and `receive()`) and therefore from both ingest
+   routes; its docstring already flags that reading can WRITE for this reason. In the generation
+   model that branch stops discarding and instead resolves-or-creates the generation the incoming
+   context names, leaving the canonical one answering.
+
+   ~~What stays OPEN is whose cursor `expectedFromBlock()` answers with.~~ **ANSWERED by question 6
+   below**: it answers PER WIRE CONTEXT, not per indexer, so the ambiguity dissolves. Two generations
+   on the SAME stream (a processor-only change) share one stream and therefore one cursor and one
+   answer; two generations on DIFFERENT streams have different contexts and get different answers.
+   The number was only ambiguous while the endpoint was assumed to return exactly one.
+6. ~~**How does a FILTER-change successor get its logs?**~~ **ANSWERED: a registry entry holds SEVERAL
+   LIVE WIRE CONTEXTS, and `expected-from-block` answers with one entry per context.**
+
+   The problem was real: `ServerOptions.getIngestion` yielded ONE `LogIngestion` with ONE readonly
+   `WireContext`, and `assertContext` refuses a foreign `{source, config}` with a `400` that is
+   deliberately NOT resumable — so a successor on a NEW stream could not receive logs at all while
+   the old generation was still being fed. This is the server's version of the browser's "a successor
+   follows the head itself", and it does not port, because in the browser the indexer owns its own
+   fetching and here it does not.
+
+   The resolution rides on what `indexer-server-feed` already builds. That spec introduces
+   `/{indexer}/ingest` and a NAME-KEYED REGISTRY resolving one `LogIngestion` per named indexer, with
+   ONE live context each. THIS spec widens a registry entry to hold several: the route selects the
+   INDEXER, and the batch's own `{source, config}` then selects WHICH stream-builder within it
+   receives the batch. A context in neither is still the existing `400`, so the refusal families are
+   untouched.
+
+   `POST /{indexer}/ingest/expected-from-block` correspondingly answers with one
+   `{context, expectedFromBlock}` per LIVE context rather than a single pair. That is a WIDENING of
+   what it does today — it already returns its `context` beside the block number, precisely so a
+   sender knows which receiver it reached — and it is what lets one fetcher host run one fetch loop
+   per context. Record it as a deliberate response-shape change with a changeset.
+
+   The one thing to build carefully: a successor's context becomes live when the successor is created
+   and stops being live when its generation is dropped or the successor becomes canonical and the old
+   stream is reaped. That lifetime is this spec's, since it owns generation creation and the caps.
 
 <!-- /open-questions -->
 
@@ -134,9 +192,15 @@ promotion policy defaulting to `on-catch-up` everywhere are all
 `a-reconfigure-is-not-an-outage`'s and are consumed unchanged. Restating any of them here would
 create a second source of truth that drifts.
 
-**The project discriminator is the same composite key**, structurally non-omittable, and whether it
-maps to a column, a table prefix or a schema is exactly the storage-adapter decision the sibling
-spec deliberately left open. This runtime is where that decision actually gets made.
+**The INDEXER NAME is the discriminator**, structurally non-omittable, and it is the same composite
+key `indexer-server-feed` pins on the emission table. That spec owns the table and now also owns the
+physical mapping (COLUMNS, since neither SQLite nor D1 has schema namespaces); this spec consumes it.
+
+**One name is one chain at a time**, and the consequence is worth stating because it removes a
+feature rather than adding one: changing an indexer's chain moves `chainId`/`genesisHash` in the
+block-0 skeleton entry, so it moves the source hash and therefore the STREAM — an ordinary
+reconfigure that makes a new generation, with the old one retained and revertible. So this runtime
+needs no chain axis in its tenancy key at all. Two chains live at once are two names.
 
 **ADR-0008 is superseded in its KEY and its RETENTION, not in its mechanism.** Its rebuild-alongside
 and flip-a-pointer shape is what this builds. Its namespace key (processor version hash alone) cannot
@@ -156,8 +220,9 @@ recorded on the ADR; this spec is the thing it points at for the server.
   as the key/value keepers rather than against a layout — ideally through the shared conformance
   material `appending-to-the-stream-costs-the-batch` names, which is where a third implementation
   earns its keep.
-- **Two projects with identical sources never touch each other's data**: same chain, same contracts,
-  same processor; deleting everything in one leaves the other complete and readable.
+- **Two NAMED INDEXERS with identical sources never touch each other's data**: same chain, same
+  contracts, same processor; deleting everything in one leaves the other complete and readable. This
+  is the multi-tenancy guard and it fails loudly under any missing discriminator.
 - **The CLI and the server take the same path**, asserted by driving both through one fixture.
 
 ## Out of Scope
