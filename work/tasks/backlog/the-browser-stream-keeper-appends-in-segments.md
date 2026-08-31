@@ -20,9 +20,8 @@ Put `keepStreamOnIndexedDB` on the segmentation helper that
 the entire history.
 
 This is the SECOND independent implementation of one contract, not a second design. Every rule —
-ordinal keys, the cursor as ONE record per stream committed with its segment, sealing by not being
-the highest ordinal any more, the anchored enumeration, the contiguity refusal, legacy adoption in
-place, presence as the cursor record — lives in the helper. This task supplies the **port** and
+ordinal keys, the cursor riding in the open TAIL, sealing as an explicit strip of that cursor, the anchored enumeration, the contiguity refusal, legacy adoption in
+place, presence as the tail — lives in the helper. This task supplies the **port** and
 proves the contract holds on IndexedDB.
 
 `packages/browser/src/storage/stream/OnIndexedDB.ts` today reads the whole stream, concatenates and
@@ -47,33 +46,26 @@ for the migration test — rather than patching it blind on a red gate.
 ## Acceptance criteria
 
 - [ ] `keepStreamOnIndexedDB` is implemented on the core segmentation helper, supplying a
-      `get`/`set`/`setMany`/`del`/`delMany`/`keys` port over `idb-keyval`, plus the capabilities record. No segmentation rule is re-implemented here.
+      `get`/`set`/`del`/`delMany`/`keys` port over `idb-keyval`. No segmentation rule is re-implemented here.
 - [ ] **No full structured-clone of the history on a save**, asserted as WORK at a module-level mock
       of `idb-keyval`'s `set` behind `OnIndexedDB`: assert the CEILING — no save writes more than one
       tail plus its batch, and the 100th append costs no more than the 10th at the same tail phase.
       Wall-clock cannot be the yardstick here: `fake-indexeddb` is itself quadratic, and ADR-0032
       rules out wall-clock on a loaded machine.
-- [ ] **The segment and the cursor commit in ONE `readwrite` transaction**, via `idb-keyval`'s
-      `setMany` (verified: it opens one transaction, puts every entry, and awaits
-      `store.transaction`), so a crash can never leave the cursor ahead of its events. Assert it for
-      the first save after a legacy adoption too. This is where IndexedDB is BETTER placed than the
-      filesystem, which has no multi-file transaction and relies on write-order plus orphan discard.
-- [ ] **No stored SEGMENT contains a `lastSync`**, while the CURSOR RECORD carries the whole of it,
-      unchanged from today. Both halves, matching the helper. Do not strip `unconfirmedBlocks` out of
-      the cursor here; that belongs to `the-stream-stores-only-what-the-node-said`.
+- [ ] **No SEALED segment contains a `lastSync`, while the TAIL carries the whole of it.** Both
+      halves, matching the helper. Do not strip `unconfirmedBlocks` out of the tail here; that belongs
+      to `the-stream-stores-only-what-the-node-said`.
 - [ ] **A save with no new events** costs nothing proportional to history.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order, strict equality.
 - [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events, which is what stops
       `indexer.ts` taking its clear branch.
-- [ ] **The cursor comes from the cursor record** (`{lastSync, committedThrough, committedEvents}`),
-      with no competing copy anywhere.
-- [ ] **The port DECLARES atomic multi-key commit**, and the helper therefore takes its one-commit
-      branch: `setMany` opens one `readwrite` transaction for the segment and the cursor together.
-      Assert the declaration is set AND that CRASH RECOVERY (orphan discard + tail truncation) never
-      executes on this keeper — it compensates for a capability the filesystem lacks and IndexedDB
-      has. The CONTIGUITY REFUSAL is a DIFFERENT recovery and is UNCONDITIONAL: it must still run
-      here, because a gap comes from an interrupted `clear`, which IndexedDB can suffer too.
+- [ ] **The cursor comes from the TAIL**, with no competing copy anywhere, because sealing stripped
+      every sealed segment's.
+- [ ] **A save writes exactly ONE key**, including an empty save and the first save after a legacy
+      adoption — the atomicity guard, and on IndexedDB it means no transaction is needed for it.
+- [ ] **A SEAL writes one extra key and is safe to fail**: interrupt between opening the new tail and
+      stripping the old, and assert the stream still reads correctly and a later pass strips it.
 - [ ] **A sealed segment is never rewritten** and is **readable by its own key**.
 - [ ] **Replay across a reorg** returns retractions in APPEND order.
 - [ ] **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where

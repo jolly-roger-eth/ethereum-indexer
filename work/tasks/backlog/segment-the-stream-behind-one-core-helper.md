@@ -23,40 +23,29 @@ The shape to build:
   SCANNED EXTENT. A save appends to the open tail: ONE write, bounded by the
   tail plus its batch, never by the history. The tail is SEALED when it exceeds a size threshold and
   the next save opens a new one. A sealed segment is immutable forever.
-- **The segment and the CURSOR commit together, and the cursor is ONE record per stream.** Not one
-  per segment: `LastSync.unconfirmedBlocks` is `EventBlock[]` and `EventBlock` carries the FULL
-  decoded events of each block, so a per-segment copy duplicates up to `finality` blocks of real
-  event data into every sealed segment, permanently, where nothing reads it again.
+- **A save writes exactly ONE key: the open TAIL, holding its events AND the `lastSync` current
+  after them.** One key is one write, so the cursor and its events are the SAME BYTES on every
+  substrate and cannot disagree. No two-key commit, no transaction requirement, no orphan rule.
+- **SEALING STRIPS THE CURSOR, and that is the whole point of this change.** A frozen `lastSync` in
+  every sealed segment is real waste: `unconfirmedBlocks` is `EventBlock[]` and `EventBlock` carries
+  the FULL decoded events of each block, so it is up to `finality` blocks of event data per segment,
+  forever, read by nothing. So when a save opens segment `N+1` it also rewrites segment `N` WITHOUT
+  its `lastSync`; after that `N` is sealed and immutable.
 
-  The two failure directions are NOT equal, and that asymmetry is the design. **Cursor AHEAD** of its
-  events is unacceptable: a lost segment is never replayed and the stream silently claims coverage it
-  lacks. **Cursor BEHIND** is recoverable, PROVIDED the extra segment is DISCARDED as an orphan
-  rather than kept — keeping it and re-fetching from the stale `lastToBlock` is what appends
-  duplicates. So the cursor is written LAST, as the commit point:
-
-  - **IndexedDB** has a real multi-key transaction: `idb-keyval`'s `setMany` opens one `readwrite`
-    transaction, puts every entry and awaits `store.transaction`. Both commit together.
-  - **The filesystem** has no multi-file transaction, so it relies on the ordering plus the orphan
-    rule: write the segment, then the cursor via a temp file and `rename`, which IS atomic for one
-    file.
-
-  Orphan discard is the same shape as the contiguity rule below — drop from the break upward, keep
-  the prefix — but they are TWO recoveries and only one is conditional. CRASH RECOVERY (orphan
-  discard + tail truncation) compensates for a non-atomic port and must never fire on an atomic one.
-  The CONTIGUITY REFUSAL is UNCONDITIONAL on every port, because a gap comes from an interrupted
-  `clear` rather than from a torn commit.
-- **Sealing is not a write.** A segment is sealed exactly when it is no longer the highest ordinal,
-  so it happens implicitly when the next save opens a new one, and a reader tells by enumeration.
-  Nothing is ever written INTO a segment to mark it sealed, which is what keeps immutability true.
-  A segment holds its EVENTS plus its SCANNED EXTENT (`{lastFromBlock, lastToBlock, latestBlock}`)
-  and nothing else — no `context`, no `unconfirmedBlocks`.
-- **The live cursor is the CURSOR RECORD, `{lastSync, committedThrough, committedEvents}`.** `committedThrough` is the
-  ORDINAL of the segment it was committed with, and it is REQUIRED rather than convenient: `LastSync`
-  names only blocks, and block order is NOT monotonic across segments (a reorg re-appends lower
-  blocks into a later segment), so nothing can identify the segments ABOVE the cursor from block
-  numbers — which is exactly what orphan discard needs. The per-segment scalars are NOT the
-  per-segment cursor being reinstated: what made that expensive was `unconfirmedBlocks` (whole blocks
-  WITH their events); three numbers are free, and they are what makes any PREFIX self-describing.
+  One extra write per SEAL, not per save, and OFF THE CRITICAL PATH: if it never happens, segment `N`
+  keeps a stale cursor nothing reads (the live cursor is the TAIL's), and the next pass strips it.
+  Idempotent and safe to fail, which is why it needs no ordering rule and no recovery.
+- **The empty save rewrites the tail, and that is accepted.** `indexer.ts` calls `save`
+  unconditionally, so a head-following indexer pays one tail rewrite per poll. It is bounded by the
+  SEAL THRESHOLD and never by history — which is what story 1 claims — and it is tunable. Do NOT
+  "optimise" this by moving the cursor into its own record: that was specified and withdrawn, because
+  it makes the cursor and the segment two things that must agree and drags in a per-port atomicity
+  capability, orphan discard and tail truncation.
+- **Segments are written through temp-file-plus-rename.** A bare `writeFileSync` can leave a TORN
+  file, and `storage().get` wraps only `readFileSync` in its `try`/`catch` — `JSON.parse` is OUTSIDE
+  it — so a torn segment THROWS out of `fetchFrom`, which `indexer.ts` does not wrap, leaving the
+  indexer permanently unloadable. Rename is atomic for one file. A segment that still fails to parse
+  is treated as a GAP at its ordinal.
 - **Keys are ORDINAL, and the read stays a full ordered scan.** The stored stream is an EMISSION
   stream: on a reorg the indexer re-appends superseded events at their ORIGINAL `blockNumber` flagged
   `removed`, then continues at LOWER block numbers. So block ranges overlap and cannot key or order
@@ -85,13 +74,11 @@ The shape to build:
     prefix (below) means this task never enlarges that window. If you find yourself widening it,
     surface it rather than absorbing it.
   - **Not the whole stream.** On a hole at ordinal `k`, delete `k` and above and KEEP `0..k-1`.
-    Segment `k-1` carries its own SCANNED EXTENT, so the surviving prefix is self-describing: rewrite
-    the cursor record from it, window EMPTY (correct — a recovered cursor never drives a scan with an
-    empty window, because the prefix is REPLAYED first and `generateStreamToAppend` rebuilds the
-    window from the replayed events). Open a FRESH ordinal above the prefix rather than appending
-    into the segment that was sealed beneath it. If nothing survives, DELETE the cursor so the stream
-    reads as absent. And if a later save's `fromBlock` would sit ABOVE the recovered cursor, that
-    save would create a HOLE — clear the stream instead of writing it. Clearing everything would throw away a good prefix (story 5
+    Segment `k-1` becomes the TAIL and carries its own `lastSync`, so what survives is a shorter,
+    VALID stream that resumes from its own cursor — nothing to rewrite. If nothing survives there is
+    no tail, presence reads FALSE, and the next load clears. And if a later save's `fromBlock` would
+    sit ABOVE the surviving tail's `lastToBlock + 1`, that save would create a HOLE — clear the
+    stream instead of writing it. Clearing everything would throw away a good prefix (story 5
     says an upgrade must cost nothing the user notices) and, on the state-kept path, would be
     SILENT: `indexer.ts` only clears there when `streamMatches` fails, so an undefined `fetchFrom`
     leaves the state cursor untouched and the next save writes a stream covering only from now on,
@@ -102,21 +89,20 @@ The shape to build:
   not "starts at ordinal 0": after a legacy adoption the earliest segment is the legacy key.
 - **The legacy blob is ADOPTED IN PLACE as the earliest sealed segment**, never copied. The stream
   blob carries no format field, so the old shape is recognised structurally. It is read first,
-  followed by `_0.._N`, and the adoption writes ONE thing — the cursor record, seeded from the
-  `lastSync` inside the legacy blob — so the atomic-commit rule holds THROUGH the migration rather
-  than being suspended for it.
-- **Presence is the CURSOR RECORD, never a segment count and never a tail.** `fetchFrom` must keep
-  returning a DEFINED result for a stream saved to but holding no events, because a defined result is
-  what stops `indexer.ts` taking its clear branch. The cursor record exists as soon as anything has
-  been saved — including an empty save, and including the moment a legacy blob is adopted, when no
-  ordinal segment exists yet.
+  followed by `_0.._N`, and the adoption writes NOTHING AT ALL: the legacy blob already contains a
+  `lastSync`, so it IS a valid tail the moment it is adopted, and the one-write rule holds THROUGH the
+  migration rather than being suspended for it. It is stripped and sealed when `_0` is opened.
+- **Presence is the TAIL, never a segment count.** `fetchFrom` must keep returning a DEFINED result
+  for a stream saved to but holding no events, because a defined result is what stops `indexer.ts`
+  taking its clear branch. A tail exists as soon as anything has been saved — including an empty
+  save, and including the moment a legacy blob is adopted, which IS a tail.
 - **`clear` removes ALL of it.** It deletes a single storage id today; with N segment keys a naive
   port orphans every segment but one, after which the next save appends beside a dead prefix and the
   next `fetchFrom` concatenates it into the replay — wrong state, SILENTLY. It is called from five
   paths in `indexer.ts`.
 
 **Put the rules in ONE internal core helper parameterised over a
-`get`/`set`/`setMany`/`del`/`delMany`/`keys` port plus a CAPABILITIES record**, and
+`get`/`set`/`del`/`delMany`/`keys` port**, and
 let the keeper supply the port. Ordinal naming, the anchored match, the contiguity refusal, the seal
 decision, legacy adoption and cursor selection are identical for both keepers and are the whole
 substance of this change; a helper per keeper would re-implement the same prose twice and drift.
@@ -132,11 +118,7 @@ stops the two keepers choosing differently and makes the seal test deterministic
 
 ## Acceptance criteria
 
-- [ ] The port carries an explicit ATOMIC-MULTI-KEY capability, and the helper branches on it: with
-      the capability, one commit and no recovery path executed; without it, cursor-last plus orphan
-      discard and tail truncation. Assert BOTH branches, and assert the recovery never fires on the
-      atomic one.
-- [ ] A core helper implements segmentation over an injected `get`/`set`/`setMany`/`del`/`delMany`/`keys` port plus a CAPABILITIES record, and is
+- [ ] A core helper implements segmentation over an injected `get`/`set`/`del`/`delMany`/`keys` port, and is
       reachable from `@etherfold/fs` (core's `exports` map is only `.` and `./package.json`, so
       `index.ts` must re-export it). That export line is published surface: **ship a changeset**, and
       scope it to `@etherfold/core` and `@etherfold/fs` only. The sibling task ships its own for
@@ -146,48 +128,30 @@ stops the two keepers choosing differently and makes the seal test deterministic
 - [ ] `keepStreamOnFile` is implemented on the helper and `packages/fs/src/utils/fs.ts` gains `keys`.
 - [ ] **Append cost is asserted as WORK, not wall-clock**, at a module-level mock of `node:fs` behind
       `packages/fs/src/utils/fs.ts`. Assert the CEILING: no save writes more than one tail plus its
-      batch PLUS the cursor record, and the 100th append costs no more than the 10th at the same tail
-      phase. Count the cursor record explicitly: it is bounded by `finality` blocks WITH their events,
-      not by the tail, so a ceiling stated as "one tail plus its batch" is violable by a correct
-      implementation. (Asserting the
+      batch, and the 100th append costs no more than the 10th at the same tail phase. The tail carries
+      the cursor, so its `unconfirmedBlocks` is inside that bound already. (Asserting the
       tenth equals the first is false by design — a tail absorbs several batches before sealing.)
       Wall-clock would be flaky on a loaded machine, per ADR-0032.
-- [ ] **A crash between a TAIL APPEND and the cursor write is recovered**, which is the MAJORITY
-      case and the one an ordinal-only rule misses: the tail grows at the SAME ordinal, so nothing
-      exceeds `committedThrough`. Assert the tail is TRUNCATED to `committedEvents` on load, and that
-      the resumed cursor then covers exactly the events present. Without this the overshooting tail
-      is kept and the next fetch appends duplicates.
-- [ ] **A save with NO events writes ONLY the cursor record** — not the tail — asserted at the
-      instrumented seam. This is story 3 on the filesystem, and it is the behaviour the whole
-      cursor-record design was bought for, so it must be asserted here and not only in the browser.
+- [ ] **A save with NO events rewrites ONLY the open tail**, never the history, asserted at the
+      instrumented seam. This is story 3 on the filesystem: the cost is bounded by the SEAL THRESHOLD
+      and never by how much has been stored.
 - [ ] **A TORN segment file degrades instead of throwing**: segments are written through
-      temp-file-plus-rename like the cursor, and a segment that still fails to parse is treated as a
+      temp-file-plus-rename, and a segment that still fails to parse is treated as a
       GAP at its ordinal. Assert nothing raises out of `fetchFrom` — `indexer.ts` does not wrap it and
       `JSON.parse` sits outside `storage().get`'s `try`, so a throw makes the indexer permanently
       unloadable.
-- [ ] **Segments with NO cursor record finish the clear**, asserted by the keeper rather than left to
-      the indexer: the state-kept branch has no `else` on an undefined `fetchFrom`, so nothing else
-      would.
+- [ ] **`clear` deletes from the HIGHEST ordinal DOWNWARD**, asserted by interrupting it: what remains
+      is a contiguous prefix whose tail carries its own cursor — a shorter but VALID stream — rather
+      than a hole. Deleting upward would leave one, for no benefit.
 - [ ] **A save that would create a HOLE clears instead**: after a contiguity refusal, a save whose
       `fromBlock` sits above the recovered cursor must clear the stream rather than append over a gap
       no reader could detect.
-- [ ] **A crash never leaves the cursor AHEAD of its events**, asserted by interrupting a save at the
-      instrumented seam, INCLUDING the first save after a legacy adoption. Assert the cursor is
-      written LAST, and that a segment above it is DISCARDED as an orphan on the next load rather
-      than replayed. This is the atomicity guard.
 - [ ] **No stored SEGMENT contains a `lastSync`**, while the **CURSOR RECORD carries the whole of
       it**, unchanged from what the single blob stores today. Assert BOTH halves: the per-segment copy
       is the duplication this change removes, and the cursor's copy is existing behaviour you are NOT
       changing (this task changes no published type). Do not "optimise" `unconfirmedBlocks` out of the
       cursor — stripping it is the sibling spec `the-stream-stores-only-what-the-node-said`'s job and
       it has its own reasoning and its own tests.
-- [ ] **The cursor comes from the cursor record**, and an ORPHAN is identified by ORDINAL: a segment
-      whose ordinal exceeds `committedThrough` is discarded on load. Assert this with a segment whose
-      BLOCK numbers are LOWER than the cursor's `lastToBlock` (the reorg case), which a
-      block-number-based orphan test would wrongly keep.
-- [ ] **`clear` deletes the CURSOR FIRST, then the segments**, asserted by interrupting between the
-      two: the remains must read as ABSENT (so the next load re-clears and finishes) rather than as a
-      present stream claiming coverage it does not have.
 - [ ] **A sealed segment is never rewritten** (no write ever targets its key again) and is **readable
       by its own key** without reading the others.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
@@ -265,9 +229,10 @@ stream*: it records what the indexer emitted, including retractions, not a block
   nor monotonic over an emission stream, so it cannot key one. Its `seq` is a SERVER concept for
   query cursors. Do NOT invent a per-event sequence client-side, and do not import ADR-0006's two
   views, cursor validation or compaction into a cache that has none of those problems.
-- Every save writes TWO things, a segment and the cursor record, and they must COMMIT TOGETHER: one
-  `setMany` transaction on IndexedDB, cursor-written-last plus discard-what-it-does-not-cover on the
-  filesystem. Do NOT collapse them back into one key.
+- Every save writes exactly ONE key: the open tail. Not two, and never a separate cursor record: one
+  one key — the open TAIL — carrying its events AND the `lastSync`. If you find yourself writing a
+  separate cursor record, re-read the sealing-strips-the-cursor rule: that alternative was specified
+  and withdrawn.
 - Enumerate with an ANCHORED regex. A `startsWith` on the storage id is a silent cross-chain data
   corruption, not a style preference.
 
