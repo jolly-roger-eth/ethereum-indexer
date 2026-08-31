@@ -72,19 +72,25 @@ Four properties, which every keeper must satisfy and a conformance test can chec
    coverage the stored events do not have; that is silent data loss. Cursor-BEHIND is tolerable, but
    only if the keeper can DETECT the uncommitted excess and discard it — keeping it and re-fetching
    is what appends duplicates.
-3. **No cursor data accumulates per sealed segment.** `LastSync.unconfirmedBlocks` is `EventBlock[]`
-   and `EventBlock` carries the FULL decoded events of each block, so a per-segment copy is up to
-   `finality` blocks of event data, duplicated forever, read by nothing.
+3. **No unconfirmed WINDOW accumulates per sealed segment.** This is narrower than "no cursor data"
+   ON PURPOSE. What is expensive is `LastSync.unconfirmedBlocks`: it is `EventBlock[]` and
+   `EventBlock` carries the FULL decoded events of each block, so a per-segment copy is up to
+   `finality` blocks of event data, duplicated forever, read by nothing. The rest of `LastSync` —
+   three block numbers and the context hashes — is a few dozen bytes and is REQUIRED per segment,
+   because a truncation must leave a stream that can still say where it got to. A rule stripping the
+   whole `LastSync` would leave the surviving prefix with NO cursor at all, and `StreamFetcher` must
+   return one whenever it returns anything.
 4. **An empty save costs nothing proportional to the history.**
 
 **Both shipped keepers satisfy these by putting the cursor IN THE OPEN TAIL and STRIPPING it when the
 segment seals.** One key is one write, so property 2 holds by construction with no transaction, no
 ordering rule and no recovery; sealing is an explicit act — when a save opens segment `N+1` it
-rewrites segment `N` without its `lastSync` — which gives property 3.
+rewrites segment `N` with its `unconfirmedBlocks` EMPTIED, keeping the rest of its `lastSync` — which
+gives property 3 while leaving every segment self-describing.
 
 That strip is one extra write per SEAL, not per save, and it is OFF THE CRITICAL PATH: if it never
-happens, segment `N` keeps a stale cursor nothing reads (the live cursor is the TAIL's, and the tail
-is the highest ordinal), and the next pass strips it. Idempotent and safe to fail.
+happens, segment `N` keeps a stale WINDOW nothing reads (the live cursor is the TAIL's, and the tail
+is the highest ordinal), and the next pass empties it. Idempotent and safe to fail.
 
 **A keeper whose substrate offers atomic multi-row updates MAY place the cursor elsewhere**, and
 should not be read as violating this spec for doing so. A SQL-backed stream can hold its cursor in
@@ -219,8 +225,12 @@ SURVIVES.** Say which, because the two readings differ by an entire cached histo
 destructive one is the intuitive one. On finding a hole at ordinal `k`, delete `k` and everything
 above it and KEEP `0..k-1`.
 
-The prefix is safe to keep for the reason the tail exists: the surviving top segment is a TAIL and
-carries its own `lastSync`, so a truncated stream is self-describing with nothing to rewrite. The
+The prefix is safe to keep because EVERY segment carries its own `lastSync` (sealed ones with an
+emptied window, which is exactly why the strip is narrow): the surviving top segment becomes the TAIL
+and can say where the stream got to, so a truncated stream is self-describing with nothing to
+rewrite. Its window is empty, which is correct — a recovered cursor never drives a scan with an empty
+window, because the prefix is REPLAYED first and `generateStreamToAppend` rebuilds the window from
+the replayed events. The
 recovery is simply "delete from the gap upward"; what remains is a shorter, valid stream that resumes
 from its own cursor. Nothing is replayed as if it were complete, because the cursor came from the
 surviving tail rather than from a stale higher one.
@@ -342,7 +352,9 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   an empty save costing nothing proportional to history. These belong in the shared conformance
   material, following ADR-0020's precedent of testing each backend against its own claim.
 - **For the two keepers that use the TAIL strategy**, assert its mechanics too: seal a tail and
-  confirm the cursor is gone from it while the new tail carries it. Do not strip `unconfirmedBlocks`
+  confirm its `unconfirmedBlocks` is EMPTY while the rest of its `lastSync` survives and the new tail
+  carries a full one. Assert the paired negative explicitly — a sealed segment must still be able to
+  say where the stream got to, or a truncation leaves a prefix that cannot be resumed. Do not strip `unconfirmedBlocks`
   out of the tail — that is `the-stream-stores-only-what-the-node-said`'s job.
 - **A save is atomic in the cursor-ahead direction**, asserted by interrupting at the instrumented
   seam, INCLUDING an empty save and the first save after a legacy adoption. For the tail keepers that

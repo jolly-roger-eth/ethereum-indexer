@@ -20,7 +20,7 @@ Put `keepStreamOnIndexedDB` on the segmentation helper that
 the entire history.
 
 This is the SECOND independent implementation of one contract, not a second design. Every rule —
-ordinal keys, the CURSOR CONTRACT (one authoritative cursor, never ahead of its events, none per sealed segment, empty save bounded), the tail strategy that satisfies it here, sealing as an explicit strip of that cursor, the anchored enumeration, the contiguity refusal, legacy adoption in
+ordinal keys, the CURSOR CONTRACT (one authoritative cursor, never ahead of its events, none per sealed segment, empty save bounded), the tail strategy that satisfies it here, sealing as an explicit emptying of that cursor's window, the anchored enumeration, the contiguity refusal, legacy adoption in
 place, presence as the tail — lives in the helper. This task supplies the **port** and
 proves the contract holds on IndexedDB.
 
@@ -52,8 +52,9 @@ for the migration test — rather than patching it blind on a red gate.
       tail plus its batch, and the 100th append costs no more than the 10th at the same tail phase.
       Wall-clock cannot be the yardstick here: `fake-indexeddb` is itself quadratic, and ADR-0032
       rules out wall-clock on a loaded machine.
-- [ ] **No SEALED segment contains a `lastSync`, while the TAIL carries the whole of it.** Both
-      halves, matching the helper. Do not strip `unconfirmedBlocks` out of the tail here; that belongs
+- [ ] **No SEALED segment retains an unconfirmed WINDOW, while every segment still carries the rest
+      of its `lastSync` and the TAIL carries a full one.** All three, matching the helper — a sealed
+      segment that could not say where the stream got to would leave a truncated prefix unresumable. Do not strip `unconfirmedBlocks` out of the tail here; that belongs
       to `the-stream-stores-only-what-the-node-said`.
 - [ ] **A save with no new events** costs nothing proportional to history.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,

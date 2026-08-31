@@ -33,14 +33,15 @@ The shape to build:
   cursor-ahead is impossible by construction — no two-key commit, no transaction requirement, no
   orphan rule. Do not generalise this into the helper as the only layout: a SQL keeper with atomic
   multi-row updates should be free to hold its cursor in its own row instead.
-- **SEALING STRIPS THE CURSOR, and that is the whole point of this change.** A frozen `lastSync` in
-  every sealed segment is real waste: `unconfirmedBlocks` is `EventBlock[]` and `EventBlock` carries
+- **SEALING EMPTIES THE UNCONFIRMED WINDOW — not the whole `lastSync`.** The waste is the window: `unconfirmedBlocks` is `EventBlock[]` and `EventBlock` carries
   the FULL decoded events of each block, so it is up to `finality` blocks of event data per segment,
   forever, read by nothing. So when a save opens segment `N+1` it also rewrites segment `N` WITHOUT
-  its `lastSync`; after that `N` is sealed and immutable.
+  its `unconfirmedBlocks`, KEEPING the three block numbers and the context. After that `N` is sealed and immutable.
+  The narrowness is load-bearing: strip the whole `lastSync` and a truncated prefix has NO cursor,
+  while `StreamFetcher` must return one whenever it returns anything.
 
   One extra write per SEAL, not per save, and OFF THE CRITICAL PATH: if it never happens, segment `N`
-  keeps a stale cursor nothing reads (the live cursor is the TAIL's), and the next pass strips it.
+  keeps a stale WINDOW nothing reads (the live cursor is the TAIL's), and the next pass empties it.
   Idempotent and safe to fail, which is why it needs no ordering rule and no recovery.
 - **The empty save rewrites the tail, and that is accepted.** `indexer.ts` calls `save`
   unconditionally, so a head-following indexer pays one tail rewrite per poll. It is bounded by the
@@ -81,7 +82,8 @@ The shape to build:
     prefix (below) means this task never enlarges that window. If you find yourself widening it,
     surface it rather than absorbing it.
   - **Not the whole stream.** On a hole at ordinal `k`, delete `k` and above and KEEP `0..k-1`.
-    Segment `k-1` becomes the TAIL and carries its own `lastSync`, so what survives is a shorter,
+    Segment `k-1` becomes the TAIL and carries its own `lastSync` (window emptied at seal, the rest
+    intact — which is why the strip is narrow), so what survives is a shorter,
     VALID stream that resumes from its own cursor — nothing to rewrite. If nothing survives there is
     no tail, presence reads FALSE, and the next load clears. And if a later save's `fromBlock` would
     sit ABOVE the surviving tail's `lastToBlock + 1`, that save would create a HOLE — clear the
