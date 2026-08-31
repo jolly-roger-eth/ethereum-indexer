@@ -98,6 +98,14 @@ implementation of those operations.
   `indexer.ts` only clears there when `streamMatches` fails.
 - **Contiguity means NO HOLES, not "starts at ordinal 0."** After a legacy adoption the earliest
   segment is the legacy key.
+- **KEEPING THE PREFIX IS ISOLATED AND REMOVABLE. Build it so it can be deleted.** Gaps are not
+  routine (see above), so keeping a prefix rather than clearing rests on one argument — that when a
+  gap does happen, a full re-index may be impossible on a public node. That may not always hold, so:
+  put the recovery behind ONE seam with ONE call site, such that replacing it with "detect the gap,
+  clear the stream" is a local change; and treat the SCANNED EXTENT on a sealed segment as having
+  EXACTLY ONE READER, that recovery. It exists only to make a truncated prefix resumable. Do not use
+  it for anything else, and do not let any other code path assume a truncated stream is resumable —
+  a second consumer would silently make this permanent.
 - **A save that would create a HOLE clears instead.** After a refusal the stream is short; a save
   whose `fromBlock` sits above the surviving tail's `lastToBlock + 1` would leave the stream claiming
   coverage it lacks, which no reader can detect.
@@ -163,6 +171,10 @@ implementation of those operations.
 - [ ] **A TORN segment degrades instead of throwing**: temp-file-plus-rename, a temp name the
       anchored pattern rejects, and a still-unparseable segment treated as a gap.
 - [ ] **A save that would create a HOLE clears instead.**
+- [ ] **The prefix-keeping recovery is REMOVABLE**, demonstrated rather than asserted: it lives behind
+      one seam with one call site, and the sealed segment's scanned extent has exactly one reader.
+      Record in your `## Decisions` block what deleting it would take — it should be replacing that
+      one call with a `clear`, plus dropping the scanned extent from the segment shape.
 - [ ] **`clear` deletes from the HIGHEST ordinal DOWNWARD**, asserted by interrupting it: what remains
       is a contiguous prefix that still reads, not a hole.
 - [ ] **`clear` removes everything** and no orphan survives; **enumeration does not cross chains**

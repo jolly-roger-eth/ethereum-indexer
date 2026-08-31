@@ -123,7 +123,7 @@ nothing. Belt and braces: a segment that still fails to parse is treated as a GA
 goes through the contiguity refusal, so corruption from any other cause degrades instead of throwing.
 
 **`clear` deletes from the HIGHEST ordinal DOWNWARD.** The fs `clear` is N `unlinkSync` calls and is
-not atomic, so an interrupted clear is reachable in normal operation. Deleting downward leaves a
+not atomic, so an interrupted clear is reachable. Deleting downward leaves a
 contiguous prefix `0..k` with its own tail carrying its own cursor — a shorter but VALID stream,
 which the next load either continues or clears again. Deleting upward would leave a hole, which is
 strictly worse for no benefit.
@@ -216,9 +216,23 @@ If a head pointer is used anyway for some reason, the delete order is head FIRST
 because the head is the root pointer and orphans left unreachable are harmless while a head over
 missing segments is not. An earlier draft had this backwards.
 
-**A partial or interrupted clear is REFUSED, not tolerated.** A gap in the ordinals means a fragment
+**A GAP in the ordinals is REFUSED, not tolerated.** A gap means a fragment
 was lost, and "some of the stream" replayed as if it were "the stream" is the same silent-absence
 failure class the reorg model and `SuspectedTruncationError` already refuse.
+
+**Be honest about WHEN a gap happens, because the obvious answer is no longer right.** Every
+gap-producing case the SYSTEM can cause has been engineered away: a torn write cannot survive
+temp-file-plus-rename (a segment is fully present or absent); an interrupted `clear` leaves a
+CONTIGUOUS prefix because `clear` deletes highest-ordinal-downward; on IndexedDB `delMany` and `set`
+are each one transaction, and eviction is per-origin so it produces absence rather than holes; and
+there is no segment-versus-cursor crash window, because a save writes one key.
+
+What remains is EXOGENOUS — external deletion (a cleanup script, a restored backup, a file-sync tool
+pointed at the folder), media damage, and an unparseable segment, which is routed here too — plus the
+case that probably matters most: **a bug in our own segmentation logic.** The refusal is really an
+assertion that the enumeration invariant holds, and its main beneficiary is US: it turns a silent hole
+introduced by a future keeper or helper change into a loud, bounded failure. The check is nearly free,
+because the ordinals are being enumerated anyway.
 
 **"The remainder" is the segments AT AND ABOVE the gap, and the contiguous PREFIX BENEATH IT
 SURVIVES.** Say which, because the two readings differ by an entire cached history and the
@@ -249,6 +263,28 @@ next save appending at head on top of it, which would leave the stream claiming 
 missing everything between — undetectable by any reader, and replayed as whole by a later state
 discard. So a save whose `fromBlock` sits above the surviving tail's `lastToBlock + 1` would CREATE a
 hole, and the keeper CLEARS the stream rather than writing it.
+
+**KEEPING THE PREFIX IS ISOLATED AND REMOVABLE, and nothing may be built that depends on it.** This
+is a deliberate constraint on the design rather than a note. Gaps are no longer routine, so the case
+for keeping a prefix rather than simply clearing rests on one thing: when a gap DOES happen, the
+alternative recovery may not exist, because on a public node a full re-index is often impossible. That
+is a good enough reason today and may not be tomorrow, so the option to drop it must stay open.
+
+Concretely, three rules:
+
+- The recovery is ONE seam — detect the gap, keep the prefix, resume from its tail — with one call
+  site, so that replacing it with "detect the gap, clear the stream" is a local change and not a
+  redesign.
+- **The scanned extent a sealed segment carries has EXACTLY ONE READER: that recovery.** It exists
+  only to make a truncated prefix resumable. If the recovery goes, the scanned extent goes with it and
+  sealing can strip the whole `lastSync`. Any second consumer would silently make this permanent.
+- Nothing outside the recovery may assume a truncated stream is resumable, or that a stream may
+  legitimately begin above its first ordinal.
+
+The one thing that WOULD create a dependency is the deferred optimisation where a new stream reuses a
+prefix of an existing one (`a-reconfigure-is-not-an-outage`'s Out of Scope): that wants exactly this
+per-segment extent, for a second purpose. It is not built, and if it ever is, this constraint is what
+it must be measured against — building it makes the prefix recovery permanent.
 
 **If nothing survives** — a gap at ordinal 0 with no adopted legacy segment — there is no tail, so
 presence reads FALSE and the next load takes the clear branch, which is correct: an empty stream is

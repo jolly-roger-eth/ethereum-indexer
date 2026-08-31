@@ -462,7 +462,17 @@ serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then
 
 - **Sharing a prefix between two streams.** The named, deliberately-declined optimisation: when a new
   filter is a superset of an old one, the new stream is identical to the old up to some point and
-  could reuse it. Worth doing later, and cheap to add because streams are addressed by digest and
+  could reuse it.
+
+  **If it is ever built, it makes a REMOVABLE thing PERMANENT, and that cost must be counted at the
+  time.** `appending-to-the-stream-costs-the-batch` keeps a prefix on a gap rather than clearing, and
+  isolates that recovery so it can be dropped later; the SCANNED EXTENT a sealed segment carries
+  exists solely to enable it and is required to have exactly one reader. Prefix sharing wants that
+  same extent for a second purpose, which would make both it and the recovery load-bearing forever.
+  Note also that it is not as cheap as it sounds: identity is enumeration over an ANCHORED key
+  pattern, so a segment lives under one stream's prefix only, and a superset filter yields a
+  DIFFERENT digest — so reuse needs an indirection, which is the head pointer that spec rejected on
+  merit. Worth doing later, and cheap to add because streams are addressed by digest and
   nothing about this design assumes a stream was fetched entirely by its own generation. Not now: it
   buys a rare case and it is where all the complexity of the superseded design lived.
 - **Sharing streams ACROSS projects.** Reachable; see the multi-project decision for why not first.
