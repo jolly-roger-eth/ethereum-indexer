@@ -105,12 +105,14 @@ live reorg window.
 > `a-generation-can-be-seeded-from-a-published-artifact`, so that reason has evaporated: nothing left
 > in `a-reconfigure` depends on `replayStream`.
 >
-> The edge SURVIVES on a different and still-live ground: **file overlap.** `a-reconfigure`'s
-> landable 1 rewrites the stream KEYSPACE — the key shape, the anchored enumeration pattern and the
-> migration — inside both keepers and inside the shared core segmentation helper. This spec narrows
-> the STORED-EVENT TYPE through those same files (`saveNewEvents` strips the decoded half in core,
-> and both keepers persist the narrowed shape). Landed the other way round, the keyspace rewrite
-> would rebase onto a changed stored type in the files it is rewriting, for no gain. This is
+> The edge SURVIVES on a different and still-live ground: **file overlap**, though it is NARROWER
+> than it was. An earlier draft of `a-reconfigure`'s landable 1 rewrote the whole stream keyspace,
+> which touched everything this spec touches. Hierarchical addressing removed that: the prerequisite
+> now leaves a PLACEHOLDER digest level and landable 1 only fills it, so there is no key rewrite and
+> no migration. What still overlaps is real but smaller — both changes land in `@etherfold/core`
+> (the digest computation and the shared segmentation helper there, against `saveNewEvents`'s strip
+> of the decoded half) and in both keepers (address construction, against persisting the narrowed
+> shape). Landed the other way round they rebase onto each other in the same files for no gain. This is
 > `TASKING-PROTOCOL` section 3's serialise-on-shared-files rule applied across specs, not a logical
 > dependency: nothing here NEEDS the generation model, it just must not collide with it.
 >

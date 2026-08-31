@@ -43,8 +43,9 @@ TABLE THIS SPEC CREATES and each is free now and expensive later.
 
 **Every row carries TWO discriminators from the first migration: the INDEXER NAME and the STREAM**,
 both as COLUMNS, and both structurally part of every read and write — never a field a query may omit,
-never defaulted, on the same hazard class as the cross-chain prefix collision anchored enumeration
-exists to prevent.
+never defaulted. The hazard class is the one hierarchical addressing removed on the client side: a
+discriminator that a read can omit, or that is packed where something else can be mistaken for it,
+silently answers with another tenant's rows.
 
 **The second axis is the STREAM and deliberately NOT the generation, which is the trap here.**
 ADR-0006 keys the STREAM on `{source, config}` and only the STATE on `{source, config, processor}`,

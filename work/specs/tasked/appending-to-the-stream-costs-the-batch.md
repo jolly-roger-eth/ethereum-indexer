@@ -48,6 +48,15 @@ append order. ADR-0006 is cited for that ORDERING argument only; its `seq`, its 
 validation and its compaction are SERVER concepts and belong to a feed with consumers, which this
 client cache does not have.
 
+**A stream is addressed HIERARCHICALLY, not by a delimited string.** `[<indexer-name>, <streamDigest>,
+<ordinal>]` — ARRAY keys on IndexedDB (`idb-keyval` takes `IDBValidKey`, which includes arrays),
+DIRECTORIES on the filesystem, columns on SQL. Enumeration is then a SCOPED listing rather than a
+pattern match over a flat namespace, which is what removes the cross-chain corruption hazard, the
+anchored regex, the temp-name constraint and the orphaned-cursor case in one move rather than
+defending against each. `chainId` is deliberately absent, being already inside the digest. The CURSOR
+lives within its stream's subtree wherever a keeper puts it, so `clear` is one scoped delete.
+(`a-reconfigure-is-not-an-outage` supplies the digest; until it lands the level is a placeholder.)
+
 **Segments are a WRITE-path optimisation; the read stays a full ordered scan.** Since a LATER segment
 can hold LOWER block numbers, no segment can be skipped on a block bound, so `fetchFrom` keeps its
 signature and its semantics. A spec implying segments make READS cheaper would promise what the reorg

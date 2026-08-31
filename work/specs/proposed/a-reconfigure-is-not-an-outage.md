@@ -80,8 +80,8 @@ below.
 9. As an operator, I want deleting a generation or a stream to be one cheap, complete operation.
 10. As an operator, I want to PAUSE a generation so it stops indexing without being deleted, and resume
     it later, without it ever answering with state a reorg has invalidated underneath it.
-11. As a developer, I want a generation's stream key to be derived from its FILTER, so two
-    generations with different filters never collide and one with the same filter is reused.
+11. As a developer, I want a stream to be RESOLVED by its filter, so two generations with different
+    filters never collide and one with the same filter is reused.
     (Multi-tenancy across several NAMED INDEXERS is `the-server-and-cli-hold-generations-too`; a
     browser page carries one indexer and needs no discriminator beyond the `name` it already has.)
 12. As a developer, I want a generation whose stream is unavailable to fall back to a full re-index,
@@ -160,11 +160,12 @@ context buys nothing and costs a deployment constraint.
 
 ### The stream
 
-**Streams are separate keyspaces and share nothing.** In the browser the existing key simply GAINS
-the stream digest: `stream_<name>_<chainId>_<streamDigest>` with segments beneath, per
-`appending-to-the-stream-costs-the-batch`. That is an addition to what is already there, not a new
-path, which is what keeps landable 1's migration small. A server, which holds several NAMED INDEXERS, adds
-its own discriminator ahead of this — see the sibling spec. Two generations on one stream READ it;
+**Streams are separate keyspaces and share nothing.** The prerequisite already addresses a stream
+HIERARCHICALLY as `[<indexer-name>, <streamDigest>, <ordinal>]` and leaves the digest level as a
+PLACEHOLDER; this spec fills it with the real value. So there is no re-keying and no migration: the
+address shape does not change, only what occupies one level of it. A server holds several named
+indexers over the same shape — see the sibling spec. `chainId` is deliberately absent throughout,
+being already inside the digest. Two generations on one stream READ it;
 only the one that is indexing WRITES it.
 
 **There is NO tenancy component in the browser key, because a browser page carries exactly ONE
@@ -192,8 +193,8 @@ lack; no unconfirmed WINDOW on a sealed segment; an empty save costing nothing p
 history — and leaves PLACEMENT to each keeper. Both shipped keepers put the cursor in the OPEN TAIL
 and empty its window on seal; a keeper with atomic multi-row updates may hold a cursor row instead.
 
-**All this spec adds is the SCOPE: one cursor per STREAM, and a stream is now keyed
-`stream_<name>_<chainId>_<streamDigest>`.** Everything else about cursors — where they live, how a save
+**All this spec adds is the SCOPE: one cursor per STREAM, and a stream is now addressed
+`[<indexer-name>, <streamDigest>]` with its segments and its cursor beneath.** Everything else about cursors — where they live, how a save
 commits, what happens after a crash — is settled there and must not be restated here, because a
 second statement is a second source of truth that can drift. An earlier draft of this section
 specified a separate cursor record with orphan discard; that design was withdrawn in the prerequisite
@@ -450,7 +451,7 @@ in `work/specs/dropped/`.)
   ADR-0034 established. An event appended above the cursor is the regression guard.
 - **The cursor contract is the PREREQUISITE's to assert**, not this spec's. Do not restate it here;
   the only thing to assert is the SCOPE, that a cursor belongs to exactly one
-  `stream_<name>_<chainId>_<streamDigest>` and two generations on different streams never share one.
+  `[<indexer-name>, <streamDigest>]` subtree and two generations on different streams never share one.
 - **The stream digest is STABLE UNDER A DECODE-ONLY CHANGE.** This is the assertion that catches the
   ordering trap: rename a non-indexed parameter, and the digest must not move even though every
   entry's `hash` did and the entry list therefore reordered. Also stable under ABI reordering and
@@ -487,8 +488,8 @@ in `work/specs/dropped/`.)
 EIGHT separable landables. Cutting them together produces one task nobody can review.
 
 1. **Stream identity and the keyspace** — the STREAM DIGEST, the wide sync hash, and the
-   `stream_<name>_<chainId>_<streamDigest>` key. Owns the hash choice and its collision test.
-   Everything depends on it.
+   `[<indexer-name>, <streamDigest>, <ordinal>]` address, filling the digest level the prerequisite
+   left as a placeholder. Owns the hash choice and its collision test. Everything depends on it.
 
    **The digest is the deduplicated `streamHash` digest PLUS the stream config hash, and both halves
    are this landable's.** Say it here and not only in the prose above, because this is where it gets
@@ -498,58 +499,31 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    indexer, no caller supplies such a value, and the server's discriminator belongs to
    `the-server-and-cli-hold-generations-too`.
 
-   **It also RE-ANCHORS the enumeration pattern**, which is otherwise unowned. The prerequisite
-   matches `^stream_<name>_<chainId>_(\d+)$`; inserting the digest before the ordinal breaks that
-   pattern, and a stale anchor either matches nothing (every stream reads empty) or, if loosened to
-   a prefix, matches across chains. So this landable owns the new anchor AND the digest's ENCODING,
-   since the anchor cannot be written without knowing the character set the digest can produce.
+   **The digest's ENCODING is this landable's**, because the address level has to hold it: it must be
+   a value the substrates can carry as a key element (a string on IndexedDB and a directory name on
+   the filesystem), so a hex or base32 rendering rather than raw bytes, and fixed-length so no
+   rendering of one digest can be confused with another. There is no enumeration PATTERN to own —
+   hierarchical addressing means enumeration is a scoped listing of one level — which is what
+   deletes the anchored regex, the cross-chain collision hazard and the temp-name constraint an
+   earlier flat-key design had to carry.
 
-   **It also OWNS THE DISPOSAL of the prerequisite's keyspace, which is otherwise unowned and would
-   leak.** `appending-to-the-stream-costs-the-batch` leaves any stream under
-   `stream_<name>_<chainId>_<ordinal>` (and, for anyone older, the adopted label-less legacy key,
-   which carries the cursor inside it). This spec's key matches NONE of those, so landed in the
-   stated order every such stream becomes unreachable AND is never deleted — a permanent storage
-   leak. Disposing of them is therefore this landable's, and the disposal is a SWEEP (below).
+   **There is NO MIGRATION and no sweep, because the prerequisite already left the level empty.**
+   `appending-to-the-stream-costs-the-batch` addresses a stream as
+   `[<indexer-name>, <streamDigest>, <ordinal>]` with a PLACEHOLDER in the digest position. This
+   landable computes the real digest and writes it there. Streams under the placeholder are simply
+   streams under a different digest: they are unreachable by a filter that now resolves elsewhere,
+   so they are REAPED by the ordinary stream-reaping rule (landable 2), not by a bespoke migration
+   path. That deletes the whole of what this landable used to own here — a resumable per-key payload
+   rewrite, its quota exposure, and then even the sweep that replaced it.
 
-   **The SWEEP must delete more than the segments, and the key it will miss is the one an enumeration
-   cannot see.** On the cursor-record keeper (IndexedDB, per ADR-0035) a stream also has a separate
-   CURSOR RECORD, keyed so that the ANCHORED ORDINAL PATTERN deliberately REJECTS it. A sweep driven
-   by enumerating segments therefore deletes every segment and leaves the CURSOR behind — and since
-   PRESENCE is "the read-cursor operation returns something", what remains reads PRESENT with no
-   events and a cursor claiming coverage from block 0, which is precisely the non-self-healing
-   orphaned-cursor state ADR-0035 added a `clear-cursor` operation to prevent. Sweep the cursor
-   record BY NAME along with the segments, and note this is the SECOND instance of one shape (the
-   first is why `clear-cursor` exists at all), so the durable question for this landable is "what
-   else is keyed OUTSIDE the anchored pattern?", not this one instance.
+   Two things follow that are worth stating so they are not rediscovered:
 
-   **DECIDED: SWEEP the old keys, do NOT move the payload. This migration has no beneficiary.**
-   Three stream key shapes exist across this family, and only the FIRST was ever shipped: the legacy
-   blob `stream_<name>_<chainId>` (written by the published `ethereum-indexer-browser`); the ordinal
-   segments `stream_<name>_<chainId>_<ordinal>` introduced by the PREREQUISITE, which has not landed;
-   and this spec's digest-keyed shape. What this landable migrates is the SECOND to the THIRD — a
-   format that exists only in unreleased builds, so no disk anywhere will hold it unless etherfold is
-   PUBLISHED and acquires users in the window between the two landing. Nothing is published, the
-   publish task is `humanOnly` and in backlog, and the reference deployment has a live contract but no
-   players, so that window is under our control and currently empty.
-
-   So: enumerate the old-shaped keys and DELETE them, and let the stream rebuild. The sweep is not
-   optional and is the part that was never in question — an orphaned keyspace nobody deletes is a
-   permanent storage leak, and a stream must never be silently orphaned-but-retained. What goes is the
-   expensive half: no `get`+`set`+`del` of a whole history on IndexedDB, no transient doubling under a
-   quota `work/notes/findings/browser-storage-headroom-for-generations.md` shows is not reported
-   reliably, and no per-key resumability machinery to make that safe. That is a large amount of the
-   riskiest code in this landable, deleted for a benefit that would have accrued to nobody.
-
-   **What would REVERSE this**, stated so it is checked rather than assumed: publishing etherfold
-   before this lands, and someone running the prerequisite's format for real. If that happens, revisit
-   and take one of the other two shapes — moving the payload, or adopting the old keys in place as
-   the earliest segments the way the prerequisite already does for the legacy blob (cheapest, but it
-   needs a digest-to-legacy-keyspace indirection, which is narrower than the prefix sharing that spec
-   rejected but is still an indirection).
-
-   Note what is NOT affected: the PREREQUISITE's own legacy-blob adoption stays exactly as written. It
-   migrates the one format that really did ship, it writes NOTHING to adopt, and it is the capability
-   demonstration this project is actually selling.
+   - **Nothing needs to move because nothing is addressed by content that changed.** Hierarchical
+     addressing is what buys this: with a delimited flat key, changing one component re-keyed every
+     segment, which is why earlier drafts of this landable carried a migration at all.
+   - **Redefining the digest LATER is equally cheap**, for the same reason: it orphans a subtree that
+     the reaping rule collects. Worth knowing, because the digest rule is the kind of thing that gets
+     refined.
 
 2. **The generation registry, the canonical pointer, and the caps** — creating a generation, moving
    the pointer (forward and back), refusing at a cap, deleting a generation or a stream.
@@ -650,10 +624,10 @@ the dependency.
   isolates that recovery so it can be dropped later; the SCANNED EXTENT a sealed segment carries
   exists solely to enable it and is required to have exactly one reader. Prefix sharing wants that
   same extent for a second purpose, which would make both it and the recovery load-bearing forever.
-  Note also that it is not as cheap as it sounds: identity is enumeration over an ANCHORED key
-  pattern, so a segment lives under one stream's prefix only, and a superset filter yields a
-  DIFFERENT digest — so reuse needs an indirection, which is the head pointer that spec rejected on
-  merit. Worth doing later, and cheap to add because streams are addressed by digest and
+  Note also that it is not as cheap as it sounds: a segment lives under exactly ONE stream's subtree
+  and a superset filter yields a DIFFERENT digest, so reuse needs an indirection from one stream's
+  address to another's segments — which is the head pointer that spec rejected on merit, and which
+  hierarchical addressing makes no easier. Worth doing later, and cheap to add because streams are addressed by digest and
   nothing about this design assumes a stream was fetched entirely by its own generation. Not now: it
   buys a rare case and it is where all the complexity of the superseded design lived.
 - **Sharing streams ACROSS named indexers.** Reachable; see the multi-tenancy decision for why not
