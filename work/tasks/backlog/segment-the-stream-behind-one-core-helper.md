@@ -45,10 +45,15 @@ The shape to build:
 - **Sealing is not a write.** A segment is sealed exactly when it is no longer the highest ordinal,
   so it happens implicitly when the next save opens a new one, and a reader tells by enumeration.
   Nothing is ever written INTO a segment to mark it sealed, which is what keeps immutability true.
-  Segments hold EVENTS and nothing else.
-- **The cursor is read from the TAIL alone.** Every sealed segment still carries the `lastSync` that
-  was current when it was written, and those are STALE; a reader picking a lower one silently
-  rewinds.
+  A segment holds its EVENTS plus its SCANNED EXTENT (`{lastFromBlock, lastToBlock, latestBlock}`)
+  and nothing else — no `context`, no `unconfirmedBlocks`.
+- **The live cursor is the CURSOR RECORD, `{lastSync, committedThrough}`.** `committedThrough` is the
+  ORDINAL of the segment it was committed with, and it is REQUIRED rather than convenient: `LastSync`
+  names only blocks, and block order is NOT monotonic across segments (a reorg re-appends lower
+  blocks into a later segment), so nothing can identify the segments ABOVE the cursor from block
+  numbers — which is exactly what orphan discard needs. The per-segment scalars are NOT the
+  per-segment cursor being reinstated: what made that expensive was `unconfirmedBlocks` (whole blocks
+  WITH their events); three numbers are free, and they are what makes any PREFIX self-describing.
 - **Keys are ORDINAL, and the read stays a full ordered scan.** The stored stream is an EMISSION
   stream: on a reorg the indexer re-appends superseded events at their ORIGINAL `blockNumber` flagged
   `removed`, then continues at LOWER block numbers. So block ranges overlap and cannot key or order
@@ -77,8 +82,10 @@ The shape to build:
     prefix (below) means this task never enlarges that window. If you find yourself widening it,
     surface it rather than absorbing it.
   - **Not the whole stream.** On a hole at ordinal `k`, delete `k` and above and KEEP `0..k-1`.
-    Segment `k-1` carries its own `lastSync`, so the surviving prefix is self-describing and the
-    stream resumes from that boundary. Clearing everything would throw away a good prefix (story 5
+    Segment `k-1` carries its own SCANNED EXTENT, so the surviving prefix is self-describing: rewrite
+    the cursor record from it with `committedThrough = k-1`, carrying `context` over and leaving
+    `unconfirmedBlocks` empty (the next round re-scans from `latestBlock - finality` and rebuilds the
+    window, so that is correct rather than lossy). Clearing everything would throw away a good prefix (story 5
     says an upgrade must cost nothing the user notices) and, on the state-kept path, would be
     SILENT: `indexer.ts` only clears there when `streamMatches` fails, so an undefined `fetchFrom`
     leaves the state cursor untouched and the next save writes a stream covering only from now on,
@@ -141,8 +148,13 @@ stops the two keepers choosing differently and makes the seal test deterministic
       changing (this task changes no published type). Do not "optimise" `unconfirmedBlocks` out of the
       cursor — stripping it is the sibling spec `the-stream-stores-only-what-the-node-said`'s job and
       it has its own reasoning and its own tests.
-- [ ] **The cursor comes from the cursor record**: a stream with several sealed segments resumes from
-      it, and there is no competing copy anywhere to pick from.
+- [ ] **The cursor comes from the cursor record**, and an ORPHAN is identified by ORDINAL: a segment
+      whose ordinal exceeds `committedThrough` is discarded on load. Assert this with a segment whose
+      BLOCK numbers are LOWER than the cursor's `lastToBlock` (the reorg case), which a
+      block-number-based orphan test would wrongly keep.
+- [ ] **`clear` deletes the CURSOR FIRST, then the segments**, asserted by interrupting between the
+      two: the remains must read as ABSENT (so the next load re-clears and finishes) rather than as a
+      present stream claiming coverage it does not have.
 - [ ] **A sealed segment is never rewritten** (no write ever targets its key again) and is **readable
       by its own key** without reading the others.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,

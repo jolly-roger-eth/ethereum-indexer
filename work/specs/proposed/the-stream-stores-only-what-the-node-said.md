@@ -1,7 +1,7 @@
 ---
 title: 'The stream stores only what the node said'
 slug: the-stream-stores-only-what-the-node-said
-taskedAfter: [appending-to-the-stream-costs-the-batch]
+taskedAfter: [appending-to-the-stream-costs-the-batch, a-reconfigure-is-not-an-outage]
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -94,6 +94,13 @@ in memory, and `checkTxInclusion` answers from the STATE keeper's copy. So keepi
 leave the one stale thing in the stream. **The strip must build a NEW `LastSync`**, because the same
 object is handed to the state keeper on the same tick and a mutating strip would silently empty the
 live reorg window.
+
+> **ORDERED AFTER `a-reconfigure-is-not-an-outage`, and this decision is why.** That spec's SEEDING
+> path rests on `replayStream` returning an `ExistingStream` today, which it does
+> (`stream/fixture.ts`). This spec narrows that seam so it no longer can. Tasked in the other order,
+> the seeding work would be cut against a premise this spec removes. When this lands, the seeding
+> path must move onto the fixture's own reader type, and `CONTEXT.md`'s `seeding` glossary entry —
+> which names `replayStream` as returning an `ExistingStream` — must be updated in the SAME change.
 
 **`replayStream` stops being an `ExistingStream`.** The exclusion form forces this and it is the
 right answer rather than a casualty. Nothing wires `replayStream` as `keepStream`, so they never meet

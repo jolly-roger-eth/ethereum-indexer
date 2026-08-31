@@ -85,13 +85,10 @@ below.
     query, prefix scan or cap in one project can ever reach another's data.
 12. As a developer, I want a generation whose stream is unavailable to fall back to a full re-index,
     which is today's behaviour, so the feature degrades rather than breaks.
-13. As an APP AUTHOR shipping a client upgrade whose filter changed, I want the new generation to be
-    SEEDED from a remote stream or snapshot I publish, so my users do not have to re-index from the
-    chain — which on a public node they frequently CANNOT do at all.
-14. As a DEVELOPER iterating on a processor, I want the new generation to become canonical
+13. As a DEVELOPER iterating on a processor, I want the new generation to become canonical
     IMMEDIATELY, before it has caught up, because I am looking for what my edit does and stale-but-
     complete old answers are more confusing than incomplete new ones.
-15. As an APP AUTHOR shipping to users, I want the opposite default — the old generation keeps
+14. As an APP AUTHOR shipping to users, I want the opposite default — the old generation keeps
     answering until the new one is ready — because my users did not ask for a reconfigure and should
     not see the state go backwards.
 
@@ -262,41 +259,25 @@ The entities path publishes a handle bound to a store, so a consumer holding one
 would silently read a retired generation; the handle is therefore INDIRECT, resolving to whichever
 generation is canonical.
 
-### Seeding, and why the browser needs it
+### Seeding is SPLIT OUT, and why
 
-**A new stream may be SEEDED from a remote source instead of backfilled from the node**, and for a
-user-facing browser app this is the primary path rather than a fallback. The reason is not speed:
-**on a public node the backfill is frequently IMPOSSIBLE**, because old logs are not served at all
-(Base's public endpoints are the worked example, and it is why stratagems ships a remotely-computed
-snapshot rather than indexing from genesis in the browser). A design whose only answer to a filter
-change is "re-fetch the history" would therefore not be slow in the user case, it would be BROKEN.
+A new stream may be SEEDED from a published artifact instead of backfilled from the node, and for a
+user-facing browser app that is the PRIMARY path rather than a fallback: on a public node the
+backfill is frequently IMPOSSIBLE, because old logs are not served at all (Base's public endpoints
+are the worked example, and it is why stratagems ships a remotely-computed snapshot rather than
+indexing from genesis in the browser).
 
-Seeding also fits the deployment reality rather than fighting it: a filter change means the user is
-getting a new CLIENT BUILD anyway, so the app is already shipping something, and a stream or snapshot
-is one more artifact alongside it.
+**That is a real requirement and it is NOT taskable yet**, which is why it is
+`work/specs/proposed/a-generation-can-be-seeded-from-a-published-artifact.md` rather than a story
+here. Two things it needs do not exist: a loader that fetches a captured stream from a REMOTE (today
+`loadStreamFixture` reads a local path, and only the state snapshot has a remote path), and a decision
+about the publishing side, which is `work/notes/ideas/publishing-snapshots-of-versioned-state.md`
+territory. Tasking a confident subset of a spec whose remainder is gated is exactly what
+`TASKING-PROTOCOL` §2a forbids, so it splits.
 
-**Two seed shapes, and they are not equivalent.** Both already exist and this spec reuses rather than
-invents:
-
-- **A captured STREAM** (`captureStream`, `StreamFixture`, and `replayStream`, which already returns
-  an `ExistingStream`). It seeds the stream itself, so every generation over that stream can re-fold
-  from it. This is the one that composes with everything here.
-- **A state SNAPSHOT** (ADR-0028, `bootstrapFromSnapshot`, and the `remote` argument
-  `keepStateOnIndexedDB(name, remote)` already takes). It seeds the FOLD, not the stream, so the
-  generation reports a retention FLOOR at the snapshot's block and refuses reverts and as-of reads
-  beneath it. Cheaper to publish and much smaller; it cannot be re-folded by a later processor
-  change, so a generation bootstrapped this way is a leaf.
-
-The distinction is worth stating because the second one silently forfeits this design's main benefit:
-a snapshot-seeded generation cannot serve as the source for a future processor-only change, which is
-the common case that is otherwise free. Publish a stream where you can; publish a snapshot where the
-stream is too large and accept the floor.
-
-**What this spec must NOT do is decide the publishing side.** How an app builds, hosts, versions or
-authenticates a remote stream is `work/notes/ideas/publishing-snapshots-of-versioned-state.md`
-territory and is out of scope here. What is in scope is that creating a generation accepts a SEED as
-an alternative to a backfill, and that a seeded stream is indistinguishable from a fetched one
-afterwards.
+What THIS spec owes that one is only that creating a generation takes its starting stream as an
+INPUT: a generation does not assume it must fetch its own history. Nothing else here depends on
+seeding.
 
 ### Indexing, pausing, and the promotion policy
 
@@ -392,11 +373,22 @@ reconciled or dropped rather than left asking a settled question.
 
 ## Tasking note
 
-Five separable landables. Cutting them together produces one task nobody can review.
+SIX separable landables. Cutting them together produces one task nobody can review.
 
 1. **Stream identity and the keyspace** — the canonical filter digest, the wide sync hash, the
    `<project>/<chainId>/<filterDigest>` key, and the composite key type that makes the project
    discriminator non-omittable. Owns the hash choice and its collision test. Everything depends on it.
+
+   **It also OWNS the migration off the prerequisite's keyspace, which is otherwise unowned and would
+   silently orphan every cached history.** `appending-to-the-stream-costs-the-batch` leaves users
+   holding `stream_<name>_<chainId>_<ordinal>` plus its cursor record (and, for anyone older, the
+   adopted label-less legacy key). This spec's key matches NONE of those, so landed in the stated
+   order every existing stream becomes unreachable AND is never deleted: a full re-index plus a
+   permanent storage leak, which directly reverts the prerequisite's story 5. The existing stream is
+   ADOPTED at its computed `<project>/<chainId>/<filterDigest>` — the filter it was fetched under is
+   the one the running source describes, or the adoption is refused and the old keys are swept rather
+   than left. Migrate by RENAME, which the spike showed moves no payload; order each write before its
+   delete so a crash leaves both and the migration re-runs harmlessly.
 2. **The generation registry, the canonical pointer, and the caps** — creating a generation, moving the
    pointer (forward and back), refusing at a cap, deleting a generation or a stream. Independently
    testable with no indexer running.
@@ -423,10 +415,15 @@ Five separable landables. Cutting them together produces one task nobody can rev
    are unowned unless named: the README usage block, two JSDoc examples in
    `packages/browser/src/IndexerState.ts`, the JSDoc in `BrowserStateStore.ts`, and `CONTEXT.md`.
 5. **Pause and resume**, including the truncation and the matching state revert.
+6. **Progress and degradation** — `SyncingState` reporting that a non-canonical generation exists and
+   how far it has caught up (story 5), and the fallback when a generation's stream is unavailable or
+   unreadable: a full re-index, which is today's behaviour, so the feature degrades rather than
+   breaks (story 12). Small, but it was unowned, and story 12 is the guard that stops a corrupt
+   stream taking the app down with it.
 
-Landables 3, 4 and 5 all edit `packages/browser/src/IndexerState.ts` (`SyncingState` at the top,
+Landables 3, 4, 5 and 6 all edit `packages/browser/src/IndexerState.ts` (`SyncingState` at the top,
 `createIndexerState`, three `stateDiscarded` sites, and the container is what it returns), so
-serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then (4), then (5).
+serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then (4), then (5), then (6).
 
 ## Out of Scope
 

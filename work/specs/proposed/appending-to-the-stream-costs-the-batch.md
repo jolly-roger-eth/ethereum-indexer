@@ -82,22 +82,45 @@ interrupted save:
 - **The filesystem** has no multi-file transaction, so it relies on the ordering plus the orphan rule:
   write the segment, then write the cursor via a temp file and `rename`, which IS atomic for one file.
 
-Orphan discard is the same shape as the contiguity rule below — drop from the break upward, keep the
-prefix beneath — so this is one recovery discipline rather than two.
+An ORPHAN is any segment whose ordinal exceeds `committedThrough`, which is why the ordinal is in the
+record. Orphan discard is then the same shape as the contiguity rule below — drop from the break
+upward, keep the prefix beneath, rewrite the cursor from the surviving tail — so this is one recovery
+discipline rather than two.
+
+**`clear` deletes the CURSOR FIRST, then the segments.** The fs `clear` is N `unlinkSync` calls and is
+not atomic, so an interrupted clear is reachable in normal operation. Segments-first would leave a
+cursor with no segments, which reads as PRESENT while claiming coverage the stream does not hold —
+the silent cursor-ahead direction. Cursor-first leaves segments with no cursor, which reads as ABSENT,
+so the next load takes the clear branch and finishes the job. Self-healing in the safe direction.
 
 So the shape is an append-only log with an OPEN TAIL:
 
-- the newest segment is OPEN and carries both its events and the `lastSync` current after them;
+- the newest segment is OPEN and holds its events, plus the three SCANNED-EXTENT numbers below;
 - a save appends to the open tail, which is ONE write, bounded by the tail's size and never by the
   history;
 - the tail is SEALED when it exceeds a size threshold, and the next save starts a new one;
 - **a sealed segment is immutable forever.**
 
 This is what makes the empty-batch case cheap without needing a rule against empty segments: a save
-with no events rewrites only the open tail to move its cursor, which is bounded, rather than
+with no events rewrites only the open tail and its cursor record, which is bounded, rather than
 rewriting the whole history as it does today.
 
-**Sealing is not a write, and the cursor is read from the CURSOR RECORD.** A segment is SEALED
+**The CURSOR RECORD is `{lastSync, committedThrough}`, and every segment carries three SCANNED-EXTENT
+numbers.** Both halves are forced, and getting either wrong makes a stated recovery unimplementable.
+
+`committedThrough` is the ORDINAL of the segment the cursor was committed with. It is required because
+`LastSync` names only BLOCKS, and this spec's own central argument is that block order is NOT
+monotonic across segments — a reorg re-appends lower blocks into a later segment. So no reader can
+work out which segments sit ABOVE the cursor from block numbers, which is exactly what the orphan rule
+needs. With the ordinal it is a comparison.
+
+Each segment additionally carries `{lastFromBlock, lastToBlock, latestBlock}` — the extent SCANNED
+when it was written, and nothing else. This is not a return to the per-segment cursor that was
+removed: what made that expensive was `unconfirmedBlocks`, which carries whole blocks WITH their
+events. Three numbers are free, and they are what makes any PREFIX self-describing, which the
+gap-recovery below depends on. No `context`, no window.
+
+**Sealing is not a write, and the live cursor is read from the CURSOR RECORD.** A segment is SEALED
 exactly when it is no longer the highest ordinal, so sealing happens implicitly the moment the next
 save opens a new one, and a reader tells by enumeration. Nothing is ever written INTO a segment to
 mark it sealed, which is what keeps immutability true. Segments hold EVENTS and nothing else; the
@@ -196,9 +219,12 @@ SURVIVES.** Say which, because the two readings differ by an entire cached histo
 destructive one is the intuitive one. On finding a hole at ordinal `k`, delete `k` and everything
 above it and KEEP `0..k-1`.
 
-The prefix is safe to keep for the reason the open tail exists: every segment carries the `lastSync`
-current when it was written, so segment `k-1` is self-describing, and the cursor read from it is the
-real scanned extent of what survived. So the stream resumes from that boundary and re-fetches the
+The prefix is safe to keep because every segment carries its SCANNED EXTENT, so segment `k-1` is
+self-describing: the recovery rewrites the cursor record from `k-1`'s three numbers, with
+`committedThrough = k-1`, carrying the existing `context` over and leaving `unconfirmedBlocks` EMPTY.
+An empty window is correct here rather than lossy — `getFromBlock` re-scans from
+`latestBlock - finality` on the next round and `generateStreamToAppend` rebuilds the window from what
+it re-fetches, so any reorg in that range is re-derived from the node rather than inherited. So the stream resumes from that boundary and re-fetches the
 rest, which is a bounded loss instead of a whole re-index. Nothing is replayed as if it were
 complete, which is the whole point of the refusal: the truncated tail is DISCARDED, not trusted, and
 the cursor comes from the surviving tail rather than from a stale higher one.
