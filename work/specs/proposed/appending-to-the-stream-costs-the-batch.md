@@ -301,16 +301,12 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   cursor is written last and that a segment above it is DISCARDED as an orphan on the next load
   rather than replayed. This is the atomicity guard and it is the reason the cursor is one record.
 - **No stored SEGMENT contains a `lastSync`** — asserted by inspection at the storage seam — **while
-  the CURSOR RECORD carries the whole of it, `unconfirmedBlocks` included.** Assert both halves. The
-  window is IRREPLACEABLE (a reorg makes the old blocks unreachable, so it can never be refetched)
-  and it is fed forward from the STREAM's `lastSync` on the state-discarded/stream-kept path, so a
-  builder trimming it out of the cursor as "waste" would leave that path blind to a reorg. The cursor
-  lives in its own record, and a segment carrying one is the duplication this spec exists to remove —
-  `unconfirmedBlocks` holds whole blocks WITH their events, so a per-segment copy is expensive and
-  permanent.
-- **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where a
-  `clear` on one leaves the other intact and its replay unpolluted. This is the anchored-match guard
-  and it fails loudly under a bare prefix filter.
+  the CURSOR RECORD carries the whole of it, unchanged from what the blob stores today.** Both halves.
+  The per-segment copy is the duplication being removed; the cursor's copy is today's behaviour and
+  this spec changes no published type. (Its `unconfirmedBlocks` is dead weight — `_feed` reads only
+  `latestBlock`/`lastToBlock`/`lastFromBlock` from a fetched `lastSync`, and
+  `generateStreamToAppend` rebuilds the window itself — but removing it is
+  `the-stream-stores-only-what-the-node-said`'s job, not this spec's.)
 - **The cursor comes from the cursor record**: a stream with several sealed segments resumes from it,
   and a reader never has to pick between competing copies because there is only one.
 - **A sealed segment is never rewritten** (no write targets its key again) and is **readable by its

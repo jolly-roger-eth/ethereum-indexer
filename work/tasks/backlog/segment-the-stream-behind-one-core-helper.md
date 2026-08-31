@@ -135,14 +135,12 @@ stops the two keepers choosing differently and makes the seal test deterministic
       instrumented seam, INCLUDING the first save after a legacy adoption. Assert the cursor is
       written LAST, and that a segment above it is DISCARDED as an orphan on the next load rather
       than replayed. This is the atomicity guard.
-- [ ] **No stored SEGMENT contains a `lastSync`**, while the **CURSOR RECORD carries the whole of it,
-      `unconfirmedBlocks` included**. Assert BOTH halves: the per-segment copy is the duplication this
-      change removes, but the window itself is IRREPLACEABLE (it can never be refetched — a reorg
-      makes the old blocks unreachable) and `indexer.ts` feeds the STREAM's `lastSync` forward when
-      the state was discarded and the stream survived. Trimming the window out of the cursor would
-      leave that path blind to a reorg that struck while offline.
-- [ ] **A save with no new events** costs nothing proportional to history (it rewrites only the open
-      tail to move the cursor).
+- [ ] **No stored SEGMENT contains a `lastSync`**, while the **CURSOR RECORD carries the whole of
+      it**, unchanged from what the single blob stores today. Assert BOTH halves: the per-segment copy
+      is the duplication this change removes, and the cursor's copy is existing behaviour you are NOT
+      changing (this task changes no published type). Do not "optimise" `unconfirmedBlocks` out of the
+      cursor — stripping it is the sibling spec `the-stream-stores-only-what-the-node-said`'s job and
+      it has its own reasoning and its own tests.
 - [ ] **The cursor comes from the cursor record**: a stream with several sealed segments resumes from
       it, and there is no competing copy anywhere to pick from.
 - [ ] **A sealed segment is never rewritten** (no write ever targets its key again) and is **readable

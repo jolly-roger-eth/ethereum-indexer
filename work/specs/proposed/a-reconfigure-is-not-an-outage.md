@@ -157,43 +157,33 @@ Cursor-ahead is the unacceptable failure: it silently skips events that were nev
 Cursor-behind is recoverable, and discarding orphans above the cursor is what makes it so — the same
 shape as the contiguity rule, which clears from the gap upward and keeps the prefix.
 
-**`unconfirmedBlocks` IS KEPT, in the cursor record, exactly ONCE.** The waste being removed is the
-PER-SEGMENT duplication, not the window itself: with the cursor as one record per stream, keeping the
-window there costs one copy rather than one per sealed segment.
+**The cursor record carries the whole `LastSync`, exactly as the blob does today** — no published
+type changes here, and that is what keeps `appending-to-the-stream-costs-the-batch` a no-published-type
+spec. What changes is that there is ONE copy instead of one per segment.
 
-Keeping it is not a convenience, it is REQUIRED, and the reason is that the window is IRREPLACEABLE.
-It must never be refetched from the node — after a reorg the old blocks are unreachable, so the node
-returns the NEW chain, which is precisely what a reorg check needs to compare AGAINST. Refetching
-cannot answer the question it would be asked.
+**Its `unconfirmedBlocks` is dead weight in the stream, and that is CHECKED, not assumed.** Three
+readers were traced end to end:
 
-And the stream's own copy is load-bearing on a path that already exists: when the STATE verdict is
-invalid but the STREAM verdict is valid, `indexer.ts` replays the stored stream and feeds the
-STREAM's `lastSync` forward (`feed(replayable, lastSyncFetched)`). On that path the state's copy is
-gone by definition, so a stream that had dropped its window would resume with an empty one and be
-blind to a reorg that struck while it was offline.
+- `_feed` is handed the stream's `lastSync` on the state-discarded/stream-kept path, but reads only
+  `latestBlock`, `lastToBlock` and `lastFromBlock` from it. The window is rebuilt by
+  `generateStreamToAppend` from the IN-MEMORY `lastSync` plus the events being fed.
+- `checkTxInclusion` answers from the STATE keeper's copy.
+- A full stream replay reconstructs the window as a by-product of the fold, since
+  `generateStreamToAppend` derives it from the events it is given.
 
-So there are TWO DURABLE COPIES — the stream's cursor record, and the state's cursor (ADR-0027,
-`processor-entities/src/cursor.ts`, which exists precisely because that window carries BigInt-bearing
-events). That is chosen redundancy, not an oversight: two copies of one small record is the right
-price for data that cannot be re-derived from anywhere, and each serves a resumption path the other
-cannot. A normal load resumes from the STATE's copy, because it describes what the FOLD has seen. The
-state-discarded/stream-kept path resumes from the STREAM's, because the state's is gone by definition.
+So the window is never read back OUT of the stream as events, and it does not need to be: it is
+derivable from the events the stream already holds, by the replay that already happens.
 
-**The two keepers are NOT written atomically with each other, so they CAN diverge, and the direction
-decides what to do.** This is the same asymmetry as cursor-ahead versus cursor-behind, one level up:
+**`the-stream-stores-only-what-the-node-said` therefore STRIPS it, and this spec must not contradict
+that.** That sibling makes the stream raw-only and removes the decoded events from the stored
+`LastSync` for exactly this reason — they are the one stale thing left in the stream. This spec's
+cursor record is the thing it strips; the two compose rather than conflict.
 
-- **stream AHEAD of state** is safe and expected — events are stored but not yet folded, and the fold
-  catches up by replaying the stream from the state's position. This is the normal steady state
-  between a stream save and the state save that follows it.
-- **state AHEAD of stream** is the bad direction: the state claims to have folded events the stream
-  does not hold, so a replay cannot reproduce it and a revert cannot reach under it. Refuse and
-  rebuild the state from the stream rather than trusting a fold nothing can reproduce.
-
-Ordering follows: the STREAM is saved before the STATE, so a crash between them lands in the safe
-direction.
-
-On a rebuild from the stream the window also falls out of the replay as a by-product of the fold, so
-nothing ever has to RECONSTRUCT it as a separate operation.
+**The one durable copy that matters is the STATE keeper's**, which is where `checkTxInclusion` reads
+and where a normal load resumes from. The window can never be REFETCHED (after a reorg the old blocks
+are unreachable, so the node returns the new chain, which is precisely what a reorg check needs to
+compare against), but it does not need to be, because it is derivable from stored events and is
+already held where it is read.
 
 ### Generations
 
