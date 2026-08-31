@@ -34,15 +34,26 @@ and the **cursor operations**, and proves the contract holds on IndexedDB.
    events, so a per-segment copy is up to `finality` blocks of event data, forever, read by nothing);
 4. an empty save costs nothing proportional to the history.
 
-**This keeper uses the same TAIL strategy as the filesystem one**: the cursor rides in the open tail,
-sealing empties its window while keeping the three block numbers and the context, and a save writes
-exactly ONE key. One key is one write, so property 2 holds by construction here as it does there.
+**This keeper uses the CURSOR-RECORD strategy, NOT the filesystem's tail strategy**, and the
+difference is the whole reason the contract was separated from the placement. IndexedDB has an atomic
+multi-key write and the filesystem does not:
 
-IndexedDB COULD instead hold the cursor in its own key and commit both in one `setMany` transaction —
-placement is a keeper's business and the helper does not bake it in. That is not built here: matching
-the filesystem keeps one strategy under test on both substrates, and the transactional alternative
-buys only a cheaper empty save. If you find a reason to diverge, that is a `## Decisions` entry, not
-a silent choice.
+- a save commits the segment AND a separate cursor record in ONE `setMany` transaction (it opens one
+  `readwrite` transaction, puts every entry and awaits `store.transaction`), so property 2 holds
+  through the transaction rather than by writing one key;
+- **property 3 is VACUOUS here** — the cursor was never inside a segment, so there is nothing to
+  strip and NO SEAL-STRIP WRITE AT ALL;
+- **property 4 is free** — an empty save writes one small cursor record instead of rewriting the open
+  tail, which on the filesystem is the recurring cost of its strategy and is why it uses one.
+
+So do NOT port the tail strategy here. The cursor record's key must be one the anchored segment
+pattern REJECTS (that pattern matches a numeric ordinal suffix, so `_cursor` is safely excluded).
+
+**What is the SAME on both keepers**: every segment carries its SCANNED EXTENT
+(`{lastFromBlock, lastToBlock, latestBlock}`), because the truncation recovery needs a prefix that
+can say where it got to. Here the recovery ADDITIONALLY rewrites the cursor record from the surviving
+top segment — a stream-wide cursor would otherwise be left describing segments that are gone, which
+is the cursor-ahead direction.
 
 **The substrate facts this rests on**, checked rather than assumed:
 
@@ -73,16 +84,19 @@ for the migration test — rather than patching it blind on a red gate.
       tail plus its batch, and the 100th append costs no more than the 10th at the same tail phase.
       Wall-clock cannot be the yardstick: `fake-indexeddb` is itself quadratic, and ADR-0032 rules out
       wall-clock on a loaded machine.
-- [ ] **A save writes exactly ONE key**, including an empty save and the first save after a legacy
-      adoption — the atomicity guard, and why no transaction is needed for a save here.
+- [ ] **A save commits the segment AND the cursor record in ONE `setMany` transaction**, asserted at
+      the instrumented seam — this is how property 2 holds here, and it is why no write-ordering rule
+      or crash recovery is needed on this keeper.
+- [ ] **An empty save writes ONLY the cursor record**, not the tail — property 4, and the concrete
+      advantage of this strategy over the filesystem's.
 - [ ] **A save with NO events rewrites only the open tail**, never the history (story 3).
-- [ ] **Sealing empties the WINDOW and keeps the rest**: a sealed segment's `unconfirmedBlocks` is
-      empty while its `lastFromBlock`/`lastToBlock`/`latestBlock`/`context` survive and the new tail
-      carries a full `lastSync`. Assert the paired negative — a sealed segment must still be able to
-      say where the stream got to, or a truncation leaves an unresumable prefix.
-- [ ] **A SEAL is safe to fail**: interrupt between opening the new tail and stripping the old, and
-      assert the stream still reads correctly and a later pass empties it.
-- [ ] **The cursor comes from the TAIL**, with no competing copy anywhere.
+- [ ] **NO segment contains a `lastSync` at all** on this keeper — property 3 is vacuous here, so
+      there is no seal-strip to perform and none to test. Every segment DOES carry its scanned extent,
+      asserted, because the truncation recovery needs it.
+- [ ] **The cursor comes from the CURSOR RECORD**, with no competing copy anywhere, and its key is
+      one the anchored segment pattern rejects.
+- [ ] **A truncation REWRITES the cursor record** from the surviving top segment's scanned extent, so
+      it never describes segments that are gone.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order, strict equality.
 - [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events, which is what stops
@@ -134,7 +148,9 @@ key and must be updated.
 
 **Domain vocabulary** is the helper's: a *segment* is one stored batch of events plus the `lastSync`
 current after them; the *tail* is the open, highest-ordinal segment and holds the live cursor;
-*sealed* means the unconfirmed WINDOW has been emptied while the rest of the `lastSync` remains. The
+*sealed* means "no longer the highest ordinal" — on THIS keeper nothing is stripped at seal, because
+the cursor was never in a segment. The *cursor record* is its own key, committed with its segment in
+one transaction. The
 stored stream is an *emission stream*, so a later segment can hold LOWER block numbers and no segment
 may be skipped on a block bound.
 
@@ -158,7 +174,7 @@ strip `unconfirmedBlocks` from the TAIL. Do NOT touch core's `index.ts`. Do NOT 
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (how
 you mocked `idb-keyval`'s `set` for the cost assertion; anything the port had to do that the fs port
-did not; any reason you diverged from the tail strategy). That block is the ONE sanctioned channel
+did not; the cursor-record key you chose and why the anchored pattern rejects it). That block is the ONE sanctioned channel
 for build-time rationale and the runner transcribes it into the done record. Do NOT write the done
 record, the commit message or the PR body, and do NOT open an observation note for decisions.
 

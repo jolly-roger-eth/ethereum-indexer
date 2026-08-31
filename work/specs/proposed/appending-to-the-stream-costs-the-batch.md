@@ -82,11 +82,30 @@ Four properties, which every keeper must satisfy and a conformance test can chec
    return one whenever it returns anything.
 4. **An empty save costs nothing proportional to the history.**
 
-**Both shipped keepers satisfy these by putting the cursor IN THE OPEN TAIL and STRIPPING it when the
-segment seals.** One key is one write, so property 2 holds by construction with no transaction, no
-ordering rule and no recovery; sealing is an explicit act — when a save opens segment `N+1` it
-rewrites segment `N` with its `unconfirmedBlocks` EMPTIED, keeping the rest of its `lastSync` — which
-gives property 3 while leaving every segment self-describing.
+**THE TWO SHIPPED KEEPERS SATISFY THESE DIFFERENTLY, which is the point of separating the contract
+from the placement.** IndexedDB has an atomic multi-key write and the filesystem does not, so they
+should not be forced onto one layout:
+
+- **IndexedDB — a CURSOR RECORD committed in ONE transaction.** `setMany` opens one `readwrite`
+  transaction, puts every entry and awaits `store.transaction`, so a segment and a separate cursor
+  record land together or not at all. Property 2 holds through the transaction; property 3 is
+  VACUOUS, because the cursor was never in a segment and there is nothing to strip; and property 4 is
+  free — an empty save writes one small record instead of rewriting the tail. Strictly better than
+  the tail strategy here, and available for nothing.
+- **The filesystem — the cursor IN THE OPEN TAIL, stripped on seal.** It has no multi-file
+  transaction, so the only way to make property 2 hold by construction is to make a save ONE key.
+
+A SQL keeper would take the IndexedDB shape, with a cursor ROW updated in the same transaction as its
+segment insert.
+
+**Presence is uniform even though placement is not**: it is "the read-cursor operation returns
+something". On the filesystem that reads the tail; on IndexedDB it reads the cursor record.
+
+**The FILESYSTEM's tail strategy, in detail.** One key is one write, so property 2 holds by construction with no transaction, no
+ordering rule and no recovery; One key is one write, so property 2 holds by
+construction with no transaction, no ordering rule and no recovery. Sealing is then an explicit act —
+when a save opens segment `N+1` it rewrites segment `N` with its `unconfirmedBlocks` EMPTIED, keeping
+the rest of its `lastSync` — which gives property 3 while leaving every segment self-describing.
 
 That strip is one extra write per SEAL, not per save, and it is OFF THE CRITICAL PATH: if it never
 happens, segment `N` keeps a stale WINDOW nothing reads (the live cursor is the TAIL's, and the tail
@@ -100,7 +119,8 @@ That is a BETTER fit for that substrate, and the server's ADR-0006 emission-stre
 concrete case. The tail strategy is chosen here because it is the simplest thing that satisfies all
 four on the two substrates this spec actually ships, NOT because it is the only correct layout.
 
-**The empty save is the cost of this shape, and it is bounded and tunable.** A save with no new
+**The empty save is the cost of the TAIL shape specifically, and it is bounded and tunable.** It is
+why IndexedDB does not use it. A save with no new
 events still rewrites the tail to move the cursor, and a head-following indexer saves on EVERY poll
 (`indexer.ts` calls `save` unconditionally; the `eventStream.length > 0` guard beside it covers only
 state updates). So the steady-state cost is one tail rewrite per poll. That is bounded by the SEAL
@@ -108,12 +128,18 @@ THRESHOLD, never by the history — which is what story 1 actually claims — an
 events a tail is a few hundred KB and a handful of milliseconds; at 250 it is under a millisecond.
 
 A separate cursor record makes an empty save one small write instead, and on a substrate with
-transactions that is strictly better — which is exactly why the contract above leaves it open. What
-was withdrawn is MANDATING it everywhere: on a substrate that cannot commit two keys, the cursor and
+transactions that is strictly better — which is why IndexedDB uses it. What was withdrawn is
+MANDATING it everywhere: on a substrate that cannot commit two keys, the cursor and
 the segment become two things that must agree, and paying for that means orphan discard, truncation
 to a committed event count, and integers whose only job is to compensate for the missing capability.
 Four review rounds found defects in that machinery and nowhere else. So the filesystem takes the
 milliseconds and a transactional keeper takes the separate record; neither is imposed on the other.
+
+**Every segment carries its SCANNED EXTENT (`{lastFromBlock, lastToBlock, latestBlock}`) on BOTH
+keepers**, regardless of where the cursor lives. It is what makes a truncated prefix say where it got
+to, and the truncation recovery needs it either way. On the cursor-record keeper the recovery
+additionally REWRITES the cursor from the surviving top segment, because a stream-wide cursor record
+would otherwise be left describing segments that are gone — the cursor-ahead direction.
 
 **Segments are written through temp-file-plus-rename on the filesystem.** A bare `writeFileSync` can
 leave a TORN file, and `storage().get` wraps only `readFileSync` in its `try`/`catch` — `JSON.parse`

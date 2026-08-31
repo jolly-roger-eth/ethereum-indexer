@@ -52,6 +52,12 @@ WHERE a keeper puts its cursor is the KEEPER's business. The helper enforces the
 
 ### How the fs keeper satisfies them: the TAIL strategy
 
+The two shipped keepers satisfy the contract DIFFERENTLY, and the helper must not assume either.
+IndexedDB has an atomic multi-key write, so the browser keeper commits a segment and a SEPARATE
+CURSOR RECORD in one `setMany` transaction — property 3 is vacuous there and there is no seal-strip.
+The filesystem has no multi-file transaction, so it uses the tail. Build the helper so both are
+expressible through the keeper-supplied cursor operations, and test the fs one here.
+
 - **A save writes exactly ONE key — the open tail — holding its events AND the `lastSync` current
   after them.** One key is one write, so property 2 holds by CONSTRUCTION: there is nothing to order,
   no transaction to need, and no orphan rule.

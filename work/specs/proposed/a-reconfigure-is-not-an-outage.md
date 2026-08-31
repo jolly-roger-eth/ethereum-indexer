@@ -2,7 +2,6 @@
 title: 'A reconfigure is not an outage: a generation is a stream plus a fold, and the canonical pointer moves when one is ready'
 slug: a-reconfigure-is-not-an-outage
 taskedAfter: [appending-to-the-stream-costs-the-batch]
-needsAnswers: true
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -19,22 +18,6 @@ needsAnswers: true
 > `work/notes/ideas/stream-grafting-what-we-established.md`. The promotion-cost spike
 > (`work/notes/findings/promotion-cost-of-a-two-label-stream.md`) answered a question this design no
 > longer asks; it is retained as evidence, not as an input.
-
-<!-- open-questions -->
-
-## Open questions
-
-1. **Is `project` the existing `name`, renamed?** Both keepers take a caller-supplied `name` today
-   (`keepStreamOnIndexedDB(name)`, `keepStateOnFile(folder, name)`) and key `<name>_<chainId>`, so
-   `name` IS the current tenancy discriminator. Landable 1 owns the keyspace migration and cannot
-   compute an adopted key without an answer: if they are the same thing the migration is mechanical
-   and no caller changes; if `project` is a new required input, every existing caller must supply one
-   and adoption is undefined for callers that do not. (Recommendation: they are the same, `project`
-   being `name` promoted to a structural key component — but it is a published-surface question and
-   is not being decided silently.)
-
-<!-- /open-questions -->
-
 ## Problem Statement
 
 An indexer has exactly one state, and reconfiguring mutates it in place. When ADR-0034 says a change
@@ -174,6 +157,13 @@ context buys nothing and costs a deployment constraint.
 **Streams are separate keyspaces and share nothing.** `<project>/<chainId>/<filterDigest>`, with
 segments beneath, per `appending-to-the-stream-costs-the-batch`. Two generations on one stream READ it;
 only the one that is indexing WRITES it.
+
+**`project` IS the existing caller-supplied `name`, promoted to a structural key component.** Both
+keepers already take one (`keepStreamOnIndexedDB(name)`, `keepStateOnFile(folder, name)`) and key
+`<name>_<chainId>`, so `name` is ALREADY the tenancy discriminator — it is just not structural, and
+nothing stops a query forgetting it. So this is a rename plus a guarantee, NOT a new required input:
+no existing caller changes, and landable 1's keyspace migration is mechanical because the adopted key
+is computable from what the caller already passes.
 
 **The project is a separate KEY COMPONENT, never mixed into the digest.** Same isolation either way,
 but keeping it separate leaves the keys debuggable, lets a project be enumerated or dropped by prefix,
