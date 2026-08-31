@@ -113,21 +113,17 @@ So: take the `streamHash` values only, DEDUPLICATE them, sort them BY THEMSELVES
 
 **The stream digest ALSO covers the STREAM CONFIG hash, and ADR-0006 already said so.** The filter is
 not the only thing that decides what a stream CONTAINS. `ProvidedStreamConfig` is `{finality,
-alwaysFetchTimestamps, alwaysFetchTransactions, parse}`, and `parse.logValues`,
-`alwaysFetchTimestamps` and `alwaysFetchTransactions` each change WHAT IS STORED.
+alwaysFetchTimestamps, alwaysFetchTransactions, parse}`, and `alwaysFetchTimestamps`,
+`alwaysFetchTransactions` and `parse.filters` each change WHAT IS STORED.
 
-**One third of that justification EXPIRES, and the expiry must not be acted on by accident.**
-`the-stream-stores-only-what-the-node-said` makes `logValues` a PROCESSOR-facing projection only, so
-once it lands `logValues` changes neither the stored nor the sent bytes and is no longer a reason to
-fork a stream. Keeping it inside the config hash then stays SAFE but becomes CONSERVATIVE: a
-`logValues` change would re-fetch a whole history for a change that affects nothing stored.
-`alwaysFetchTimestamps` and `alwaysFetchTransactions` are untouched and still justify the config hash
-on their own, so nothing here breaks. NARROWING the hash is a separate decision with re-fetch
-consequences, it belongs to this spec, and it must be made deliberately rather than as a side effect
-of the sibling landing. The code agrees
-emphatically: `sourceInvalidationOf` compares the config hash FIRST and, on a mismatch, returns
-`{valid: false, invalidFromBlock: 0}` for BOTH halves — a config change invalidates the STREAM, not
-just the fold.
+**One third of that justification is DELETED WITH THE KNOB, and the conclusion is unaffected.**
+`the-stream-stores-only-what-the-node-said` DELETES `logValues` outright (it is an unused stub whose
+only purpose, reducing what is stored, that spec removes). So `logValues` stops being a reason to
+fork a stream by ceasing to exist, rather than by becoming a reason that is quietly wrong. Nothing
+here needs narrowing and no follow-up decision is left open: `alwaysFetchTimestamps` and
+`alwaysFetchTransactions` still change what is stored, and `parse` remains in the hash on the
+strength of `parseConfig.filters`, which narrows which events are parsed and kept at all. The config
+hash keeps its full justification.
 
 Keyed on the filter alone, two different configs would map to ONE stream, so a generation would adopt
 logs the verdict has already declared invalid, and the only existing remedy (clear the stream) would
@@ -456,10 +452,8 @@ in `work/specs/dropped/`.)
   under a redundant appended entry, and a collision cannot be produced across a corpus of realistic
   sources.
 - **The stream digest MOVES on a stream-config change**, and the old stream is left intact rather
-  than adopted. Use `alwaysFetchTimestamps` or `alwaysFetchTransactions` as the worked example rather
-  than `parse.logValues`: once `the-stream-stores-only-what-the-node-said` lands, `logValues` no
-  longer alters what is stored, so a test written on it would be asserting the CONSERVATIVE half of
-  the rule and would have to change if the hash is ever narrowed. This is the guard
+  than adopted. Use `alwaysFetchTimestamps` or `alwaysFetchTransactions` as the worked example, NOT
+  `parse.logValues`, which `the-stream-stores-only-what-the-node-said` deletes. This is the guard
   against a generation adopting logs the verdict has declared invalid.
 - **A cap REFUSES and names what to delete**, and nothing is evicted. Assert the existing generations are
   all still readable after the refusal.
