@@ -526,6 +526,32 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    so the durable question for this landable is "what else is keyed OUTSIDE the anchored pattern?",
    not this one instance.
 
+   **RECONSIDER WHETHER THE PAYLOAD MOVE IS WORTH IT AT ALL — flagged, not decided.** This migration
+   was sized when preserving a user's cached history was treated as near-inviolable. `CONTEXT.md` now
+   says otherwise: stratagems is a CAPABILITY REFERENCE and not a compatibility constraint, and the
+   real question is what a RE-INDEX costs the people it lands on. Two of the three jobs here are not
+   in question — the old keys must be SWEPT either way (an orphaned keyspace nobody deletes is a
+   permanent leak), and a stream must never be silently orphaned-but-retained. What IS in question is
+   the third: MOVING the payload.
+
+   - **Move** (as written): no re-index, at the cost of rewriting a whole cached history on
+     IndexedDB, under a quota that is not reliably reported, needing per-key resumability to be safe.
+   - **Sweep and rebuild**: delete the old keys, re-index or re-seed. Trivial to build and no quota
+     risk, but it costs a full re-index — which on a public node can be IMPOSSIBLE, and a state
+     SNAPSHOT only rescues the fold, leaving the generation a LEAF that cannot re-fold for the next
+     processor change.
+   - **Adopt in place**: read the old keys as the earliest segments of the new stream without moving
+     a byte, which is exactly what the prerequisite already does for the pre-segment legacy blob
+     ("adopted in place, never copied, the adoption writes NOTHING"). Cheapest of the three if it
+     works, but it needs an indirection from the digest to a legacy keyspace, and indirection is what
+     that spec rejected on merit for prefix sharing — though this case is narrower, being one
+     one-time alias rather than a general sharing mechanism.
+
+   The choice turns on whether seeding exists by then
+   (`a-generation-can-be-seeded-from-a-published-artifact` is an EXPLORATION spec, so it does not
+   yet). Decide it when this landable is cut, and record which and why; do not default to the
+   expensive one just because it is written out below.
+
    **Size the migration honestly, because it is FREE ON ONE KEEPER AND NOT ON THE OTHER.** A rename
    moves no payload on the filesystem — but IndexedDB has no rename, so there it is `get`+`set`+`del`
    and moves the WHOLE payload (the spike measured 135.6 MB of segments in four store operations).
