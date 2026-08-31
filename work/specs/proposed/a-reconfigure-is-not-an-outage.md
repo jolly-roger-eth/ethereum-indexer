@@ -172,11 +172,25 @@ STREAM's `lastSync` forward (`feed(replayable, lastSyncFetched)`). On that path 
 gone by definition, so a stream that had dropped its window would resume with an empty one and be
 blind to a reorg that struck while it was offline.
 
-So there are two durable copies — the stream's cursor record and the state's cursor (ADR-0027,
+So there are TWO DURABLE COPIES — the stream's cursor record, and the state's cursor (ADR-0027,
 `processor-entities/src/cursor.ts`, which exists precisely because that window carries BigInt-bearing
-events) — and that is DELIBERATE rather than an oversight. Two copies of one small record is the
-right price for data that cannot be re-derived from anywhere. They are written from the same
-`lastSync` object, so they do not drift; where one is missing the other is authoritative.
+events). That is chosen redundancy, not an oversight: two copies of one small record is the right
+price for data that cannot be re-derived from anywhere, and each serves a resumption path the other
+cannot. A normal load resumes from the STATE's copy, because it describes what the FOLD has seen. The
+state-discarded/stream-kept path resumes from the STREAM's, because the state's is gone by definition.
+
+**The two keepers are NOT written atomically with each other, so they CAN diverge, and the direction
+decides what to do.** This is the same asymmetry as cursor-ahead versus cursor-behind, one level up:
+
+- **stream AHEAD of state** is safe and expected — events are stored but not yet folded, and the fold
+  catches up by replaying the stream from the state's position. This is the normal steady state
+  between a stream save and the state save that follows it.
+- **state AHEAD of stream** is the bad direction: the state claims to have folded events the stream
+  does not hold, so a replay cannot reproduce it and a revert cannot reach under it. Refuse and
+  rebuild the state from the stream rather than trusting a fold nothing can reproduce.
+
+Ordering follows: the STREAM is saved before the STATE, so a crash between them lands in the safe
+direction.
 
 On a rebuild from the stream the window also falls out of the replay as a by-product of the fold, so
 nothing ever has to RECONSTRUCT it as a separate operation.
@@ -205,6 +219,17 @@ handler is in constantly. So: drop-on-promotion applies to `on-catch-up` and `ma
 promotion means the successor DEMONSTRATED something. Under `immediate` the previous generation is
 retained until the new one reaches the cursor the old one had at promotion, and only then dropped.
 
+**The cap is a CONFIGURED number and must never be derived from `navigator.storage.estimate()`**, on
+three measured grounds (`work/notes/findings/browser-storage-headroom-for-generations.md`): WebKit
+does not implement it at all, `quota` varies four-fold between engines and moves between runs on one
+engine, and with a real quota forced down to 8 MB it still reported 6.45 GB of headroom while writes
+were failing. A pre-flight check against that number is worse than no check.
+
+Two measurements that make the browser default comfortable rather than tight: IndexedDB COMPRESSES
+event payloads about 6–10x, so a generation of 31,332 real logs occupies roughly 2 MB stored rather
+than the 17.7 MB its JSON weighs; and a `QuotaExceededError` does NOT tear a `setMany`, so the atomic
+segment-plus-cursor commit survives a full disk and needs no storage-side guard.
+
 Reaching either cap REFUSES the new generation and names what to delete. It never evicts: eviction picks
 a victim by a policy that cannot know which generation an operator was keeping deliberately, and story 4
 exists precisely because old generations have value. A refusal costs one operator action; a wrong
@@ -223,7 +248,14 @@ wearing one name.** The axis is DEVELOPMENT versus PRODUCTION, and it is not the
 browser-versus-server:
 
 - **`immediate`** — the new generation becomes canonical the moment it is created, before it has
-  caught up. The DEVELOPMENT default. A developer who just edited a handler is looking for what the
+  caught up. `checkTxInclusion` degrades HONESTLY here rather than lying, and this was CHECKED
+  against the code rather than assumed: it is answered from the canonical generation's
+  `unconfirmedBlocks`, and a generation still catching up has `lastToBlock < latestBlock - finality`,
+  which `verdictFor` already answers `unknown` / `window-not-covering` — not `absent`. A generation
+  with no `lastSync` at all answers `unknown` / `not-synced`. So a freshly-promoted generation reports
+  that it does not know, which is the answer an app can act on safely; it never claims a transaction
+  is missing when a neighbouring generation has indexed it. Nothing to build here, and nothing to
+  guard against. The DEVELOPMENT default. A developer who just edited a handler is looking for what the
   edit does, and stale-but-complete answers from the old processor are more confusing than incomplete
   answers from the new one. This is closest to today's behaviour, minus the discard: the old
   generation is still there and still reverted-to.

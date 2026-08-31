@@ -1,0 +1,65 @@
+{
+  "project": "firefox",
+  "ranAt": "2026-08-31T05:34:48.302Z",
+  "rows": [
+    {
+      "project": "firefox",
+      "mode": "footprint",
+      "repeat": 2,
+      "sealAfter": 1000,
+      "segmentCount": 63,
+      "eventCount": 62664,
+      "estimateBefore": {
+        "quota": 1617445273,
+        "usage": 0
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 419,
+          "estimate": {
+            "quota": 1617445273,
+            "usage": 6946064
+          },
+          "keyCount": 65
+        },
+        {
+          "generation": 1,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 403,
+          "estimate": {
+            "quota": 1617445273,
+            "usage": 13937704
+          },
+          "keyCount": 130
+        },
+        {
+          "generation": 2,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 423,
+          "estimate": {
+            "quota": 1617445273,
+            "usage": 17285120
+          },
+          "keyCount": 195
+        }
+      ],
+      "quotaHit": null,
+      "estimateAfter": {
+        "quota": 1617445273,
+        "usage": 17285120
+      },
+      "totalKeys": 195,
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0"
+      }
+    }
+  ]
+}

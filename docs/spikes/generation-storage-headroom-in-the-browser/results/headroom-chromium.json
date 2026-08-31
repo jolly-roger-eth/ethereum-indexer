@@ -1,0 +1,279 @@
+{
+  "project": "chromium",
+  "ranAt": "2026-08-31T05:34:43.601Z",
+  "rows": [
+    {
+      "project": "chromium",
+      "mode": "footprint",
+      "repeat": 1,
+      "sealAfter": 1000,
+      "segmentCount": 32,
+      "eventCount": 31332,
+      "estimateBefore": {
+        "quota": 6442450944,
+        "usage": 0
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "bytes": 17715609,
+          "records": 33,
+          "ms": 124.90000000596046,
+          "estimate": {
+            "quota": 6443652598,
+            "usage": 1201654
+          },
+          "keyCount": 34
+        },
+        {
+          "generation": 1,
+          "bytes": 17715609,
+          "records": 33,
+          "ms": 97.60000002384186,
+          "estimate": {
+            "quota": 6445437484,
+            "usage": 2986540
+          },
+          "keyCount": 68
+        },
+        {
+          "generation": 2,
+          "bytes": 17715609,
+          "records": 33,
+          "ms": 96,
+          "estimate": {
+            "quota": 6449064246,
+            "usage": 6613302
+          },
+          "keyCount": 102
+        }
+      ],
+      "quotaHit": null,
+      "estimateAfter": {
+        "quota": 6449064246,
+        "usage": 6613302
+      },
+      "totalKeys": 102,
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36"
+      }
+    },
+    {
+      "project": "chromium",
+      "mode": "quota-tear",
+      "repeat": 1,
+      "sealAfter": 1000,
+      "segmentCount": 32,
+      "eventCount": 31332,
+      "estimateBefore": {
+        "quota": 6442450944,
+        "usage": 0
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "bytes": 17715609,
+          "records": 33,
+          "ms": 93.2999999821186,
+          "estimate": {
+            "quota": 6443652598,
+            "usage": 1201654
+          },
+          "keyCount": 34
+        },
+        {
+          "generation": 1,
+          "bytes": 17715609,
+          "records": 33,
+          "ms": 92.09999999403954,
+          "estimate": {
+            "quota": 6445541154,
+            "usage": 3090210
+          },
+          "keyCount": 68
+        },
+        {
+          "generation": 2,
+          "bytes": 17715609,
+          "records": 33,
+          "ms": 97.40000000596046,
+          "estimate": {
+            "quota": 6445941456,
+            "usage": 3490512
+          },
+          "keyCount": 102
+        },
+        {
+          "generation": 3,
+          "bytes": 17715609,
+          "records": 33,
+          "ms": 116.2000000178814,
+          "estimate": {
+            "quota": 6447363260,
+            "usage": 4912316
+          },
+          "keyCount": 136
+        }
+      ],
+      "quotaHit": {
+        "generation": 4,
+        "errorName": "QuotaExceededError",
+        "message": "",
+        "highestSegment": 6,
+        "cursorAt": 6,
+        "segmentCount": 7,
+        "transactionTorn": false,
+        "tearDirection": "none",
+        "estimate": {
+          "quota": 6451116216,
+          "usage": 8665272
+        }
+      },
+      "estimateAfter": {
+        "quota": 6451116216,
+        "usage": 8665272
+      },
+      "totalKeys": 144,
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36"
+      }
+    },
+    {
+      "project": "chromium",
+      "mode": "footprint",
+      "repeat": 2,
+      "sealAfter": 1000,
+      "segmentCount": 63,
+      "eventCount": 62664,
+      "estimateBefore": {
+        "quota": 5368709120,
+        "usage": 0
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 219.5,
+          "estimate": {
+            "quota": 5370987191,
+            "usage": 2278071
+          },
+          "keyCount": 65
+        },
+        {
+          "generation": 1,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 214.09999999403954,
+          "estimate": {
+            "quota": 5375707862,
+            "usage": 6998742
+          },
+          "keyCount": 130
+        },
+        {
+          "generation": 2,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 296.7000000178814,
+          "estimate": {
+            "quota": 5379659163,
+            "usage": 10950043
+          },
+          "keyCount": 195
+        }
+      ],
+      "quotaHit": null,
+      "estimateAfter": {
+        "quota": 5379659163,
+        "usage": 10950043
+      },
+      "totalKeys": 195,
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36"
+      }
+    },
+    {
+      "project": "chromium",
+      "mode": "quota-tear",
+      "repeat": 2,
+      "sealAfter": 1000,
+      "segmentCount": 63,
+      "eventCount": 62664,
+      "estimateBefore": {
+        "quota": 6442450944,
+        "usage": 0
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 196,
+          "estimate": {
+            "quota": 6444836797,
+            "usage": 2385853
+          },
+          "keyCount": 65
+        },
+        {
+          "generation": 1,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 224.7999999821186,
+          "estimate": {
+            "quota": 6449757945,
+            "usage": 7307001
+          },
+          "keyCount": 130
+        },
+        {
+          "generation": 2,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 308.80000001192093,
+          "estimate": {
+            "quota": 6453133210,
+            "usage": 10682266
+          },
+          "keyCount": 195
+        }
+      ],
+      "quotaHit": {
+        "generation": 3,
+        "errorName": "QuotaExceededError",
+        "message": "",
+        "highestSegment": 2,
+        "cursorAt": 2,
+        "segmentCount": 3,
+        "transactionTorn": false,
+        "tearDirection": "none",
+        "estimate": {
+          "quota": 6451300200,
+          "usage": 8849256
+        }
+      },
+      "estimateAfter": {
+        "quota": 6451300200,
+        "usage": 8849256
+      },
+      "totalKeys": 199,
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.34 Safari/537.36"
+      }
+    }
+  ]
+}

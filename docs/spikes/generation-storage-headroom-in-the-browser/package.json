@@ -1,0 +1,16 @@
+{
+	"name": "spike-generation-storage-headroom-in-the-browser",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"description": "Evidence for work/notes/findings/: what does a generation cost in browser storage, and is a quota failure atomic?",
+	"scripts": {"browser": "playwright test"},
+	"devDependencies": {
+		"@playwright/test": "^1.60.0",
+		"@types/node": "^22.0.0",
+		"idb-keyval": "^6.2.4",
+		"playwright-browser-harness": "^0.3.0",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.0"
+	}
+}

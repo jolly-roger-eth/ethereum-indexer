@@ -1,0 +1,65 @@
+{
+  "project": "webkit",
+  "ranAt": "2026-08-31T05:34:51.549Z",
+  "rows": [
+    {
+      "project": "webkit",
+      "mode": "footprint",
+      "repeat": 2,
+      "sealAfter": 1000,
+      "segmentCount": 63,
+      "eventCount": 62664,
+      "estimateBefore": {
+        "quota": null,
+        "usage": null
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 293,
+          "estimate": {
+            "quota": null,
+            "usage": null
+          },
+          "keyCount": 65
+        },
+        {
+          "generation": 1,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 261,
+          "estimate": {
+            "quota": null,
+            "usage": null
+          },
+          "keyCount": 130
+        },
+        {
+          "generation": 2,
+          "bytes": 35408390,
+          "records": 64,
+          "ms": 245,
+          "estimate": {
+            "quota": null,
+            "usage": null
+          },
+          "keyCount": 195
+        }
+      ],
+      "quotaHit": null,
+      "estimateAfter": {
+        "quota": null,
+        "usage": null
+      },
+      "totalKeys": 195,
+      "env": {
+        "crossOriginIsolated": false,
+        "hasSharedArrayBuffer": false,
+        "hasOPFS": false,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"
+      }
+    }
+  ]
+}
