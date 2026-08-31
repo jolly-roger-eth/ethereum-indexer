@@ -504,62 +504,53 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    a prefix, matches across chains. So this landable owns the new anchor AND the digest's ENCODING,
    since the anchor cannot be written without knowing the character set the digest can produce.
 
-   **It also OWNS the migration off the prerequisite's keyspace, which is otherwise unowned and would
-   silently orphan every cached history.** `appending-to-the-stream-costs-the-batch` leaves users
-   holding `stream_<name>_<chainId>_<ordinal>` (and, for anyone older, the adopted label-less legacy
-   key, which carries the cursor inside it). This spec's key matches NONE of those, so landed in the stated
-   order every existing stream becomes unreachable AND is never deleted: a full re-index plus a
-   permanent storage leak, which directly reverts the prerequisite's story 5. The existing stream is
-   ADOPTED at its computed `stream_<name>_<chainId>_<streamDigest>` — the filter it was fetched under
-   is the one the running source describes, or the adoption is refused and the old keys are swept
-   rather than left.
+   **It also OWNS THE DISPOSAL of the prerequisite's keyspace, which is otherwise unowned and would
+   leak.** `appending-to-the-stream-costs-the-batch` leaves any stream under
+   `stream_<name>_<chainId>_<ordinal>` (and, for anyone older, the adopted label-less legacy key,
+   which carries the cursor inside it). This spec's key matches NONE of those, so landed in the
+   stated order every such stream becomes unreachable AND is never deleted — a permanent storage
+   leak. Disposing of them is therefore this landable's, and the disposal is a SWEEP (below).
 
-   **THREE key shapes migrate, not two, and the third is the one an enumeration cannot see.** On the
-   cursor-record keeper (IndexedDB, per ADR-0035) a stream also has a separate CURSOR RECORD, keyed
-   so that the ANCHORED ORDINAL PATTERN deliberately REJECTS it. A migration driven by enumerating
-   segments therefore moves every segment and silently leaves the cursor behind — and since PRESENCE
-   is "the read-cursor operation returns something", the migrated stream then reads ABSENT,
-   `indexer.ts` takes its clear branch, and every browser user re-fetches their entire history:
-   exactly the outcome this bullet exists to prevent, arriving through the one key it did not
-   enumerate. Migrate the cursor record in the SAME resumable per-key sweep. Note this is the SECOND
-   instance of one shape — ADR-0035 had to add a `clear-cursor` operation for the same blind spot —
-   so the durable question for this landable is "what else is keyed OUTSIDE the anchored pattern?",
-   not this one instance.
+   **The SWEEP must delete more than the segments, and the key it will miss is the one an enumeration
+   cannot see.** On the cursor-record keeper (IndexedDB, per ADR-0035) a stream also has a separate
+   CURSOR RECORD, keyed so that the ANCHORED ORDINAL PATTERN deliberately REJECTS it. A sweep driven
+   by enumerating segments therefore deletes every segment and leaves the CURSOR behind — and since
+   PRESENCE is "the read-cursor operation returns something", what remains reads PRESENT with no
+   events and a cursor claiming coverage from block 0, which is precisely the non-self-healing
+   orphaned-cursor state ADR-0035 added a `clear-cursor` operation to prevent. Sweep the cursor
+   record BY NAME along with the segments, and note this is the SECOND instance of one shape (the
+   first is why `clear-cursor` exists at all), so the durable question for this landable is "what
+   else is keyed OUTSIDE the anchored pattern?", not this one instance.
 
-   **RECONSIDER WHETHER THE PAYLOAD MOVE IS WORTH IT AT ALL — flagged, not decided.** This migration
-   was sized when preserving a user's cached history was treated as near-inviolable. `CONTEXT.md` now
-   says otherwise: stratagems is a CAPABILITY REFERENCE and not a compatibility constraint, and the
-   real question is what a RE-INDEX costs the people it lands on. Two of the three jobs here are not
-   in question — the old keys must be SWEPT either way (an orphaned keyspace nobody deletes is a
-   permanent leak), and a stream must never be silently orphaned-but-retained. What IS in question is
-   the third: MOVING the payload.
+   **DECIDED: SWEEP the old keys, do NOT move the payload. This migration has no beneficiary.**
+   Three stream key shapes exist across this family, and only the FIRST was ever shipped: the legacy
+   blob `stream_<name>_<chainId>` (written by the published `ethereum-indexer-browser`); the ordinal
+   segments `stream_<name>_<chainId>_<ordinal>` introduced by the PREREQUISITE, which has not landed;
+   and this spec's digest-keyed shape. What this landable migrates is the SECOND to the THIRD — a
+   format that exists only in unreleased builds, so no disk anywhere will hold it unless etherfold is
+   PUBLISHED and acquires users in the window between the two landing. Nothing is published, the
+   publish task is `humanOnly` and in backlog, and the reference deployment has a live contract but no
+   players, so that window is under our control and currently empty.
 
-   - **Move** (as written): no re-index, at the cost of rewriting a whole cached history on
-     IndexedDB, under a quota that is not reliably reported, needing per-key resumability to be safe.
-   - **Sweep and rebuild**: delete the old keys, re-index or re-seed. Trivial to build and no quota
-     risk, but it costs a full re-index — which on a public node can be IMPOSSIBLE, and a state
-     SNAPSHOT only rescues the fold, leaving the generation a LEAF that cannot re-fold for the next
-     processor change.
-   - **Adopt in place**: read the old keys as the earliest segments of the new stream without moving
-     a byte, which is exactly what the prerequisite already does for the pre-segment legacy blob
-     ("adopted in place, never copied, the adoption writes NOTHING"). Cheapest of the three if it
-     works, but it needs an indirection from the digest to a legacy keyspace, and indirection is what
-     that spec rejected on merit for prefix sharing — though this case is narrower, being one
-     one-time alias rather than a general sharing mechanism.
+   So: enumerate the old-shaped keys and DELETE them, and let the stream rebuild. The sweep is not
+   optional and is the part that was never in question — an orphaned keyspace nobody deletes is a
+   permanent storage leak, and a stream must never be silently orphaned-but-retained. What goes is the
+   expensive half: no `get`+`set`+`del` of a whole history on IndexedDB, no transient doubling under a
+   quota `work/notes/findings/browser-storage-headroom-for-generations.md` shows is not reported
+   reliably, and no per-key resumability machinery to make that safe. That is a large amount of the
+   riskiest code in this landable, deleted for a benefit that would have accrued to nobody.
 
-   The choice turns on whether seeding exists by then
-   (`a-generation-can-be-seeded-from-a-published-artifact` is an EXPLORATION spec, so it does not
-   yet). Decide it when this landable is cut, and record which and why; do not default to the
-   expensive one just because it is written out below.
+   **What would REVERSE this**, stated so it is checked rather than assumed: publishing etherfold
+   before this lands, and someone running the prerequisite's format for real. If that happens, revisit
+   and take one of the other two shapes — moving the payload, or adopting the old keys in place as
+   the earliest segments the way the prerequisite already does for the legacy blob (cheapest, but it
+   needs a digest-to-legacy-keyspace indirection, which is narrower than the prefix sharing that spec
+   rejected but is still an indirection).
 
-   **Size the migration honestly, because it is FREE ON ONE KEEPER AND NOT ON THE OTHER.** A rename
-   moves no payload on the filesystem — but IndexedDB has no rename, so there it is `get`+`set`+`del`
-   and moves the WHOLE payload (the spike measured 135.6 MB of segments in four store operations).
-   So the browser rewrites its entire cached history on the first boot after upgrade, transiently
-   holding two copies under a quota that `work/notes/findings/browser-storage-headroom-for-generations.md`
-   shows is not reported reliably. Make it RESUMABLE PER KEY — write the new key, delete the old,
-   move on — so an interrupted migration continues rather than restarting, and so the transient
-   doubling is one segment rather than one history.
+   Note what is NOT affected: the PREREQUISITE's own legacy-blob adoption stays exactly as written. It
+   migrates the one format that really did ship, it writes NOTHING to adopt, and it is the capability
+   demonstration this project is actually selling.
+
 2. **The generation registry, the canonical pointer, and the caps** — creating a generation, moving
    the pointer (forward and back), refusing at a cap, deleting a generation or a stream.
    Independently testable with no indexer running. **It also owes the seeding spec its one
