@@ -24,23 +24,14 @@ needsAnswers: true
 
 ## Open questions
 
-1. **How does a deployment declare DEVELOPMENT versus PRODUCTION?** The promotion policy is put on
-   that axis (`immediate` for dev, `on-catch-up` for production) while RETENTION is put on the
-   browser-versus-server axis, and NOTHING IN A BROWSER BUILD CAN DETECT THE FIRST. This is not an
-   edge case: browser-plus-development is the primary runtime (ADR-0002) and it selects `immediate`
-   plus drop-on-promotion, which is exactly the pair this spec calls unsafe and then patches with an
-   interlock. Is it an explicit option with no default, an existing build-time signal, or is the axis
-   wrong?
-2. **Is the SERVER/CLI tier in this spec, a sibling spec, or a named follow-up?** Every landable that
-   RUNS a generation edits `packages/browser/src/IndexerState.ts`, and nothing builds a stream keeper
-   over the ADR-0006 emission-stream table or `RemoteSQL`. Yet story 11 says "server or CLI" and this
-   spec bills itself as generalising ADR-0008, a SERVER decision now amended to point here. As it
-   stands the destination is a browser-only generation model with a server ADR describing it.
-3. **Is `project` the existing `name`, renamed?** Both keepers take a caller-supplied `name` today
-   and key `<name>_<chainId>`, so `name` IS the current tenancy discriminator. Landable 1 owns the
-   keyspace migration and cannot compute an adopted key without an answer: if they are the same the
-   migration is mechanical; if `project` is new, every existing caller must supply one and adoption
-   is undefined for callers that do not.
+1. **Is `project` the existing `name`, renamed?** Both keepers take a caller-supplied `name` today
+   (`keepStreamOnIndexedDB(name)`, `keepStateOnFile(folder, name)`) and key `<name>_<chainId>`, so
+   `name` IS the current tenancy discriminator. Landable 1 owns the keyspace migration and cannot
+   compute an adopted key without an answer: if they are the same thing the migration is mechanical
+   and no caller changes; if `project` is a new required input, every existing caller must supply one
+   and adoption is undefined for callers that do not. (Recommendation: they are the same, `project`
+   being `name` promoted to a structural key component — but it is a published-surface question and
+   is not being decided silently.)
 
 <!-- /open-questions -->
 
@@ -106,8 +97,10 @@ below.
 9. As an operator, I want deleting a generation or a stream to be one cheap, complete operation.
 10. As an operator, I want to PAUSE a generation so it stops indexing without being deleted, and resume
     it later, without it ever answering with state a reorg has invalidated underneath it.
-11. As an operator running MULTIPLE PROJECTS on one server or CLI, I want them fully isolated, so no
-    query, prefix scan or cap in one project can ever reach another's data.
+11. As a developer, I want the KEY SHAPE to carry a project discriminator structurally from the
+    start, so multi-project isolation is available to whatever runtime needs it and is never
+    retrofitted. (Running several projects on a server or CLI is
+    `the-server-and-cli-hold-generations-too`; what THIS spec owes it is the key, not the runtime.)
 12. As a developer, I want a generation whose stream is unavailable to fall back to a full re-index,
     which is today's behaviour, so the feature degrades rather than breaks.
 13. As a DEVELOPER iterating on a processor, I want the new generation to become canonical
@@ -225,7 +218,8 @@ generation HAS a store WITH a retention window, so the two words will meet in on
   with stream count, leaving the resource anyone actually cares about — total storage, total state
   stores — unbounded.
 
-**The DEFAULTS differ by runtime, because the reason to RETAIN a generation differs.** On a server or
+**The RETENTION defaults differ by runtime, and unlike the promotion axis this one IS detectable — a
+package knows which it is.** On a server or
 the CLI an operator inspects, A/B-tests and reverts, so KEEPING generations is the point and the cap
 should be generous. In a BROWSER there is usually nothing to revert TO that matters: the app author ships a new
 build, and the user did not choose the reconfigure. So the browser default keeps the previous
@@ -264,28 +258,35 @@ reaped when its last generation goes.
 promotion, and it is a single small record write, so promotion has no meaningful cost and no
 multi-key recovery problem. Moving it back is the revert.
 
-**The promotion policy has THREE values, not two, because the browser is two different runtimes
-wearing one name.** The axis is DEVELOPMENT versus PRODUCTION, and it is not the same axis as
-browser-versus-server:
+**The promotion policy has THREE values, and `on-catch-up` is the default EVERYWHERE.** There is no
+per-runtime and no per-environment default, because the axis that would select one is not detectable:
+promotion would want a DEVELOPMENT-versus-PRODUCTION distinction, and nothing in a browser build can
+tell which it is in. An undetectable axis with a dangerous default is worse than no axis, so the safe
+value is the default and the unsafe one is a deliberate opt-in:
 
+- **`on-catch-up`** (DEFAULT, everywhere) — the pointer moves when the new generation reaches the old
+  one's cursor. What story 1 asks for.
 - **`immediate`** — the new generation becomes canonical the moment it is created, before it has
-  caught up. `checkTxInclusion` degrades HONESTLY here rather than lying, and this was CHECKED
-  against the code rather than assumed: it is answered from the canonical generation's
-  `unconfirmedBlocks`, and a generation still catching up has `lastToBlock < latestBlock - finality`,
-  which `verdictFor` already answers `unknown` / `window-not-covering` — not `absent`. A generation
-  with no `lastSync` at all answers `unknown` / `not-synced`. So a freshly-promoted generation reports
-  that it does not know, which is the answer an app can act on safely; it never claims a transaction
-  is missing when a neighbouring generation has indexed it. Nothing to build here, and nothing to
-  guard against. The DEVELOPMENT default. A developer who just edited a handler is looking for what the
-  edit does, and stale-but-complete answers from the old processor are more confusing than incomplete
-  answers from the new one. This is closest to today's behaviour, minus the discard: the old
-  generation is still there and still reverted-to.
-- **`on-catch-up`** — the pointer moves when the new generation reaches the old one's cursor. The
-  PRODUCTION default, and the one story 1 asks for.
+  caught up. OPT-IN. It is what a developer iterating on a handler wants, because stale-but-complete
+  answers from the old processor are more confusing than incomplete answers from the new one; it is
+  not something a deployment should ever land in by accident.
 - **`manual`** — the pointer moves only when asked, so an operator can inspect first.
 
-`immediate` is the value an earlier two-valued knob could not express, and leaving it out would have
-forced every developer into either a wait they did not want or a hand-promotion after every save.
+`checkTxInclusion` degrades HONESTLY under `immediate`, and this was CHECKED rather than assumed: it
+is answered from the canonical generation's `unconfirmedBlocks`, and a generation still catching up
+has `lastToBlock < latestBlock - finality`, which `verdictFor` already answers `unknown` /
+`window-not-covering` — not `absent`. A generation with no `lastSync` answers `unknown` /
+`not-synced`. So it reports that it does not know, which is safe to act on, and never claims a
+transaction is missing that a neighbouring generation has indexed.
+
+**Drop-on-promotion is INCOMPATIBLE with `immediate`, and the two are resolved by ORDER rather than
+by an interlock.** `immediate` promotes a generation that has caught up to nothing, so dropping the
+previous one at that moment discards a complete state for an empty one with no fallback when the new
+processor throws on its first event. So: **drop-on-promotion applies only under `on-catch-up` and
+`manual`**, where promotion means the successor demonstrated something. Under `immediate` the
+previous generation is retained until the new one reaches the cursor the old one had at promotion,
+and only then dropped. Because `immediate` is now opt-in rather than a default, this is a documented
+consequence of a deliberate choice instead of a trap the primary runtime falls into.
 
 **Reads do NOT carry generation identity, and the handle FOLLOWS the pointer.** Per-read provenance
 would break the four `StateStore` READ verbs (`getCurrent`, `listCurrent`, `getAsOf`, `listAsOf` —
