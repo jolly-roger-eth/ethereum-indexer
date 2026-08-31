@@ -76,9 +76,12 @@ The correct value is the one already pinned in the glossary: a wide digest over 
 `streamHash` values SORTED BY `streamHash`, plus the stream CONFIG hash. `sourceHashesOf` already
 yields a `streamHash` per entry, so nothing new is invented here — but the DIGEST RULE has exactly one
 home, `a-reconfigure-is-not-an-outage`'s landable 1, which builds it in core where both runtimes
-reach it. **That is why this spec is now `taskedAfter` that one**: a second implementation of the rule
-is the second-source-of-truth hazard this tree refuses everywhere, and this table cannot be keyed on a
-digest that does not exist yet. The edge is a real dependency, not bookkeeping.
+reach it. **That is why this spec is `taskedAfter` that one**: a second implementation of the rule is the
+second-source-of-truth hazard this tree refuses everywhere, and this table cannot be keyed on a digest
+that does not exist yet. Note the edge rests on DUPLICATION and not on migration cost — with no data
+and no consumers this table could legitimately be built on a placeholder key and re-keyed later, so
+the edge is a choice to build it once rather than a constraint forcing it. Worth knowing if the
+ordering ever needs to be broken to unblock the server work.
 
 What ADR-0006 does NOT supply is the tenancy half: `{source, config}` alone collides for two named
 indexers with identical sources (same chain, same contracts, same processor), which is exactly the
@@ -92,12 +95,15 @@ NOT here and never will be", because the versioned-row store creates those at ru
 the log table in the fixed, shippable schema, which is what makes a wrangler D1 migration and the
 Node `applySchema` path produce the same database.
 
-**Why BOTH must be there from the start, rather than added when the sibling needs them.** This spec
-builds the table AND ships stories 1-5, which are a PUBLIC, resumable consumer contract over it.
-Retrofitting either discriminator later is a primary-key rebuild PLUS a breaking change to a cursor
-other people hold. `node-log-api` already makes exactly this argument for its topic columns ("free at
-design time, a migration over millions of rows afterwards"), and it is STRONGER here, because the DDL
-is still free today while a published cursor will not be. Neither column is speculative: a server
+**Why BOTH must be there from the start.** Not because retrofitting would be expensive — that
+argument is VOID and is corrected here rather than left to mislead. Nothing is deployed, no server
+holds data, and no consumer holds a cursor (`CONTEXT.md`: nothing is published), so re-keying this
+table later would cost a migration over an EMPTY database and a change to a contract nobody has yet.
+The honest reason is narrower and survives anyway: getting it right now is FREE, getting it wrong
+costs a second build of the same table, and a key is the one thing a schema cannot be sloppy about
+without every read inheriting the sloppiness. `node-log-api` makes the neighbouring argument for its
+topic columns ("free at design time, a migration over millions of rows afterwards"), which WILL be
+true once there is data — it is just not true yet. Neither column is speculative: a server
 hosts several NAMED INDEXERS, and one name holds several STREAMS over its life, since a filter change
 makes a new one (`a-reconfigure-is-not-an-outage`). Note the axis: it is STREAMS and not generations
 that multiply here, because generations partition the state.

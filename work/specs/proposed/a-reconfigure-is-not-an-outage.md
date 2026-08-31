@@ -300,8 +300,13 @@ and only then dropped. Because `immediate` is now opt-in rather than a default, 
 consequence of a deliberate choice instead of a trap the primary runtime falls into.
 
 **Reads do NOT carry generation identity, and the handle FOLLOWS the pointer.** Per-read provenance
-would break the four `StateStore` READ verbs (`getCurrent`, `listCurrent`, `getAsOf`, `listAsOf` —
-the interface has eleven in total), four backends and the conformance suite, and is REJECTED.
+would touch the four `StateStore` READ verbs (`getCurrent`, `listCurrent`, `getAsOf`, `listAsOf` —
+the interface has eleven in total), four backends and the conformance suite. Note the reason that is
+NO LONGER load-bearing: that breadth used to be a COST argument, and it is not, since nothing is
+published (`CONTEXT.md`) so the churn is work rather than risk. It is still REJECTED, on the ground
+that survives: provenance on every read is noise on the common path, and "which generation answered"
+is purely ADDITIVE later where a caller actually needs it (see Out of Scope), so putting it in the
+seam now would tax four backends forever to answer a question almost no read asks.
 The entities path publishes a handle bound to a store, so a consumer holding one across a pointer move
 would silently read a retired generation; the handle is therefore INDIRECT, resolving to whichever
 generation is canonical.
@@ -542,7 +547,10 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    discards it — the code says the block "is carried no further than the log line". The container is
    browser-side, so the verdict must cross that boundary. ADDITIVE: it publishes the verdict and grows
    `ReconfigureOutcome` while the verbs still discard as they do today; landable 4 removes the
-   discard when it lands the container that replaces it. Includes the `stateDiscarded` sweep, **38**
+   discard when it lands the container that replaces it. Keep the two-step, but for the RIGHT reason:
+   it is NOT to spare a consumer a breaking change (nothing is published, `CONTEXT.md`), it is so
+   each landable lands GREEN on its own, which is `TASKING-PROTOCOL` section 3a's expand-then-contract
+   and applies whatever the release status. Includes the `stateDiscarded` sweep, **38**
    references — `packages/core` (11), `packages/browser` (23), `examples/browser-reference` (2),
    `docs/guide/indexing-in-a-browser-app/index.md` (2).
 4. **The container plus the factory migration.** The indirect handle, per-generation state factories,

@@ -397,7 +397,14 @@ generation — and it is why a sealed segment must still say where the stream go
 **Tests must not touch the real environment.** Point every keeper at a temp/scratch folder and assert
 no real home/config path is written. The module-level `node:fs` mock behind
 `packages/fs/src/utils/fs.ts` is the instrumented seam the cost assertions use, CHOSEN deliberately:
-an injected writer would widen `keepStreamOnFile`, which is published surface.
+an injected writer would widen `keepStreamOnFile`. **REVISIT THAT REASON BEFORE FOLLOWING IT**: it
+rested on `keepStreamOnFile` being published surface, and nothing is published (`CONTEXT.md`), so
+widening costs a changeset and nothing else. Module-level mocking was chosen to avoid a cost that
+does not exist. Two better options are now open and either is acceptable: widen the factory with an
+optional writer, or — probably best, and available because of this task's own design — instrument the
+PORT, since the helper already receives `get`/`set`/`del`/`delMany`/`keys` FROM the keeper, so a test
+can pass a counting port and measure write volume exactly with no module mocking and no public
+change. Keep a keeper-level round-trip test either way, so the wiring is still proven end to end.
 
 **Scope fence.** Do NOT make the stream raw-only — that is `the-stream-stores-only-what-the-node-said`.
 Do NOT add per-segment block-range metadata: nothing consumes one. Do NOT strip `unconfirmedBlocks`
