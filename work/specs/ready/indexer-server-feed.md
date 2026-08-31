@@ -1,7 +1,7 @@
 ---
 title: Indexer-server log feed (the stored emission stream and the two views over it)
 slug: indexer-server-feed
-taskedAfter: [historical-state-database]
+taskedAfter: [historical-state-database, a-reconfigure-is-not-an-outage]
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -54,20 +54,39 @@ logs on a processor-only change — duplicating the whole history under a new va
 that omits a discriminator this spec forbids omitting. That is precisely the case the generation model
 promises is FREE (`a-reconfigure-is-not-an-outage` story 2: change the processor without re-fetching a
 single log; `CONTEXT.md`: two generations may READ one stream, only the one indexing WRITES it), and
-it is what `the-server-and-cli-hold-generations-too` story 8 rebuilds FROM. So the stream column's
-value is the `{source, config}` the route already resolved, and nothing about the processor enters
-this table.
+it is what `the-server-and-cli-hold-generations-too` story 8 rebuilds FROM. So nothing about the processor enters this table.
 
 Generations partition the STATE, not the log. That split is ADR-0006's and is left exactly where it
 found it.
+
+**The stream column's VALUE is `CONTEXT.md`'s STREAM IDENTITY, and NOT the `{source, config}` the
+route resolved.** They look interchangeable and are not, which is why this is stated rather than left
+to the obvious reading. `wireContextOf` builds the wire's `{source, config}` as
+`[{startBlock: 0, hash: simple_hash(source)}]` — ONE 32-bit hash over the WHOLE source — and ADR-0034
+keeps it whole-source DELIBERATELY, because it is an identity check between the two halves of a split
+deployment and not a question about what a stored context covers. Used as this table's key it would
+fail twice over: a DECODE-ONLY change (a regenerated ABI, an added view function, a reordered array,
+a renamed non-indexed parameter) moves the whole-source hash while the fetch filter is untouched, so
+the stored history would FORK and be orphaned, the server would re-fetch from a chain that may not
+serve old logs, and every outstanding feed cursor would be refused because the cursor carries the
+stream; and `simple_hash` is 32 bits, which `CONTEXT.md` rules out as a KEY on the ground that a
+collision means one indexer silently adopting another's logs.
+
+The correct value is the one already pinned in the glossary: a wide digest over the DEDUPLICATED
+`streamHash` values SORTED BY `streamHash`, plus the stream CONFIG hash. `sourceHashesOf` already
+yields a `streamHash` per entry, so nothing new is invented here — but the DIGEST RULE has exactly one
+home, `a-reconfigure-is-not-an-outage`'s landable 1, which builds it in core where both runtimes
+reach it. **That is why this spec is now `taskedAfter` that one**: a second implementation of the rule
+is the second-source-of-truth hazard this tree refuses everywhere, and this table cannot be keyed on a
+digest that does not exist yet. The edge is a real dependency, not bookkeeping.
 
 What ADR-0006 does NOT supply is the tenancy half: `{source, config}` alone collides for two named
 indexers with identical sources (same chain, same contracts, same processor), which is exactly the
 isolation test the sibling spec asserts. Hence the indexer name beside it.
 
 **Why COLUMNS rather than a table or a schema per partition**, decided here because this spec creates
-the table: neither SQLite nor D1 has schema namespaces, so a schema per generation is not available
-on the actual backends; and a table per generation would push the LOG table into dynamic DDL, which
+the table: neither SQLite nor D1 has schema namespaces, so a schema per partition is not available on
+the actual backends; and a table per partition would push the LOG table into dynamic DDL, which
 `packages/server/src/schema/sql/db.sql` deliberately excludes ("FIXED tables only… Entity tables are
 NOT here and never will be", because the versioned-row store creates those at runtime). Columns keep
 the log table in the fixed, shippable schema, which is what makes a wrangler D1 migration and the
@@ -79,8 +98,9 @@ Retrofitting either discriminator later is a primary-key rebuild PLUS a breaking
 other people hold. `node-log-api` already makes exactly this argument for its topic columns ("free at
 design time, a migration over millions of rows afterwards"), and it is STRONGER here, because the DDL
 is still free today while a published cursor will not be. Neither column is speculative: a server
-hosts several NAMED INDEXERS, and each holds several GENERATIONS
-(`a-reconfigure-is-not-an-outage`), so both axes are certain.
+hosts several NAMED INDEXERS, and one name holds several STREAMS over its life, since a filter change
+makes a new one (`a-reconfigure-is-not-an-outage`). Note the axis: it is STREAMS and not generations
+that multiply here, because generations partition the state.
 
 **Where the indexer NAME comes from is settled and is not this spec's to invent**: it arrives on
 `upload`, alongside the source info and the processor, supplied by the operator and refused when
@@ -98,7 +118,7 @@ families (`409` resumable, `400` otherwise) are unchanged. The alternative of ca
 envelope was rejected: it would make the wire format carry tenancy and turn a misdirected batch into
 a payload error rather than a routing one.
 
-**The consumer CURSOR is OPAQUE and carries the indexer name, the STREAM and the position.** Three
+**The consumer CURSOR is OPAQUE and carries the indexer name, the STREAM and the position.** Four
 rules, and the third is the one that cannot be walked back:
 
 - **Opaque to the consumer.** It is a server-encoded string, not structured data a client parses.
@@ -112,7 +132,10 @@ rules, and the third is the one that cannot be walked back:
   `seq` positions in two STREAMS are unrelated, so serving one at the other's number is the
   plausible-wrong-answer class this repo refuses everywhere. The response shape already exists: this
   is ADR-0006's cursor validation one level up, where a no-longer-canonical block hash answers
-  "rewind to fork block F".
+  "rewind to fork block F". Say what THIS one answers with, since it is a consumer-facing refusal and
+  a builder must not invent it: the current stream identity plus the position its feed starts at, so
+  a consumer can re-subscribe deliberately. It is NOT a rewind — there is no fork block, because the
+  logs a filter change produces were never on the old stream at all.
 - **A GENERATION change does NOT invalidate a cursor, and saying so is the point.** Two generations
   over one stream read the SAME logs in the SAME `seq` space, so a processor-only change costs a feed
   consumer nothing — the free case extended to the read side. What changes is the FOLD, which is why
