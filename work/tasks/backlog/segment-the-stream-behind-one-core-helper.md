@@ -126,6 +126,10 @@ stops the two keepers choosing differently and makes the seal test deterministic
 
 ## Acceptance criteria
 
+- [ ] The port carries an explicit ATOMIC-MULTI-KEY capability, and the helper branches on it: with
+      the capability, one commit and no recovery path executed; without it, cursor-last plus orphan
+      discard and tail truncation. Assert BOTH branches, and assert the recovery never fires on the
+      atomic one.
 - [ ] A core helper implements segmentation over an injected `get`/`set`/`del`/`keys` port, and is
       reachable from `@etherfold/fs` (core's `exports` map is only `.` and `./package.json`, so
       `index.ts` must re-export it). That export line is published surface: **ship a changeset**, and

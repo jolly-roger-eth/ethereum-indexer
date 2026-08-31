@@ -123,8 +123,29 @@ recurs for the life of the indexer. The storage saving is the lesser half and is
 looks, since the per-segment scanned extent below is retained anyway and
 `the-stream-stores-only-what-the-node-said` strips the window regardless.
 
+**These two integers are a COMPENSATION for a missing substrate capability, not a design element, and
+the spec says so structurally.** They cost nothing to store (two numbers, once per stream) but they
+imply RECOVERY MACHINERY, and that machinery is only ever needed where the store cannot commit the
+segment and the cursor together. So:
+
+**The port DECLARES whether it can commit multiple keys atomically, and the recovery is conditional
+on that declaration.**
+
+- **IndexedDB CAN** — `setMany` opens one `readwrite` transaction, puts every entry and awaits
+  `store.transaction`. Segment and cursor land together or not at all.
+- **`RemoteSQL` exposes `batch(list)`**, but whether a given driver makes it a transaction is a
+  DRIVER property, not an interface guarantee. That is exactly why this is a declared capability
+  rather than an assumed one: the adapter that knows says so.
+- **The filesystem CANNOT.** `writeFileSync` is per file and there is no multi-file transaction.
+
+Where the port declares atomicity, the save is one commit and the recovery below is DEAD CODE that
+must never fire — assert that rather than porting the filesystem's recovery into a keeper that cannot
+need it. Where it does not, the cursor is written LAST and the two integers are what make
+cursor-behind recoverable. The record keeps ONE SHAPE on every keeper regardless, because two
+integers are free and a uniform record is worth more than the saving.
+
 `committedEvents` is the number of events segment `committedThrough` held at that commit, and it is
-required for a reason the ordinal alone does not cover. A save usually APPENDS to the OPEN TAIL rather
+required — on a non-atomic port — for a reason the ordinal alone does not cover. A save usually APPENDS to the OPEN TAIL rather
 than opening a new segment — that is the whole point of a tail — so on the filesystem a crash between
 the segment write and the cursor write leaves a tail that has GROWN at the SAME ordinal. No ordinal
 exceeds `committedThrough`, so an ordinal-only orphan rule sees nothing, keeps the overshooting tail,

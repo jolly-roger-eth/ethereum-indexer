@@ -68,11 +68,11 @@ for the migration test — rather than patching it blind on a red gate.
       `indexer.ts` taking its clear branch.
 - [ ] **The cursor comes from the cursor record** (`{lastSync, committedThrough, committedEvents}`),
       with no competing copy anywhere.
-- [ ] **A crash between a tail append and the cursor write cannot occur here**, because `setMany`
-      commits both in ONE transaction — assert that property directly rather than porting the
-      filesystem's truncate-to-`committedEvents` recovery, which exists only because the filesystem
-      has no transaction. The recovery code still runs (it is the helper's), but on IndexedDB it must
-      never find anything to do.
+- [ ] **The port DECLARES atomic multi-key commit**, and the helper therefore takes its one-commit
+      branch: `setMany` opens one `readwrite` transaction for the segment and the cursor together.
+      Assert the declaration is set AND that the helper's orphan/truncation recovery never executes
+      on this keeper — it exists to compensate for a capability the filesystem lacks and IndexedDB
+      has, and a browser keeper running it would be paying for the wrong substrate's problem.
 - [ ] **A sealed segment is never rewritten** and is **readable by its own key**.
 - [ ] **Replay across a reorg** returns retractions in APPEND order.
 - [ ] **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where
