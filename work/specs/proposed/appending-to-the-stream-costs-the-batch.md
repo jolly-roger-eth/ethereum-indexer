@@ -108,6 +108,21 @@ rewriting the whole history as it does today.
 **The CURSOR RECORD is `{lastSync, committedThrough}`, and every segment carries three SCANNED-EXTENT
 numbers.** Both halves are forced, and getting either wrong makes a stated recovery unimplementable.
 
+**Why this is needed NOW and was not before, since a reader will ask.** Today the stream is ONE key
+holding `{lastSync, eventStream}`: cursor and events are the same bytes and cannot disagree, so there
+is no question to answer. A design that kept the cursor INSIDE the open tail would keep that property
+— writing the tail WOULD BE committing the cursor, one write, no orphans, no transaction needed on
+any substrate. Moving the cursor OUT is what creates two things that must agree, and therefore what
+creates the need to say which segments a cursor covers.
+
+That move is bought deliberately, and by the EMPTY SAVE rather than by storage. A head-following
+indexer polls constantly and most polls yield no events; with the cursor in the tail, every such poll
+rewrites the WHOLE open tail (up to the seal threshold, a full structured clone on IndexedDB) purely
+to advance three numbers. With a cursor record it writes one small record. That is story 3, and it
+recurs for the life of the indexer. The storage saving is the lesser half and is thinner than it
+looks, since the per-segment scanned extent below is retained anyway and
+`the-stream-stores-only-what-the-node-said` strips the window regardless.
+
 `committedThrough` is the ORDINAL of the segment the cursor was committed with. It is required because
 `LastSync` names only BLOCKS, and this spec's own central argument is that block order is NOT
 monotonic across segments — a reorg re-appends lower blocks into a later segment. So no reader can
