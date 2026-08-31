@@ -42,7 +42,7 @@ Reorg at the DB layer = `revertTo(blockNumber)` then re-apply — the DB-level m
 
 - Implementation detail: the design landed as `docs/design/historical-state-database.md`, and the build is decomposed into tasks (see below).
 - **Storing and serving the log stream, and rebuilding state on a processor upgrade.** That scope arrived via ADR-0006 and ADR-0008 and is covered by none of the stories above, so it is a separate spec: `indexer-server-feed`, `taskedAfter` this one.
-- The trigger system that consumes all of this (separate spec `trigger-system`).
+- The trigger system that consumes all of this. It is a SEPARATE DELIVERABLE, not built in this repo (ADR-0005); the spec is `work/specs/dropped/trigger-system.md`, which records what this platform owes it as a consumer contract.
 
 ## Further Notes
 

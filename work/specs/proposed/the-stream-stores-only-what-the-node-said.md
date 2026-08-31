@@ -75,6 +75,11 @@ it needs a changeset.
    rather than a workaround, and that is the honest framing.)
 4. As a developer upgrading, I want segments written before this change to keep working untouched,
    so adopting a stricter stored type costs me no rebuild.
+5. As a developer using `logValues` to trim what my HANDLERS receive, I do not want it to trim what is
+   STORED, so a projection can never leave a stored event with nothing left to decode from. (The
+   story exists because relocating that projection out of `LogEventFetcher.parse` is real WORK on the
+   fetch path, decided below but previously covered by no story — so it would have been tasked with
+   an empty `covers` or not at all.)
 
 ## Implementation Decisions
 
@@ -95,12 +100,31 @@ leave the one stale thing in the stream. **The strip must build a NEW `LastSync`
 object is handed to the state keeper on the same tick and a mutating strip would silently empty the
 live reorg window.
 
-> **ORDERED AFTER `a-reconfigure-is-not-an-outage`, and this decision is why.** That spec's SEEDING
-> path rests on `replayStream` returning an `ExistingStream` today, which it does
-> (`stream/fixture.ts`). This spec narrows that seam so it no longer can. Tasked in the other order,
-> the seeding work would be cut against a premise this spec removes. When this lands, the seeding
-> path must move onto the fixture's own reader type, and `CONTEXT.md`'s `seeding` glossary entry —
-> which names `replayStream` as returning an `ExistingStream` — must be updated in the SAME change.
+> **ORDERED AFTER `a-reconfigure-is-not-an-outage`, and the REASON HAS CHANGED — read this rather
+> than re-deriving the old one.** The edge originally rested on that spec's SEEDING path, which used
+> `replayStream` returning an `ExistingStream` (`stream/fixture.ts`) — a seam this spec narrows so it
+> no longer can. **Seeding has since been SPLIT OUT** into
+> `a-generation-can-be-seeded-from-a-published-artifact`, so that reason has evaporated: nothing left
+> in `a-reconfigure` depends on `replayStream`.
+>
+> The edge SURVIVES on a different and still-live ground: **file overlap.** `a-reconfigure`'s
+> landable 1 rewrites the stream KEYSPACE — the key shape, the anchored enumeration pattern and the
+> migration — inside both keepers and inside the shared core segmentation helper. This spec narrows
+> the STORED-EVENT TYPE through those same files (`saveNewEvents` strips the decoded half in core,
+> and both keepers persist the narrowed shape). Landed the other way round, the keyspace rewrite
+> would rebase onto a changed stored type in the files it is rewriting, for no gain. This is
+> `TASKING-PROTOCOL` section 3's serialise-on-shared-files rule applied across specs, not a logical
+> dependency: nothing here NEEDS the generation model, it just must not collide with it.
+>
+> **`taskedAfter` orders TASKING, not LANDING, so the tasker must carry this through.** The collision
+> this edge names is a merge conflict between two sets of tasks, and ordering the tasking alone does
+> not prevent it. The tasks emitted from THIS spec must carry `blockedBy` onto `a-reconfigure`'s
+> landable-1 tasks (`TASKING-PROTOCOL` §3, serialise tasks known to touch the same module).
+>
+> The `replayStream` disposition below is unchanged and is still this spec's to do — it is now owed
+> to the SEEDING spec rather than to `a-reconfigure`. Whichever lands first, the seeding path must be
+> written against the seam as it stands THEN, and `CONTEXT.md`'s `seeding` glossary entry — which
+> names `replayStream` as returning an `ExistingStream` — must be updated in the SAME change.
 
 **`replayStream` stops being an `ExistingStream`.** The exclusion form forces this and it is the
 right answer rather than a casualty. Nothing wires `replayStream` as `keepStream`, so they never meet

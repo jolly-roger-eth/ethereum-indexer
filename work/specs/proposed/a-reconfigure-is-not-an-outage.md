@@ -82,8 +82,8 @@ below.
     it later, without it ever answering with state a reorg has invalidated underneath it.
 11. As a developer, I want a generation's stream key to be derived from its FILTER, so two
     generations with different filters never collide and one with the same filter is reused.
-    (Multi-project isolation is `the-server-and-cli-hold-generations-too`; a browser page is one
-    project and needs no discriminator beyond the `name` it already has.)
+    (Multi-tenancy across several NAMED INDEXERS is `the-server-and-cli-hold-generations-too`; a
+    browser page carries one indexer and needs no discriminator beyond the `name` it already has.)
 12. As a developer, I want a generation whose stream is unavailable to fall back to a full re-index,
     which is today's behaviour, so the feature degrades rather than breaks.
 13. As a DEVELOPER iterating on a processor, I want the new generation to become canonical
@@ -157,12 +157,12 @@ context buys nothing and costs a deployment constraint.
 **Streams are separate keyspaces and share nothing.** In the browser the existing key simply GAINS
 the stream digest: `stream_<name>_<chainId>_<streamDigest>` with segments beneath, per
 `appending-to-the-stream-costs-the-batch`. That is an addition to what is already there, not a new
-path, which is what keeps landable 1's migration small. A server, which holds several projects, adds
+path, which is what keeps landable 1's migration small. A server, which holds several NAMED INDEXERS, adds
 its own discriminator ahead of this — see the sibling spec. Two generations on one stream READ it;
 only the one that is indexing WRITES it.
 
-**There is NO project component in the browser key, because a browser page IS one project.** An
-earlier draft put a `project` discriminator in the key here and asserted it was the existing
+**There is NO tenancy component in the browser key, because a browser page carries exactly ONE
+indexer.** An earlier draft put a discriminator in the key here and asserted it was the existing
 caller-supplied `name` renamed. That was wrong on the code: `createIndexerState` takes NO name —
 `keepState` and `keepStream` are separate optional options each closing over their OWN name, an
 entities deployment passes no `keepState` at all and discriminates by `databaseName` (which
@@ -176,7 +176,8 @@ mechanism is untouched here.
 **So multi-tenancy is a SERVER and CLI concern, and it lives in
 `the-server-and-cli-hold-generations-too`** — including the composite key whose discriminator is
 structurally non-omittable, which is a real requirement on a runtime that genuinely holds several
-projects. That spec also answers where the value comes from, which the browser never has to.
+named indexers. That spec also answers where the name comes from (it arrives on `upload`), which the
+browser never has to.
 
 **The CURSOR is the PREREQUISITE's business, not this spec's.**
 `appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of four properties — exactly one
@@ -224,13 +225,9 @@ build, and the user did not choose the reconfigure. So the browser default keeps
 generation only until the new one is promoted, then drops it — which is two generations transiently,
 not N, and bounds browser storage to roughly what it is today rather than to a multiple of it.
 
-**But drop-on-promotion is UNSAFE under the `immediate` policy, and the two knobs must be read
-together.** `immediate` promotes a generation that has caught up to NOTHING, so dropping the previous
-one at that moment discards a complete state in favour of an empty one, with nothing to fall back to
-when the new processor throws on its first event — the exact situation a developer iterating on a
-handler is in constantly. So: drop-on-promotion applies to `on-catch-up` and `manual`, where
-promotion means the successor DEMONSTRATED something. Under `immediate` the previous generation is
-retained until the new one reaches the cursor the old one had at promotion, and only then dropped.
+**Drop-on-promotion interacts with the promotion POLICY and is resolved there**, under "Drop-on-
+promotion is INCOMPATIBLE with `immediate`" below. Stated once, deliberately: this spec's own rule is
+that a second statement of a rule is a second source of truth that can drift.
 
 **The cap is a CONFIGURED number and must never be derived from `navigator.storage.estimate()`**, on
 three measured grounds (`work/notes/findings/browser-storage-headroom-for-generations.md`): WebKit
@@ -270,12 +267,22 @@ value is the default and the unsafe one is a deliberate opt-in:
   not something a deployment should ever land in by accident.
 - **`manual`** — the pointer moves only when asked, so an operator can inspect first.
 
-`checkTxInclusion` degrades HONESTLY under `immediate`, and this was CHECKED rather than assumed: it
-is answered from the canonical generation's `unconfirmedBlocks`, and a generation still catching up
-has `lastToBlock < latestBlock - finality`, which `verdictFor` already answers `unknown` /
-`window-not-covering` — not `absent`. A generation with no `lastSync` answers `unknown` /
-`not-synced`. So it reports that it does not know, which is safe to act on, and never claims a
-transaction is missing that a neighbouring generation has indexed.
+`checkTxInclusion` degrades HONESTLY under `immediate`, and this was CHECKED against `verdictFor`
+rather than assumed — including which BASIS answers, because the two differ and only one of them was
+checked the first time:
+
+- a caller with NO `minedAtBlock` on a generation still catching up (`lastToBlock < latestBlock -
+  finality`) gets `unknown` / `window-not-covering`;
+- a caller WITH a `minedAtBlock` above the cursor gets `absent` / **`ahead-of-cursor`**, because that
+  branch is tested BEFORE the window-not-covering one. The STATUS is `absent`, so the earlier claim
+  that a catching-up generation never answers `absent` was wrong on the code.
+
+The SAFETY conclusion survives, on the basis rather than on the status: `ahead-of-cursor` means "not
+processed that far yet", which is the correct direction for the caller this exists for — an
+optimistic update laid over a generation that has not reached the transaction is right, not
+double-counted. What must not be built is a consumer switching on `status` alone, and a test written
+from the old sentence would have failed. A generation with no `lastSync` answers `unknown` /
+`not-synced`.
 
 **Drop-on-promotion is INCOMPATIBLE with `immediate`, and the two are resolved by ORDER rather than
 by an interlock.** `immediate` promotes a generation that has caught up to nothing, so dropping the
@@ -367,11 +374,11 @@ matters because it is destructive and capability-gated; and resume is simply rem
 
 ### Multi-tenancy is NOT here
 
-A browser page is one project, so this spec has no tenancy discriminator and needs none: the existing
+A browser page carries one indexer, so this spec has no tenancy discriminator and needs none: the existing
 `name` (and `databaseName` on the entities path) already separates two unrelated indexers sharing an
 origin, and nothing here changes that.
 
-The runtime that genuinely holds several projects is a server or a CLI, and
+The runtime that genuinely holds several NAMED INDEXERS is a server or a CLI, and
 `the-server-and-cli-hold-generations-too` owns it — the composite key whose discriminator cannot be
 omitted, where its value comes from, and whether it maps to a column, a prefix or a schema. That is
 the right home: the discriminator is only load-bearing where more than one tenant exists, and
@@ -394,9 +401,15 @@ Three differences to record, because they are real:
 - ADR-0008 says retention is load-bearing, since a rebuild needs the stream from genesis. That holds
   and is why the caps REFUSE rather than evict.
 
-`an-ingest-server-reconfigure-is-not-a-blackout` currently lists "does the server hold two
-generations, or refuse?" as OPEN. ADR-0008 answered it, and this spec answers it. That stub should be
-reconciled or dropped rather than left asking a settled question.
+**The SERVER side of this generalisation is not this spec.** ADR-0008's 2026-08-31 amendment routes
+it to `the-server-and-cli-hold-generations-too`, which owns the stream keeper over the emission-stream
+table, the container above `StreamBuilder` that replaces `processor.clear()`, and this ADR's
+`current_version` row's successor. This spec is the MODEL and the browser runtime; read the ADR
+section above as what the model owes that ADR, not as a claim on the server.
+
+(The stub `an-ingest-server-reconfigure-is-not-a-blackout`, which asked whether the server holds two
+generations or refuses, was already DROPPED once this spec and its server sibling answered it. It is
+in `work/specs/dropped/`.)
 
 ## Testing Decisions
 
@@ -412,7 +425,7 @@ reconciled or dropped rather than left asking a settled question.
   ADR-0034 established. An event appended above the cursor is the regression guard.
 - **The cursor contract is the PREREQUISITE's to assert**, not this spec's. Do not restate it here;
   the only thing to assert is the SCOPE, that a cursor belongs to exactly one
-  `<project>/<chainId>/<streamDigest>` and two generations on different streams never share one.
+  `stream_<name>_<chainId>_<streamDigest>` and two generations on different streams never share one.
 - **The stream digest is STABLE UNDER A DECODE-ONLY CHANGE.** This is the assertion that catches the
   ordering trap: rename a non-indexed parameter, and the digest must not move even though every
   entry's `hash` did and the entry list therefore reordered. Also stable under ABI reordering and
@@ -421,9 +434,6 @@ reconciled or dropped rather than left asking a settled question.
 - **The stream digest MOVES on a stream-config change**, including a `parse.logValues` change that
   alters what is stored, and the old stream is left intact rather than adopted. This is the guard
   against a generation adopting logs the verdict has declared invalid.
-- **Two projects with IDENTICAL sources never touch each other's data**: same chain, same contracts,
-  same processor; deleting every stream and generation in one leaves the other complete and readable.
-  This is the multi-tenancy guard and it fails loudly under any missing discriminator.
 - **A cap REFUSES and names what to delete**, and nothing is evicted. Assert the existing generations are
   all still readable after the refusal.
 - **Deleting a generation leaves its stream** if another generation uses it, and reaps the stream when the
@@ -448,11 +458,25 @@ reconciled or dropped rather than left asking a settled question.
 
 ## Tasking note
 
-SEVEN separable landables. Cutting them together produces one task nobody can review.
+EIGHT separable landables. Cutting them together produces one task nobody can review.
 
-1. **Stream identity and the keyspace** — the canonical filter digest, the wide sync hash, the
-   `<project>/<chainId>/<filterDigest>` key, and the composite key type that makes the project
-   discriminator non-omittable. Owns the hash choice and its collision test. Everything depends on it.
+1. **Stream identity and the keyspace** — the STREAM DIGEST, the wide sync hash, and the
+   `stream_<name>_<chainId>_<streamDigest>` key. Owns the hash choice and its collision test.
+   Everything depends on it.
+
+   **The digest is the deduplicated `streamHash` digest PLUS the stream config hash, and both halves
+   are this landable's.** Say it here and not only in the prose above, because this is where it gets
+   BUILT: a landable that read "the filter digest" would key the narrower thing, and two configs
+   would then map to one stream, so a generation adopts logs the verdict has already declared
+   invalid. There is NO tenancy component and no composite key type here — a browser page carries one
+   indexer, no caller supplies such a value, and the server's discriminator belongs to
+   `the-server-and-cli-hold-generations-too`.
+
+   **It also RE-ANCHORS the enumeration pattern**, which is otherwise unowned. The prerequisite
+   matches `^stream_<name>_<chainId>_(\d+)$`; inserting the digest before the ordinal breaks that
+   pattern, and a stale anchor either matches nothing (every stream reads empty) or, if loosened to
+   a prefix, matches across chains. So this landable owns the new anchor AND the digest's ENCODING,
+   since the anchor cannot be written without knowing the character set the digest can produce.
 
    **It also OWNS the migration off the prerequisite's keyspace, which is otherwise unowned and would
    silently orphan every cached history.** `appending-to-the-stream-costs-the-batch` leaves users
@@ -460,9 +484,21 @@ SEVEN separable landables. Cutting them together produces one task nobody can re
    key, which carries the cursor inside it). This spec's key matches NONE of those, so landed in the stated
    order every existing stream becomes unreachable AND is never deleted: a full re-index plus a
    permanent storage leak, which directly reverts the prerequisite's story 5. The existing stream is
-   ADOPTED at its computed `<project>/<chainId>/<filterDigest>` — the filter it was fetched under is
-   the one the running source describes, or the adoption is refused and the old keys are swept rather
-   than left.
+   ADOPTED at its computed `stream_<name>_<chainId>_<streamDigest>` — the filter it was fetched under
+   is the one the running source describes, or the adoption is refused and the old keys are swept
+   rather than left.
+
+   **THREE key shapes migrate, not two, and the third is the one an enumeration cannot see.** On the
+   cursor-record keeper (IndexedDB, per ADR-0035) a stream also has a separate CURSOR RECORD, keyed
+   so that the ANCHORED ORDINAL PATTERN deliberately REJECTS it. A migration driven by enumerating
+   segments therefore moves every segment and silently leaves the cursor behind — and since PRESENCE
+   is "the read-cursor operation returns something", the migrated stream then reads ABSENT,
+   `indexer.ts` takes its clear branch, and every browser user re-fetches their entire history:
+   exactly the outcome this bullet exists to prevent, arriving through the one key it did not
+   enumerate. Migrate the cursor record in the SAME resumable per-key sweep. Note this is the SECOND
+   instance of one shape — ADR-0035 had to add a `clear-cursor` operation for the same blind spot —
+   so the durable question for this landable is "what else is keyed OUTSIDE the anchored pattern?",
+   not this one instance.
 
    **Size the migration honestly, because it is FREE ON ONE KEEPER AND NOT ON THE OTHER.** A rename
    moves no payload on the filesystem — but IndexedDB has no rename, so there it is `get`+`set`+`del`
@@ -513,16 +549,39 @@ SEVEN separable landables. Cutting them together produces one task nobody can re
    with its `immediate`-only deferral. It was decided in prose and owned by nothing, which left
    stories 1, 3, 13 and 14 with no delivering task — including the production default and the one
    story 1 asks for. It cannot fold into landable 2, which is explicitly testable with no indexer
-   running, because the trigger needs a running one. `blockedBy` 2 and 4.
+   running, because the trigger needs a running one — which is landable 8. `blockedBy` 2, 4 and 8.
 7. **Progress and degradation** — `SyncingState` reporting that a non-canonical generation exists and
    how far it has caught up (story 5), and the fallback when a generation's stream is unavailable or
    unreadable: a full re-index, which is today's behaviour, so the feature degrades rather than
    breaks (story 12). Small, but it was unowned, and story 12 is the guard that stops a corrupt
    stream taking the app down with it.
 
-Landables 3, 4, 5, 6 and 7 all edit `packages/browser/src/IndexerState.ts` (`SyncingState` at the top,
-`createIndexerState`, three `stateDiscarded` sites, and the container is what it returns), so
-serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then (4), then (5), then (6), then (7).
+8. **RUNNING a non-canonical generation** — a second generation that actually INDEXES: its own
+   fetch-and-fold loop, its own cursor and stream, alongside the canonical one. Named separately
+   because it was UNOWNED and is the capability the headline rests on. Landable 4's container HOLDS
+   generations and landable 2's registry CREATES them (both explicitly testable with no indexer
+   running); landable 5 owns only PAUSING one; landable 6's promotion TRIGGER — the successor
+   reaching the cursor the canonical generation had — presupposes a successor that is moving. So
+   stories 1, 3, 13 and 14 all need this and none of the other landables delivers it.
+
+   It owns the duplicated head-following fetch the Solution section prices ("indexing costs a
+   duplicated head-following fetch"), and it must decide ONE thing the prose leaves open: whether the
+   two generations poll INDEPENDENTLY or share one head fetch fanned out to both folds. Independent
+   is the honest default because two generations may sit on different STREAMS with different
+   filters, and sharing is only expressible where they sit on the SAME stream. Do not build the
+   shared path first. `blockedBy` 2 and 4; landable 6 is `blockedBy` this.
+
+Landables 3, 4, 5, 6, 7 and 8 all edit `packages/browser/src/IndexerState.ts` (`SyncingState` at the
+top, `createIndexerState`, three `stateDiscarded` sites, and the container is what it returns), so
+serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then (4), then (8), then
+(5), then (6), then (7).
+
+**Story-to-landable map, so a hole is visible rather than argued:** 1 → 6 (over 8 and 4); 2 → 1 + 4;
+3 → 1 + 6 (over 8); 4 → 2; 5 → 7; 6 → 4; 7 → 3; 8 → 2; 9 → 2; 10 → 5; 11 → 1; 12 → 7;
+13 → 6 (over 8); 14 → 6 (over 8). Every story has a deliverer and no landable is an orphan. The
+four stories annotated "over 8" are the ones landable 8 lists as needing a RUNNING non-canonical
+generation; 6 is what makes each of them observable, which is why 6 is the named deliverer and 8 is
+the dependency.
 
 ## Out of Scope
 
@@ -541,7 +600,8 @@ serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then
   merit. Worth doing later, and cheap to add because streams are addressed by digest and
   nothing about this design assumes a stream was fetched entirely by its own generation. Not now: it
   buys a rare case and it is where all the complexity of the superseded design lived.
-- **Sharing streams ACROSS projects.** Reachable; see the multi-project decision for why not first.
+- **Sharing streams ACROSS named indexers.** Reachable; see the multi-tenancy decision for why not
+  first.
 - **Pruning segments WITHIN a stream.** Not needed: the bound is the caps plus explicit deletion.
 - **Exposing which generation answered a read.** Purely additive later; a query layer is its home.
 - **Smoothing the pointer move.** It is a step. Interpolating would serve a state neither generation had.
@@ -554,7 +614,7 @@ which is an INPUT to a generation's identity here rather than the thing itself, 
 would mean two things one sentence apart. `deployment` is worse (it already means the fetcher/server
 topology and a browser installation, both a level ABOVE this). `candidate` is taken by the entity
 snapshot path. `generation` had zero prior uses in `CONTEXT.md`, `packages/*/src` or `docs/adr/`, and
-is pinned in the `CONTEXT.md` glossary alongside `stream`, `project` and `canonical pointer`.
+is pinned in the `CONTEXT.md` glossary alongside `stream`, `indexer` and `canonical pointer`.
 
 The design record `work/notes/ideas/stream-grafting-what-we-established.md` carries the invariants
 this rests on and the options weighed, including the two-generation design this replaces.

@@ -214,31 +214,39 @@ events is plausible since they carry `blockHash`, and a successor re-fetches fro
 `lastToBlock - finality` on its first round anyway. This point flipped three times in conversation,
 which is the signal that it should be settled by a build rather than by more prose.
 
-## State of the specs as of this note
+## State of the specs — SUPERSEDED SNAPSHOT, kept only to date the note
 
-Four in `work/specs/proposed/`:
+> This section and the next described the spec tree as it stood when this note was written, and BOTH
+> are now out of date in ways that would mislead. The note's VALUE is the invariants and the options
+> weighed, above; do not take routing advice from here. The current tree is whatever is in
+> `work/specs/*/`, and the entry points are `a-reconfigure-is-not-an-outage` (the model) and
+> `work/specs/tasked/appending-to-the-stream-costs-the-batch` (the foundation, now tasked).
 
-- **`appending-to-the-stream-costs-the-batch`** — has an APPROVE from review, changes no published
-  type, fixes the quadratic append. The one to task first. Note it currently carries a per-segment
-  block-range requirement that this conversation concluded is UNNECESSARY, which should be reverted.
-- **`the-stream-stores-only-what-the-node-said`** — raw-only storage, `taskedAfter` the above.
-- **`a-reconfigure-is-not-an-outage`** — the generation model, browser-scoped. The largest, and a
-  reviewer judged it bundles four separable landables. Should be rewritten against option D, which
-  will shorten it considerably.
-- **`an-ingest-server-reconfigure-is-not-a-blackout`** — an honest stub, `needsAnswers: true`.
+As of this note, four sat in `work/specs/proposed/`: `appending-to-the-stream-costs-the-batch`,
+`the-stream-stores-only-what-the-node-said`, `a-reconfigure-is-not-an-outage`, and
+`an-ingest-server-reconfigure-is-not-a-blackout` (an honest stub).
 
-## What a fresh context should do next
+What has happened to each since, so a reader is not sent somewhere that has moved:
 
-1. Read this note first; it is the accumulated context.
-2. ~~Spike the promotion cost.~~ **DONE** — see ANSWERED above and the finding.
-3. ~~Revert the block-range metadata from `appending`.~~ **DONE** — it now records positively why the
-   `lastSync` already in every segment answers a strictly better question than a `{min, max}` would.
-4. ~~Rewrite `a-reconfigure` against option D.~~ **DONE** — it now states the two-label design once,
-   and points here for the alternatives. The rewrite removed the read-only stream view, the
-   one-writer rule, the generation-keyed stream and the finality clamp, each of which existed only to
-   serve option B.
-5. ~~Task `appending`.~~ **DONE** — two tasks in `work/tasks/backlog/`, awaiting promotion.
+- **`appending-to-the-stream-costs-the-batch`** is TASKED (`work/specs/tasked/`), with two tasks in
+  `work/tasks/backlog/`. Its durable rationale — the four-property cursor contract, and why cursor
+  PLACEMENT is left to each keeper — is ADR-0035. The per-segment block-range requirement this note
+  flagged was duly reverted.
+- **`a-reconfigure-is-not-an-outage`** was rewritten, but NOT against option D. Option D was
+  abandoned entirely — see the supersession box at the top of this note. It is now N generations,
+  each with its OWN stream keyed by its fetch filter, plus a canonical pointer; and it is
+  BROWSER-SCOPED, with the server and CLI runtime split out.
+- **`an-ingest-server-reconfigure-is-not-a-blackout`** is DROPPED (`work/specs/dropped/`). It is
+  replaced by `the-server-and-cli-hold-generations-too`, which is the real server tier and which also
+  absorbed `indexer-server-feed`'s rebuild stories.
+- **Two specs exist that this note never mentions**, both split out under `TASKING-PROTOCOL` §2a:
+  `the-server-and-cli-hold-generations-too` (the server/CLI runtime, gated) and
+  `a-generation-can-be-seeded-from-a-published-artifact` (an EXPLORATION spec for the seeding path).
 
-What is left, in order: promote and land the two `appending` tasks; settle the unconfirmed-window
-question above by a build rather than more prose; and open the ingest server, which is still an
-honest stub.
+**No forward guidance in this note is still live.** The "What is still OPEN" question above — whether
+the unconfirmed window must be stored per boundary or can be reconstructed — was SETTLED, and by a
+build rather than by more prose, which is what this note asked for. The answer is ADR-0035: a sealed
+segment keeps its scanned extent and NOT its window, and the truncation recovery composes a cursor
+with an EMPTY window, which is safe because the surviving prefix is REPLAYED first and
+`generateStreamToAppend` rebuilds `unconfirmedBlocks` from the replayed events. Read this note now
+only for its INVARIANTS and its OPTIONS WEIGHED.
