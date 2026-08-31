@@ -207,6 +207,16 @@ and the refusal is the CORRECT behaviour when it does not (a tip-served answer w
 wrong number). Recorded because nothing had written it down and the feed is what makes lagging
 consumers a normal condition rather than an exceptional one.
 
+**The topic columns REST ON the raw log reaching this server, which is a constraint owned elsewhere
+and named here so it is not assumed.** `logValues` is applied on the SENDER (inside
+`LogEventFetcher.parse`, before `WireBatch` is built), so a projection dropping `topics`/`data` would
+populate these columns from bytes that never crossed the wire. `the-stream-stores-only-what-the-node-said`
+decides that `logValues` is processor-facing only and that storage and the wire always keep the raw
+log, which removes the hazard at its source. No `taskedAfter` edge is added for it: the columns are
+correct either way and the failure is a misconfiguration that spec eliminates, so blocking this table
+behind a stored-type migration would be disproportionate. But a deployment doing it before that lands
+gets empty topic columns, and that is worth knowing rather than discovering.
+
 **The topic columns follow `node-log-api`'s index decision, not a fresh one.** Story 8 asks for
 `address` and `topic0..topic3` as columns; the INDEX shape is already decided there and must be
 honoured rather than re-derived: a composite index on `(address, topic0, blockNumber)`, with

@@ -76,10 +76,10 @@ it needs a changeset.
 4. As a developer upgrading, I want segments written before this change to keep working untouched,
    so adopting a stricter stored type costs me no rebuild.
 5. As a developer using `logValues` to trim what my HANDLERS receive, I do not want it to trim what is
-   STORED, so a projection can never leave a stored event with nothing left to decode from. (The
-   story exists because relocating that projection out of `LogEventFetcher.parse` is real WORK on the
-   fetch path, decided below but previously covered by no story — so it would have been tasked with
-   an empty `covers` or not at all.)
+   STORED **or what is SENT**, so a projection can never leave an event with nothing left to decode
+   from, on either side of a split deployment. (The story exists because relocating that projection
+   out of `LogEventFetcher.parse` is real WORK on the fetch path, decided below but previously
+   covered by no story — so it would have been tasked with an empty `covers` or not at all.)
 
 ## Implementation Decisions
 
@@ -154,7 +154,8 @@ re-read and clear it.
 Under raw-only the interaction gets sharper: an event whose raw half was projected away has NOTHING
 left, where before it at least carried `args`.
 
-**Decided: `logValues` is a PROCESSOR-facing projection only, and storage always keeps the raw log.**
+**Decided: `logValues` is a PROCESSOR-facing projection only. Storage always keeps the raw log, AND
+SO DOES THE WIRE.**
 What handlers receive is unchanged, so nothing silently changes for an existing processor; what gets
 STORED stops being projected. The alternative, refusing a projection that drops `topics`/`data`
 whenever a `keepStream` is configured, was rejected because it turns a storage-size knob into a
@@ -170,6 +171,35 @@ unreachable for new writes rather than removable.
 
 It does give up the storage saving `logValues` offered on the stream, which is consistent with this
 spec's position that size is not the case for the change.
+
+**The WIRE is included deliberately, and it is the half that was nearly missed.** In a SPLIT
+deployment the projection happens on the SENDER: `LogFetcher` holds a `LogEventFetcher`, calls
+`getLogEvents`, which calls `parse`, which applies `logValues`, and the result goes straight into
+`WireBatch.logs`. So a projection that drops `topics`/`data` means the batch reaching the server never
+carried them, and the server cannot recover what it was never sent. Three things downstream break on
+a deployment that does it, none of which can defend itself: `indexer-server-feed`'s indexed
+`address`/`topic0..3` columns are populated from nothing, so the migration is paid and the benefit is
+not; `node-log-api` cannot answer `eth_getLogs` at all; and the server-side rebuild-from-the-stored-
+stream replays events that cannot be re-decoded, which is exactly the `reparse`-returns-`undefined`
+case. Fixing it at `parse` fixes all three at once and needs no interlock anywhere else, which is why
+the alternative of a server-side refusal was rejected: by the time the server could refuse, the
+fetcher has already discarded the bytes, so the operator gets a broken deployment plus an error
+instead of a working one.
+
+This does NOT contradict the wire-format line in Out of Scope, and the distinction is worth stating
+because the two look alike: that line is about DECODED versus RAW (the wire keeps shipping decoded
+events, since the receiving primitive takes them). This is about PROJECTED versus WHOLE. Different
+axis, and the answer differs on each.
+
+**One CONSEQUENCE this creates elsewhere, flagged rather than silently acted on.**
+`a-reconfigure-is-not-an-outage` folds the STREAM CONFIG hash into the stream digest, and part of its
+stated justification is that `parse.logValues` "changes WHAT IS STORED". After this spec that is no
+longer true: `logValues` becomes processor-facing, so changing it changes neither the stored nor the
+sent bytes. Leaving the config hash as it is therefore stays SAFE but becomes CONSERVATIVE: a
+`logValues` change would fork a new stream and re-fetch a whole history for a change that no longer
+affects a single stored byte. Narrowing the config hash is a real decision with re-fetch consequences
+and it belongs to that spec, not to this one, so this spec only records that the justification
+expires here. Do not narrow it as a side effect of landing this.
 
 **Relocating the projection is WORK, and is named here rather than assumed.** `logValues` is applied
 inside `LogEventFetcher.parse`, which trims the object that reaches BOTH the processor and storage.
@@ -208,8 +238,9 @@ rewriting migration is performed. Pin that with a test rather than leaving it to
 
 - **Everything in `appending-to-the-stream-costs-the-batch`**: segments, `clear`, enumeration, the
   `lastSync` key, the structural migration. This spec assumes that landed.
-- **The wire format.** `WireBatch` keeps shipping decoded events, since the receiving primitive takes
-  them and the sender holds the ABI. Storage and wire may differ.
+- **The wire format's DECODED shape.** `WireBatch` keeps shipping decoded events, since the receiving
+  primitive takes them and the sender holds the ABI. Storage and wire may differ on that axis. What
+  is NOT out of scope is the PROJECTION: the wire, like storage, always carries the raw log (above).
 - **Per-segment filter or lineage provenance.**
 
 ## Further Notes

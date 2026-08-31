@@ -114,7 +114,17 @@ So: take the `streamHash` values only, DEDUPLICATE them, sort them BY THEMSELVES
 **The stream digest ALSO covers the STREAM CONFIG hash, and ADR-0006 already said so.** The filter is
 not the only thing that decides what a stream CONTAINS. `ProvidedStreamConfig` is `{finality,
 alwaysFetchTimestamps, alwaysFetchTransactions, parse}`, and `parse.logValues`,
-`alwaysFetchTimestamps` and `alwaysFetchTransactions` each change WHAT IS STORED. The code agrees
+`alwaysFetchTimestamps` and `alwaysFetchTransactions` each change WHAT IS STORED.
+
+**One third of that justification EXPIRES, and the expiry must not be acted on by accident.**
+`the-stream-stores-only-what-the-node-said` makes `logValues` a PROCESSOR-facing projection only, so
+once it lands `logValues` changes neither the stored nor the sent bytes and is no longer a reason to
+fork a stream. Keeping it inside the config hash then stays SAFE but becomes CONSERVATIVE: a
+`logValues` change would re-fetch a whole history for a change that affects nothing stored.
+`alwaysFetchTimestamps` and `alwaysFetchTransactions` are untouched and still justify the config hash
+on their own, so nothing here breaks. NARROWING the hash is a separate decision with re-fetch
+consequences, it belongs to this spec, and it must be made deliberately rather than as a side effect
+of the sibling landing. The code agrees
 emphatically: `sourceInvalidationOf` compares the config hash FIRST and, on a mismatch, returns
 `{valid: false, invalidFromBlock: 0}` for BOTH halves — a config change invalidates the STREAM, not
 just the fold.
@@ -300,7 +310,21 @@ The entities path publishes a handle bound to a store, so a consumer holding one
 would silently read a retired generation; the handle is therefore INDIRECT, resolving to whichever
 generation is canonical.
 
-**It RE-RESOLVES ONCE PER READ UNIT OF WORK and holds that generation for its duration.**
+**It RE-RESOLVES ONCE PER READ UNIT OF WORK and holds that generation for its duration — and in the
+BROWSER that unit is the interval between NOTIFICATIONS.** Name it, because the rule was written for
+a server request and this spec's landables are browser-side, so a builder would otherwise have to
+invent a boundary. `createIndexerState` already returns subscribable stores (`state`, `syncing`,
+`status`) and already pushes updates through the indexer's state callback, so the app already treats
+a notification as "the world moved, re-read". **A pointer move is APPLIED AT a notification**, which
+makes every read between two notifications answer from ONE generation without inventing a scope API,
+a transaction handle or a timer. It also composes with the server tier rather than competing with it:
+there the unit is the request, here it is the interval, and the RULE is the same in both.
+
+The residual, stated rather than discovered: a caller that reads OUTSIDE any subscription (a one-off
+read in an event handler) gets per-CALL resolution, so two such reads either side of a promotion can
+straddle it. Tolerable, and bounded: under the `on-catch-up` default the successor has reached the
+canonical cursor so the two answers agree closely, and the case where they differ sharply is
+`immediate`, which is opt-in and for a developer watching their own edit.
 Indirection without a stated granularity is a new failure rather than a fix: a GraphQL request fans
 out into many resolver calls, so a pointer move mid-request would yield a response MIXING TWO
 GENERATIONS that no consumer can detect — and under the `immediate` policy the mixture is a COMPLETE
@@ -431,8 +455,11 @@ in `work/specs/dropped/`.)
   entry's `hash` did and the entry list therefore reordered. Also stable under ABI reordering and
   under a redundant appended entry, and a collision cannot be produced across a corpus of realistic
   sources.
-- **The stream digest MOVES on a stream-config change**, including a `parse.logValues` change that
-  alters what is stored, and the old stream is left intact rather than adopted. This is the guard
+- **The stream digest MOVES on a stream-config change**, and the old stream is left intact rather
+  than adopted. Use `alwaysFetchTimestamps` or `alwaysFetchTransactions` as the worked example rather
+  than `parse.logValues`: once `the-stream-stores-only-what-the-node-said` lands, `logValues` no
+  longer alters what is stored, so a test written on it would be asserting the CONSERVATIVE half of
+  the rule and would have to change if the hash is ever narrowed. This is the guard
   against a generation adopting logs the verdict has declared invalid.
 - **A cap REFUSES and names what to delete**, and nothing is evicted. Assert the existing generations are
   all still readable after the refusal.
@@ -525,7 +552,10 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    references — `packages/core` (11), `packages/browser` (23), `examples/browser-reference` (2),
    `docs/guide/indexing-in-a-browser-app/index.md` (2).
 4. **The container plus the factory migration.** The indirect handle, per-generation state factories,
-   and passing the processor factory rather than its result.
+   and passing the processor factory rather than its result. **It owns the READ UNIT OF WORK in the
+   browser**, which is the interval between notifications: the pointer move is applied AT a
+   notification, so reads between two of them see one generation, and a read outside any subscription
+   resolves per call. That reuses the existing subscribable stores rather than adding a scope API.
 
    **It also owns the `EthereumIndexer` RENAME, which `CONTEXT.md` promises and nothing else
    delivers.** That class is one source plus one processor plus one state, which under this spec is a
