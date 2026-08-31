@@ -58,24 +58,41 @@ segment can hold LOWER block numbers, no segment can be skipped on a block bound
 order, concatenate, apply the existing `blockNumber >= fromBlock` filter. A spec implying segments
 make READS cheaper would promise what the reorg model forbids.
 
-**A save writes exactly ONE key: the open TAIL, which holds its events AND the `lastSync` current
-after them.** One key is one write, so the cursor and the events it describes are the SAME BYTES on
-every substrate. They cannot disagree, there is nothing to commit in two places, and no store needs a
-transaction for this to be safe. That property is worth more than anything a separate cursor record
-buys, and the rest of this section is downstream of it.
+**What the spec fixes is the CURSOR CONTRACT. WHERE a keeper puts the cursor is ITS OWN business.**
+This distinction is the one that took longest to see, and getting it wrong is what made this section
+oscillate: a single storage layout was being chosen for every substrate at once, so the filesystem's
+inability to commit two keys kept being imposed on stores that CAN, and their capability kept being
+imposed back on the filesystem.
 
-**Sealing STRIPS the cursor, and that is what stops it accumulating.** A frozen `lastSync` left in
-every sealed segment would be real waste: `unconfirmedBlocks` is `EventBlock[]` and `EventBlock`
-carries the FULL decoded events of each block, so it is up to `finality` blocks of event data,
-duplicated per segment, forever, read by nothing. So sealing is an explicit ACT rather than a side
-effect: when a save opens segment `N+1`, it rewrites segment `N` WITHOUT its `lastSync`. After that
-`N` is sealed and immutable.
+Four properties, which every keeper must satisfy and a conformance test can check:
 
-That is one extra write per SEAL — once per seal threshold, not once per save — and it is OFF THE
-CRITICAL PATH. If it never happens (a crash, a killed tab) segment `N` simply keeps a stale cursor
-that nothing reads, because the live cursor is the TAIL's and the tail is the highest ordinal. The
-next pass strips it. The operation is idempotent and safe to fail, which is why it needs no ordering
-rule, no journal and no recovery.
+1. **Exactly ONE authoritative cursor per stream.** A reader never has to choose between competing
+   copies.
+2. **A save is atomic in the CURSOR-AHEAD direction.** A reader must never see a cursor claiming
+   coverage the stored events do not have; that is silent data loss. Cursor-BEHIND is tolerable, but
+   only if the keeper can DETECT the uncommitted excess and discard it — keeping it and re-fetching
+   is what appends duplicates.
+3. **No cursor data accumulates per sealed segment.** `LastSync.unconfirmedBlocks` is `EventBlock[]`
+   and `EventBlock` carries the FULL decoded events of each block, so a per-segment copy is up to
+   `finality` blocks of event data, duplicated forever, read by nothing.
+4. **An empty save costs nothing proportional to the history.**
+
+**Both shipped keepers satisfy these by putting the cursor IN THE OPEN TAIL and STRIPPING it when the
+segment seals.** One key is one write, so property 2 holds by construction with no transaction, no
+ordering rule and no recovery; sealing is an explicit act — when a save opens segment `N+1` it
+rewrites segment `N` without its `lastSync` — which gives property 3.
+
+That strip is one extra write per SEAL, not per save, and it is OFF THE CRITICAL PATH: if it never
+happens, segment `N` keeps a stale cursor nothing reads (the live cursor is the TAIL's, and the tail
+is the highest ordinal), and the next pass strips it. Idempotent and safe to fail.
+
+**A keeper whose substrate offers atomic multi-row updates MAY place the cursor elsewhere**, and
+should not be read as violating this spec for doing so. A SQL-backed stream can hold its cursor in
+its own row and update it in the SAME transaction as the segment insert, which satisfies properties 1
+and 2 directly and makes property 3 vacuous — no strip, and no tail rewrite on an empty save either.
+That is a BETTER fit for that substrate, and the server's ADR-0006 emission-stream table is the
+concrete case. The tail strategy is chosen here because it is the simplest thing that satisfies all
+four on the two substrates this spec actually ships, NOT because it is the only correct layout.
 
 **The empty save is the cost of this shape, and it is bounded and tunable.** A save with no new
 events still rewrites the tail to move the cursor, and a head-following indexer saves on EVERY poll
@@ -84,12 +101,13 @@ state updates). So the steady-state cost is one tail rewrite per poll. That is b
 THRESHOLD, never by the history — which is what story 1 actually claims — and it is tunable: at 1000
 events a tail is a few hundred KB and a handful of milliseconds; at 250 it is under a millisecond.
 
-The alternative, a separate cursor record, makes an empty save one small write instead. It was
-specified and then withdrawn, because paying for it means the cursor and the segment become two
-things that must agree: a declared per-port atomicity capability, orphan discard, tail truncation to
-a committed event count, and two integers whose only job is to compensate for a substrate that cannot
-commit two keys. Four review rounds found defects in exactly that machinery and nowhere else. A few
-milliseconds per poll is the cheaper side of that trade by a wide margin.
+A separate cursor record makes an empty save one small write instead, and on a substrate with
+transactions that is strictly better — which is exactly why the contract above leaves it open. What
+was withdrawn is MANDATING it everywhere: on a substrate that cannot commit two keys, the cursor and
+the segment become two things that must agree, and paying for that means orphan discard, truncation
+to a committed event count, and integers whose only job is to compensate for the missing capability.
+Four review rounds found defects in that machinery and nowhere else. So the filesystem takes the
+milliseconds and a transactional keeper takes the separate record; neither is imposed on the other.
 
 **Segments are written through temp-file-plus-rename on the filesystem.** A bare `writeFileSync` can
 leave a TORN file, and `storage().get` wraps only `readFileSync` in its `try`/`catch` — `JSON.parse`
@@ -250,7 +268,9 @@ raw half a `logValues` projection dropped, so it cannot be re-read), that mandat
 stream that cannot be re-read is correct and is not a silent clear. What is forbidden is clearing a
 READABLE stream merely because its shape is old.
 
-**The segmentation rules live in ONE place, not in each keeper.** Ordinal naming, the anchored match,
+**The segmentation rules live in ONE place, not in each keeper — and the CURSOR PLACEMENT is
+deliberately NOT one of them.** The helper owns the rules that must not drift; each keeper owns how
+it commits a segment and its cursor, which is where substrates genuinely differ. Ordinal naming, the anchored match,
 the contiguity refusal, the seal decision, legacy adoption and cursor selection are identical for
 both keepers and are the whole substance of this change. `OnFile` and `OnIndexedDB` are independent
 implementations of `ExistingStream` in different packages, so a task cut per keeper would
@@ -316,14 +336,19 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   IndexedDB assert the segment and cursor commit in one transaction; on the filesystem assert the
   cursor is written last and that a segment above it is DISCARDED as an orphan on the next load
   rather than replayed. This is the atomicity guard and it is the reason the cursor is one record.
-- **No SEALED segment contains a `lastSync`, while the TAIL carries the whole of it** — both halves,
-  asserted by inspection at the storage seam. Seal a tail and assert the cursor is gone from it; the
-  new tail carries it. This is the duplication being removed, and it is the ONLY thing this change
-  removes: the tail's copy is today's behaviour and this spec changes no published type. Do not strip
-  `unconfirmedBlocks` out of the tail — that is `the-stream-stores-only-what-the-node-said`'s job.
-- **A save writes exactly ONE key**, asserted at the instrumented seam, INCLUDING an empty save and
-  the first save after a legacy adoption. This is the atomicity guard: one key cannot be torn between
-  a cursor and its events.
+- **The four CURSOR CONTRACT properties are asserted against the KEEPER, not against a layout**, so a
+  keeper that places its cursor differently is tested on the same terms: exactly one authoritative
+  cursor; no cursor claiming coverage the stored events lack; no cursor data per SEALED segment; and
+  an empty save costing nothing proportional to history. These belong in the shared conformance
+  material, following ADR-0020's precedent of testing each backend against its own claim.
+- **For the two keepers that use the TAIL strategy**, assert its mechanics too: seal a tail and
+  confirm the cursor is gone from it while the new tail carries it. Do not strip `unconfirmedBlocks`
+  out of the tail — that is `the-stream-stores-only-what-the-node-said`'s job.
+- **A save is atomic in the cursor-ahead direction**, asserted by interrupting at the instrumented
+  seam, INCLUDING an empty save and the first save after a legacy adoption. For the tail keepers that
+  reduces to "a save writes exactly ONE key", which is the strongest form of it: one key cannot be
+  torn between a cursor and its events. A transactional keeper would assert the same property through
+  its transaction instead.
 - **A SEAL writes one extra key and is safe to fail**: interrupt between opening the new tail and
   stripping the old one, and assert the stream still reads correctly (the stale cursor in the sealed
   segment is ignored, because the live cursor is the tail's) and that a later pass strips it.

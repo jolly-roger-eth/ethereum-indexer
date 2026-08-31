@@ -20,7 +20,7 @@ Put `keepStreamOnIndexedDB` on the segmentation helper that
 the entire history.
 
 This is the SECOND independent implementation of one contract, not a second design. Every rule —
-ordinal keys, the cursor riding in the open TAIL, sealing as an explicit strip of that cursor, the anchored enumeration, the contiguity refusal, legacy adoption in
+ordinal keys, the CURSOR CONTRACT (one authoritative cursor, never ahead of its events, none per sealed segment, empty save bounded), the tail strategy that satisfies it here, sealing as an explicit strip of that cursor, the anchored enumeration, the contiguity refusal, legacy adoption in
 place, presence as the tail — lives in the helper. This task supplies the **port** and
 proves the contract holds on IndexedDB.
 

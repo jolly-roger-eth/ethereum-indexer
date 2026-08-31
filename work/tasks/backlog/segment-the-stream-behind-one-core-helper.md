@@ -23,9 +23,16 @@ The shape to build:
   SCANNED EXTENT. A save appends to the open tail: ONE write, bounded by the
   tail plus its batch, never by the history. The tail is SEALED when it exceeds a size threshold and
   the next save opens a new one. A sealed segment is immutable forever.
-- **A save writes exactly ONE key: the open TAIL, holding its events AND the `lastSync` current
-  after them.** One key is one write, so the cursor and its events are the SAME BYTES on every
-  substrate and cannot disagree. No two-key commit, no transaction requirement, no orphan rule.
+- **The CURSOR CONTRACT is what the helper enforces; WHERE the cursor lives is the keeper's choice.**
+  Four properties: exactly one authoritative cursor; a save never leaves a cursor claiming coverage
+  the stored events lack (cursor-AHEAD is silent data loss; cursor-BEHIND is tolerable only if the
+  excess can be detected and discarded); no cursor data per SEALED segment; an empty save costs
+  nothing proportional to history.
+- **The fs keeper satisfies them with the TAIL strategy: a save writes exactly ONE key, the open
+  tail, holding its events AND the `lastSync` current after them.** One key is one write, so
+  cursor-ahead is impossible by construction — no two-key commit, no transaction requirement, no
+  orphan rule. Do not generalise this into the helper as the only layout: a SQL keeper with atomic
+  multi-row updates should be free to hold its cursor in its own row instead.
 - **SEALING STRIPS THE CURSOR, and that is the whole point of this change.** A frozen `lastSync` in
   every sealed segment is real waste: `unconfirmedBlocks` is `EventBlock[]` and `EventBlock` carries
   the FULL decoded events of each block, so it is up to `finality` blocks of event data per segment,
