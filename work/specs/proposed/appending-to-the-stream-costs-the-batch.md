@@ -117,7 +117,8 @@ its own row and update it in the SAME transaction as the segment insert, which s
 and 2 directly and makes property 3 vacuous — no strip, and no tail rewrite on an empty save either.
 That is a BETTER fit for that substrate, and the server's ADR-0006 emission-stream table is the
 concrete case. The tail strategy is chosen here because it is the simplest thing that satisfies all
-four on the two substrates this spec actually ships, NOT because it is the only correct layout.
+four on a substrate WITHOUT an atomic multi-key write, NOT because it is the only correct layout —
+the other shipped keeper does not use it.
 
 **The empty save is the cost of the TAIL shape specifically, and it is bounded and tunable.** It is
 why IndexedDB does not use it. A save with no new
@@ -156,9 +157,15 @@ strictly worse for no benefit.
 
 **The live cursor is the TAIL's, and the TAIL is the highest ordinal.** A reader tells by
 enumeration. Every sealed segment has had its cursor stripped, so there is no stale copy to pick by
-mistake; a sealed segment holds EVENTS and nothing else.
+mistake; on that keeper a sealed segment holds its events and its scanned extent, and no window. On
+the cursor-record keeper no segment ever held a cursor, so there is nothing to strip and no stale
+copy by construction.
 
-**PRESENCE is the TAIL.** `fetchFrom` must keep
+**PRESENCE is "the read-cursor operation returns something"**, which is uniform across keepers even
+though placement is not: on the filesystem that reads the TAIL, on IndexedDB the cursor record. State
+it that way and not as "the tail", because on the cursor-record keeper an empty first save writes NO
+segment and a legacy adoption writes nothing at all — a tail-shaped presence check would report
+absent and `indexer.ts` would clear a perfectly good stream. `fetchFrom` must keep
 returning a DEFINED result for a stream that has been saved to but holds no events, because today an
 empty first save writes `{lastSync, eventStream: []}` and a defined result is what stops `indexer.ts`
 taking its clear branch. A tail exists as soon as anything has been saved, including a save with
@@ -419,7 +426,7 @@ Name it in the task so it is updated deliberately rather than patched blind on a
   cursor; no cursor claiming coverage the stored events lack; no cursor data per SEALED segment; and
   an empty save costing nothing proportional to history. These belong in the shared conformance
   material, following ADR-0020's precedent of testing each backend against its own claim.
-- **For the two keepers that use the TAIL strategy**, assert its mechanics too: seal a tail and
+- **For the keeper that uses the TAIL strategy** (the filesystem), assert its mechanics too: seal a tail and
   confirm its `unconfirmedBlocks` is EMPTY while the rest of its `lastSync` survives and the new tail
   carries a full one. Assert the paired negative explicitly — a sealed segment must still be able to
   say where the stream got to, or a truncation leaves a prefix that cannot be resumed. Do not strip `unconfirmedBlocks`
@@ -432,8 +439,9 @@ Name it in the task so it is updated deliberately rather than patched blind on a
 - **A SEAL writes one extra key and is safe to fail**: interrupt between opening the new tail and
   stripping the old one, and assert the stream still reads correctly (the stale cursor in the sealed
   segment is ignored, because the live cursor is the tail's) and that a later pass strips it.
-- **The cursor comes from the TAIL**: a stream with several sealed segments resumes from the highest
-  ordinal's `lastSync`, and no sealed segment offers a competing copy because sealing stripped them.
+- **The cursor comes from wherever that keeper puts it**, with no competing copy: on the filesystem
+  the highest ordinal's `lastSync` (no sealed segment offers one, because sealing emptied their
+  windows); on IndexedDB the cursor record (no segment ever held one).
 - **A sealed segment is never rewritten** (no write targets its key again) and is **readable by its
   own key** without reading the others.
 - **`fetchFrom` returns a DEFINED result for a stream saved with no events**, which is the guard

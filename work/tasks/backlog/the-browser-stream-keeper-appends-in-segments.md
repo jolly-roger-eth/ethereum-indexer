@@ -73,14 +73,16 @@ for the migration test — rather than patching it blind on a red gate.
 ## Acceptance criteria
 
 - [ ] `keepStreamOnIndexedDB` is implemented on the core helper, supplying a
-      `get`/`set`/`del`/`delMany`/`keys` port over `idb-keyval` plus the tail cursor operations. No
+      `get`/`set`/`setMany`/`del`/`delMany`/`keys` port over `idb-keyval` plus the cursor operations. No
       segmentation rule is re-implemented here.
 - [ ] **Ship a changeset for `@etherfold/browser`.** This changes the persisted IndexedDB layout and
       adds a legacy-blob migration, which is what a browser consumer needs a release note for; the
       sibling's changeset was written before this work existed and cannot describe it. A separate
       file means no merge contention.
 - [ ] **No full structured-clone of the history on a save**, asserted as WORK at a module-level mock
-      of `idb-keyval`'s `set` behind `OnIndexedDB`. Assert the CEILING: no save writes more than one
+      of `idb-keyval`'s **`setMany`** (and `set`, if any path still uses it) behind `OnIndexedDB`.
+      Naming only `set` would make this assertion and the one-transaction assertion pass VACUOUSLY,
+      because the commit path is `setMany`. Assert the CEILING: no save writes more than one
       tail plus its batch, and the 100th append costs no more than the 10th at the same tail phase.
       Wall-clock cannot be the yardstick: `fake-indexeddb` is itself quadratic, and ADR-0032 rules out
       wall-clock on a loaded machine.
@@ -89,14 +91,27 @@ for the migration test — rather than patching it blind on a red gate.
       or crash recovery is needed on this keeper.
 - [ ] **An empty save writes ONLY the cursor record**, not the tail — property 4, and the concrete
       advantage of this strategy over the filesystem's.
-- [ ] **A save with NO events rewrites only the open tail**, never the history (story 3).
 - [ ] **NO segment contains a `lastSync` at all** on this keeper — property 3 is vacuous here, so
       there is no seal-strip to perform and none to test. Every segment DOES carry its scanned extent,
       asserted, because the truncation recovery needs it.
 - [ ] **The cursor comes from the CURSOR RECORD**, with no competing copy anywhere, and its key is
       one the anchored segment pattern rejects.
-- [ ] **A truncation REWRITES the cursor record** from the surviving top segment's scanned extent, so
-      it never describes segments that are gone.
+- [ ] **A truncation REWRITES the cursor record BEFORE deleting**, and this ORDER is required. The
+      recovery is two operations here (`delMany` then a cursor write) and IndexedDB gives no
+      delete-plus-put primitive, so deleting first leaves an observable window where the cursor
+      describes segments that are gone — the cursor-AHEAD direction — and, worse, the ordinals are
+      contiguous again afterwards so the gap check can never re-detect it. Rewrite the cursor to the
+      surviving prefix FIRST, then delete upward: that order leaves a re-detectable gap and is
+      idempotent. The fs keeper has no such window, because its surviving tail IS the cursor.
+- [ ] **The rewritten cursor carries a `context`.** `LastSync` requires one and `indexer.ts` reads it
+      on both load branches via `streamMatches`, but a segment's scanned extent does not have one.
+      Carry the existing cursor record's `context` forward; fabricating one makes `streamMatches`
+      fail and CLEARS the very prefix the recovery exists to keep.
+- [ ] **Presence works when there is NO segment yet.** Two cases the tail rule does not cover here:
+      an empty FIRST save writes only the cursor record and no segment; and a legacy adoption writes
+      nothing at all, so an adopted stream has its `lastSync` inside the legacy blob and no cursor
+      record. Assert `fetchFrom` returns DEFINED in both, or `indexer.ts` takes its clear branch and
+      the migration becomes a full re-fetch for every browser user — breaking story 5.
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order, strict equality.
 - [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events, which is what stops
@@ -168,8 +183,8 @@ survive a `clear`.
 
 **Scope fence.** Do NOT change the helper — a change there means this task found drift, so surface it
 rather than editing. Do NOT make the stream raw-only (that is
-`the-stream-stores-only-what-the-node-said`). Do NOT add per-segment block-range metadata. Do NOT
-strip `unconfirmedBlocks` from the TAIL. Do NOT touch core's `index.ts`. Do NOT add a dependency on
+`the-stream-stores-only-what-the-node-said`). Do NOT add per-segment block-range metadata. Do NOT strip `unconfirmedBlocks` from the CURSOR RECORD —
+removing it entirely is the raw-only spec's job. Do NOT touch core's `index.ts`. Do NOT add a dependency on
 `@etherfold/fs`.
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (how

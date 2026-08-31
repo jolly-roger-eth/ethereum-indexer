@@ -75,15 +75,15 @@ below.
    answering from whichever generation is now canonical, so holding a reference is never a way to be
    silently stale.
 7. As a developer, I want a reconfigure the invalidation verdict calls a no-op to cost nothing.
-8. As an operator, I want a bound on how many generations and streams a project can accumulate, and a
+8. As an operator, I want a bound on how many generations and streams an indexer can accumulate, and a
    loud refusal when I reach it rather than a silent eviction of something I still wanted.
 9. As an operator, I want deleting a generation or a stream to be one cheap, complete operation.
 10. As an operator, I want to PAUSE a generation so it stops indexing without being deleted, and resume
     it later, without it ever answering with state a reorg has invalidated underneath it.
-11. As a developer, I want the KEY SHAPE to carry a project discriminator structurally from the
-    start, so multi-project isolation is available to whatever runtime needs it and is never
-    retrofitted. (Running several projects on a server or CLI is
-    `the-server-and-cli-hold-generations-too`; what THIS spec owes it is the key, not the runtime.)
+11. As a developer, I want a generation's stream key to be derived from its FILTER, so two
+    generations with different filters never collide and one with the same filter is reused.
+    (Multi-project isolation is `the-server-and-cli-hold-generations-too`; a browser page is one
+    project and needs no discriminator beyond the `name` it already has.)
 12. As a developer, I want a generation whose stream is unavailable to fall back to a full re-index,
     which is today's behaviour, so the feature degrades rather than breaks.
 13. As a DEVELOPER iterating on a processor, I want the new generation to become canonical
@@ -154,21 +154,29 @@ context buys nothing and costs a deployment constraint.
 
 ### The stream
 
-**Streams are separate keyspaces and share nothing.** `<project>/<chainId>/<filterDigest>`, with
-segments beneath, per `appending-to-the-stream-costs-the-batch`. Two generations on one stream READ it;
+**Streams are separate keyspaces and share nothing.** In the browser the existing key simply GAINS
+the stream digest: `stream_<name>_<chainId>_<streamDigest>` with segments beneath, per
+`appending-to-the-stream-costs-the-batch`. That is an addition to what is already there, not a new
+path, which is what keeps landable 1's migration small. A server, which holds several projects, adds
+its own discriminator ahead of this — see the sibling spec. Two generations on one stream READ it;
 only the one that is indexing WRITES it.
 
-**`project` IS the existing caller-supplied `name`, promoted to a structural key component.** Both
-keepers already take one (`keepStreamOnIndexedDB(name)`, `keepStateOnFile(folder, name)`) and key
-`<name>_<chainId>`, so `name` is ALREADY the tenancy discriminator — it is just not structural, and
-nothing stops a query forgetting it. So this is a rename plus a guarantee, NOT a new required input:
-no existing caller changes, and landable 1's keyspace migration is mechanical because the adopted key
-is computable from what the caller already passes.
+**There is NO project component in the browser key, because a browser page IS one project.** An
+earlier draft put a `project` discriminator in the key here and asserted it was the existing
+caller-supplied `name` renamed. That was wrong on the code: `createIndexerState` takes NO name —
+`keepState` and `keepStream` are separate optional options each closing over their OWN name, an
+entities deployment passes no `keepState` at all and discriminates by `databaseName` (which
+DEFAULTS), and the CLI keeper takes only a folder. There is no single name at the indexer level to
+promote.
 
-**The project is a separate KEY COMPONENT, never mixed into the digest.** Same isolation either way,
-but keeping it separate leaves the keys debuggable, lets a project be enumerated or dropped by prefix,
-and does not foreclose a future shared stream pool across projects. Hashing it in would make that a
-rewrite.
+More to the point, the browser does not need one. A page carries one indexer; where two unrelated
+indexers share an origin, the EXISTING `name` and `databaseName` already separate them, and that
+mechanism is untouched here.
+
+**So multi-tenancy is a SERVER and CLI concern, and it lives in
+`the-server-and-cli-hold-generations-too`** — including the composite key whose discriminator is
+structurally non-omittable, which is a real requirement on a runtime that genuinely holds several
+projects. That spec also answers where the value comes from, which the browser never has to.
 
 **The CURSOR is the PREREQUISITE's business, not this spec's.**
 `appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of four properties — exactly one
@@ -178,7 +186,7 @@ history — and leaves PLACEMENT to each keeper. Both shipped keepers put the cu
 and empty its window on seal; a keeper with atomic multi-row updates may hold a cursor row instead.
 
 **All this spec adds is the SCOPE: one cursor per STREAM, and a stream is now keyed
-`<project>/<chainId>/<streamDigest>`.** Everything else about cursors — where they live, how a save
+`stream_<name>_<chainId>_<streamDigest>`.** Everything else about cursors — where they live, how a save
 commits, what happens after a crash — is settled there and must not be restated here, because a
 second statement is a second source of truth that can drift. An earlier draft of this section
 specified a separate cursor record with orphan discard; that design was withdrawn in the prerequisite
@@ -203,8 +211,8 @@ a distance in BLOCK NUMBERS, with ADR-0019 explicitly refusing a second retentio
 anything else. A generation cap is a COUNT of generations, a different object entirely — and every
 generation HAS a store WITH a retention window, so the two words will meet in one config object.
 
-- `maxStreams` per project bounds distinct filters.
-- `maxGenerations` per project, as a TOTAL and not per-stream. Per-stream would let total growth scale
+- `maxStreams` per indexer bounds distinct filters.
+- `maxGenerations` per indexer, as a TOTAL and not per-stream. Per-stream would let total growth scale
   with stream count, leaving the resource anyone actually cares about — total storage, total state
   stores — unbounded.
 
@@ -244,7 +252,7 @@ eviction costs a re-index.
 is cheap only because streams are self-contained, which is the payoff of separating them. A stream is
 reaped when its last generation goes.
 
-**One CANONICAL POINTER per project names the generation that answers reads.** Moving it IS the
+**One CANONICAL POINTER per indexer names the generation that answers reads.** Moving it IS the
 promotion, and it is a single small record write, so promotion has no meaningful cost and no
 multi-key recovery problem. Moving it back is the revert.
 
@@ -357,24 +365,17 @@ continued light polling (head checks plus a shrinking re-scan) before the genera
 consumer should be able to see that draining state; `revertTo` is NOT needed on this path, which
 matters because it is destructive and capability-gated; and resume is simply removing the cap.
 
-### Multi-project
+### Multi-tenancy is NOT here
 
-**The project discriminator is structural, never a field a query can omit.** This repo has already
-been bitten by exactly this class: `stream_tag_1` is a prefix of `stream_tag_10_0`, so a bare prefix
-filter silently crossed CHAINS. A project discriminator has the identical failure mode with a larger
-blast radius. Every read and write takes a composite key that carries it; there is no default project
-and no way to address storage without one.
+A browser page is one project, so this spec has no tenancy discriminator and needs none: the existing
+`name` (and `databaseName` on the entities path) already separates two unrelated indexers sharing an
+origin, and nothing here changes that.
 
-**Whether that maps to one shared table with a discriminator column, a table prefix, or a schema per
-project is a STORAGE ADAPTER decision, not a model decision** — and it stays that way only if the key
-is composite. Sharing a table is cheap in storage and performance; what it is not cheap in is safety,
-and the composite key is what buys the safety back.
-
-**Streams are PER PROJECT to start.** Two projects watching the same contracts could share one stream
-and one fetch, which is a real multi-tenant saving, but it reintroduces the multi-referent lifetime
-problem that killed share-by-reference in this design's own history: whose stream is it, who may
-delete it, does one project's reconfigure disturb another's. Per-project duplicates some fetching and
-keeps every lifetime trivial. The key shape above leaves the global pool reachable later.
+The runtime that genuinely holds several projects is a server or a CLI, and
+`the-server-and-cli-hold-generations-too` owns it — the composite key whose discriminator cannot be
+omitted, where its value comes from, and whether it maps to a column, a prefix or a schema. That is
+the right home: the discriminator is only load-bearing where more than one tenant exists, and
+inventing one here would have made every browser caller supply something it has no use for.
 
 ### Relationship to ADR-0008
 
@@ -447,7 +448,7 @@ reconciled or dropped rather than left asking a settled question.
 
 ## Tasking note
 
-SIX separable landables. Cutting them together produces one task nobody can review.
+SEVEN separable landables. Cutting them together produces one task nobody can review.
 
 1. **Stream identity and the keyspace** — the canonical filter digest, the wide sync hash, the
    `<project>/<chainId>/<filterDigest>` key, and the composite key type that makes the project
@@ -507,15 +508,21 @@ SIX separable landables. Cutting them together produces one task nobody can revi
    must keep tracking the REAL head — capping that too makes `getFromBlock` return
    `latestBlock - finality` forever and the drain never idles. Owns the DRAINING state a consumer can
    see, which otherwise falls between this and landable 6.
-6. **Progress and degradation** — `SyncingState` reporting that a non-canonical generation exists and
+6. **The PROMOTION POLICY** — the three values, the `on-catch-up` DEFAULT, the `immediate` opt-in, the
+   TRIGGER (the successor reaching the cursor the canonical generation had), and drop-on-promotion
+   with its `immediate`-only deferral. It was decided in prose and owned by nothing, which left
+   stories 1, 3, 13 and 14 with no delivering task — including the production default and the one
+   story 1 asks for. It cannot fold into landable 2, which is explicitly testable with no indexer
+   running, because the trigger needs a running one. `blockedBy` 2 and 4.
+7. **Progress and degradation** — `SyncingState` reporting that a non-canonical generation exists and
    how far it has caught up (story 5), and the fallback when a generation's stream is unavailable or
    unreadable: a full re-index, which is today's behaviour, so the feature degrades rather than
    breaks (story 12). Small, but it was unowned, and story 12 is the guard that stops a corrupt
    stream taking the app down with it.
 
-Landables 3, 4, 5 and 6 all edit `packages/browser/src/IndexerState.ts` (`SyncingState` at the top,
+Landables 3, 4, 5, 6 and 7 all edit `packages/browser/src/IndexerState.ts` (`SyncingState` at the top,
 `createIndexerState`, three `stateDiscarded` sites, and the container is what it returns), so
-serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then (4), then (5), then (6).
+serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then (4), then (5), then (6), then (7).
 
 ## Out of Scope
 

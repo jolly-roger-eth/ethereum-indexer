@@ -2,10 +2,19 @@
 title: 'The server and the CLI hold generations too, over the emission-stream table'
 slug: the-server-and-cli-hold-generations-too
 needsAnswers: true
-taskedAfter: [a-reconfigure-is-not-an-outage]
+taskedAfter: [a-reconfigure-is-not-an-outage, indexer-server-feed]
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
+
+> **ALSO ABSORBS `indexer-server-feed`'s rebuild stories (9-11), which it supersedes.** That spec
+> owns the STORAGE and the FEED — the ADR-0006 emission table, the two views, cursor semantics,
+> compaction, the indexed topic columns — and this spec is `taskedAfter` it because it needs that
+> table. Its rebuild stories described ADR-0008's blue-green: replay into a namespace keyed by the
+> processor version hash, flip a pointer, DROP the old. Keyed by the processor hash alone that cannot
+> express a FILTER change, and dropping the old namespace is what makes a revert impossible, so the
+> generation model supersedes it rather than being layered on top of it. Building blue-green and then
+> replacing it would be paying twice. The boundary moved; the work did not duplicate.
 
 > **SPLIT out of `a-reconfigure-is-not-an-outage`** under `TASKING-PROTOCOL` §2a. That spec's
 > landables all edit `packages/browser/src/IndexerState.ts`, and nothing in it builds a stream keeper
@@ -49,13 +58,16 @@ Three things this runtime supplies that the browser one does not:
   of calling `processor.clear()`.
 - **The canonical pointer as a table row**, which is what ADR-0008's `current_version` row becomes.
 
-**This runtime is where the prerequisite's cursor freedom is actually SPENT.**
+**This runtime is the SECOND cursor-record keeper, not the first.**
 `appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of four properties and leaves
 PLACEMENT to each keeper precisely so a substrate with atomic multi-row updates is not forced into a
 layout invented for a filesystem. A SQL keeper holds its cursor in its own ROW and updates it in the
 SAME transaction as the segment insert: that satisfies property 1 and property 2 directly, makes
 property 3 (no unconfirmed window per sealed segment) vacuous because there is nothing to strip, and
-gives property 4 for free with no tail rewrite on an empty save. Do not port the tail strategy here.
+gives property 4 for free with no tail rewrite on an empty save. The shipped IndexedDB keeper already
+does exactly this with `setMany`, so there is prior art rather than novelty — which is itself the
+argument for the shared conformance material, since a third implementation is where it earns its
+keep. Do not port the FILESYSTEM's tail strategy here.
 
 ## User Stories
 
@@ -74,14 +86,27 @@ gives property 4 for free with no tail rewrite on an empty save. Do not port the
    deploys.
 7. As an operator, I want a bound on how many generations a project accumulates, and a loud refusal
    at the bound rather than a silent eviction.
+8. As a maintainer, I want a processor-logic upgrade to rebuild state from the locally stored stream
+   rather than from the chain, so an upgrade costs a local scan instead of a full re-index. (From
+   `indexer-server-feed`, story 9.)
+9. As a maintainer, I want the rebuild to run in BOUNDED CHUNKS against a durable checkpoint, so it
+   completes on a serverless host that cannot hold a long-running loop. (From `indexer-server-feed`,
+   story 10; ADR-0008's self-enqueueing queue reasoning survives unchanged, and the cron watchdog
+   with it.)
+10. As an operator, I want the canonical generation served throughout a rebuild and the pointer moved
+    atomically at the end, so readers never observe partial state and a rollback before the move is
+    free. (From `indexer-server-feed`, story 11 — now strictly stronger, because the retired
+    generation is RETAINED under the caps rather than dropped, so the rollback stays free AFTER the
+    move too.)
 
 <!-- open-questions -->
 
 ## Open questions
 
-1. **What is the emission-stream table's schema, and does it exist yet?** ADR-0006's own docstring
-   notes the emission-stream storage is not yet built. This spec assumes it, so it either depends on
-   that work or carries it. Which?
+1. ~~What is the emission-stream table's schema, and does it exist yet?~~ **ANSWERED, and it is why
+   this spec is `taskedAfter indexer-server-feed`.** `StreamBuilder`'s docstring (not ADR-0006's — an
+   ADR has none) says it "does not store the emission stream: that arrives with ADR-0006, in the
+   `indexer-server-feed` spec". That spec owns the table; this one consumes it.
 2. **How does a generation partition that table?** A `generation` column with every read filtered on
    it, a table per generation, or a schema per generation. The same question the browser answered
    with a key component, and the answer here is a storage-adapter decision that the composite key
@@ -89,15 +114,21 @@ gives property 4 for free with no tail rewrite on an empty save. Do not port the
 3. **Does the CLI hold several generations, or one?** A long-running `serve` clearly can. A one-shot
    batch arguably should not, and forcing it to would add a pointer read to a path that has no
    reconfigure. If they differ, the difference must be in the HOST rather than in the model.
-4. **What replaces `processor.clear()` in `StreamBuilder`, exactly?** It is called on two routes and
+4. **Where does `project`'s VALUE come from on a server or CLI?** The browser needs no discriminator
+   (a page is one project) and has none, so this runtime is the first to require one, and nothing
+   supplies it today: `createFileKeepState(folder)` takes no name and `packages/server` has none. Is
+   it a deployment config key, a path segment on the ingest route, or derived from the feed's own
+   identity?
+5. **What replaces `processor.clear()` in `StreamBuilder`, exactly?** It is called on two routes and
    its removal is the concrete deletion sweep this spec owns.
 
 <!-- /open-questions -->
 
 ## Implementation Decisions
 
-**None of the MODEL is re-decided here.** Generation identity (the invalidation verdict plus the
-processor hash), stream identity (the deduplicated `streamHash` digest plus the stream config hash),
+**None of the MODEL is re-decided here.** Generation identity (its STREAM plus the processor version
+hash — the VERDICT decides whether anything is created at all, which is a different question and one
+the model spec keeps deliberately separate), stream identity (the deduplicated `streamHash` digest plus the stream config hash),
 the canonical pointer, the caps that refuse rather than evict, cap-and-drain pausing, and the
 promotion policy defaulting to `on-catch-up` everywhere are all
 `a-reconfigure-is-not-an-outage`'s and are consumed unchanged. Restating any of them here would

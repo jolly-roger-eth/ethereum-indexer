@@ -142,8 +142,11 @@ implementation of those operations.
 ## Acceptance criteria
 
 - [ ] A core helper implements segmentation over an injected `get`/`set`/`del`/`delMany`/`keys` port
-      PLUS keeper-supplied cursor operations (commit-segment-with-cursor, read-cursor), so cursor
-      PLACEMENT is not baked in. `keepStreamOnFile` supplies the tail implementation and
+      PLUS keeper-supplied cursor operations, so cursor PLACEMENT is not baked in. **THREE operations, not
+      two**: commit-segment-with-cursor, read-cursor, and **write-cursor-only**. The third is not
+      optional — the cursor-record keeper needs it for an empty save (no segment) and for the
+      truncation rewrite (no segment), and a seam without it leaves that keeper unable to satisfy its
+      own criteria inside its scope fence. `keepStreamOnFile` supplies the tail implementation and
       `packages/fs/src/utils/fs.ts` gains `keys`, `delMany` and an atomic write.
 - [ ] Core's `index.ts` re-exports the helper (core's `exports` map is only `.` and
       `./package.json`), so **ship a changeset**, scoped to `@etherfold/core` and `@etherfold/fs`.
