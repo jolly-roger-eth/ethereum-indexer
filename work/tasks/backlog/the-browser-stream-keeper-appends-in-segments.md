@@ -47,7 +47,7 @@ for the migration test — rather than patching it blind on a red gate.
 ## Acceptance criteria
 
 - [ ] `keepStreamOnIndexedDB` is implemented on the core segmentation helper, supplying a
-      `get`/`set`/`del`/`keys` port over `idb-keyval`. No segmentation rule is re-implemented here.
+      `get`/`set`/`setMany`/`del`/`delMany`/`keys` port over `idb-keyval`, plus the capabilities record. No segmentation rule is re-implemented here.
 - [ ] **No full structured-clone of the history on a save**, asserted as WORK at a module-level mock
       of `idb-keyval`'s `set` behind `OnIndexedDB`: assert the CEILING — no save writes more than one
       tail plus its batch, and the 100th append costs no more than the 10th at the same tail phase.
@@ -70,9 +70,10 @@ for the migration test — rather than patching it blind on a red gate.
       with no competing copy anywhere.
 - [ ] **The port DECLARES atomic multi-key commit**, and the helper therefore takes its one-commit
       branch: `setMany` opens one `readwrite` transaction for the segment and the cursor together.
-      Assert the declaration is set AND that the helper's orphan/truncation recovery never executes
-      on this keeper — it exists to compensate for a capability the filesystem lacks and IndexedDB
-      has, and a browser keeper running it would be paying for the wrong substrate's problem.
+      Assert the declaration is set AND that CRASH RECOVERY (orphan discard + tail truncation) never
+      executes on this keeper — it compensates for a capability the filesystem lacks and IndexedDB
+      has. The CONTIGUITY REFUSAL is a DIFFERENT recovery and is UNCONDITIONAL: it must still run
+      here, because a gap comes from an interrupted `clear`, which IndexedDB can suffer too.
 - [ ] **A sealed segment is never rewritten** and is **readable by its own key**.
 - [ ] **Replay across a reorg** returns retractions in APPEND order.
 - [ ] **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where

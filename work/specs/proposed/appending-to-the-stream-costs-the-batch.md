@@ -83,15 +83,31 @@ interrupted save:
   write the segment, then write the cursor via a temp file and `rename`, which IS atomic for one file.
 
 An ORPHAN is any segment whose ordinal exceeds `committedThrough`, which is why the ordinal is in the
-record. Orphan discard is then the same shape as the contiguity rule below — drop from the break
-upward, keep the prefix beneath, rewrite the cursor from the surviving tail — so this is one recovery
-discipline rather than two.
+record.
+
+**There are TWO recoveries and only ONE of them is conditional. Naming them separately is load-bearing,
+because conflating them makes the browser keeper unbuildable.**
+
+- **CRASH RECOVERY** — orphan discard by ordinal, plus truncating the open tail to `committedEvents`.
+  This compensates for a port that cannot commit atomically. Where the port DECLARES atomicity it is
+  dead code that must never fire.
+- **THE CONTIGUITY REFUSAL** — a gap detected on load, resolved by clearing from the gap upward and
+  keeping the prefix. This is UNCONDITIONAL on every port. A gap does not come from a torn commit; it
+  comes from an interrupted `clear`, which every substrate can suffer.
+
+They share a SHAPE (drop from the break upward, keep the prefix beneath) and that is all they share.
 
 **`clear` deletes the CURSOR FIRST, then the segments.** The fs `clear` is N `unlinkSync` calls and is
 not atomic, so an interrupted clear is reachable in normal operation. Segments-first would leave a
 cursor with no segments, which reads as PRESENT while claiming coverage the stream does not hold —
-the silent cursor-ahead direction. Cursor-first leaves segments with no cursor, which reads as ABSENT,
-so the next load takes the clear branch and finishes the job. Self-healing in the safe direction.
+the silent cursor-ahead direction. Cursor-first leaves segments with no cursor, which reads as ABSENT.
+
+**Segments with no cursor record are FINISHED OFF explicitly, by the keeper, and not left to the
+indexer to notice.** The self-healing story only works on one of the two branches: the state-kept
+path (`indexer.ts`) is an `if` with NO `else`, so an undefined `fetchFrom` there clears nothing —
+and that branch is exactly where a `clear` is issued for a stream whose filter no longer matches. So
+the rule is the keeper's: a load or a save that finds segments and NO cursor record completes the
+clear before doing anything else.
 
 So the shape is an append-only log with an OPEN TAIL:
 
@@ -138,6 +154,21 @@ on that declaration.**
   rather than an assumed one: the adapter that knows says so.
 - **The filesystem CANNOT.** `writeFileSync` is per file and there is no multi-file transaction.
 
+**The capability is REPORTED the way this repo already reports one**, not under a new idiom:
+`StateStore` exposes a `readonly capabilities` record (`packages/state-store/src/capabilities.ts`)
+described as “what a store can do, as DATA a caller reads before it asks a question”, and ADR-0020's
+conformance suite reads a backend's declared capabilities and tests it against its OWN claim. The
+stream port follows that shape. Inventing a second capability mechanism here would fork a concept
+the repo has already settled.
+
+**Segments are written through temp-file-plus-rename too, not just the cursor.** A bare
+`writeFileSync` can leave a TORN file, and `storage().get` wraps only `readFileSync` in its
+`try`/`catch` — `JSON.parse` sits OUTSIDE it — so a torn segment THROWS out of `fetchFrom`, which
+`indexer.ts` does not wrap, and the indexer is then permanently unloadable. A rename is atomic for a
+single file, so this costs nothing and removes the class. Belt and braces: a segment that still fails
+to parse is treated as a GAP at its ordinal and goes through the contiguity refusal, so corruption
+from any other cause degrades instead of throwing.
+
 Where the port declares atomicity, the save is one commit and the recovery below is DEAD CODE that
 must never fire — assert that rather than porting the filesystem's recovery into a keeper that cannot
 need it. Where it does not, the cursor is written LAST and the two integers are what make
@@ -183,7 +214,9 @@ This also carries the migration: adopting a legacy blob writes the cursor record
 inside it, so presence reads true from that moment, with no ordinal segments yet in existence. In
 that state `committedThrough` is the SENTINEL `-1` (and `committedEvents` `0`), which is what makes
 the orphan comparison work at ordinal 0: a segment `_0` written by a save that then crashed exceeds
-`-1` and is discarded.
+`-1` and is discarded. `committedEvents` applies ONLY to a segment identified by an ordinal
+`committedThrough >= 0`, and NEVER to the adopted legacy segment — truncating that one to `0` would
+wipe the whole history the adoption exists to preserve.
 
 The seal threshold is counted in **EVENTS**, not bytes. Bytes are natural on the filesystem (the JSON
 string is already built) and not cheaply available on IndexedDB (structured-clone size is not
@@ -269,27 +302,35 @@ destructive one is the intuitive one. On finding a hole at ordinal `k`, delete `
 above it and KEEP `0..k-1`.
 
 The prefix is safe to keep because every segment carries its SCANNED EXTENT, so segment `k-1` is
-self-describing. But the recovery must do MORE than rewrite the cursor from it, and the reason is
-specific: a resumed cursor with an EMPTY `unconfirmedBlocks` DUPLICATES.
+self-describing: the recovery rewrites the cursor record from its three numbers, with
+`committedThrough`/`committedEvents` set to that segment and `unconfirmedBlocks` EMPTY.
 
-`getFromBlock` returns `min(lastToBlock + 1, latestBlock - finality)`, so in the head-following steady
-state the next scan starts BELOW the recovered `lastToBlock`, inside blocks the surviving prefix
-already holds. And with an empty window, `generateStreamToAppend` sets its
-`startingBlockForNewEvent` to the FIRST re-fetched block rather than to the end of the window, so
-every re-fetched event in that overlap is emitted as NEW. Appended to a stream nothing ever rewrites,
-that permanently duplicates up to `finality` blocks of events, unflagged, and a rebuild double-folds
-them — breaking story 4. Today this cannot happen, because the window is always persisted beside the
-events in the single blob.
+**An empty window is correct here, and the reason was CHECKED rather than reasoned.** A recovered
+cursor never drives a scan with an empty window: on the state-discarded path the prefix is REPLAYED
+first (`feed`), and `generateStreamToAppend` returns a `newLastSync` whose `unconfirmedBlocks` it
+rebuilt from the events it just processed, so the window is populated before anything fetches. On the
+state-kept path the stream's cursor drives no scan at all — it is read only to check `streamMatches`.
 
-So the recovery TRUNCATES the surviving prefix to a segment boundary at or below
-`latestBlock - finality`, and rewrites the cursor from THAT segment's scanned extent with
-`committedThrough`/`committedEvents` set to it and `unconfirmedBlocks` empty. With `lastToBlock` at or
-beneath the horizon, `getFromBlock` returns `lastToBlock + 1`, so the next scan starts exactly where
-the stream ends and overlaps nothing. The empty window is then correct rather than lossy, because
-there is nothing unconfirmed left in the stream for it to describe.
+> A draft added a rule TRUNCATING the surviving prefix to a segment boundary below
+> `latestBlock - finality` to avoid a duplication hazard on this path. That hazard does not exist,
+> for the reason above, and the rule was worse than the problem: the indexer scans to head
+> (`toBlock = latestBlock`), so a head-era segment has `lastToBlock == latestBlock` and NO segment
+> satisfies `lastToBlock <= latestBlock - finality`. It would have truncated every segment and
+> deleted the cursor — total loss of a cached history, on a recoverable gap. Recorded so it is not
+> re-derived.
 
-This is the SAME rule `a-reconfigure-is-not-an-outage` applies when it PAUSES a generation, and
-deliberately so: one truncate-below-the-horizon discipline, not two.
+**The recovery must not leave the stream open for append above a hole it cannot fill.** Keeping the
+prefix is safe for READING (it is complete from block 0 to its own cursor). What is NOT safe is the
+next save appending at head on top of it: the stream would then claim `0..head` while missing
+everything between the truncation point and head, which no reader can detect and which a later
+state-discard replays as if it were the whole history. So a save whose `fromBlock` is above the
+recovered cursor's `lastToBlock + 1` would CREATE a hole, and the keeper CLEARS the stream rather
+than writing it. A stream that cannot be continued contiguously is worth less than nothing.
+
+**After a contiguity refusal the recovery opens a FRESH ordinal above the surviving prefix**, rather
+than appending into the segment that was sealed beneath it. Otherwise a previously-sealed key would
+be written again, contradicting the immutability invariant and the test written against it. One empty
+ordinal is cheaper than a qualified invariant.
 
 **If nothing survives** — a gap at ordinal 0 with no adopted legacy segment, or a horizon that
 truncates everything — the cursor record is DELETED, so the stream reads as ABSENT and the next load
@@ -334,7 +375,7 @@ the contiguity refusal, the seal decision, legacy adoption and cursor selection 
 both keepers and are the whole substance of this change. `OnFile` and `OnIndexedDB` are independent
 implementations of `ExistingStream` in different packages, so a task cut per keeper would
 re-implement the same prose twice and drift. Put the rules in an internal core helper parameterised
-over a `get`/`set`/`del`/`keys` port, and let each keeper supply the port. That also gives the
+over a `get`/`set`/`setMany`/`del`/`delMany`/`keys` port plus a capabilities record, and let each keeper supply both. That also gives the
 module-mocking seam below one place to bite.
 
 One consequence to accept deliberately: core's `exports` map is only `.` and `./package.json`, so a

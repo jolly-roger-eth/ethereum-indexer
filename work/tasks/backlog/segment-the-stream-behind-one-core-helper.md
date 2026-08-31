@@ -41,13 +41,16 @@ The shape to build:
     file.
 
   Orphan discard is the same shape as the contiguity rule below — drop from the break upward, keep
-  the prefix — so this is one recovery discipline rather than two.
+  the prefix — but they are TWO recoveries and only one is conditional. CRASH RECOVERY (orphan
+  discard + tail truncation) compensates for a non-atomic port and must never fire on an atomic one.
+  The CONTIGUITY REFUSAL is UNCONDITIONAL on every port, because a gap comes from an interrupted
+  `clear` rather than from a torn commit.
 - **Sealing is not a write.** A segment is sealed exactly when it is no longer the highest ordinal,
   so it happens implicitly when the next save opens a new one, and a reader tells by enumeration.
   Nothing is ever written INTO a segment to mark it sealed, which is what keeps immutability true.
   A segment holds its EVENTS plus its SCANNED EXTENT (`{lastFromBlock, lastToBlock, latestBlock}`)
   and nothing else — no `context`, no `unconfirmedBlocks`.
-- **The live cursor is the CURSOR RECORD, `{lastSync, committedThrough}`.** `committedThrough` is the
+- **The live cursor is the CURSOR RECORD, `{lastSync, committedThrough, committedEvents}`.** `committedThrough` is the
   ORDINAL of the segment it was committed with, and it is REQUIRED rather than convenient: `LastSync`
   names only blocks, and block order is NOT monotonic across segments (a reorg re-appends lower
   blocks into a later segment), so nothing can identify the segments ABOVE the cursor from block
@@ -82,11 +85,13 @@ The shape to build:
     prefix (below) means this task never enlarges that window. If you find yourself widening it,
     surface it rather than absorbing it.
   - **Not the whole stream.** On a hole at ordinal `k`, delete `k` and above and KEEP `0..k-1`.
-    Segment `k-1` carries its own SCANNED EXTENT, so the surviving prefix is self-describing. Then
-    TRUNCATE it to a segment boundary at or below `latestBlock - finality` and rewrite the cursor
-    from that segment, window empty — the same truncate-below-the-horizon rule
-    `a-reconfigure-is-not-an-outage` uses when it pauses a generation. If nothing survives, DELETE
-    the cursor so the stream reads as absent. Clearing everything would throw away a good prefix (story 5
+    Segment `k-1` carries its own SCANNED EXTENT, so the surviving prefix is self-describing: rewrite
+    the cursor record from it, window EMPTY (correct — a recovered cursor never drives a scan with an
+    empty window, because the prefix is REPLAYED first and `generateStreamToAppend` rebuilds the
+    window from the replayed events). Open a FRESH ordinal above the prefix rather than appending
+    into the segment that was sealed beneath it. If nothing survives, DELETE the cursor so the stream
+    reads as absent. And if a later save's `fromBlock` would sit ABOVE the recovered cursor, that
+    save would create a HOLE — clear the stream instead of writing it. Clearing everything would throw away a good prefix (story 5
     says an upgrade must cost nothing the user notices) and, on the state-kept path, would be
     SILENT: `indexer.ts` only clears there when `streamMatches` fails, so an undefined `fetchFrom`
     leaves the state cursor untouched and the next save writes a stream covering only from now on,
@@ -110,7 +115,8 @@ The shape to build:
   next `fetchFrom` concatenates it into the replay — wrong state, SILENTLY. It is called from five
   paths in `indexer.ts`.
 
-**Put the rules in ONE internal core helper parameterised over a `get`/`set`/`del`/`keys` port**, and
+**Put the rules in ONE internal core helper parameterised over a
+`get`/`set`/`setMany`/`del`/`delMany`/`keys` port plus a CAPABILITIES record**, and
 let the keeper supply the port. Ordinal naming, the anchored match, the contiguity refusal, the seal
 decision, legacy adoption and cursor selection are identical for both keepers and are the whole
 substance of this change; a helper per keeper would re-implement the same prose twice and drift.
@@ -130,7 +136,7 @@ stops the two keepers choosing differently and makes the seal test deterministic
       the capability, one commit and no recovery path executed; without it, cursor-last plus orphan
       discard and tail truncation. Assert BOTH branches, and assert the recovery never fires on the
       atomic one.
-- [ ] A core helper implements segmentation over an injected `get`/`set`/`del`/`keys` port, and is
+- [ ] A core helper implements segmentation over an injected `get`/`set`/`setMany`/`del`/`delMany`/`keys` port plus a CAPABILITIES record, and is
       reachable from `@etherfold/fs` (core's `exports` map is only `.` and `./package.json`, so
       `index.ts` must re-export it). That export line is published surface: **ship a changeset**, and
       scope it to `@etherfold/core` and `@etherfold/fs` only. The sibling task ships its own for
@@ -154,6 +160,17 @@ stops the two keepers choosing differently and makes the seal test deterministic
 - [ ] **A save with NO events writes ONLY the cursor record** — not the tail — asserted at the
       instrumented seam. This is story 3 on the filesystem, and it is the behaviour the whole
       cursor-record design was bought for, so it must be asserted here and not only in the browser.
+- [ ] **A TORN segment file degrades instead of throwing**: segments are written through
+      temp-file-plus-rename like the cursor, and a segment that still fails to parse is treated as a
+      GAP at its ordinal. Assert nothing raises out of `fetchFrom` — `indexer.ts` does not wrap it and
+      `JSON.parse` sits outside `storage().get`'s `try`, so a throw makes the indexer permanently
+      unloadable.
+- [ ] **Segments with NO cursor record finish the clear**, asserted by the keeper rather than left to
+      the indexer: the state-kept branch has no `else` on an undefined `fetchFrom`, so nothing else
+      would.
+- [ ] **A save that would create a HOLE clears instead**: after a contiguity refusal, a save whose
+      `fromBlock` sits above the recovered cursor must clear the stream rather than append over a gap
+      no reader could detect.
 - [ ] **A crash never leaves the cursor AHEAD of its events**, asserted by interrupting a save at the
       instrumented seam, INCLUDING the first save after a legacy adoption. Assert the cursor is
       written LAST, and that a segment above it is DISCARDED as an orphan on the next load rather
@@ -189,7 +206,7 @@ stops the two keepers choosing differently and makes the seal test deterministic
 - [ ] **A gap in the ordinals CLEARS FROM THE GAP UPWARD AND KEEPS THE PREFIX**, rather than being
       replayed as a shorter stream, thrown, or resolved by wiping the stream. Assert all three: after
       punching a hole at ordinal `k`, (a) nothing raises, (b) `fetchFrom` returns a DEFINED result
-      whose events are exactly those of the surviving prefix, and (c) the prefix is TRUNCATED to a
+      whose events are exactly those of segments `0..k-1`, and (c) the prefix is TRUNCATED to a
       segment boundary at or below `latestBlock - finality` and the cursor rewritten from THAT
       segment with an empty window. Assert (c) explicitly: without the truncation the next scan
       starts below `lastToBlock` and, with an empty window, `generateStreamToAppend` re-emits the
