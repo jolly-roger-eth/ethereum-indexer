@@ -525,7 +525,14 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    references — `packages/core` (11), `packages/browser` (23), `examples/browser-reference` (2),
    `docs/guide/indexing-in-a-browser-app/index.md` (2).
 4. **The container plus the factory migration.** The indirect handle, per-generation state factories,
-   and passing the processor factory rather than its result. This landable also DISCHARGES
+   and passing the processor factory rather than its result.
+
+   **It also owns the `EthereumIndexer` RENAME, which `CONTEXT.md` promises and nothing else
+   delivers.** That class is one source plus one processor plus one state, which under this spec is a
+   GENERATION and not the container, so the name means the wrong thing the moment the container
+   exists. This landable is where the container lands, so it is where the rename belongs; left
+   unowned it becomes a wide refactor discovered mid-task. Note it is NOT covered by the 37 call
+   sites counted below, which are `createIndexerState` invocations rather than uses of the class. This landable also DISCHARGES
    `work/notes/observations/keepstate-storage-id-omits-the-processor-version.md`: that observation
    reports the js-object keeper deriving its storage key without the processor version, so two
    generations collide on one key. A generation's identity here is stream plus processor plus config,

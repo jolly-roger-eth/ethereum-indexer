@@ -2,7 +2,7 @@
 
 The server-side indexer is three parts, not two: a **log-fetcher** that only talks to the chain (`eth_getLogs`) and holds no state, a **stream-builder** that owns reorg detection and the event stream, and the existing **`EventProcessor`**, which stays exactly what it is today: a dumb reducer that is fed a stream. The fetcher is its own deployable; the stream-builder and the processor are hosted together in the **indexer-server**. We chose this so that reorg logic exists in exactly one place, and so that the processor contract in `packages/ethereum-indexer` needs no change at all.
 
-This **reverses** the intent recorded in `work/specs/ready/historical-state-database.md`, which put both the fetching and the stream (including `removed` markers and unconfirmed-block tracking) on the watcher side of the wire, leaving the processor to store only derived state.
+This **reverses** the intent recorded in `work/specs/tasked/historical-state-database.md`, which put both the fetching and the stream (including `removed` markers and unconfirmed-block tracking) on the watcher side of the wire, leaving the processor to store only derived state.
 
 ## Considered Options
 

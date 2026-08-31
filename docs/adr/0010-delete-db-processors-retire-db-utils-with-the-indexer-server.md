@@ -1,6 +1,6 @@
 # `db-processors` is deleted; `db-utils` retires with the indexer-server
 
-`ethereum-indexer-db-processors` is **deleted** rather than evolved. `ethereum-indexer-db-utils` is **kept for now and retired** once the indexer-server lands, since ADR-0006 supersedes its central role. This answers open question 6 of `work/specs/ready/historical-state-database.md`, which framed it as a single delete-or-evolve call; the two packages in fact have opposite fates.
+`ethereum-indexer-db-processors` is **deleted** rather than evolved. `ethereum-indexer-db-utils` is **kept for now and retired** once the indexer-server lands, since ADR-0006 supersedes its central role. This answers open question 6 of `work/specs/tasked/historical-state-database.md`, which framed it as a single delete-or-evolve call; the two packages in fact have opposite fates.
 
 ## Why delete rather than evolve
 
