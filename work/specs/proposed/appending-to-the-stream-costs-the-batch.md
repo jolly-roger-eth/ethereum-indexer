@@ -102,11 +102,11 @@ So the shape is an append-only log with an OPEN TAIL:
 - **a sealed segment is immutable forever.**
 
 This is what makes the empty-batch case cheap without needing a rule against empty segments: a save
-with no events rewrites only the open tail and its cursor record, which is bounded, rather than
+with no events writes ONLY the cursor record — one small record, not the tail — rather than
 rewriting the whole history as it does today.
 
-**The CURSOR RECORD is `{lastSync, committedThrough}`, and every segment carries three SCANNED-EXTENT
-numbers.** Both halves are forced, and getting either wrong makes a stated recovery unimplementable.
+**The CURSOR RECORD is `{lastSync, committedThrough, committedEvents}`, and every segment carries
+three SCANNED-EXTENT numbers.** Both halves are forced, and getting either wrong makes a stated recovery unimplementable.
 
 **Why this is needed NOW and was not before, since a reader will ask.** Today the stream is ONE key
 holding `{lastSync, eventStream}`: cursor and events are the same bytes and cannot disagree, so there
@@ -122,6 +122,17 @@ to advance three numbers. With a cursor record it writes one small record. That 
 recurs for the life of the indexer. The storage saving is the lesser half and is thinner than it
 looks, since the per-segment scanned extent below is retained anyway and
 `the-stream-stores-only-what-the-node-said` strips the window regardless.
+
+`committedEvents` is the number of events segment `committedThrough` held at that commit, and it is
+required for a reason the ordinal alone does not cover. A save usually APPENDS to the OPEN TAIL rather
+than opening a new segment — that is the whole point of a tail — so on the filesystem a crash between
+the segment write and the cursor write leaves a tail that has GROWN at the SAME ordinal. No ordinal
+exceeds `committedThrough`, so an ordinal-only orphan rule sees nothing, keeps the overshooting tail,
+and resumes from the stale `lastToBlock` — which is exactly the duplicate-appending outcome this
+design calls unrecoverable. Since a tail absorbs many batches before sealing, that is the MAJORITY of
+saves, not an edge. Recovery therefore TRUNCATES the open tail to `committedEvents` as well as
+discarding whole segments above `committedThrough`. Truncating the tail is legal because the tail is
+the one segment that is not sealed; no sealed segment is ever touched.
 
 `committedThrough` is the ORDINAL of the segment the cursor was committed with. It is required because
 `LastSync` names only BLOCKS, and this spec's own central argument is that block order is NOT
@@ -148,17 +159,19 @@ taking its clear branch. The cursor record exists as soon as anything has been s
 save with no events at all, so presence is its existence.
 
 This also carries the migration: adopting a legacy blob writes the cursor record from the `lastSync`
-inside it, so presence reads true from that moment, with no ordinal segments yet in existence.
+inside it, so presence reads true from that moment, with no ordinal segments yet in existence. In
+that state `committedThrough` is the SENTINEL `-1` (and `committedEvents` `0`), which is what makes
+the orphan comparison work at ordinal 0: a segment `_0` written by a save that then crashed exceeds
+`-1` and is discarded.
 
 The seal threshold is counted in **EVENTS**, not bytes. Bytes are natural on the filesystem (the JSON
 string is already built) and not cheaply available on IndexedDB (structured-clone size is not
 exposed), so naming the unit is what stops the two keepers choosing differently and makes the seal
 test deterministic.
 
-**No per-segment block RANGE is recorded, because the `lastSync` already in every segment is
-strictly better.** A draft added a `{min, max}` per segment so a later design could select the
+**No per-segment block RANGE is recorded, because nothing consumes one.** A draft added a `{min, max}` per segment so a later design could select the
 segments covering blocks `[0, N)`. It is unnecessary, and the reason is not that segments are
-unorderable by block (below the finality horizon they are): it is that the datum is already there.
+unorderable by block (below the finality horizon they are): it is that no consumer exists.
 
 The argument for adding it was forward compatibility: a range cannot be added retroactively without
 reading every segment, so a later design wanting to select the segments covering blocks `[0, N)`
@@ -235,11 +248,31 @@ destructive one is the intuitive one. On finding a hole at ordinal `k`, delete `
 above it and KEEP `0..k-1`.
 
 The prefix is safe to keep because every segment carries its SCANNED EXTENT, so segment `k-1` is
-self-describing: the recovery rewrites the cursor record from `k-1`'s three numbers, with
-`committedThrough = k-1`, carrying the existing `context` over and leaving `unconfirmedBlocks` EMPTY.
-An empty window is correct here rather than lossy — `getFromBlock` re-scans from
-`latestBlock - finality` on the next round and `generateStreamToAppend` rebuilds the window from what
-it re-fetches, so any reorg in that range is re-derived from the node rather than inherited. So the stream resumes from that boundary and re-fetches the
+self-describing. But the recovery must do MORE than rewrite the cursor from it, and the reason is
+specific: a resumed cursor with an EMPTY `unconfirmedBlocks` DUPLICATES.
+
+`getFromBlock` returns `min(lastToBlock + 1, latestBlock - finality)`, so in the head-following steady
+state the next scan starts BELOW the recovered `lastToBlock`, inside blocks the surviving prefix
+already holds. And with an empty window, `generateStreamToAppend` sets its
+`startingBlockForNewEvent` to the FIRST re-fetched block rather than to the end of the window, so
+every re-fetched event in that overlap is emitted as NEW. Appended to a stream nothing ever rewrites,
+that permanently duplicates up to `finality` blocks of events, unflagged, and a rebuild double-folds
+them — breaking story 4. Today this cannot happen, because the window is always persisted beside the
+events in the single blob.
+
+So the recovery TRUNCATES the surviving prefix to a segment boundary at or below
+`latestBlock - finality`, and rewrites the cursor from THAT segment's scanned extent with
+`committedThrough`/`committedEvents` set to it and `unconfirmedBlocks` empty. With `lastToBlock` at or
+beneath the horizon, `getFromBlock` returns `lastToBlock + 1`, so the next scan starts exactly where
+the stream ends and overlaps nothing. The empty window is then correct rather than lossy, because
+there is nothing unconfirmed left in the stream for it to describe.
+
+This is the SAME rule `a-reconfigure-is-not-an-outage` applies when it PAUSES a generation, and
+deliberately so: one truncate-below-the-horizon discipline, not two.
+
+**If nothing survives** — a gap at ordinal 0 with no adopted legacy segment, or a horizon that
+truncates everything — the cursor record is DELETED, so the stream reads as ABSENT and the next load
+takes the clear branch. A surviving cursor over zero coverage is the cursor-ahead direction. So the stream resumes from that boundary and re-fetches the
 rest, which is a bounded loss instead of a whole re-index. Nothing is replayed as if it were
 complete, which is the whole point of the refusal: the truncated tail is DISCARDED, not trusted, and
 the cursor comes from the surviving tail rather than from a stale higher one.

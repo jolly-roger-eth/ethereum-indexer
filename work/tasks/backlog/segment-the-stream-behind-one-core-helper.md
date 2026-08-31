@@ -19,8 +19,8 @@ empty-batch branch pays the same cost purely to move `lastSync`.
 
 The shape to build:
 
-- **An append-only log with an OPEN TAIL.** The newest segment is OPEN and carries both its events
-  and the `lastSync` current after them. A save appends to the open tail: ONE write, bounded by the
+- **An append-only log with an OPEN TAIL.** The newest segment is OPEN and holds its events plus its
+  SCANNED EXTENT. A save appends to the open tail: ONE write, bounded by the
   tail plus its batch, never by the history. The tail is SEALED when it exceeds a size threshold and
   the next save opens a new one. A sealed segment is immutable forever.
 - **The segment and the CURSOR commit together, and the cursor is ONE record per stream.** Not one
@@ -82,10 +82,11 @@ The shape to build:
     prefix (below) means this task never enlarges that window. If you find yourself widening it,
     surface it rather than absorbing it.
   - **Not the whole stream.** On a hole at ordinal `k`, delete `k` and above and KEEP `0..k-1`.
-    Segment `k-1` carries its own SCANNED EXTENT, so the surviving prefix is self-describing: rewrite
-    the cursor record from it with `committedThrough = k-1`, carrying `context` over and leaving
-    `unconfirmedBlocks` empty (the next round re-scans from `latestBlock - finality` and rebuilds the
-    window, so that is correct rather than lossy). Clearing everything would throw away a good prefix (story 5
+    Segment `k-1` carries its own SCANNED EXTENT, so the surviving prefix is self-describing. Then
+    TRUNCATE it to a segment boundary at or below `latestBlock - finality` and rewrite the cursor
+    from that segment, window empty — the same truncate-below-the-horizon rule
+    `a-reconfigure-is-not-an-outage` uses when it pauses a generation. If nothing survives, DELETE
+    the cursor so the stream reads as absent. Clearing everything would throw away a good prefix (story 5
     says an upgrade must cost nothing the user notices) and, on the state-kept path, would be
     SILENT: `indexer.ts` only clears there when `streamMatches` fails, so an undefined `fetchFrom`
     leaves the state cursor untouched and the next save writes a stream covering only from now on,
@@ -135,9 +136,20 @@ stops the two keepers choosing differently and makes the seal test deterministic
 - [ ] `keepStreamOnFile` is implemented on the helper and `packages/fs/src/utils/fs.ts` gains `keys`.
 - [ ] **Append cost is asserted as WORK, not wall-clock**, at a module-level mock of `node:fs` behind
       `packages/fs/src/utils/fs.ts`. Assert the CEILING: no save writes more than one tail plus its
-      batch, and the 100th append costs no more than the 10th at the same tail phase. (Asserting the
+      batch PLUS the cursor record, and the 100th append costs no more than the 10th at the same tail
+      phase. Count the cursor record explicitly: it is bounded by `finality` blocks WITH their events,
+      not by the tail, so a ceiling stated as "one tail plus its batch" is violable by a correct
+      implementation. (Asserting the
       tenth equals the first is false by design — a tail absorbs several batches before sealing.)
       Wall-clock would be flaky on a loaded machine, per ADR-0032.
+- [ ] **A crash between a TAIL APPEND and the cursor write is recovered**, which is the MAJORITY
+      case and the one an ordinal-only rule misses: the tail grows at the SAME ordinal, so nothing
+      exceeds `committedThrough`. Assert the tail is TRUNCATED to `committedEvents` on load, and that
+      the resumed cursor then covers exactly the events present. Without this the overshooting tail
+      is kept and the next fetch appends duplicates.
+- [ ] **A save with NO events writes ONLY the cursor record** — not the tail — asserted at the
+      instrumented seam. This is story 3 on the filesystem, and it is the behaviour the whole
+      cursor-record design was bought for, so it must be asserted here and not only in the browser.
 - [ ] **A crash never leaves the cursor AHEAD of its events**, asserted by interrupting a save at the
       instrumented seam, INCLUDING the first save after a legacy adoption. Assert the cursor is
       written LAST, and that a segment above it is DISCARDED as an orphan on the next load rather
@@ -173,8 +185,12 @@ stops the two keepers choosing differently and makes the seal test deterministic
 - [ ] **A gap in the ordinals CLEARS FROM THE GAP UPWARD AND KEEPS THE PREFIX**, rather than being
       replayed as a shorter stream, thrown, or resolved by wiping the stream. Assert all three: after
       punching a hole at ordinal `k`, (a) nothing raises, (b) `fetchFrom` returns a DEFINED result
-      whose events are exactly those of segments `0..k-1`, and (c) the resumed cursor is segment
-      `k-1`'s `lastSync`, not a stale higher one. An interrupted `clear` is the designed-for case: the
+      whose events are exactly those of the surviving prefix, and (c) the prefix is TRUNCATED to a
+      segment boundary at or below `latestBlock - finality` and the cursor rewritten from THAT
+      segment with an empty window. Assert (c) explicitly: without the truncation the next scan
+      starts below `lastToBlock` and, with an empty window, `generateStreamToAppend` re-emits the
+      whole overlap as NEW, permanently duplicating up to `finality` blocks. If nothing survives,
+      DELETE the cursor so the stream reads as absent. An interrupted `clear` is the designed-for case: the
       fs `clear` is N `unlinkSync` calls and is not atomic, so a half-cleared stream is reachable in
       normal operation, not only under fault injection.
 - [ ] **A gap does NOT wipe a healthy prefix**, asserted as the paired negative: a stream with a hole
@@ -228,7 +244,9 @@ stream*: it records what the indexer emitted, including retractions, not a block
   nor monotonic over an emission stream, so it cannot key one. Its `seq` is a SERVER concept for
   query cursors. Do NOT invent a per-event sequence client-side, and do not import ADR-0006's two
   views, cursor validation or compaction into a cache that has none of those problems.
-- One write per save. If you find yourself writing two keys, re-read the atomicity argument.
+- Every save writes TWO things, a segment and the cursor record, and they must COMMIT TOGETHER: one
+  `setMany` transaction on IndexedDB, cursor-written-last plus discard-what-it-does-not-cover on the
+  filesystem. Do NOT collapse them back into one key.
 - Enumerate with an ANCHORED regex. A `startsWith` on the storage id is a silent cross-chain data
   corruption, not a style preference.
 
@@ -239,9 +257,9 @@ alternative (an injected optional writer) would widen `keepStreamOnFile`, which 
 and contradict this spec's no-published-type promise.
 
 **Scope fence.** Do NOT make the stream raw-only — that is `the-stream-stores-only-what-the-node-said`
-and it is a breaking public API change. Do NOT add per-segment block-range metadata: the `lastSync`
-already in every segment carries `lastToBlock`, which is the scanned extent at that boundary and
-answers a strictly better question than a range over the events a segment happens to contain. Do NOT
+and it is a breaking public API change. Do NOT add per-segment block-range metadata: nothing
+consumes one, since each segment already carries its scanned extent and no design selects a block
+prefix of another stream's segments. Do NOT
 touch `packages/browser` — the browser keeper is the sibling task's file.
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (the

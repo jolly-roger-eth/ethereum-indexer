@@ -66,7 +66,13 @@ for the migration test — rather than patching it blind on a red gate.
       same order, strict equality.
 - [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events, which is what stops
       `indexer.ts` taking its clear branch.
-- [ ] **The cursor comes from the cursor record**, with no competing copy anywhere.
+- [ ] **The cursor comes from the cursor record** (`{lastSync, committedThrough, committedEvents}`),
+      with no competing copy anywhere.
+- [ ] **A crash between a tail append and the cursor write cannot occur here**, because `setMany`
+      commits both in ONE transaction — assert that property directly rather than porting the
+      filesystem's truncate-to-`committedEvents` recovery, which exists only because the filesystem
+      has no transaction. The recovery code still runs (it is the helper's), but on IndexedDB it must
+      never find anything to do.
 - [ ] **A sealed segment is never rewritten** and is **readable by its own key**.
 - [ ] **Replay across a reorg** returns retractions in APPEND order.
 - [ ] **Enumeration does not cross chains**: two streams sharing a name on chains `1` and `10`, where
