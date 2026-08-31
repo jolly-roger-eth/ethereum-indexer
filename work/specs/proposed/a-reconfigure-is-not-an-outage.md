@@ -2,6 +2,7 @@
 title: 'A reconfigure is not an outage: a generation is a stream plus a fold, and the canonical pointer moves when one is ready'
 slug: a-reconfigure-is-not-an-outage
 taskedAfter: [appending-to-the-stream-costs-the-batch]
+needsAnswers: true
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
@@ -18,6 +19,30 @@ taskedAfter: [appending-to-the-stream-costs-the-batch]
 > `work/notes/ideas/stream-grafting-what-we-established.md`. The promotion-cost spike
 > (`work/notes/findings/promotion-cost-of-a-two-label-stream.md`) answered a question this design no
 > longer asks; it is retained as evidence, not as an input.
+
+<!-- open-questions -->
+
+## Open questions
+
+1. **How does a deployment declare DEVELOPMENT versus PRODUCTION?** The promotion policy is put on
+   that axis (`immediate` for dev, `on-catch-up` for production) while RETENTION is put on the
+   browser-versus-server axis, and NOTHING IN A BROWSER BUILD CAN DETECT THE FIRST. This is not an
+   edge case: browser-plus-development is the primary runtime (ADR-0002) and it selects `immediate`
+   plus drop-on-promotion, which is exactly the pair this spec calls unsafe and then patches with an
+   interlock. Is it an explicit option with no default, an existing build-time signal, or is the axis
+   wrong?
+2. **Is the SERVER/CLI tier in this spec, a sibling spec, or a named follow-up?** Every landable that
+   RUNS a generation edits `packages/browser/src/IndexerState.ts`, and nothing builds a stream keeper
+   over the ADR-0006 emission-stream table or `RemoteSQL`. Yet story 11 says "server or CLI" and this
+   spec bills itself as generalising ADR-0008, a SERVER decision now amended to point here. As it
+   stands the destination is a browser-only generation model with a server ADR describing it.
+3. **Is `project` the existing `name`, renamed?** Both keepers take a caller-supplied `name` today
+   and key `<name>_<chainId>`, so `name` IS the current tenancy discriminator. Landable 1 owns the
+   keyspace migration and cannot compute an adopted key without an answer: if they are the same the
+   migration is mechanical; if `project` is new, every existing caller must supply one and adoption
+   is undefined for callers that do not.
+
+<!-- /open-questions -->
 
 ## Problem Statement
 
@@ -96,13 +121,40 @@ below.
 
 ### Identity, and the two levels
 
-**A stream's identity is a digest of its CANONICAL FILTER ENTRY SET.** `eventRanges.ts` already
-computes, per source entry, a `streamHash` covering "what the FETCH FILTER is built from, and nothing
-else" (address, `topic0`, block range), and already sorts the entries into a canonical set so that
-reordering an ABI produces the same bytes. The stream key digests that sorted set. Nothing new is
-derived; an existing per-entry digest is rolled up.
+**A stream's identity is a digest of its DEDUPLICATED `streamHash` VALUES, SORTED BY `streamHash`.**
+Say it that precisely, because the obvious phrasing is wrong in a way that silently breaks this
+spec's headline case. `eventRanges.ts` computes, per source entry, a `streamHash` covering "what the
+FETCH FILTER is built from, and nothing else" (address, `topic0`, block range), and sorts the entry
+list by `(startBlock, hash)`. That sort key is **`hash`, not `streamHash`** — and `hash` covers the
+DECODING shape. So a decode-only change (a renamed non-indexed parameter, the very case the
+two-digest split exists for) REORDERS the list while every `streamHash` in it is unchanged. A digest
+rolled up over the list in that order would move, fork a new stream key, re-fetch the whole history
+and orphan the old stream — silently, with no error — which is the exact opposite of what this spec
+promises for a decode-only change.
 
-**A generation's identity is its stream plus the `processor` version hash plus the config hash.** A
+So: take the `streamHash` values only, DEDUPLICATE them, sort them BY THEMSELVES, and digest that.
+`hash` and `legacyHash` are excluded; digesting whole entries has the same defect, worse.
+
+**The stream digest ALSO covers the STREAM CONFIG hash, and ADR-0006 already said so.** The filter is
+not the only thing that decides what a stream CONTAINS. `ProvidedStreamConfig` is `{finality,
+alwaysFetchTimestamps, alwaysFetchTransactions, parse}`, and `parse.logValues`,
+`alwaysFetchTimestamps` and `alwaysFetchTransactions` each change WHAT IS STORED. The code agrees
+emphatically: `sourceInvalidationOf` compares the config hash FIRST and, on a mismatch, returns
+`{valid: false, invalidFromBlock: 0}` for BOTH halves — a config change invalidates the STREAM, not
+just the fold.
+
+Keyed on the filter alone, two different configs would map to ONE stream, so a generation would adopt
+logs the verdict has already declared invalid, and the only existing remedy (clear the stream) would
+destroy the stream the live generation is still answering from, which story 3 forbids.
+
+**This is a correction, not an innovation: ADR-0006 keys the stored stream by `{source, config}` and
+the state by `{source, config, processor}`.** This spec's stream digest is the concrete form of that
+ADR's `{source, config}`, narrowed on the source side to the FETCH half of the source per ADR-0034.
+Record the narrowing where ADR-0008's differences are recorded; do not silently re-key a stream ADR-0006
+governs.
+
+**A generation's identity is its stream plus the `processor` version hash.** Config is already inside
+the stream digest, so naming it again here would be redundant. A
 changed processor makes a new generation on the same stream. A changed filter makes a new stream, and
 therefore necessarily a new generation.
 
@@ -119,7 +171,8 @@ a filter that does not match it, so logs are missing and nothing reports it. `si
 filters. Use a **128-bit synchronous** digest.
 
 Not sha-256, deliberately: the browser's only built-in is `crypto.subtle.digest`, which is ASYNC and
-requires a SECURE CONTEXT, so an app served over plain HTTP would fail to derive a key at all. This is
+requires a SECURE CONTEXT, so an app served over plain HTTP would fail to derive a key at all
+(`localhost` IS a secure context, so this bites non-localhost plain HTTP specifically). This is
 a collision-resistance problem against accidental collisions, not an adversarial one, so the secure
 context buys nothing and costs a deployment constraint.
 
@@ -134,57 +187,38 @@ but keeping it separate leaves the keys debuggable, lets a project be enumerated
 and does not foreclose a future shared stream pool across projects. Hashing it in would make that a
 rewrite.
 
-**The CURSOR is ONE record per stream, written ATOMICALLY with the segment it describes.** It is not
-copied into every segment. That matters more than it looks: `LastSync.unconfirmedBlocks` is
-`EventBlock[]`, and `EventBlock` carries the FULL decoded events of each block (deliberately, since
-retraction needs them), so a per-segment copy duplicates up to `finality` blocks of real event data
-into every sealed segment, permanently, where it is never read again.
+**The CURSOR is the PREREQUISITE's business, not this spec's.**
+`appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of four properties — exactly one
+authoritative cursor per stream; a save never leaves a cursor claiming coverage the stored events
+lack; no unconfirmed WINDOW on a sealed segment; an empty save costing nothing proportional to
+history — and leaves PLACEMENT to each keeper. Both shipped keepers put the cursor in the OPEN TAIL
+and empty its window on seal; a keeper with atomic multi-row updates may hold a cursor row instead.
 
-Atomicity is available on two substrates and reachable on the third:
+**All this spec adds is the SCOPE: one cursor per STREAM, and a stream is now keyed
+`<project>/<chainId>/<streamDigest>`.** Everything else about cursors — where they live, how a save
+commits, what happens after a crash — is settled there and must not be restated here, because a
+second statement is a second source of truth that can drift. An earlier draft of this section
+specified a separate cursor record with orphan discard; that design was withdrawn in the prerequisite
+after four review rounds found defects in it and nowhere else, and its tasks are already emitted
+against the tail strategy.
 
-- **IndexedDB**: `setMany` opens ONE `readwrite` transaction, puts every entry and awaits
-  `store.transaction`. Segment and cursor commit together.
-- **RemoteSQL**: `batch`. ADR-0008 already commits a state chunk and a cursor this way.
-- **The filesystem** has no multi-file transaction, so the cursor is the COMMIT POINT instead: write
-  the segment file, then write the cursor by temp-file plus `rename`, which IS atomic for one file.
-  A crash before the cursor lands leaves it BEHIND, and the segment above it is an ORPHAN of an
-  interrupted save, discarded on load. The cursor can never be AHEAD, because it is written last.
+Two consequences to carry, both of them the prerequisite's rules applied to a generation:
 
-Cursor-ahead is the unacceptable failure: it silently skips events that were never stored.
-Cursor-behind is recoverable, and discarding orphans above the cursor is what makes it so — the same
-shape as the contiguity rule, which clears from the gap upward and keeps the prefix.
-
-**The cursor record carries the whole `LastSync`, exactly as the blob does today** — no published
-type changes here, and that is what keeps `appending-to-the-stream-costs-the-batch` a no-published-type
-spec. What changes is that there is ONE copy instead of one per segment.
-
-**Its `unconfirmedBlocks` is dead weight in the stream, and that is CHECKED, not assumed.** Three
-readers were traced end to end:
-
-- `_feed` is handed the stream's `lastSync` on the state-discarded/stream-kept path, but reads only
-  `latestBlock`, `lastToBlock` and `lastFromBlock` from it. The window is rebuilt by
-  `generateStreamToAppend` from the IN-MEMORY `lastSync` plus the events being fed.
-- `checkTxInclusion` answers from the STATE keeper's copy.
-- A full stream replay reconstructs the window as a by-product of the fold, since
-  `generateStreamToAppend` derives it from the events it is given.
-
-So the window is never read back OUT of the stream as events, and it does not need to be: it is
-derivable from the events the stream already holds, by the replay that already happens.
-
-**`the-stream-stores-only-what-the-node-said` therefore STRIPS it, and this spec must not contradict
-that.** That sibling makes the stream raw-only and removes the decoded events from the stored
-`LastSync` for exactly this reason — they are the one stale thing left in the stream. This spec's
-cursor record is the thing it strips; the two compose rather than conflict.
-
-**The one durable copy that matters is the STATE keeper's**, which is where `checkTxInclusion` reads
-and where a normal load resumes from. The window can never be REFETCHED (after a reorg the old blocks
-are unreachable, so the node returns the new chain, which is precisely what a reorg check needs to
-compare against), but it does not need to be, because it is derivable from stored events and is
-already held where it is read.
+- **A generation's stream is read by both generations and written by one.** The one indexing writes;
+  the other reads. That is the existing one-writer situation, not a new rule, because the two
+  generations have DIFFERENT stream keys unless they share a filter and config — in which case they
+  are the same stream and the non-canonical one is a reader.
+- **`unconfirmedBlocks` stays in the TAIL.** Do not strip it here: the prerequisite explicitly forbids
+  it, and removing it entirely is `the-stream-stores-only-what-the-node-said`'s job.
 
 ### Generations
 
-**Any number, bounded by two independent caps, and a cap REFUSES.**
+**Any number, bounded by two independent GENERATION CAPS, and a cap REFUSES.**
+
+Call them CAPS and never "retention". `retention` is already pinned, by `CONTEXT.md` and ADR-0019, to
+a distance in BLOCK NUMBERS, with ADR-0019 explicitly refusing a second retention mode measured in
+anything else. A generation cap is a COUNT of generations, a different object entirely — and every
+generation HAS a store WITH a retention window, so the two words will meet in one config object.
 
 - `maxStreams` per project bounds distinct filters.
 - `maxGenerations` per project, as a TOTAL and not per-stream. Per-stream would let total growth scale
@@ -192,8 +226,8 @@ already held where it is read.
   stores — unbounded.
 
 **The DEFAULTS differ by runtime, because the reason to RETAIN a generation differs.** On a server or
-the CLI an operator inspects, A/B-tests and reverts, so retention is the point and the cap should be
-generous. In a BROWSER there is usually nothing to revert TO that matters: the app author ships a new
+the CLI an operator inspects, A/B-tests and reverts, so KEEPING generations is the point and the cap
+should be generous. In a BROWSER there is usually nothing to revert TO that matters: the app author ships a new
 build, and the user did not choose the reconfigure. So the browser default keeps the previous
 generation only until the new one is promoted, then drops it — which is two generations transiently,
 not N, and bounds browser storage to roughly what it is today rather than to a multiple of it.
@@ -254,10 +288,20 @@ browser-versus-server:
 forced every developer into either a wait they did not want or a hand-promotion after every save.
 
 **Reads do NOT carry generation identity, and the handle FOLLOWS the pointer.** Per-read provenance
-would break the four `StateStore` verbs, four backends and the conformance suite, and is REJECTED.
+would break the four `StateStore` READ verbs (`getCurrent`, `listCurrent`, `getAsOf`, `listAsOf` —
+the interface has eleven in total), four backends and the conformance suite, and is REJECTED.
 The entities path publishes a handle bound to a store, so a consumer holding one across a pointer move
 would silently read a retired generation; the handle is therefore INDIRECT, resolving to whichever
 generation is canonical.
+
+**It RE-RESOLVES ONCE PER READ UNIT OF WORK and holds that generation for its duration.**
+Indirection without a stated granularity is a new failure rather than a fix: a GraphQL request fans
+out into many resolver calls, so a pointer move mid-request would yield a response MIXING TWO
+GENERATIONS that no consumer can detect — and under the `immediate` policy the mixture is a COMPLETE
+generation and an EMPTY one. That is the plausible-wrong-answer class this repo refuses everywhere
+(ADR-0015, ADR-0019, ADR-0028). The query layer this is heading for (Hono/Yoga/Pothos over entity
+declarations, guaranteed by `one-processor-everywhere`) is exactly where a read unit of work is
+identifiable, so the rule is pinned here for it to consume. Landable 4 owns it.
 
 ### Seeding is SPLIT OUT, and why
 
@@ -374,14 +418,17 @@ reconciled or dropped rather than left asking a settled question.
   restores its answers exactly, with no re-indexing and no fetch.
 - **A no-op reconfigure creates nothing**, asserted on ranges fetched AND state discarded, the pair
   ADR-0034 established. An event appended above the cursor is the regression guard.
-- **The cursor is never AHEAD of its events.** Interrupt a save at the write seam on both keepers; a
-  reload must never report coverage the stream does not hold. On the filesystem, assert the orphan
-  segment above the cursor is discarded rather than replayed.
-- **`unconfirmedBlocks` never appears in a stored segment**, asserted at the storage seam. This is the
-  guard against re-introducing the duplication, and it is checkable by inspection.
-- **A filter digest collision cannot be produced** by the canonical-set construction across a corpus
-  of realistic sources, and the digest is stable under ABI reordering and under a redundant appended
-  entry, which the canonical set already normalises away.
+- **The cursor contract is the PREREQUISITE's to assert**, not this spec's. Do not restate it here;
+  the only thing to assert is the SCOPE, that a cursor belongs to exactly one
+  `<project>/<chainId>/<streamDigest>` and two generations on different streams never share one.
+- **The stream digest is STABLE UNDER A DECODE-ONLY CHANGE.** This is the assertion that catches the
+  ordering trap: rename a non-indexed parameter, and the digest must not move even though every
+  entry's `hash` did and the entry list therefore reordered. Also stable under ABI reordering and
+  under a redundant appended entry, and a collision cannot be produced across a corpus of realistic
+  sources.
+- **The stream digest MOVES on a stream-config change**, including a `parse.logValues` change that
+  alters what is stored, and the old stream is left intact rather than adopted. This is the guard
+  against a generation adopting logs the verdict has declared invalid.
 - **Two projects with IDENTICAL sources never touch each other's data**: same chain, same contracts,
   same processor; deleting every stream and generation in one leaves the other complete and readable.
   This is the multi-tenancy guard and it fails loudly under any missing discriminator.
@@ -393,8 +440,11 @@ reconciled or dropped rather than left asking a settled question.
   `toBlock` is capped; it keeps re-scanning the shrinking window and corrects a reorg that strikes at
   or below the cap; once the cap falls below `latestBlock - finality` it fetches nothing (the
   existing `fromBlock > toBlock` branch); and its answers at that point are EXACTLY what they were at
-  pause. That last one is the guard that keeps story 10 compatible with story 4, which a truncating
+  pause — asserted in a NO-REORG scenario, because the two halves are mutually exclusive once a reorg
+  is corrected. That is the guard that keeps story 10 compatible with story 4, which a truncating
   pause would have broken.
+- **A reorg striking at or below the cap while draining IS corrected**, asserted separately: the
+  answers then differ from the pause instant, correctly, because they were wrong before.
 - **A paused generation is revertible-to**: move the pointer to it and assert it answers precisely
   what it answered before, with no re-index and no fetch.
 - **A paused generation resumes correctly**: resume is removing the cap, and a reorg that struck
@@ -414,17 +464,29 @@ SIX separable landables. Cutting them together produces one task nobody can revi
 
    **It also OWNS the migration off the prerequisite's keyspace, which is otherwise unowned and would
    silently orphan every cached history.** `appending-to-the-stream-costs-the-batch` leaves users
-   holding `stream_<name>_<chainId>_<ordinal>` plus its cursor record (and, for anyone older, the
-   adopted label-less legacy key). This spec's key matches NONE of those, so landed in the stated
+   holding `stream_<name>_<chainId>_<ordinal>` (and, for anyone older, the adopted label-less legacy
+   key, which carries the cursor inside it). This spec's key matches NONE of those, so landed in the stated
    order every existing stream becomes unreachable AND is never deleted: a full re-index plus a
    permanent storage leak, which directly reverts the prerequisite's story 5. The existing stream is
    ADOPTED at its computed `<project>/<chainId>/<filterDigest>` — the filter it was fetched under is
    the one the running source describes, or the adoption is refused and the old keys are swept rather
-   than left. Migrate by RENAME, which the spike showed moves no payload; order each write before its
-   delete so a crash leaves both and the migration re-runs harmlessly.
-2. **The generation registry, the canonical pointer, and the caps** — creating a generation, moving the
-   pointer (forward and back), refusing at a cap, deleting a generation or a stream. Independently
-   testable with no indexer running.
+   than left.
+
+   **Size the migration honestly, because it is FREE ON ONE KEEPER AND NOT ON THE OTHER.** A rename
+   moves no payload on the filesystem — but IndexedDB has no rename, so there it is `get`+`set`+`del`
+   and moves the WHOLE payload (the spike measured 135.6 MB of segments in four store operations).
+   So the browser rewrites its entire cached history on the first boot after upgrade, transiently
+   holding two copies under a quota that `work/notes/findings/browser-storage-headroom-for-generations.md`
+   shows is not reported reliably. Make it RESUMABLE PER KEY — write the new key, delete the old,
+   move on — so an interrupted migration continues rather than restarting, and so the transient
+   doubling is one segment rather than one history.
+2. **The generation registry, the canonical pointer, and the caps** — creating a generation, moving
+   the pointer (forward and back), refusing at a cap, deleting a generation or a stream.
+   Independently testable with no indexer running. **It also owes the seeding spec its one
+   obligation**: creating a generation takes its starting stream as an INPUT, so a generation never
+   assumes it must fetch its own history. Build creation backfill-only and
+   `a-generation-can-be-seeded-from-a-published-artifact` has to re-open the seam the split was made
+   to avoid, so it needs an acceptance criterion here.
 3. **The verdict becomes a published, actionable answer.** `sourceInvalidationOf` is INTERNAL
    (`packages/core/src/index.ts` re-exports only `ReorgCause`/`ReorgDetection` from that module, and
    core's `exports` map is `.` plus `./package.json`), and `updateIndexer` computes the verdict then
@@ -447,7 +509,13 @@ SIX separable landables. Cutting them together produces one task nobody can revi
    (`web-demo`, `event-processor-nfts`, `browser-reference`, `basic`, `mud`). Four further edit sites
    are unowned unless named: the README usage block, two JSDoc examples in
    `packages/browser/src/IndexerState.ts`, the JSDoc in `BrowserStateStore.ts`, and `CONTEXT.md`.
-5. **Pause and resume**, including the truncation and the matching state revert.
+5. **Pause and resume by CAP AND DRAIN** — cap `toBlock`, keep polling until the cap falls below
+   `latestBlock - finality`, then idle; resume by removing the cap. It truncates nothing and reverts
+   nothing, and `revertTo` is NOT on this path. Two build details the prose settles: the cap must be
+   applied to `toBlock` BEFORE the existing `fromBlock > toBlock` guard, and `lastSync.latestBlock`
+   must keep tracking the REAL head — capping that too makes `getFromBlock` return
+   `latestBlock - finality` forever and the drain never idles. Owns the DRAINING state a consumer can
+   see, which otherwise falls between this and landable 6.
 6. **Progress and degradation** — `SyncingState` reporting that a non-canonical generation exists and
    how far it has caught up (story 5), and the fallback when a generation's stream is unavailable or
    unreadable: a full re-index, which is today's behaviour, so the feature degrades rather than
