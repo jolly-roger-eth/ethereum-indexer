@@ -59,19 +59,31 @@ is a NO-OP, because the cursor was never inside a segment so there is nothing to
 Plus the INVARIANT that removes an operation: **the cursor is addressed WITHIN its stream's subtree**,
 so `clear` is one scoped delete that cannot orphan it.
 
-**This keeper uses the CURSOR-RECORD strategy, NOT the filesystem's tail strategy**, and the
-difference is the whole reason the contract was separated from the placement. IndexedDB has an atomic
-multi-key write and the filesystem does not:
+**This keeper has NO OPEN TAIL AT ALL: one segment per batch, plus a cursor record.** That is the
+sharpest difference from the filesystem keeper and it is worth understanding rather than copying.
 
-- a save commits the segment AND the cursor record in ONE `setMany` transaction (it opens one
-  `readwrite` transaction, puts every entry and awaits `store.transaction`), so property 2 holds
-  through the transaction rather than by writing one key;
-- **property 3 is VACUOUS here** — the cursor was never inside a segment, so there is nothing to strip
-  and NO SEAL WRITE AT ALL;
-- **property 4 is free** — an empty save writes one small cursor record instead of rewriting the open
-  tail, which on the filesystem is the recurring cost of its strategy and is why it uses one.
+The fs keeper keeps an open tail and REWRITES it on every save, bounded by a seal threshold. It does
+that for ONE reason: a save must be a single write, because the filesystem has no transaction and
+that is how cursor-ahead atomicity holds. IndexedDB HAS a transaction, so it never needed the tail
+for atomicity — the only thing a tail would buy here is fewer records, and it would cost a rewrite of
+up to a whole threshold's worth of events on every single save, including the empty ones a
+head-following indexer makes on every poll.
 
-So do NOT port the tail strategy here.
+So this keeper writes each batch as its OWN segment at the next ordinal, together with the cursor
+record, in ONE `setMany` transaction:
+
+- **A save writes exactly its BATCH.** Not a batch plus a rewritten tail. Nothing already written is
+  ever touched again, so a segment is immutable from birth.
+- **An empty save writes ONLY the cursor record** — no segment at all.
+- **Property 2** holds through the transaction rather than by writing one key.
+- **Property 3 is VACUOUS**: the cursor was never inside a segment, so there is nothing to strip.
+- **There is no SEAL here.** `seal-segment` exists for the tail keeper and is NEVER INVOKED on this
+  one. Implement it as a no-op and assert it is not called.
+
+**How a batch becomes segment(s) is the KEEPER's choice, exactly like cursor placement.** The helper
+owns the address, ordinal allocation, read order, the contiguity refusal and its recovery, presence
+and `clear`; it does NOT own the write shape. The fs keeper batches into a tail because it must; this
+one does not because it need not. Do NOT port the tail strategy here.
 
 **What is the SAME on both keepers**: the helper's segment record is `{events, extent}` with the
 SCANNED EXTENT `{lastFromBlock, lastToBlock, latestBlock}`, because the truncation recovery needs a
@@ -112,18 +124,25 @@ for the migration test — rather than patching it blind on a red gate.
 - [ ] **Ship a changeset for `@etherfold/browser`.** This changes the persisted IndexedDB layout and
       adds a legacy-blob migration, which is what a browser consumer needs a release note for; the
       sibling's changeset cannot describe it. A separate file means no merge contention.
-- [ ] **No full structured-clone of the history on a save**, asserted as WORK at a module-level mock
-      of `idb-keyval`'s **`setMany`** (and `set`, if any path still uses it) behind `OnIndexedDB`.
-      Naming only `set` would make this and the one-transaction assertion pass VACUOUSLY, because the
-      commit path is `setMany`. Assert the CEILING: no save writes more than one tail plus its batch,
-      and the 100th append costs no more than the 10th at the same tail phase. Wall-clock cannot be
-      the yardstick: `fake-indexeddb` is itself quadratic, and ADR-0032 rules out wall-clock on a
-      loaded machine.
+- [ ] **A save writes exactly its BATCH plus the cursor record, and NOTHING already written**,
+      asserted as WORK at a module-level mock of `idb-keyval`'s **`setMany`** (and `set`, if any path
+      still uses it) behind `OnIndexedDB`. Naming only `set` would make this and the one-transaction
+      assertion pass VACUOUSLY, because the commit path is `setMany`. This is a stronger claim than
+      the fs keeper's ceiling (one tail plus its batch) and it is the point of having no tail: assert
+      that the bytes written on the 100th save match the 100th batch and do not grow with the history
+      OR with a threshold, and that no previously-written segment key is ever written again.
+      Wall-clock cannot be the yardstick: `fake-indexeddb` is itself quadratic, and ADR-0032 rules out
+      wall-clock on a loaded machine.
+- [ ] **`seal-segment` is NEVER INVOKED on this keeper.** Implement it as a no-op and assert the
+      helper does not call it, which is the observable form of "this keeper has no tail".
 - [ ] **A save commits the segment AND the cursor record in ONE `setMany` transaction**, asserted at
       the instrumented seam — this is how property 2 holds here, and why no write-ordering rule or
       crash recovery is needed on this keeper.
-- [ ] **An empty save writes ONLY the cursor record**, not the tail — property 4, and the concrete
-      advantage of this strategy over the filesystem's.
+- [ ] **An empty save writes ONLY the cursor record**, no segment — property 4, and the concrete
+      advantage of having no tail.
+- [ ] **A segment is immutable from BIRTH here**: assert no segment key is ever written twice, which
+      on this keeper is unconditional rather than scoped to "while it remains sealed" (the truncation
+      path deletes segments; it never reopens one for appending, because there is no tail to reopen).
 - [ ] **No ORDINAL segment contains a `lastSync` at all** — property 3 is vacuous here, so there is no
       seal write to perform and none to test; assert seal-segment is a no-op. Every segment DOES carry
       its scanned extent. **Scope the claim to ORDINAL segments, because the ADOPTED LEGACY BLOB is
@@ -205,9 +224,9 @@ key and must be updated.
 the `{lastFromBlock, lastToBlock, latestBlock}` current after those events. The *cursor* is a whole
 `LastSync` and on THIS keeper it is NOT in a segment at all — it is its own *cursor record*, committed
 with its segment in one `setMany` transaction, addressed inside the same stream subtree. (The
-filesystem keeper puts its cursor inside the tail record instead; that is its business and must not be
-copied here.) The *tail* is simply the open, highest-ordinal segment; *sealed* means "no longer the
-highest ordinal" and costs NOTHING here. The stored stream is an *emission stream*, so a later segment
+filesystem keeper puts its cursor inside its open tail instead; that is its business and must not be
+copied here.) *Tail* and *sealed* are TAIL-STRATEGY words and do not apply on this keeper at all:
+there is no open segment, so every segment is sealed the instant it is written. The stored stream is an *emission stream*, so a later segment
 can hold LOWER block numbers and no segment may be skipped on a block bound.
 
 **The two hazards specific to this substrate:**

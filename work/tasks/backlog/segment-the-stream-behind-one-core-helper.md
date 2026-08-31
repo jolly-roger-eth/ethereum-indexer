@@ -45,9 +45,14 @@ in the store.
 - **An append-only log with an OPEN TAIL.** The newest segment is OPEN; a save appends to it, bounded
   by the tail plus its batch and never by the history. The tail is SEALED when it exceeds a size
   threshold and the next save opens a new one.
-- **The seal threshold is counted in EVENTS**, not bytes. Bytes are natural on the filesystem and not
-  cheaply available on IndexedDB (structured-clone size is not exposed), so naming the unit is what
-  stops the two keepers choosing differently and makes the seal test deterministic.
+- **The open tail, its threshold and the SEAL are THIS keeper's, not a shared rule.** They exist for
+  one reason: a save here must be a SINGLE write, because the filesystem has no transaction and that
+  is how cursor-ahead atomicity holds. A keeper with a transaction does not need a tail and should
+  not have one — the sibling writes one segment per batch and never rewrites anything. So the helper
+  must not assume a tail exists: it owns the address, ordinal allocation, read order, the contiguity
+  refusal and its recovery, presence and `clear`, and the KEEPER owns how a batch becomes segment(s).
+- **The seal threshold is counted in EVENTS**, not bytes, so the seal test is deterministic and does
+  not depend on serialised size.
 - **Ordinals key the segments and the read stays a full ordered scan.** The stored stream is an
   EMISSION stream: on a reorg the indexer re-appends superseded events at their ORIGINAL
   `blockNumber` flagged `removed`, then continues at LOWER block numbers. So block ranges overlap,
@@ -100,8 +105,8 @@ The helper owns the rules that must not drift; the keeper owns what its substrat
 2. **read-cursor** — the live cursor, or nothing. This is also what PRESENCE is.
 3. **write-cursor-only** — move the cursor with NO segment. The cursor-record keeper needs it for an
    empty save and for the truncation rewrite; on the tail keeper it is a tail rewrite.
-4. **seal-segment** — make the segment at a given ordinal sealed. The HELPER decides when (the
-   threshold, in events); the KEEPER decides what it costs. Here it rewrites that segment with
+4. **seal-segment** — make the segment at a given ordinal sealed. Only a keeper that keeps an OPEN
+   TAIL ever needs it; the sibling implements it as a no-op that is never invoked. Here it rewrites that segment with
    `unconfirmedBlocks` emptied; on a keeper whose cursor was never in a segment it is a NO-OP. It has
    to be a keeper operation rather than a helper-issued `set`, because a helper that stripped by
    writing the segment itself would rewrite a key the other keeper asserts is never rewritten.
