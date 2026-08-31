@@ -347,8 +347,10 @@ Name it in the task so it is updated deliberately rather than patched blind on a
 
 ## Further Notes
 
-Found while investigating whether stream branching is cheap enough to spec
-(`work/notes/ideas/a-stream-branches-instead-of-being-discarded.md`). It is not, and this is why.
+Found while investigating whether stream branching is cheap enough to spec. It is not, and this is
+why. That investigation settled in `work/notes/ideas/stream-grafting-what-we-established.md` and then
+in `a-reconfigure-is-not-an-outage`, which does not branch a stream at all: each generation gets its
+own, keyed by its fetch filter.
 The quadratic append was incidental to that search and is the more urgent half: a live cost on every
 sync today, with or without any versioning work.
 

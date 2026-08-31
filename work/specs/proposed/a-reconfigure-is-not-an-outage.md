@@ -1,15 +1,15 @@
 ---
-title: 'A reconfigure is not an outage: a version is a stream plus a fold, and the canonical pointer moves when one is ready'
+title: 'A reconfigure is not an outage: a generation is a stream plus a fold, and the canonical pointer moves when one is ready'
 slug: a-reconfigure-is-not-an-outage
 taskedAfter: [appending-to-the-stream-costs-the-batch]
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 
-> **REPLACES the two-generation design.** An earlier version of this spec held exactly TWO generations
+> **REPLACES the two-generation design.** An earlier generation of this spec held exactly TWO generations
 > in ONE stream, distinguished by a `live`/`staging` label in the key, promoted by relabelling. It is
 > superseded, not amended, and the history is in git rather than in this file. Two reasons, both
-> decisive: the label is two-valued by construction, so N versions and rollback were NOT reachable
+> decisive: the label is two-valued by construction, so N generations and rollback were NOT reachable
 > without redesign (the old spec claimed otherwise and was wrong); and the shared-keyspace promotion
 > machinery accounted for six of the ten blocking defects four review rounds found, regenerating a new
 > one each time it was fixed. Separate streams delete that machinery outright.
@@ -33,9 +33,9 @@ old state was discarded to build the new one, so the only recovery is another fu
 
 ## Solution
 
-**A VERSION is a stream plus a fold over it.** An indexer holds any number of versions; one is
-CANONICAL and answers every read. Reconfiguring builds a new version alongside the live one and moves
-the canonical pointer when it is ready. A version that is no longer canonical is kept until it is
+**A GENERATION is a stream plus a fold over it.** An indexer holds any number of generations; one is
+CANONICAL and answers every read. Reconfiguring builds a new generation alongside the live one and moves
+the canonical pointer when it is ready. A generation that is no longer canonical is kept until it is
 deleted, so moving the pointer BACK is how you revert.
 
 The whole design rests on splitting one identity into two, which is ADR-0034's distinction made
@@ -43,10 +43,10 @@ structural:
 
 - **A STREAM is identified by its FETCH FILTER.** What was requested from the node: chain, addresses,
   topics, ranges. Streams are separate keyspaces, self-contained, and never share entries.
-- **A VERSION is identified by its stream plus its PROCESSOR and CONFIG.** What the fold means.
+- **A GENERATION is identified by its stream plus its PROCESSOR and CONFIG.** What the fold means.
 
 That split is the reason this is simpler than what it replaces. The most common reconfigure by far is
-a processor change, and a processor change does not touch the filter — so it makes a **new version on
+a processor change, and a processor change does not touch the filter — so it makes a **new generation on
 the EXISTING stream** and re-fetches NOTHING. Only a genuine filter change makes a new stream, and
 that is the rare case: in production an ABI's topic set changes rarely, and in development the history
 is small enough that a re-fetch is cheap.
@@ -54,32 +54,46 @@ is small enough that a re-fetch is cheap.
 So the expensive path is rare, the common path is free, and neither needs a graft point, a shared
 prefix, a promotion journal or a two-writer rule.
 
+**And the expensive path does not have to be a backfill at all.** A new stream may be SEEDED from a
+remote captured stream, or a new generation bootstrapped from a state snapshot, instead of re-fetching
+from the node. That is not an optimisation, it is what makes the browser case possible at all — see
+below.
+
 ## User Stories
 
-1. As a browser user, I want the app to keep rendering while a new version builds, instead of going
+1. As a browser user, I want the app to keep rendering while a new generation builds, instead of going
    blank, and to switch when it is ready.
 2. As a developer, I want to change the processor without re-fetching a single log, because the
    filter did not move.
-3. As a developer, I want to change the source and have the old version keep answering until the new
+3. As a developer, I want to change the source and have the old generation keep answering until the new
    one has caught up.
 4. As a developer whose new processor is WORSE, I want to move the canonical pointer back to the
-   previous version, without re-indexing.
-5. As a developer, I want to know that a non-canonical version exists and how far it has caught up,
+   previous generation, without re-indexing.
+5. As a developer, I want to know that a non-canonical generation exists and how far it has caught up,
    so I decide whether to render, dim or hide, since only I know whether my reconfigure made the old
    answers wrong or merely incomplete.
 6. As a reader holding a state handle across a pointer move ON THE ENTITIES PATH, I want it to keep
-   answering from whichever version is now canonical, so holding a reference is never a way to be
+   answering from whichever generation is now canonical, so holding a reference is never a way to be
    silently stale.
 7. As a developer, I want a reconfigure the invalidation verdict calls a no-op to cost nothing.
-8. As an operator, I want a bound on how many versions and streams a project can accumulate, and a
+8. As an operator, I want a bound on how many generations and streams a project can accumulate, and a
    loud refusal when I reach it rather than a silent eviction of something I still wanted.
-9. As an operator, I want deleting a version or a stream to be one cheap, complete operation.
-10. As an operator, I want to PAUSE a version so it stops indexing without being deleted, and resume
+9. As an operator, I want deleting a generation or a stream to be one cheap, complete operation.
+10. As an operator, I want to PAUSE a generation so it stops indexing without being deleted, and resume
     it later, without it ever answering with state a reorg has invalidated underneath it.
 11. As an operator running MULTIPLE PROJECTS on one server or CLI, I want them fully isolated, so no
     query, prefix scan or cap in one project can ever reach another's data.
-12. As a developer, I want a version whose stream is unavailable to fall back to a full re-index,
+12. As a developer, I want a generation whose stream is unavailable to fall back to a full re-index,
     which is today's behaviour, so the feature degrades rather than breaks.
+13. As an APP AUTHOR shipping a client upgrade whose filter changed, I want the new generation to be
+    SEEDED from a remote stream or snapshot I publish, so my users do not have to re-index from the
+    chain — which on a public node they frequently CANNOT do at all.
+14. As a DEVELOPER iterating on a processor, I want the new generation to become canonical
+    IMMEDIATELY, before it has caught up, because I am looking for what my edit does and stale-but-
+    complete old answers are more confusing than incomplete new ones.
+15. As an APP AUTHOR shipping to users, I want the opposite default — the old generation keeps
+    answering until the new one is ready — because my users did not ask for a reconfigure and should
+    not see the state go backwards.
 
 ## Implementation Decisions
 
@@ -91,18 +105,18 @@ else" (address, `topic0`, block range), and already sorts the entries into a can
 reordering an ABI produces the same bytes. The stream key digests that sorted set. Nothing new is
 derived; an existing per-entry digest is rolled up.
 
-**A version's identity is its stream plus the `processor` version hash plus the config hash.** A
-changed processor makes a new version on the same stream. A changed filter makes a new stream, and
-therefore necessarily a new version.
+**A generation's identity is its stream plus the `processor` version hash plus the config hash.** A
+changed processor makes a new generation on the same stream. A changed filter makes a new stream, and
+therefore necessarily a new generation.
 
 **Whether a reconfigure creates anything at all is still the VERDICT, not digest equality.**
 `sourceInvalidationOf` deliberately ignores an added entry whose `startBlock` is above `lastToBlock`,
 so appending an event above the cursor is FREE today, and digest inequality alone would regress
 exactly the case ADR-0034 made free. So: the verdict decides whether anything is invalid; the digests
-decide WHICH stream and WHICH version the result belongs to. Both, at different jobs.
+decide WHICH stream and WHICH generation the result belongs to. Both, at different jobs.
 
 **The hash is WIDE and SYNCHRONOUS, and is not `simple_hash`.** As a change DETECTOR a collision
-costs one missed invalidation; as a KEY it means one version silently adopting another's stream, under
+costs one missed invalidation; as a KEY it means one generation silently adopting another's stream, under
 a filter that does not match it, so logs are missing and nothing reports it. `simple_hash` is 32 bits
 (`(hash << 5) - hash + char`, masked to 32), which is a coin-flip collision around 65,000 distinct
 filters. Use a **128-bit synchronous** digest.
@@ -115,7 +129,7 @@ context buys nothing and costs a deployment constraint.
 ### The stream
 
 **Streams are separate keyspaces and share nothing.** `<project>/<chainId>/<filterDigest>`, with
-segments beneath, per `appending-to-the-stream-costs-the-batch`. Two versions on one stream READ it;
+segments beneath, per `appending-to-the-stream-costs-the-batch`. Two generations on one stream READ it;
 only the one that is indexing WRITES it.
 
 **The project is a separate KEY COMPONENT, never mixed into the digest.** Same isolation either way,
@@ -153,39 +167,93 @@ It must NEVER be refetched from the node, and the reason is not cost: after a re
 unreachable, so the node returns the NEW chain, which is precisely what a reorg check needs to compare
 AGAINST. Refetching cannot answer the question it would be asked.
 
-### Versions
+### Generations
 
 **Any number, bounded by two independent caps, and a cap REFUSES.**
 
 - `maxStreams` per project bounds distinct filters.
-- `maxVersions` per project, as a TOTAL and not per-stream. Per-stream would let total growth scale
+- `maxGenerations` per project, as a TOTAL and not per-stream. Per-stream would let total growth scale
   with stream count, leaving the resource anyone actually cares about — total storage, total state
   stores — unbounded.
 
-Reaching either cap REFUSES the new version and names what to delete. It never evicts: eviction picks
-a victim by a policy that cannot know which version an operator was keeping deliberately, and story 4
-exists precisely because old versions have value. A refusal costs one operator action; a wrong
+Reaching either cap REFUSES the new generation and names what to delete. It never evicts: eviction picks
+a victim by a policy that cannot know which generation an operator was keeping deliberately, and story 4
+exists precisely because old generations have value. A refusal costs one operator action; a wrong
 eviction costs a re-index.
 
-**Deleting a version is dropping its state store; deleting a stream is dropping its keyspace.** This
+**Deleting a generation is dropping its state store; deleting a stream is dropping its keyspace.** This
 is cheap only because streams are self-contained, which is the payoff of separating them. A stream is
-reaped when its last version goes.
+reaped when its last generation goes.
 
-**One CANONICAL POINTER per project names the version that answers reads.** Moving it IS the
+**One CANONICAL POINTER per project names the generation that answers reads.** Moving it IS the
 promotion, and it is a single small record write, so promotion has no meaningful cost and no
 multi-key recovery problem. Moving it back is the revert.
 
-**Reads do NOT carry version identity, and the handle FOLLOWS the pointer.** Per-read provenance
+**The promotion policy has THREE values, not two, because the browser is two different runtimes
+wearing one name.** The axis is DEVELOPMENT versus PRODUCTION, and it is not the same axis as
+browser-versus-server:
+
+- **`immediate`** — the new generation becomes canonical the moment it is created, before it has
+  caught up. The DEVELOPMENT default. A developer who just edited a handler is looking for what the
+  edit does, and stale-but-complete answers from the old processor are more confusing than incomplete
+  answers from the new one. This is closest to today's behaviour, minus the discard: the old
+  generation is still there and still reverted-to.
+- **`on-catch-up`** — the pointer moves when the new generation reaches the old one's cursor. The
+  PRODUCTION default, and the one story 1 asks for.
+- **`manual`** — the pointer moves only when asked, so an operator can inspect first.
+
+`immediate` is the value an earlier two-valued knob could not express, and leaving it out would have
+forced every developer into either a wait they did not want or a hand-promotion after every save.
+
+**Reads do NOT carry generation identity, and the handle FOLLOWS the pointer.** Per-read provenance
 would break the four `StateStore` verbs, four backends and the conformance suite, and is REJECTED.
 The entities path publishes a handle bound to a store, so a consumer holding one across a pointer move
-would silently read a retired version; the handle is therefore INDIRECT, resolving to whichever
-version is canonical.
+would silently read a retired generation; the handle is therefore INDIRECT, resolving to whichever
+generation is canonical.
 
-**A non-canonical version may INDEX, or be PAUSED, by configuration.** Indexing costs a duplicated
+### Seeding, and why the browser needs it
+
+**A new stream may be SEEDED from a remote source instead of backfilled from the node**, and for a
+user-facing browser app this is the primary path rather than a fallback. The reason is not speed:
+**on a public node the backfill is frequently IMPOSSIBLE**, because old logs are not served at all
+(Base's public endpoints are the worked example, and it is why stratagems ships a remotely-computed
+snapshot rather than indexing from genesis in the browser). A design whose only answer to a filter
+change is "re-fetch the history" would therefore not be slow in the user case, it would be BROKEN.
+
+Seeding also fits the deployment reality rather than fighting it: a filter change means the user is
+getting a new CLIENT BUILD anyway, so the app is already shipping something, and a stream or snapshot
+is one more artifact alongside it.
+
+**Two seed shapes, and they are not equivalent.** Both already exist and this spec reuses rather than
+invents:
+
+- **A captured STREAM** (`captureStream`, `StreamFixture`, and `replayStream`, which already returns
+  an `ExistingStream`). It seeds the stream itself, so every generation over that stream can re-fold
+  from it. This is the one that composes with everything here.
+- **A state SNAPSHOT** (ADR-0028, `bootstrapFromSnapshot`, and the `remote` argument
+  `keepStateOnIndexedDB(name, remote)` already takes). It seeds the FOLD, not the stream, so the
+  generation reports a retention FLOOR at the snapshot's block and refuses reverts and as-of reads
+  beneath it. Cheaper to publish and much smaller; it cannot be re-folded by a later processor
+  change, so a generation bootstrapped this way is a leaf.
+
+The distinction is worth stating because the second one silently forfeits this design's main benefit:
+a snapshot-seeded generation cannot serve as the source for a future processor-only change, which is
+the common case that is otherwise free. Publish a stream where you can; publish a snapshot where the
+stream is too large and accept the floor.
+
+**What this spec must NOT do is decide the publishing side.** How an app builds, hosts, versions or
+authenticates a remote stream is `work/notes/ideas/publishing-snapshots-of-versioned-state.md`
+territory and is out of scope here. What is in scope is that creating a generation accepts a SEED as
+an alternative to a backfill, and that a seeded stream is indistinguishable from a fetched one
+afterwards.
+
+### Indexing, pausing, and the promotion policy
+
+**A non-canonical generation may INDEX, or be PAUSED, by configuration.** Indexing costs a duplicated
 head-following fetch; pausing costs nothing and falls behind.
 
-**PAUSING TRUNCATES the version to a segment boundary below the finality horizon, and reverts its
-state to match.** This is what makes a paused version safe to keep serving from. A stopped indexer
+**PAUSING TRUNCATES the generation to a segment boundary below the finality horizon, and reverts its
+state to match.** This is what makes a paused generation safe to keep serving from. A stopped indexer
 otherwise carries an UNCONFIRMED window it can no longer correct: if one of those blocks is reorged
 away it never finds out, and its state permanently contains events from blocks that no longer exist.
 Truncating removes exactly the part that could be wrong.
@@ -217,17 +285,17 @@ keeps every lifetime trivial. The key shape above leaves the global pool reachab
 ### Relationship to ADR-0008
 
 ADR-0008 (`processor-upgrades-rebuild-blue-green-from-the-stored-stream`) already decided this shape
-for the server: rebuild from the locally stored stream into a new namespace keyed by the processor
-version hash, keep serving the old, flip a `current_version` pointer, drop the old. This spec is the
+for the server: rebuild from the locally stored stream into a new namespace keyed by the PROCESSOR
+VERSION HASH, keep serving the old, flip a `current_version` pointer, drop the old. This spec is the
 same mechanism generalised, and it should be read as extending that ADR rather than competing with it.
 
 Three differences to record, because they are real:
 
-- ADR-0008 keys the new namespace by the PROCESSOR VERSION HASH alone. Here a version is keyed by
+- ADR-0008 keys the new namespace by the PROCESSOR VERSION HASH alone. Here a generation is keyed by
   stream plus processor plus config, so a filter change is a different stream rather than a different
   namespace over the same one. ADR-0008's keying cannot express that case.
 - ADR-0008 feeds both namespaces for a short window and then flips. Here the pointer flip is the only
-  step, because the versions are independent and neither needs the other quiesced.
+  step, because the generations are independent and neither needs the other quiesced.
 - ADR-0008 says retention is load-bearing, since a rebuild needs the stream from genesis. That holds
   and is why the caps REFUSE rather than evict.
 
@@ -241,9 +309,9 @@ reconciled or dropped rather than left asking a settled question.
   not fewer. This is the headline: the filter did not move, so the stream is reused whole.
 - **A filter change creates a NEW stream**, and the old stream is untouched, byte for byte, while the
   new one backfills.
-- **Reads succeed continuously across a reconfigure** and answer from the canonical version until the
+- **Reads succeed continuously across a reconfigure** and answer from the canonical generation until the
   pointer moves. Assert on the ANSWERS, since reads do not report identity.
-- **The pointer moves BACK**: after moving to a new version, moving the pointer to the previous one
+- **The pointer moves BACK**: after moving to a new generation, moving the pointer to the previous one
   restores its answers exactly, with no re-indexing and no fetch.
 - **A no-op reconfigure creates nothing**, asserted on ranges fetched AND state discarded, the pair
   ADR-0034 established. An event appended above the cursor is the regression guard.
@@ -256,19 +324,19 @@ reconciled or dropped rather than left asking a settled question.
   of realistic sources, and the digest is stable under ABI reordering and under a redundant appended
   entry, which the canonical set already normalises away.
 - **Two projects with IDENTICAL sources never touch each other's data**: same chain, same contracts,
-  same processor; deleting every stream and version in one leaves the other complete and readable.
+  same processor; deleting every stream and generation in one leaves the other complete and readable.
   This is the multi-tenancy guard and it fails loudly under any missing discriminator.
-- **A cap REFUSES and names what to delete**, and nothing is evicted. Assert the existing versions are
+- **A cap REFUSES and names what to delete**, and nothing is evicted. Assert the existing generations are
   all still readable after the refusal.
-- **Deleting a version leaves its stream** if another version uses it, and reaps the stream when the
+- **Deleting a generation leaves its stream** if another generation uses it, and reaps the stream when the
   last one goes.
-- **A paused version is truncated below the finality horizon and its state reverted to match**, so its
+- **A paused generation is truncated below the finality horizon and its state reverted to match**, so its
   answers contain nothing a reorg could invalidate. Assert the state cursor and the stream cursor
   agree after a pause.
-- **A paused version resumes correctly** across a reorg that happened while it was paused, deriving it
+- **A paused generation resumes correctly** across a reorg that happened while it was paused, deriving it
   from the node on its first round rather than inheriting a stale window.
-- **A handle held across a pointer move** keeps answering, from the newly canonical version.
-- **A version's progress is visible** while it is behind, and stops being reported once canonical.
+- **A handle held across a pointer move** keeps answering, from the newly canonical generation.
+- **A generation's progress is visible** while it is behind, and stops being reported once canonical.
 - **Round-trip through BOTH keepers**, since they are independent implementations of one contract.
 
 ## Tasking note
@@ -278,8 +346,8 @@ Five separable landables. Cutting them together produces one task nobody can rev
 1. **Stream identity and the keyspace** — the canonical filter digest, the wide sync hash, the
    `<project>/<chainId>/<filterDigest>` key, and the composite key type that makes the project
    discriminator non-omittable. Owns the hash choice and its collision test. Everything depends on it.
-2. **The version registry, the canonical pointer, and the caps** — creating a version, moving the
-   pointer (forward and back), refusing at a cap, deleting a version or a stream. Independently
+2. **The generation registry, the canonical pointer, and the caps** — creating a generation, moving the
+   pointer (forward and back), refusing at a cap, deleting a generation or a stream. Independently
    testable with no indexer running.
 3. **The verdict becomes a published, actionable answer.** `sourceInvalidationOf` is INTERNAL
    (`packages/core/src/index.ts` re-exports only `ReorgCause`/`ReorgDetection` from that module, and
@@ -290,8 +358,13 @@ Five separable landables. Cutting them together produces one task nobody can rev
    discard when it lands the container that replaces it. Includes the `stateDiscarded` sweep, **38**
    references — `packages/core` (11), `packages/browser` (23), `examples/browser-reference` (2),
    `docs/guide/indexing-in-a-browser-app/index.md` (2).
-4. **The container plus the factory migration.** The indirect handle, per-version state factories, and
-   passing the processor factory rather than its result. BREAKING and mostly mechanical: **37 call
+4. **The container plus the factory migration.** The indirect handle, per-generation state factories,
+   and passing the processor factory rather than its result. This landable also DISCHARGES
+   `work/notes/observations/keepstate-storage-id-omits-the-processor-version.md`: that observation
+   reports the js-object keeper deriving its storage key without the processor version, so two
+   generations collide on one key. A generation's identity here is stream plus processor plus config,
+   and the container supplies it, which is exactly the fix — assert the non-collision and delete the
+   note. BREAKING and mostly mechanical: **37 call
    sites** outside `dist/`, of which **31 under `packages/browser/test/`** (`dispose` 3,
    `invalidation` 2, `liveReload` 8, `processorKinds` 10, `reconfigure` 2, `setupIndexing` 2,
    `txInclusion` 4), plus `packages/browser/browser/workload.ts`, plus **FIVE** example apps
@@ -309,20 +382,22 @@ serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then
 - **Sharing a prefix between two streams.** The named, deliberately-declined optimisation: when a new
   filter is a superset of an old one, the new stream is identical to the old up to some point and
   could reuse it. Worth doing later, and cheap to add because streams are addressed by digest and
-  nothing about this design assumes a stream was fetched entirely by its own version. Not now: it
+  nothing about this design assumes a stream was fetched entirely by its own generation. Not now: it
   buys a rare case and it is where all the complexity of the superseded design lived.
 - **Sharing streams ACROSS projects.** Reachable; see the multi-project decision for why not first.
 - **Pruning segments WITHIN a stream.** Not needed: the bound is the caps plus explicit deletion.
-- **Exposing which version answered a read.** Purely additive later; a query layer is its home.
-- **Smoothing the pointer move.** It is a step. Interpolating would serve a state neither version had.
+- **Exposing which generation answered a read.** Purely additive later; a query layer is its home.
+- **Smoothing the pointer move.** It is a step. Interpolating would serve a state neither generation had.
 
 ## Further Notes
 
-The word **version** is used here in its ordinary sense and COLLIDES with two existing uses that a
-reader must keep separate: an entity row's half-open block-validity range (`CONTEXT.md`), and a
-processor's `version` field, which is an INPUT to a version's identity here rather than the thing
-itself. If that proves confusing in review, `generation` remains unused in `CONTEXT.md`,
-`packages/*/src` and `docs/adr/`, and is the fallback. `deployment` and `candidate` are both taken.
+**The unit is a GENERATION, and the word was chosen by elimination.** `version` is taken twice over —
+an entity row's half-open block-validity range (`CONTEXT.md`), and a processor's `version` field,
+which is an INPUT to a generation's identity here rather than the thing itself, so the same word
+would mean two things one sentence apart. `deployment` is worse (it already means the fetcher/server
+topology and a browser installation, both a level ABOVE this). `candidate` is taken by the entity
+snapshot path. `generation` had zero prior uses in `CONTEXT.md`, `packages/*/src` or `docs/adr/`, and
+is pinned in the `CONTEXT.md` glossary alongside `stream`, `project` and `canonical pointer`.
 
 The design record `work/notes/ideas/stream-grafting-what-we-established.md` carries the invariants
 this rests on and the options weighed, including the two-generation design this replaces.

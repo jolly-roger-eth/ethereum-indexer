@@ -7,8 +7,17 @@ source: 'measured by docs/spikes/promotion-cost-of-a-two-label-stream @ the comm
 The open question left by `work/notes/ideas/stream-grafting-what-we-established.md`, answered by
 measurement rather than argument, because it had already flipped in prose more than once.
 
-**LOAD-BEARING.** `a-reconfigure-is-not-an-outage` puts the generation label in the KEY because of
-these numbers. Reversing that choice without re-running the spike is reversing a measurement.
+> **SUPERSEDED AS AN INPUT, VALID AS A MEASUREMENT.** This answered "where does the generation label
+> live?" for a design that put two labels in ONE stream. That design was replaced:
+> `a-reconfigure-is-not-an-outage` now gives each generation its OWN stream keyed by its fetch filter,
+> so there is no label to place and promotion is a pointer flip. **Nothing here is load-bearing on the
+> current design.**
+>
+> The numbers are unaffected and remain reusable wherever a relabel-or-rewrite question comes up
+> again: a rename is free on the filesystem and impossible on IndexedDB; IndexedDB is indifferent
+> between the two layouts; and a label in a VALUE cannot be read without deserialising the value.
+> Finding 4 also generalises — storage-side promotion cost is dominated by whatever produced the data,
+> which is why the pointer flip in the current design is not worth measuring.
 
 ## The question
 

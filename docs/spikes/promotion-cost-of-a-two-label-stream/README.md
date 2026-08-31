@@ -1,12 +1,14 @@
 # Spike: what does promoting a staging generation cost in a key/value store?
 
+> **The design this measured was SUPERSEDED.** It compared two layouts for a two-label stream. The chosen design (`work/specs/proposed/a-reconfigure-is-not-an-outage.md`) gives each generation its own stream keyed by its fetch filter, so there is no label and promotion is a pointer flip. The harness and the numbers are still valid and re-runnable; what they decide is no longer a live question. Kept as evidence, and because the measurement is part of why that design was abandoned.
+
 Evidence for [`work/notes/findings/promotion-cost-of-a-two-label-stream.md`](../../../work/notes/findings/promotion-cost-of-a-two-label-stream.md), which is where the conclusions live. This folder holds the harness and the raw output, so every number in that finding can be re-run rather than believed.
 
 Design record whose open question this answers: [`work/notes/ideas/stream-grafting-what-we-established.md`](../../../work/notes/ideas/stream-grafting-what-we-established.md). Spec the answer feeds: `work/specs/proposed/a-reconfigure-is-not-an-outage.md`.
 
-## The question
+## The question (as it stood)
 
-The chosen design gives every stream entry a label, `live` or `staging`. A staging reader takes `gen = staging OR (gen = live AND seq <= N)`; promotion deletes the live entries above `N` and relabels staging to live. On a relational store that is one indexed `UPDATE`. In a key/value store there is no bulk update, so promotion touches one entry per staging segment, and the open question was where the label should live:
+The design under test gave every stream entry a label, `live` or `staging`. A staging reader takes `gen = staging OR (gen = live AND seq <= N)`; promotion deletes the live entries above `N` and relabels staging to live. On a relational store that is one indexed `UPDATE`. In a key/value store there is no bulk update, so promotion touches one entry per staging segment, and the open question was where the label should live:
 
 - **key-label** — the label is part of the key, so a relabel is a **rename**
 - **value-label** — the label is a field of the value, so a relabel is a **rewrite**

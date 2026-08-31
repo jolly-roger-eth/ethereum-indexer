@@ -3,14 +3,35 @@ title: 'Stream grafting: the invariants we established, the options we weighed, 
 slug: stream-grafting-what-we-established
 ---
 
-> **This is a DESIGN RECORD, not a spec.** It exists so the four specs in
-> `work/specs/proposed/` can state ONE chosen design without carrying the argument that produced it.
+> **SUPERSEDED IN ITS CONCLUSION, KEPT FOR ITS EVIDENCE. Read this box before anything below it.**
+>
+> The INVARIANTS section is still true and still the reason this note exists: every claim in it was
+> established by reading the code and is expensive to re-derive. The NAMING section is still true.
+>
+> **The chosen design is NOT the one recorded below.** Option D (two labels in one stream) was chosen,
+> specced, reviewed four times, and then REPLACED. What is built is
+> `work/specs/proposed/a-reconfigure-is-not-an-outage.md`: N generations, each with its own stream
+> keyed by its FETCH FILTER, and a canonical pointer. Two reasons it replaced D, both recorded here so
+> the argument is not had again:
+>
+> - a two-valued label caps the design at two generations BY CONSTRUCTION, so rollback and N were not
+>   reachable without a redesign (the option-D spec claimed they were, and was wrong);
+> - the shared-keyspace promotion machinery accounted for six of the ten blocking defects four review
+>   rounds found, and regenerated a new one each time it was fixed.
+>
+> So read the options below as the OPTIONS WEIGHED, not as a verdict. Where a section says "chosen",
+> it means chosen at the time.
+
+> **This is a DESIGN RECORD, not a spec.** It exists so the specs in
+> `work/specs/proposed/` can state ONE design without carrying the argument that produced it.
 > Written at the end of a long design conversation that ran through seven review rounds; the specs had
 > accumulated so much "an earlier draft said X, which was wrong because Y" that reviewers were
 > repeatedly finding paragraphs contradicting each other rather than finding real defects.
 >
-> Supersedes nothing. Extends `work/notes/ideas/a-stream-branches-instead-of-being-discarded.md`,
-> which framed the original question.
+> Extends the discharged idea note `a-stream-branches-instead-of-being-discarded`, which framed the
+> original question ("should a stream BRANCH rather than be discarded?") and is answered by the
+> current design: it does not branch, each generation gets its own stream. Deleted per the
+> capture-bucket rule; in git history if wanted.
 
 ## Why this matters
 
@@ -120,7 +141,8 @@ referencing another stream chains across successive grafts.
 the verdict, not a free choice, so "graft at latest" is the degenerate case where nothing below the
 cursor was invalidated, which is whole-stream sharing.
 
-**D. TWO LABELS — the chosen direction.** Do not make a stream a keyspace at all. Give each stream
+**D. TWO LABELS — chosen at the time, SINCE SUPERSEDED (see the box at the top).** Do not make a
+stream a keyspace at all. Give each stream
 entry a label, `live` or `staging`:
 
 ```
@@ -155,13 +177,19 @@ Which case applies is decided by the invalidation verdict, not chosen:
 - **no sharing** (a changed address, a new contract: these land in the block-0 skeleton entry, so
   nothing below is valid). A full backfill.
 
-## ANSWERED: the promotion cost
+## ANSWERED: the promotion cost — for a question the design no longer asks
+
+> **This section answered option D's open question.** The chosen design has no label to place, so the
+> conclusion below decides nothing today. It is kept because the MEASUREMENTS are reusable (renames
+> are free on the filesystem; IndexedDB is indifferent between a rename and a rewrite; a value read
+> costs the whole payload) and because it is part of why D was abandoned.
 
 The promotion cost was the open question here and it is now MEASURED, not argued:
 `work/notes/findings/promotion-cost-of-a-two-label-stream.md`, evidence in
 `docs/spikes/promotion-cost-of-a-two-label-stream`.
 
-**Put the label in the KEY.** The short version, with the reasoning in the finding:
+**Put the label in the KEY** — the verdict, for the design that no longer exists. The short version,
+with the reasoning in the finding:
 
 - **IndexedDB does not decide the question; the filesystem does.** IndexedDB has no rename, so a
   key-label relabel there is the same read-plus-write a value-label rewrite costs, and the two

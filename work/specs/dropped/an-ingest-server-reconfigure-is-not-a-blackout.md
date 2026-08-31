@@ -1,8 +1,26 @@
 ---
 title: 'An ingest-server reconfigure is not a blackout'
 slug: an-ingest-server-reconfigure-is-not-a-blackout
-needsAnswers: true
+reason: 'superseded by a-reconfigure-is-not-an-outage, whose generation model is runtime-agnostic; all three of this stub open questions are answered there and by ADR-0008'
 ---
+
+> **DROPPED, because its three open questions are all answered.** This stub existed to hold the
+> server case while the sibling spec was browser-only. That is no longer true.
+>
+> 1. *Two generations, or refuse?* Answered: N generations, each with its own filter-keyed stream and
+>    a canonical pointer. ADR-0008 had already decided the same shape for the server, which this stub
+>    did not cite.
+> 2. *What does a reader see meanwhile?* Answered: the canonical generation, throughout, until the
+>    pointer moves.
+> 3. *Is this the right layer?* Answered: yes, it is the core primitive both runtimes share, which is
+>    why the replacing spec is written per PROJECT and per GENERATION rather than per runtime.
+>
+> What remains genuinely server-specific is NOT a design question but an implementation one: the
+> server stores its stream as the ADR-0006 emission-stream table rather than as segments, so the
+> keyspace layout differs. That belongs in the tasks that land the server side, not in a spec of its
+> own. `StreamBuilder`'s `processor.clear()` on a changed context is the concrete call site to change.
+
+*Original body follows, unchanged.*
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 
