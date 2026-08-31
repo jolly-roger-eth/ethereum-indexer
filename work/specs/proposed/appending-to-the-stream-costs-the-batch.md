@@ -285,8 +285,14 @@ the contiguity refusal, the seal decision, legacy adoption and cursor selection 
 both keepers and are the whole substance of this change. `OnFile` and `OnIndexedDB` are independent
 implementations of `ExistingStream` in different packages, so a task cut per keeper would
 re-implement the same prose twice and drift. Put the rules in an internal core helper parameterised
-over a `get`/`set`/`setMany`/`del`/`delMany`/`keys` port plus a capabilities record, and let each keeper supply both. That also gives the
-module-mocking seam below one place to bite.
+over a `get`/`set`/`del`/`delMany`/`keys` port PLUS keeper-supplied CURSOR OPERATIONS — commit a
+segment together with its cursor, and read the current cursor — and let each keeper supply both.
+`delMany` is there because a segmented `clear` needs a multi-delete. The cursor operations are the
+seam that keeps PLACEMENT out of the helper: a tail keeper implements the commit as one `set` of the
+tail with the cursor inside it, while a keeper with atomic multi-row updates implements it as a
+transaction over a segment row and a cursor row. Neither is asked HOW it satisfies the contract, only
+that it does, so no capability flag is needed. That also gives the module-mocking seam below one
+place to bite.
 
 One consequence to accept deliberately: core's `exports` map is only `.` and `./package.json`, so a
 helper under `src/internal/` is unreachable from `packages/fs` and `packages/browser` unless
