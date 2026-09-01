@@ -77,8 +77,8 @@ OBSERVABLE (story 6) and the one the headline test watches advance, so this spec
 existing surface.
 
 **Getting it there is the one piece of new surface in this spec, and it is deliberately the smallest
-shape that does not break a seam.** The server has no store dependency (`server-platform-adapters`
-records its one remaining criterion as blocked on exactly that), and the cursor is an opaque string
+shape that does not break a seam.** The server has no store dependency
+(`d1-limits-reach-the-stores-batch-bounds` is blocked on exactly that), and the cursor is an opaque string
 behind the storage seam (ADR-0027), so `@etherfold/server` must not learn to read a cursor table.
 Instead the cursor arrives the way everything host-shaped already arrives: an injected reporter beside
 `getDB` / `getEnv` / `getIngestion`, supplied by the process that owns the store, absent on a host
@@ -117,7 +117,7 @@ those exist. The exceptions are small and are named so that a task can tell "ass
   `string`, so "one handle, two users" needs an option that accepts an existing `RemoteSQL` (it
   already exports `createNodeDB` for exactly this kind of sharing). Extend that adapter rather than
   re-implementing its port binding, schema auto-setup and address readback in the CLI — and note the
-  file overlap with `server-platform-adapters`, whose remaining criterion also lands there.
+  file overlap with `d1-limits-reach-the-stores-batch-bounds`, which also lands there.
 
 Beyond those two, if a task finds itself designing a component, it has left this spec.
 
@@ -342,8 +342,12 @@ variable names across all five commands — see the Implementation Decisions), a
 `platforms/nodejs-fetcher/src/bin.ts` with its `bin` entry and changeset. The second is already
 declared to be "one emitted task's to OWN rather than a side effect of another", so name which one.
 
-`server-platform-adapters` records that both host adapters are already built and that its one remaining
-criterion — D1's statement and size limits reaching the store's chunk bound — was blocked on the server
-having no store dependency. `run` is the first thing that wires a store into a server process, so
-that criterion becomes reachable here; it is not this spec's to deliver, but the seam it was waiting
-for is the one this spec creates.
+**Both host adapters are already built** (`agnostic-server-skeleton`, in `tasks/done/`). What is not
+built is D1's per-request limits reaching the store's batch bounds, which was blocked on the server
+having no store dependency and is now `work/tasks/backlog/d1-limits-reach-the-stores-batch-bounds.md`
+(the re-minted forward half of the cancelled `server-platform-adapters`). `run` is the first thing
+that wires a store into a server process, so that work becomes reachable here; it is not this spec's
+to deliver, but the seam it was waiting for is the one this spec creates. It is not merely tidy
+either — `work/notes/findings/d1-caps-bound-parameters-per-query-at-100.md` establishes that the
+shipped default is 5x over D1's bound-parameter cap on the prune path, so retention enforcement is
+currently broken on D1 and passes everywhere else.

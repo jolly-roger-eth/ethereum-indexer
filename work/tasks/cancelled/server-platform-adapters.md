@@ -1,41 +1,38 @@
 ---
-title: "D1's statement and size limits reach the store's chunk bound"
+title: Host adapters for the indexer-server (Node and Cloudflare Worker)
 slug: server-platform-adapters
 spec: historical-state-database
-blockedBy: [index-to-a-store-from-the-cli]
-needsAnswers: true
+blockedBy: []
 covers: [6]
+reason: 'superseded — six of its seven acceptance criteria were delivered by `agnostic-server-skeleton`, and the seventh is re-minted as `d1-limits-reach-the-stores-batch-bounds`'
 ---
 
-<!-- open-questions -->
-<!--
-  TRANSIENT BLOCK. This task is a REMNANT: six of its seven criteria were delivered by
-  `agnostic-server-skeleton` and are pre-ticked below, which makes it a backward artifact
-  (WORK-CONTRACT.md: "a task with pre-ticked acceptance criteria is a changelog wearing a
-  spec's shape"). Its one live criterion was, by its own STATUS note, NOT DOABLE when written.
-  Resolve the question below, then either re-cut this as a clean forward task for that one
-  criterion or cancel it and mint one.
--->
-
-## Open questions
-
-1. Does the enabling seam exist yet? The remaining criterion needs the server to reach a store's
-   chunk bound, and `agnostic-server-skeleton` deliberately gave the server NO store dependency.
-   `work/specs/ready/one-command-runs-the-whole-pipeline.md` says `run` "is the first thing that
-   wires a store into a server process, so that criterion becomes reachable here; it is not this
-   spec's to deliver" — so this task is blocked on the `run` work, and the `blockedBy` above names
-   its prerequisite (`index-to-a-store-from-the-cli`, which that spec's own tasks are blocked on)
-   as the nearest real edge. Confirm the seam is actually there before building; if it is not,
-   this bounces.
-2. Should this task be re-cut or cancelled? It carries six delivered criteria and one live one.
-   Cancelling it (`tasks/cancelled/`, reason: superseded, six criteria delivered by
-   `agnostic-server-skeleton`) and minting a forward task named for the one remaining piece is the
-   honest shape. Kept as-is only because someone must confirm nothing else in it is outstanding.
-3. It shares `platforms/nodejs/src` with `one-command-runs-the-whole-pipeline`'s
-   "`startServer` takes a `RemoteSQL`" exception. That overlap is FLAGGED in that spec and
-   serialised by nothing. Whichever is tasked second must carry the `blockedBy`.
-
-<!-- /open-questions -->
+> **CANCELLED 2026-09-01. Not abandoned: SPLIT, with its delivered half already on `main` and its
+> undelivered half re-minted as a forward task.** Nothing here is outstanding.
+>
+> **Why it was cancelled rather than kept.** Six of its seven acceptance criteria were ticked `[x]`
+> in place, which made it a BACKWARD artifact sitting in a forward bucket — "a task with pre-ticked
+> acceptance criteria is a changelog wearing a spec's shape" (WORK-CONTRACT.md). Completed work is
+> recorded by the done record of whatever delivered it plus its commit, and here that is
+> `work/tasks/done/agnostic-server-skeleton.md`, which carries the same `covers: [6]` and really did
+> build both adapters. The seventh criterion was, by this task's own STATUS note, NOT DOABLE when
+> written, so what remained was one blocked criterion carried by a record of work already finished.
+>
+> **Where the two halves went.**
+>
+> - DELIVERED (both host adapters, `platforms/nodejs` and `platforms/cf-worker`, the workspace glob,
+>   and the runtime-agnosticism assertion): `work/tasks/done/agnostic-server-skeleton.md`. Do not
+>   rebuild them.
+> - UNDELIVERED (D1's per-request limits expressed as adapter configuration feeding the store's
+>   batch bounds): `work/tasks/backlog/d1-limits-reach-the-stores-batch-bounds.md`, which is a clean
+>   forward task with no pre-ticked criteria, a real `blockedBy`, and a measured reason to exist —
+>   `work/notes/findings/d1-caps-bound-parameters-per-query-at-100.md` establishes that the shipped
+>   default is 5x over D1's limit on the prune path, which this task only suspected.
+>
+> Story 6 of `historical-state-database` keeps its coverage throughout: `agnostic-server-skeleton`
+> covers it as delivered, and the re-minted task carries the remainder.
+>
+> The body below is the original, left unedited as the record of what was asked for.
 
 ## What to build
 
