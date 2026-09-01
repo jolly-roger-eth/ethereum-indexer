@@ -11,6 +11,8 @@ The measured consequence, on turning the gate on: three type errors in that one 
 ## What was decided
 
 1. **Every workspace project is in `typecheck`,** via a third `--filter './examples/*'`, with each example carrying a `tsconfig.typecheck.json` whose include is the WHOLE package -- the same convention the packages already use, and for the same reason: a glob listing the directories that happen to hold code today silently stops covering the next one.
+
+   **Correction, 2026-09-01: this holds for 6 of the 8 examples, NOT all of them.** `examples/mud` and `examples/web-demo` carry no `tsconfig.typecheck.json`; their `typecheck` is `svelte-check --tsconfig ./tsconfig.json`, whose include is `src/**/*` only. So a package-ROOT file in those two (`vite.config.ts`, `svelte.config.js`) is still typechecked by nothing -- the exact hole this ADR was written to close, left open in a quarter of the tree. The motivating bug (`examples/mud/src/config.ts` importing a module that never existed) happened to sit INSIDE `src/`, which is why it was caught anyway. Whether to give the two Svelte examples a whole-package config, or to accept the narrower include for them and say so, is not decided here; what is decided is that the sentence above must not be read as already true of all eight.
 2. **Browser execution stays out of the gate.** `@etherfold/browser`'s Playwright run, `@etherfold/state-store-indexeddb`'s, and the examples' browser verification are all run deliberately, never by `verify`.
 
 ## Why the second half is not cowardice

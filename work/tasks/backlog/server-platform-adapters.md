@@ -1,10 +1,41 @@
 ---
-title: Host adapters for the indexer-server (Node and Cloudflare Worker)
+title: "D1's statement and size limits reach the store's chunk bound"
 slug: server-platform-adapters
 spec: historical-state-database
-blockedBy: [agnostic-server-skeleton]
+blockedBy: [index-to-a-store-from-the-cli]
+needsAnswers: true
 covers: [6]
 ---
+
+<!-- open-questions -->
+<!--
+  TRANSIENT BLOCK. This task is a REMNANT: six of its seven criteria were delivered by
+  `agnostic-server-skeleton` and are pre-ticked below, which makes it a backward artifact
+  (WORK-CONTRACT.md: "a task with pre-ticked acceptance criteria is a changelog wearing a
+  spec's shape"). Its one live criterion was, by its own STATUS note, NOT DOABLE when written.
+  Resolve the question below, then either re-cut this as a clean forward task for that one
+  criterion or cancel it and mint one.
+-->
+
+## Open questions
+
+1. Does the enabling seam exist yet? The remaining criterion needs the server to reach a store's
+   chunk bound, and `agnostic-server-skeleton` deliberately gave the server NO store dependency.
+   `work/specs/ready/one-command-runs-the-whole-pipeline.md` says `run` "is the first thing that
+   wires a store into a server process, so that criterion becomes reachable here; it is not this
+   spec's to deliver" — so this task is blocked on the `run` work, and the `blockedBy` above names
+   its prerequisite (`index-to-a-store-from-the-cli`, which that spec's own tasks are blocked on)
+   as the nearest real edge. Confirm the seam is actually there before building; if it is not,
+   this bounces.
+2. Should this task be re-cut or cancelled? It carries six delivered criteria and one live one.
+   Cancelling it (`tasks/cancelled/`, reason: superseded, six criteria delivered by
+   `agnostic-server-skeleton`) and minting a forward task named for the one remaining piece is the
+   honest shape. Kept as-is only because someone must confirm nothing else in it is outstanding.
+3. It shares `platforms/nodejs/src` with `one-command-runs-the-whole-pipeline`'s
+   "`startServer` takes a `RemoteSQL`" exception. That overlap is FLAGGED in that spec and
+   serialised by nothing. Whichever is tasked second must carry the `blockedBy`.
+
+<!-- /open-questions -->
 
 ## What to build
 
@@ -35,13 +66,16 @@ Writing these is ordinary work. **Deploying** them, which needs an account, D1 p
 
 ## Blocked by
 
-- `agnostic-server-skeleton` (the app being hosted, and the `platforms/*` workspace glob).
+- `agnostic-server-skeleton` (the app being hosted, and the `platforms/*` workspace glob) — DONE.
+- `index-to-a-store-from-the-cli`, as the nearest real edge onto the work that creates the seam the
+  one remaining criterion needs (a store wired into a server process). Added because this task sat
+  claimable with a criterion its own STATUS note calls not-doable, so an agent claiming it stalls.
 
 ## Prompt
 
 > Build the two host adapters for the indexer-server in the `etherfold` monorepo, under `platforms/`.
 >
-> FIRST, check this task against current reality: confirm `agnostic-server-skeleton` landed and that `pnpm-workspace.yaml` already globs `platforms/*`. Read `docs/adr/0003`.
+> FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED, and this one is a REMNANT — read the open-questions block at the top before anything else). Six of its seven criteria are already delivered; only the D1-limits one is live, and its own STATUS note says it was not doable when written. Confirm the store-into-server seam now EXISTS before building; if it does not, do NOT build around it — route to needs-attention with the discrepancy (WORK-CONTRACT.md, "Drift is a needs-attention signal"). Confirm also that `agnostic-server-skeleton` landed and that `pnpm-workspace.yaml` already globs `platforms/*`. Read `docs/adr/0003`.
 >
 > Follow `~/dev/github/wighawag/template-agnositic-server` exactly: each adapter supplies `{getDB, getEnv}` and nothing else. `~/dev/github/wighawag/push-notification/platforms/cf-worker` is a working second reference. Build a Node adapter (libSQL/SQLite, environment from the process) and a Cloudflare Worker adapter (D1 binding, `wrangler` config, platform-local tests).
 >

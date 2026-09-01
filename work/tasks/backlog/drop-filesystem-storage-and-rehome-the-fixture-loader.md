@@ -1,5 +1,5 @@
 ---
-title: 'Drop filesystem storage, and rehome the fixture loader that was the only thing using it'
+title: 'Drop filesystem storage and the fs event cache, and rehome the fixture loader that was the only thing using them'
 slug: drop-filesystem-storage-and-rehome-the-fixture-loader
 blockedBy: []
 covers: []
@@ -7,9 +7,16 @@ covers: []
 
 ## What to build
 
-Delete `@etherfold/fs` as a STORAGE package. IndexedDB is the browser backend and SQLite is the server
-backend; a filesystem keeper serves neither, and the one thing that package is actually used for is a
+Delete `@etherfold/fs` as a STORAGE package, **and `@etherfold/fs-cache` with it**. IndexedDB is the browser backend and SQLite is the server
+backend; a filesystem keeper serves neither, and the one thing those packages are actually used for is a
 test-fixture loader that belongs elsewhere.
+
+**`@etherfold/fs-cache` is in scope, and it was previously unowned by ANY task or spec.** It is the
+fs-backed event-log cache for the free-form path: 8 tracked files, a published name, and **ZERO
+importers anywhere in `packages/*`, `platforms/*` or `examples/*`**. It fails the same test
+`@etherfold/fs` fails, for the same reason, and it serves the path ADR-0037 retires. Re-run the grep
+before deleting; if a consumer has appeared, STOP and surface it. Adding it here rather than minting
+a second task is deliberate: it is the same judgement, the same substrate and the same changeset.
 
 **The evidence, checked rather than assumed:**
 
@@ -42,8 +49,11 @@ exactly why that helper exists — see `work/notes/ideas/an-opfs-stream-keeper-c
       that names no runtime, so do NOT do that without saying why in `## Decisions`.
 - [ ] `packages/fs` is deleted, with its workspace references removed, and nothing else in the repo
       imports it.
+- [ ] `packages/fs-cache` is deleted the same way, after re-confirming it still has zero importers.
+      Note it has no real test script (`echo "Error: no test specified"`), so a green `pnpm test`
+      proves nothing about it either way — the grep is the evidence.
 - [ ] The stratagems conformance workload still loads its fixtures and still runs.
-- [ ] Ship a changeset covering the removal of a published package name.
+- [ ] Ship a changeset covering the removal of BOTH published package names.
 - [ ] `pnpm build && pnpm typecheck && pnpm test` green.
 
 ## Blocked by
@@ -65,7 +75,8 @@ real consumer). `packages/conformance-workload-stratagems/src/fixtures.ts` is th
 that a `node:fs` keeper serves no supported runtime today. The seam it would attach to is unchanged
 and an OPFS keeper could be written against it later without this package existing.
 
-RECORD in a `## Decisions` block where `loadStreamFixture` went and why. Do NOT write the done record,
+RECORD in a `## Decisions` block where `loadStreamFixture` went and why, and confirm the zero-importer
+grep result for `@etherfold/fs-cache` at the time you ran it. Do NOT write the done record,
 the commit message or the PR body.
 
 ---

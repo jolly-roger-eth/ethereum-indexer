@@ -1,7 +1,7 @@
 ---
 title: 'Retire the JS-object processor path, keeping stratagems as a capability reference'
 slug: retire-the-js-object-processor-path
-blockedBy: [index-to-a-store-from-the-cli]
+blockedBy: [index-to-a-store-from-the-cli, a-snapshot-a-client-cannot-read-is-refused-not-installed]
 covers: []
 ---
 
@@ -31,9 +31,23 @@ mechanism survives; only the free-form authoring surface goes.
 
 `etherfold index` currently REQUIRES a keepState processor — `packages/cli/src/index.ts` throws
 `this processor do not support "keepState" config` when a processor has none — so the CLI is built
-around the path being deleted. **`index-to-a-store-from-the-cli` must land first**; it is unblocked
-and its stated goal is exactly the replacement ("the same processor object, unchanged, indexing on a
-server into SQLite").
+around the path being deleted. **`index-to-a-store-from-the-cli` must land first**; it is in
+`work/tasks/ready/` and its stated goal is exactly the replacement ("the same processor object,
+unchanged, indexing on a server into SQLite").
+
+**THE CLI ARM IS THIS TASK'S TO REMOVE, and it was previously owned by nobody.** The seam is
+three-way and only one edge existed: `index-to-a-store-from-the-cli` CREATES `--store file` with its
+required `--folder` over `createFileKeepState`; `work/specs/ready/one-command-runs-the-whole-pipeline.md`
+RENAMES the command that flag lives on; and this task is what makes the free-form arm meaningless. So
+name it explicitly: when this lands, `--store` loses its `file` value, `--folder` goes with it,
+`packages/cli/src/keepState.ts` goes unless the snapshot path still needs it (see the `KeepState`
+judgement below), and the kind/store mismatch refusal collapses because there is only one kind left.
+
+**Beware the command RENAME while doing it.** This task says `etherfold index` twice, and its
+ordering argument turns on which command carries the `keepState` refusal. Under the command set
+`CONTEXT.md` now pins, the one-shot becomes **`build`** and `index` is re-meant as the receiving half
+of a split. Check which names exist when you claim this; if the rename has landed, the refusal you
+are deleting lives on `build`, and the argument is unchanged but the file is not.
 
 ### The stratagems conformance workload: what to keep and what to accept losing
 
@@ -61,9 +75,22 @@ path.
 
 ## Acceptance criteria
 
-- [ ] `packages/js-processor` is deleted, along with its workspace references (it is a
-      **devDependency** of `@etherfold/browser` and `@etherfold/processor-sqlite`, not a runtime one —
-      check before assuming a deeper coupling).
+- [ ] `packages/js-processor` is deleted, along with **every** workspace reference. Derive the list
+      rather than trusting this one; at the time of writing it is a **devDependency** of
+      `@etherfold/browser`, `@etherfold/processor-sqlite` and
+      `@etherfold/conformance-workload-stratagems`, and a **runtime `dependency` of all SIX example
+      packages** (`basic`, `event-processor-bleeps`, `event-processor-conquest-eth`,
+      `event-processor-conquest-fplay`, `event-processor-nfts`, `mud`). An earlier version of this
+      criterion said "not a runtime one" and named only two dependents, which is wrong on seven of
+      nine and is exactly the shape that makes a deletion look done while the workspace still
+      references it.
+- [ ] **The five files under `docs/spikes/sqlite-in-the-browser/` that import the package by relative
+      path into its `dist/` are handled deliberately** (`run/verify-port.ts`, `browser/patch-cut.ts`,
+      `run/build-traces.ts`, `run/measure-patch-replay.ts`, `run/sharing-probe.ts`). `docs/spikes/` is
+      NOT a workspace package, so `pnpm typecheck` cannot see them and a green gate will NOT tell you
+      they broke. They are a durable EVIDENCE store, so decide between leaving them as a historical
+      record with a note saying the import no longer resolves, and pruning them; say which in
+      `## Decisions`. Do not silently leave dangling imports with no marker.
 - [ ] The `'js-object'` `ProcessorKind` and the `TaggedProcessor` fork are removed from
       `@etherfold/browser`, along with the bare `EventProcessorWithInitialState` form
       `createIndexerState` accepts for backward compatibility. One kind, one call shape.
@@ -85,6 +112,14 @@ path.
 
 - `index-to-a-store-from-the-cli` — the CLI refuses a processor without `keepState` today, so deleting
   the JS-object path before that lands breaks `etherfold index`.
+- `a-snapshot-a-client-cannot-read-is-refused-not-installed` — SHARED FILE, and an ordering that
+  matters. Both tasks edit `packages/browser/src/storage/state/OnIndexedDB.ts`: that one HARDENS the
+  free-form keeper's remote-snapshot install (refuse an unreadable format instead of installing
+  silently mistyped state), and this one removes or reduces the `KeepState` family around it.
+  Serialised so the guard lands while the keeper still exists, which also means this task's central
+  `KeepState` judgement is made with the snapshot path's real requirements already pinned in code
+  rather than guessed at. Unserialised these two are a merge conflict, and worse, a chance to delete
+  a guard that had just been added.
 
 ## Prompt
 
@@ -98,8 +133,12 @@ requires `keepState`; if it still does, STOP and surface that rather than workin
 
 **Where to look.** `packages/js-processor` is the package. `packages/browser/src/IndexerState.ts`
 carries the `ProcessorKind` fork. `packages/cli/src/index.ts` has the `keepState` requirement.
-`packages/conformance-workload-stratagems/src/oracle.ts` is the only real consumer of
-`fromJSProcessor` outside the examples, and `src/fixtures.ts` describes the golden files.
+`packages/conformance-workload-stratagems/src/oracle.ts` is the consumer that MATTERS outside the
+examples (it drives the vendored original to produce the golden), and `src/fixtures.ts` describes the
+golden files. It is not the only one, though: `packages/browser/test/invalidation.test.ts`,
+`packages/browser/test/reconfigure.test.ts` and `packages/processor-sqlite/test/equivalence.test.ts`
+all use `fromJSProcessor` too, and those tests must be ported or dropped with the path rather than
+discovered when the build goes red.
 
 **The judgement this task really carries** is what happens to `KeepState`. It serves two masters: the
 JS-object processor's whole-state blob, and the SNAPSHOT hydration path (`bootstrap` in `CONTEXT.md`).

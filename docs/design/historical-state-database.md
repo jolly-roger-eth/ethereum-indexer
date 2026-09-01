@@ -1,6 +1,6 @@
 # Design: historical-state database
 
-Status: **design complete, not built**. This closes the open questions of `work/specs/ready/historical-state-database.md`. The architectural decisions it depends on are ADR-0003 through ADR-0011; this document is the storage-level detail underneath them.
+Status: **design complete, not built**. This closes the open questions of `work/specs/tasked/historical-state-database.md`. The architectural decisions it depends on are ADR-0003 through ADR-0011; this document is the storage-level detail underneath them.
 
 Most of what follows was established by running code, not by reasoning alone: a verified prototype with benchmarks lives at `~/dev/github/wighawag/research/ethereum-indexer-historical-state-db` (versioned-row store, reorg proof, codegen and scale benchmarks on real libSQL). Where a claim is measured, the number is given.
 

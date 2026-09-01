@@ -23,6 +23,22 @@ So this is a placement question before it is a validation question. The writer a
 
 Decide it and say why. What must NOT happen is a second constant in the browser package kept in step with the CLI's by attention.
 
+**FIRST, though: there are ALREADY TWO exported symbols named `SNAPSHOT_FORMAT`, for two unrelated
+artifacts, and "one `SNAPSHOT_FORMAT`" is therefore NOT the goal.** `packages/cli/src/keepState.ts`
+exports `SNAPSHOT_FORMAT = 2` for the free-form BLOB envelope (the one this task is about), and
+`packages/state-store/src/snapshot.ts` exports `SNAPSHOT_FORMAT = 1` for the ENTITY snapshot envelope
+(refused via `SnapshotFormatError`). They version DIFFERENT file shapes and must stay independent —
+merging them would make one envelope's revision falsely invalidate the other's. `@etherfold/browser`
+already depends on `@etherfold/state-store`, so both are reachable from the very reader being fixed,
+and `packages/core/src/utils/bigint.ts` already has to disambiguate them by hand in prose.
+
+So the real requirement is **one constant PER ENVELOPE, each in a package its writer and all its
+readers can import, and NAMED so the two cannot be confused at a call site.** Moving the CLI's number
+into `@etherfold/core` under the same bare name would create a THIRD identical identifier in a graph
+where all three are importable together, which is worse than the problem. Rename as you relocate
+(something like `BLOB_SNAPSHOT_FORMAT` beside `ENTITY_SNAPSHOT_FORMAT`, or a single namespaced
+object) and say what you chose.
+
 ### What a refusal means here, which is not obvious
 
 The CLI's answer to an unreadable snapshot is a cold start: log it and index from the start block, because re-indexing is its existing recovery. A browser client has the same recovery available and it is more expensive (it is why snapshots exist at all), so state the behaviour deliberately rather than inheriting it by accident:
@@ -41,7 +57,7 @@ The consuming side only, and only the free-form path's keeper. The entity path's
 
 ## Acceptance criteria
 
-- [ ] One `SNAPSHOT_FORMAT`, in a package the CLI's writer and the browser's reader can both import. No second constant kept in step by attention.
+- [ ] ONE format constant PER ENVELOPE, each in a package its writer and every reader can import, and the two DISTINGUISHABLE by name at a call site. No second constant for the SAME envelope kept in step by attention, and no third identifier spelled `SNAPSHOT_FORMAT` added to a graph that already has two.
 - [ ] A remote snapshot whose format the client does not recognise is REFUSED, never installed, and the refusal is visible (logged with the location and both numbers) rather than silent.
 - [ ] A test proving the failure this closes: a format-1 payload offered to `keepStateOnIndexedDB` must not produce state whose `args` are `"123n"` strings. Assert the TYPE, not just the value, since that is the whole defect.
 - [ ] Failover is exercised: an unreadable mirror falls through to a readable one, and the readable one's state is what loads.
@@ -56,13 +72,15 @@ The consuming side only, and only the free-form path's keeper. The entity path's
 
 ## Prompt
 
-> Close the last corner where an unreadable published snapshot is installed instead of refused, in the `etherfold` monorepo (the repository directory is still named `ethereum-indexer`).
+> Close the last corner where an unreadable published snapshot is installed instead of refused, in the `etherfold` monorepo.
 >
-> FIRST read `packages/browser/src/storage/state/OnIndexedDB.ts` — the module note names this gap explicitly and is where the reasoning starts — then `packages/cli/src/keepState.ts` (the writer, and the local reader that DOES refuse a format it cannot read), ADR-0029, and `packages/processor-entities/src/snapshot.ts` for the shape to mirror (`SnapshotFormatError`, plus a processor-version check).
+> FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED). If a dependency landed differently, or an ADR superseded an assumption here, do NOT build on the stale premise — route to needs-attention with the discrepancy (WORK-CONTRACT.md, "Drift is a needs-attention signal"). In particular re-check the two existing `SNAPSHOT_FORMAT` constants named below before designing the placement, and re-check whether `retire-the-js-object-processor-path` has landed — it may have removed the free-form keeper this task hardens, in which case STOP and surface that rather than hardening something on its way out.
+>
+> Then read `packages/browser/src/storage/state/OnIndexedDB.ts` — the module note names this gap explicitly and is where the reasoning starts — then `packages/cli/src/keepState.ts` (the writer, and the local reader that DOES refuse a format it cannot read), ADR-0029, and `packages/processor-entities/src/snapshot.ts` for the shape to mirror (`SnapshotFormatError`, plus a processor-version check).
 >
 > The defect: the CLI refuses a format-1 snapshot locally and cold starts; the browser reads the same bytes without checking the number, and since ADR-0029 removed every fallback reviver, each `uint256` in `lastSync.unconfirmedBlocks[].events[].args` arrives as the STRING `"123n"` rather than a BigInt. The client then indexes on top of silently mistyped state, which is the failure the tagged codec exists to prevent.
 >
-> The real problem is placement, not validation. `SNAPSHOT_FORMAT` is the CLI's own constant and `@etherfold/browser` must not depend on `@etherfold/cli` — the browser package has to stay bundleable for a tab, which `bundlesForABrowser.test.ts` pins and which is why `@etherfold/utils/indexer` exists. Put the number where the writer and every reader can see it, `@etherfold/core` being the obvious candidate, and record the choice. A second constant in the browser kept in step by attention is the one outcome to avoid.
+> The real problem is placement, not validation — and note that TWO exported symbols named `SNAPSHOT_FORMAT` already exist, for different envelopes: the CLI's (`keepState.ts`, = 2, the blob) and the entity path's (`packages/state-store/src/snapshot.ts`, = 1). Keep them independent and make them distinguishable by NAME; do not merge them and do not add a third under the same spelling. `SNAPSHOT_FORMAT` as this task means it is the CLI's own constant and `@etherfold/browser` must not depend on `@etherfold/cli` — the browser package has to stay bundleable for a tab, which `bundlesForABrowser.test.ts` pins and which is why `@etherfold/utils/indexer` exists. Put the number where the writer and every reader can see it, `@etherfold/core` being the obvious candidate, and record the choice. A second constant in the browser kept in step by attention is the one outcome to avoid.
 >
 > Refuse; do not translate. Translating is the fallback ADR-0029 rules out, and the translation IS the guess. An unreadable mirror should fail over to the next one, since that path already fails over for an unreachable mirror, and local state that is already ahead must still win.
 >
