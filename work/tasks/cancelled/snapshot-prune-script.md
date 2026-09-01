@@ -4,6 +4,7 @@ slug: snapshot-prune-script
 covers: []
 blockedBy: []
 needsAnswers: true
+reason: superseded by retire-the-js-object-processor-path — the files this script would prune are written by the free-form `--store file` CLI arm, which ADR-0037 retires and which retire-the-js-object-processor-path deletes. Once that lands the file family no longer exists, so building a prune script for it is pure waste. Confirmed by maintainer.
 ---
 
 <!-- open-questions -->
