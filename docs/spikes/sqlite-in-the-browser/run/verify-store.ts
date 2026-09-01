@@ -18,7 +18,7 @@ import {fileURLToPath} from 'node:url';
 import {createClient} from '@libsql/client';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import {blocksOf} from '../../../../packages/core/dist/index.js';
-import {loadStreamFixture} from '../../../../packages/fs/dist/index.js';
+import {loadStreamFixture} from '../../../../packages/conformance-workload-stratagems/src/fixture-file.js';
 import {MemoryBlockStore} from '../src/store/memory.js';
 import {VersionedSqlBlockStore} from '../src/store/versioned-sql.js';
 import {runPortOverBlocks} from '../src/port/run-port.js';

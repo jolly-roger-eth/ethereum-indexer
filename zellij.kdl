@@ -13,12 +13,6 @@ layout {
 			}
 		}
 		pane split_direction="horizontal" {
-			pane name="fs" command="pnpm" cwd="packages/fs" {
-				args "dev"
-			}
-			pane name="fs-cache" command="pnpm" cwd="packages/fs-cache" {
-				args "dev"
-			}
 			pane name="js-processor" command="pnpm" cwd="packages/js-processor" {
 				args "dev"
 			}

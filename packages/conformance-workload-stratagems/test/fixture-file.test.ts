@@ -1,10 +1,25 @@
+/**
+ * The fixture-file IO this package's own fixtures are committed in.
+ *
+ * `saveStreamFixture` / `loadStreamFixture` lived in `@etherfold/fs`, a STORAGE
+ * package whose every other export had no consumer: a filesystem keeper serves
+ * no supported runtime (IndexedDB is the browser backend, SQLite the server
+ * one), so the package was deleted and its one real consumer -- the loader that
+ * reads THESE fixtures -- moved here, where it is test material reading test
+ * material and needs no storage package to exist.
+ *
+ * What is asserted is the file CONVENTION rather than the parse: gzip chosen by
+ * the `.gz` extension, indentation by default, and a refusal that names the
+ * file. The parse itself is `@etherfold/core`'s (`parseStreamFixture`) and is
+ * tested there.
+ */
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {describe, expect, it} from 'vitest';
 import type {Abi} from '@etherfold/core';
 import {STREAM_FIXTURE_FORMAT, type StreamFixture} from '@etherfold/core';
-import {loadStreamFixture, saveStreamFixture} from '../src/storage/stream/Fixture.js';
+import {loadStreamFixture, saveStreamFixture} from '../src/fixture-file.js';
 
 const FIXTURE: StreamFixture<Abi> = {
 	format: STREAM_FIXTURE_FORMAT,

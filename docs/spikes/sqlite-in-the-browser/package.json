@@ -5,7 +5,7 @@
 	"type": "module",
 	"description": "Evidence for work/notes/findings/sqlite-in-the-browser.md: does wasm SQLite ever beat the IndexedDB backend for the stratagems workload?",
 	"scripts": {
-		"capture": "node capture/capture-stratagems-base.mjs",
+		"capture": "tsx capture/capture-stratagems-base.mjs",
 		"port:verify": "tsx run/verify-port.ts",
 		"trace": "tsx run/build-traces.ts",
 		"patches": "tsx run/measure-patch-replay.ts",

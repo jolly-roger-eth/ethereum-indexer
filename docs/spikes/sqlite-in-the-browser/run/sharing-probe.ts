@@ -11,7 +11,7 @@
 import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {blocksOf} from '../../../../packages/core/dist/index.js';
-import {loadStreamFixture} from '../../../../packages/fs/dist/index.js';
+import {loadStreamFixture} from '../../../../packages/conformance-workload-stratagems/src/fixture-file.js';
 import {fromJSProcessor} from '../../../../packages/js-processor/dist/index.js';
 import {StratagemsIndexerProcessor} from '../../../../packages/conformance-workload-stratagems/vendor/stratagems/js-processor.js';
 

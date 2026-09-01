@@ -15,7 +15,7 @@
 import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {taggedBnReplacer, type StreamFixture} from '@etherfold/core';
-import {loadStreamFixture} from '@etherfold/fs';
+import {loadStreamFixture} from './fixture-file.js';
 import type {StratagemsABI} from '../vendor/stratagems/abi.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

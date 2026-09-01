@@ -1,0 +1,11 @@
+# Filesystem storage is deleted, not dormant
+
+`@etherfold/fs` (the `node:fs` state/stream keeper) and `@etherfold/fs-cache` (the fs-backed event-log cache for the free-form path) are DELETED from the workspace rather than left dormant. A filesystem keeper serves no supported runtime — IndexedDB is the browser backend and SQLite the server one — and `fs-cache` had zero importers besides serving a path ADR-0037 retires. The reason to delete rather than leave the code sitting there is the DESIGN PULL, not the code: with no transaction, a filesystem stream needed an open tail, a seal threshold, the strip, temp-file-plus-rename and torn-segment recovery — machinery that shaped the shared stream helper for a substrate with no users, and whose presence invites the next author to serve it again.
+
+## Consequences
+
+- The packages' one real consumer, the fixture-file IO (`loadStreamFixture` / `saveStreamFixture`, gzip chosen by the `.gz` extension so the filename states the intent), moved to `@etherfold/conformance-workload-stratagems` (`src/fixture-file.ts`): it is test material reading test material. It is deliberately NOT in `@etherfold/core`, which names no runtime and must not grow a `node:fs` dependency for a loader.
+- This is not a statement that file-shaped storage is forever wrong. The plausible future keeper is the browser's OPFS (`FileSystemSyncAccessHandle`, not `node:fs`), which would ride the same substrate-neutral seam and reuse nothing from either package (`work/notes/ideas/an-opfs-stream-keeper-could-be-a-real-append.md`).
+- The removal is recorded HERE and not as a changeset, because changesets cannot express a removal (ADR-0014): a pending changeset may only name packages that exist in the workspace (`packages/core/test/pendingChangesets.test.ts`), and neither name was ever published, so there is no release note to write and no `npm deprecate` owed.
+
+Relates to ADR-0035 (the stream cursor contract the keeper's tail and seal used to lean on) and ADR-0037 (the free-form path `fs-cache` served).

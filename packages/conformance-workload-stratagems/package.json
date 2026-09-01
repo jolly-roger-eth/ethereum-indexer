@@ -12,7 +12,6 @@
 	},
 	"devDependencies": {
 		"@etherfold/core": "workspace:*",
-		"@etherfold/fs": "workspace:*",
 		"@etherfold/js-processor": "workspace:*",
 		"@etherfold/processor-entities": "workspace:*",
 		"@etherfold/state-store": "workspace:*",

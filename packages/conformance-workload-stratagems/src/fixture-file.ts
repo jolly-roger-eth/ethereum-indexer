@@ -1,3 +1,20 @@
+/**
+ * Reading and writing the fixture FILES this package commits.
+ *
+ * This used to live in `@etherfold/fs`, a STORAGE package whose every other
+ * export (`keepStateOnFile`, `keepStreamOnFile`, the `storage` helper) had no
+ * consumer: a filesystem keeper serves no supported runtime -- IndexedDB is the
+ * browser backend, SQLite the server one -- so that package was deleted and its
+ * one real consumer moved here. A fixture loader is test material reading test
+ * material; it needs `node:fs` and `node:zlib`, which is exactly why it does NOT
+ * belong in `@etherfold/core` (a package that names no runtime) and why no
+ * storage package needs to exist for it to have a home.
+ *
+ * The parse and the serialize are `@etherfold/core`'s (`parseStreamFixture` /
+ * `serializeStreamFixture`, one format number for the shape); what lives here is
+ * only the FILE convention around them, which is why the gzip choice belongs to
+ * the filename and not to a caller's second argument.
+ */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
