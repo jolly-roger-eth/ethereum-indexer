@@ -1,18 +1,30 @@
 ---
 title: 'An upgraded contract is indexable from its first block'
 slug: an-upgraded-contract-is-indexable-from-its-first-block
+needsAnswers: true
 ---
 
-> **SUPERSEDED ON ITS CENTRAL MECHANISM, 2026-08-28.** This spec argues for per-range ABI
+> **SUPERSEDED ON ITS CENTRAL MECHANISM, 2026-08-28. DO NOT RE-TASK THIS SPEC AS IT STANDS.**
+> `needsAnswers: true` is set for exactly that reason: WORK-CONTRACT.md requires it on a
+> `specs/tasked/` spec that has drifted, so that a re-task cannot fire off the dead model. The spec
+> stays in `specs/tasked/` (it really was tasked, and that is permanent); the flag means "tasked, but
+> do not RE-task or rely on it until reconciled". Its emitted tasks all LANDED and are unaffected.
+>
+> This spec argues for per-range ABI
 > BUCKETS with a block axis in `parse()`, so that a log decodes with "the ABI live at its
 > block". That model was rejected in design review. The boundary block is unknowable in
 > advance, so a live indexer can never fill it in, and it is not block-granular anyway,
 > because the upgrade transaction sits mid-block and logs on either side of it share a block.
 > Decoding stays by topic0 with NO block axis; block ranges survive only as a FETCH-FILTER
 > and invalidation concern. The current design lives in
-> `work/tasks/ready/abi-versions-are-block-ranged.md` (see its re-scope note) and
-> `work/tasks/ready/an-event-is-never-silently-dropped-from-the-fetch-filter.md`, which now
-> BLOCKS it. Where this spec and those tasks disagree, the TASKS win; read this for background.
+> `work/tasks/done/abi-versions-are-block-ranged.md` (see its re-scope note),
+> `work/tasks/done/an-event-is-never-silently-dropped-from-the-fetch-filter.md`, and ADR-0033 and
+> ADR-0034, which are the durable form. Where this spec and those disagree, the TASKS and ADRs win;
+> read this for background only.
+>
+> **The body below still argues the REJECTED design at length and in the present tense** — the
+> "Per-range buckets, not a merged union" decision and the "block axis in the parser" consequence in
+> particular. Read them as the reasoning that was tried, not as prescription.
 
 > Launch snapshot — records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 >

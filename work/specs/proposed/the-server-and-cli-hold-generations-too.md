@@ -116,22 +116,34 @@ filesystem storage is not supported.
    namespaces, and a table per partition would push the log table into dynamic DDL that the server's
    fixed-schema file deliberately excludes.)
 
-   **But the KEY SHAPE is not open, and it must be pinned BEFORE `indexer-server-feed` builds the
-   table, not here.** `CONTEXT.md` already decides that on this runtime the discriminator is
-   STRUCTURAL, part of a composite key every read and write takes, never a field a query may omit
-   and never defaulted. `indexer-server-feed` is ungated and auto-taskable and creates that table
-   with no discriminator in it, so tasked first it ships a primary key AND a public feed cursor and
-   route with no tenant — and retrofitting then costs a primary-key rebuild plus a breaking change to
-   a consumer-facing contract. That is the same argument `node-log-api` already makes for its topic
-   columns, and it is stronger here because the DDL is still free (nothing is deployed) while the
-   cursor contract will not be. Recorded as a finding against that spec, not as a question for this
-   one.
-3. **Does the CLI hold several generations, or one?** A long-running `serve` clearly can. A one-shot
+   **The KEY SHAPE is not open either, and it is now PINNED — this paragraph's premise has been
+   ACTED ON and is kept only so the reasoning is not re-run.** `CONTEXT.md` decides that on this
+   runtime the discriminator is STRUCTURAL, part of a composite key every read and write takes,
+   never a field a query may omit and never defaulted. When this question was written,
+   `indexer-server-feed` was ungated and created that table with no discriminator in it, so tasked
+   first it would have shipped a primary key AND a public feed cursor and route with no tenant.
+   **That is fixed**: that spec now carries BOTH discriminators (the indexer NAME and the STREAM) as
+   columns from the first migration, and it is no longer ungated — it sits in `specs/proposed/` with
+   a `taskedAfter` edge onto `a-reconfigure-is-not-an-outage`. So there is nothing left to do here;
+   do not go and re-fix it. (The original note said this was "recorded as a finding against that
+   spec". It was recorded IN that spec, which is what actually happened and the right home; `finding`
+   is a pinned term for verified EXTERNAL ground truth in `work/notes/findings/` and no such file
+   exists or should.)
+3. **Does the CLI hold several generations, or one?** A long-running server clearly can. A one-shot
    batch arguably should not, and forcing it to would add a pointer read to a path that has no
    reconfigure. If they differ, the difference must be in the HOST rather than in the model.
-   Evidence, checked: `etherfold index` is a one-shot `indexToTip` that exits, and `etherfold serve`
-   lazily imports `@etherfold/platform-nodejs` and runs the same server, so the two verbs are already
-   different HOSTS over shared machinery — which is where the difference would have to live.
+
+   **The EVIDENCE below is written in the PRE-RENAME command vocabulary and the engine it names is
+   being retired — re-check it before answering.** `CONTEXT.md` now pins a five-command set in which
+   the one-shot is **`build`**, `index` is the RECEIVING half of a split, and `serve` is read-only;
+   and `work/specs/ready/one-command-runs-the-whole-pipeline.md` moves all server-side folding onto
+   `StreamBuilder`, so `indexToTip` and `EthereumIndexer` stop being the CLI's engine. The shape of
+   the argument survives — different HOSTS over shared machinery is still where the difference would
+   live — but the nouns do not.
+
+   Evidence as checked at the time: `etherfold index` was a one-shot `indexToTip` that exits, and
+   `etherfold serve` lazily imported `@etherfold/platform-nodejs` and ran the same server, so the two
+   verbs were already different HOSTS over shared machinery.
 4. ~~**Where does `project`'s VALUE come from on a server or CLI?**~~ **ANSWERED, and the concept was
    renamed with it.** There is no `project`: the unit is a NAMED INDEXER (`CONTEXT.md`), because once
    an indexer is one chain and one answer set, a separate tenancy axis above it was a synonym. The

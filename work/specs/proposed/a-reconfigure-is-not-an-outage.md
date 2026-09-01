@@ -175,15 +175,30 @@ indexers over the same shape — see the sibling spec. `chainId` is deliberately
 being already inside the digest. Two generations on one stream READ it;
 only the one that is indexing WRITES it.
 
-**There is NO tenancy component in the browser key, because a browser page carries exactly ONE
-indexer.** An earlier draft put a discriminator in the key here and asserted it was the existing
-caller-supplied `name` renamed. That was wrong on the code: `createIndexerState` takes NO name —
-`keepState` and `keepStream` are separate optional options each closing over their OWN name, an
-entities deployment passes no `keepState` at all and discriminates by `databaseName` (which
-DEFAULTS), and the CLI keeper takes only a folder. There is no single name at the indexer level to
-promote.
+**This spec adds NO NEW tenancy component, because the address ALREADY HAS ONE and it is the
+prerequisite's.** Be exact about this, because the loose phrasing ("there is no tenancy component in
+the browser key") is FALSE against three artifacts at once and an earlier draft of this paragraph
+said it. `CONTEXT.md` pins the indexer NAME as UNIVERSAL, not a server-only concept, and as the TOP
+LEVEL of the stream address everywhere; `appending-to-the-stream-costs-the-batch` and its emitted
+task BUILD that level (`['stream', <indexer-name>, <digest>, <ordinal>]`), with the name supplied by
+the caller; and the browser case is explicitly not hypothetical, since an app watching several
+accounts names one indexer per watched account. So the `<indexer-name>` level EXISTS, a caller DOES
+supply it, and nothing here may collapse or hard-code it — its acceptance criteria assert that two
+names and two chains cannot see each other's data.
 
-More to the point, the browser does not need one. A page carries one indexer; where two unrelated
+What is true, and is all that was ever meant, is narrower: **this spec introduces no SECOND
+discriminator and no composite-key TYPE browser-side.** It fills the DIGEST level and leaves the name
+level exactly as it found it.
+
+An earlier draft went further and asserted the name level was the existing `keepState`/`keepStream`
+option renamed. THAT was wrong on the code, and the correction is worth keeping: `createIndexerState`
+takes NO name — `keepState` and `keepStream` are separate optional options each closing over their
+OWN name, an entities deployment passes no `keepState` at all and discriminates by `databaseName`
+(which DEFAULTS), and the CLI keeper takes only a folder. So the name is not a rename of an existing
+indexer-level value; it is a value the CALLER passes to the keeper, which is what the prerequisite
+built.
+
+Where two unrelated
 indexers share an origin, the EXISTING `name` and `databaseName` already separate them, and that
 mechanism is untouched here.
 
@@ -509,39 +524,71 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    are this landable's.** Say it here and not only in the prose above, because this is where it gets
    BUILT: a landable that read "the filter digest" would key the narrower thing, and two configs
    would then map to one stream, so a generation adopts logs the verdict has already declared
-   invalid. There is NO tenancy component and no composite key type here — a browser page carries one
-   indexer, no caller supplies such a value, and the server's discriminator belongs to
+   invalid. This landable adds NO SECOND discriminator and no composite key type: the
+   `<indexer-name>` level ALREADY EXISTS and is caller-supplied (the prerequisite built it), so fill
+   the DIGEST level and leave the name level untouched. Do NOT collapse or hard-code it — the
+   prerequisite's criteria assert that two names, and two chains, cannot see each other's data. The
+   SERVER's discriminator is a different question and belongs to
    `the-server-and-cli-hold-generations-too`.
 
    **The digest's ENCODING is this landable's**, because the address level has to hold it: it must be
-   a value the substrates can carry as a key element (a string on IndexedDB and a directory name on
-   the filesystem), so a hex or base32 rendering rather than raw bytes, and fixed-length so no
+   a value the substrates can carry as a key element (a string on IndexedDB, a column on SQL), so a
+   hex or base32 rendering rather than raw bytes, and fixed-length so no
    rendering of one digest can be confused with another. There is no enumeration PATTERN to own —
    hierarchical addressing means enumeration is a scoped listing of one level — which is what
    deletes the anchored regex, the cross-chain collision hazard and the temp-name constraint an
    earlier flat-key design had to carry.
 
-   **There is NO MIGRATION and no sweep, because the prerequisite already left the level empty.**
+   **There is NO MIGRATION and no payload rewrite, because the prerequisite already left the level
+   empty. There IS a SWEEP, and it is landable 2's — see below.**
    `appending-to-the-stream-costs-the-batch` addresses a stream as
    `['stream', <indexer-name>, <streamDigest>, <ordinal>]` with a PLACEHOLDER in the digest position. This
    landable computes the real digest and writes it there. Streams under the placeholder are simply
    streams under a different digest: they are unreachable by a filter that now resolves elsewhere,
-   so they are REAPED by the ordinary stream-reaping rule (landable 2), not by a bespoke migration
-   path. That deletes the whole of what this landable used to own here — a resumable per-key payload
-   rewrite, its quota exposure, and then even the sweep that replaced it.
+   so nothing needs to MOVE. That deletes the whole of what this landable used to own here — a
+   resumable per-key payload rewrite and its quota exposure.
+
+   **What it does NOT delete is the DISPOSAL of what is left behind, and an earlier draft was WRONG
+   to hand that to "the ordinary stream-reaping rule".** That rule (landable 2) reaps a stream when
+   its LAST GENERATION goes. A placeholder-keyed subtree was written BEFORE generations existed, so
+   it has no generation whose departure can fire the rule: nothing enumerates it, nothing deletes it,
+   and it does not count against `maxStreams` either, because the registry never learns of it. Left
+   as written, every browser that ran the prerequisite and then upgrades keeps its entire
+   pre-upgrade stream forever — roughly 2 MB stored for the 31,332-log stratagems capture, more for
+   a longer history — in the one runtime where this spec argues at length about storage headroom and
+   refuses to trust `navigator.storage.estimate()`. **Landable 2 therefore owns an UNREGISTERED-SUBTREE
+   SWEEP** (a scoped listing of the `['stream', <indexer-name>]` level, dropping every digest the
+   registry does not know), which is cheap precisely because addressing is hierarchical, and which
+   generalises: it collects an orphan from ANY cause, not just from the placeholder period.
 
    Two things follow that are worth stating so they are not rediscovered:
 
    - **Nothing needs to move because nothing is addressed by content that changed.** Hierarchical
      addressing is what buys this: with a delimited flat key, changing one component re-keyed every
      segment, which is why earlier drafts of this landable carried a migration at all.
-   - **Redefining the digest LATER is equally cheap**, for the same reason: it orphans a subtree that
-     the reaping rule collects. Worth knowing, because the digest rule is the kind of thing that gets
-     refined.
+   - **Redefining the digest LATER is equally cheap**, for the same reason: it orphans a subtree, and
+     the unregistered-subtree sweep above collects it. Worth knowing, because the digest rule is the
+     kind of thing that gets refined — and note that this is exactly why the sweep must key on "the
+     registry does not know this digest" rather than on a known placeholder value.
 
-2. **The generation registry, the canonical pointer, and the caps** — creating a generation, moving
+2. **The generation registry, the canonical pointer, the caps, and the UNREGISTERED-SUBTREE SWEEP**
+   — creating a generation, moving
    the pointer (forward and back), refusing at a cap, deleting a generation or a stream.
-   Independently testable with no indexer running. **It also owes the seeding spec its one
+   Independently testable with no indexer running.
+
+   **The SWEEP is named here because landable 1 cannot perform it and the reaping rule cannot reach
+   it.** Reaping fires when a stream's LAST GENERATION goes; a subtree the registry never knew about
+   has no generation, so it is unreachable by that path and leaks forever (landable 1 carries the
+   full reasoning and the measured cost). This landable is where the registry exists, so it is the
+   only place that can answer "which digests are known". Build it as: a SCOPED listing of the
+   `['stream', <indexer-name>]` level, dropping every digest subtree with no generation in the
+   registry. Assert it against the case that creates it — write a stream under the prerequisite's
+   placeholder digest, bring up the registry, and assert the subtree is gone and the live streams
+   are untouched — and assert it is IDEMPOTENT and never touches another indexer NAME's subtree.
+   Run it on registry open rather than on a timer, since that is the one moment the known set is
+   authoritative and nothing is mid-write.
+
+   **It also owes the seeding spec its one
    obligation**: creating a generation takes its starting stream as an INPUT, so a generation never
    assumes it must fetch its own history. Build creation backfill-only and
    `a-generation-can-be-seeded-from-a-published-artifact` has to re-open the seam the split was made
@@ -581,6 +628,19 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    (`web-demo`, `event-processor-nfts`, `browser-reference`, `basic`, `mud`). Four further edit sites
    are unowned unless named: the README usage block, two JSDoc examples in
    `packages/browser/src/IndexerState.ts`, the JSDoc in `BrowserStateStore.ts`, and `CONTEXT.md`.
+
+   **CUT THIS LANDABLE AS EXPAND → MIGRATE → CONTRACT, or it cannot compile per batch.** It changes
+   TWO non-indirected surfaces at once — an exported CLASS NAME and the `createIndexerState`
+   signature — across 37 call sites plus five example apps, which is precisely the shape
+   `TASKING-PROTOCOL` §3a's wide-refactor rule exists to catch: a linear hard swap of a
+   non-indirected identifier read at that many sites cannot leave `pnpm -r build` green in
+   isolation. The three batches: **expand** (add the new class name as the real export with the old
+   name aliased to it, and accept BOTH the old and the new factory shape), **migrate** (move the 37
+   call sites, the five examples and the four doc sites onto the new forms; purely additive, green
+   throughout), **contract** (delete the alias and the old factory shape, with the changeset).
+   Alternatively, state explicitly why a single swap compiles alone — but do not leave it
+   unaddressed, because "BREAKING and mostly mechanical" is exactly how the last one read before it
+   stopped at build time.
 5. **Pause and resume by CAP AND DRAIN** — cap `toBlock`, keep polling until the cap falls below
    `latestBlock - finality`, then idle; resume by removing the cap. It truncates nothing and reverts
    nothing, and `revertTo` is NOT on this path. Two build details the prose settles: the cap must be
@@ -637,11 +697,18 @@ serialise them with `blockedBy`. A workable order is (1) and (2), then (3), then
 (5), then (6), then (7).
 
 **Story-to-landable map, so a hole is visible rather than argued:** 1 → 6 (over 8 and 4); 2 → 1 + 4;
-3 → 1 + 6 (over 8); 4 → 2; 5 → 7; 6 → 4; 7 → 3; 8 → 2; 9 → 2; 10 → 5; 11 → 1; 12 → 7;
-13 → 6 (over 8); 14 → 6 (over 8). Every story has a deliverer and no landable is an orphan. The
+3 → 1 + 6 (over 8); 4 → 2; 5 → 7; 6 → 4; 7 → 3 (over 4); 8 → 2; 9 → 2; 10 → 5; 11 → 1; 12 → 7;
+13 → 6 (over 8); 14 → 6 (over 8). Every story has a deliverer. The
 four stories annotated "over 8" are the ones landable 8 lists as needing a RUNNING non-canonical
 generation; 6 is what makes each of them observable, which is why 6 is the named deliverer and 8 is
-the dependency.
+the dependency. Story 7 carries the same annotation for the same reason: landable 3 is deliberately
+ADDITIVE (it publishes the verdict while the verbs still discard as they do today), so a no-op
+reconfigure is not OBSERVABLY free until landable 4 removes the discard.
+
+**Landable 8 is never a NAMED deliverer, and that is deliberate rather than an orphan.** It is the
+dependency under four stories (1, 3, 13, 14) whose observable behaviour landable 6 delivers. Said
+plainly because the map's earlier phrasing ("no landable is an orphan") reads as a claim the map
+itself does not make.
 
 ## Out of Scope
 
@@ -651,9 +718,15 @@ the dependency.
 
   **If it is ever built, it makes a REMOVABLE thing PERMANENT, and that cost must be counted at the
   time.** `appending-to-the-stream-costs-the-batch` keeps a prefix on a gap rather than clearing, and
-  isolates that recovery so it can be dropped later; the SCANNED EXTENT a sealed segment carries
-  exists solely to enable it and is required to have exactly one reader. Prefix sharing wants that
-  same extent for a second purpose, which would make both it and the recovery load-bearing forever.
+  isolated that recovery so it could be dropped later. **BOTH ARE NOW GONE, and the cost argument
+  changes shape rather than disappearing.** ADR-0035's amendment withdrew the per-segment SCANNED
+  EXTENT, the prefix-keeping gap recovery and the SEAL itself; a segment is `{events}` and nothing
+  else, and an inconsistent stream is CLEARED rather than repaired. So prefix sharing can no longer
+  make an existing mechanism permanent — it would have to REINTRODUCE the extent (or an equivalent)
+  from nothing, and own it alone. That is a cleaner trade than the one this paragraph used to
+  describe, and a strictly larger build. Do not read the old form and go looking for an extent to
+  reuse: there is none.
+
   Note also that it is not as cheap as it sounds: a segment lives under exactly ONE stream's subtree
   and a superset filter yields a DIFFERENT digest, so reuse needs an indirection from one stream's
   address to another's segments — which is the head pointer that spec rejected on merit, and which
@@ -673,7 +746,9 @@ an entity row's half-open block-validity range (`CONTEXT.md`), and a processor's
 which is an INPUT to a generation's identity here rather than the thing itself, so the same word
 would mean two things one sentence apart. `deployment` is worse (it already means the fetcher/server
 topology and a browser installation, both a level ABOVE this). `candidate` is taken by the entity
-snapshot path. `generation` had zero prior uses in `CONTEXT.md`, `packages/*/src` or `docs/adr/`, and
+snapshot path. `generation` had zero prior uses ANYWHERE when this spec was written (it is now, of
+course, used throughout `CONTEXT.md` and cited by ADRs 0008, 0033, 0036 and 0037 — all of them
+downstream of this spec); it remains unused in `packages/*/src`, which is the half that matters, and
 is pinned in the `CONTEXT.md` glossary alongside `stream`, `indexer` and `canonical pointer`.
 
 The design record `work/notes/ideas/stream-grafting-what-we-established.md` carries the invariants
