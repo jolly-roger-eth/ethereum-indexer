@@ -1,12 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import {
 	BlockNotRetainedError,
+	ENTITY_SNAPSHOT_FORMAT,
 	MemoryStateStore,
 	openSnapshotAware,
 	RevertBeyondSnapshotError,
 	SnapshotFormatError,
 	SnapshotProcessorMismatchError,
-	SNAPSHOT_FORMAT,
 	type StateSnapshot,
 	type StateStore,
 } from '../src/index.js';
@@ -29,7 +29,7 @@ const TAKEN_AT = 1_000;
 
 function snapshotAt(number: number, options: Partial<StateSnapshot> = {}): StateSnapshot {
 	return {
-		format: SNAPSHOT_FORMAT,
+		format: ENTITY_SNAPSHOT_FORMAT,
 		processor: 'proc-v1',
 		savedAt: '2026-08-24T00:00:00.000Z',
 		takenAt: block(number),

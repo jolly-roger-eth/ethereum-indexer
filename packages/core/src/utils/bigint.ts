@@ -36,8 +36,9 @@
  * ending in `n` would refuse legitimate event data. Where a persisted artifact
  * carries a FORMAT number the number was bumped instead, so a file written under
  * the old convention is refused AS A FILE by its own reader rather than
- * half-decoded here: `STREAM_FIXTURE_FORMAT` (`stream/fixture.ts`) and the CLI's
- * `SNAPSHOT_FORMAT` (`@etherfold/cli`, `keepState.ts`) both went to 2.
+ * half-decoded here: `STREAM_FIXTURE_FORMAT` (`stream/fixture.ts`) and the
+ * blob snapshot's `BLOB_SNAPSHOT_FORMAT` (`snapshot.ts`, the number the CLI's
+ * keeper writes) both went to 2.
  *
  * The one place `"123n"` still appears is INSIDE `simple_hash`, which renders a
  * BigInt that way purely to have bytes to hash. Nothing ever decodes that, so

@@ -2,7 +2,8 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createFileKeepState, filepaths, SNAPSHOT_FORMAT} from '../src/keepState.js';
+import {BLOB_SNAPSHOT_FORMAT} from '@etherfold/core';
+import {createFileKeepState, filepaths} from '../src/keepState.js';
 
 // Minimal ProcessorContext for filename derivation (contextFilenames hashes source/config/version).
 const CONTEXT: any = {
@@ -90,7 +91,7 @@ describe('createFileKeepState — snapshot envelope (HIGH-2)', () => {
 
 		const {stateFile} = filepaths(folder, CONTEXT);
 		const raw = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
-		expect(raw.format).toBe(SNAPSHOT_FORMAT);
+		expect(raw.format).toBe(BLOB_SNAPSHOT_FORMAT);
 		expect(raw.processor).toBe('hash-abc');
 		expect(typeof raw.savedAt).toBe('string');
 		// and it still round-trips

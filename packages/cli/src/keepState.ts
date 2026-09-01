@@ -1,4 +1,12 @@
-import {Abi, KeepState, ProcessorContext, taggedBnReplacer, taggedBnReviver} from '@etherfold/core';
+import {
+	Abi,
+	BLOB_SNAPSHOT_FORMAT,
+	isReadableBlobSnapshot,
+	KeepState,
+	ProcessorContext,
+	taggedBnReplacer,
+	taggedBnReviver,
+} from '@etherfold/core';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -8,26 +16,16 @@ import {contextFilenames} from '@etherfold/utils';
 const logger = logs('etherfold:keepState');
 
 /**
- * Current on-disk snapshot envelope version. The state file is written as
- * `{format, processor, savedAt, lastSync, state, history}`.
+ * This keeper is the WRITER of the blob snapshot envelope, and the number saying
+ * which encoding it wrote lives in `@etherfold/core`
+ * (`BLOB_SNAPSHOT_FORMAT`), with the codec it versions.
  *
- * ## Why it is 2, and why an older one is now REFUSED
- *
- * Format 1 (and the bare pre-envelope form, which reads as `format ===
- * undefined`) encoded BigInts by suffixing their decimal form with `n`, and
- * decoded by recognising that suffix. `"123n"` is also a perfectly legal string
- * for a contract to emit, so that decoder had to guess, and it silently changed
- * the type of whichever it got wrong. Format 2 tags them instead
- * (`taggedBnReplacer`, `@etherfold/core`).
- *
- * Reads used to accept the older forms. They no longer can: this reader does not
- * interpret `"123n"`, so accepting a format-1 file would resume from a state
- * whose every `uint256` had quietly become a string, and a wrong resume is worse
- * than no resume. An unrecognised format takes the same path a corrupt file
- * takes -- logged, then a cold start -- because re-indexing is the recovery for
- * a snapshot that cannot be read, and this is one.
+ * It used to be this module's own constant, which is why the published snapshot
+ * a browser downloads went unchecked for so long: `@etherfold/browser` cannot
+ * depend on this package (it must bundle for a tab), so the one reader that
+ * needed the number most could not see it. It is not re-exported from here
+ * either -- one constant, one home, imported by writer and readers alike.
  */
-export const SNAPSHOT_FORMAT = 2;
 
 export function filepaths(folder: string, context: ProcessorContext<Abi, any>) {
 	const {stateFile, lastSyncFile} = contextFilenames(context);
@@ -83,11 +81,11 @@ export function createFileKeepState<ABI extends Abi>(folder: string): KeepState<
 			}
 			try {
 				const json = JSON.parse(content, taggedBnReviver);
-				if (json?.format !== SNAPSHOT_FORMAT) {
+				if (!isReadableBlobSnapshot(json)) {
 					// Not this build's encoding, so its BigInts cannot be recovered here.
-					// See SNAPSHOT_FORMAT: cold starting is the honest answer.
+					// See BLOB_SNAPSHOT_FORMAT: cold starting is the honest answer.
 					logger.error(
-						`snapshot at ${stateFile} is format ${json?.format} and this build writes ${SNAPSHOT_FORMAT}, treating as no snapshot`,
+						`snapshot at ${stateFile} is format ${(json as any)?.format} and this build reads ${BLOB_SNAPSHOT_FORMAT}, treating as no snapshot`,
 					);
 					return undefined as any;
 				}
@@ -106,7 +104,7 @@ export function createFileKeepState<ABI extends Abi>(folder: string): KeepState<
 		save: async (context, all) => {
 			const {stateFile, lastSyncFile} = filepaths(folder, context);
 			const envelope = {
-				format: SNAPSHOT_FORMAT,
+				format: BLOB_SNAPSHOT_FORMAT,
 				processor: (all.lastSync as any)?.context?.processor,
 				savedAt: new Date().toISOString(),
 				lastSync: all.lastSync,
