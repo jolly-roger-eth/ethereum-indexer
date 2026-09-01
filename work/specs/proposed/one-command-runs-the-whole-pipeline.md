@@ -39,19 +39,19 @@ choice made when a chain-facing host and a serving host genuinely need to be dif
 **Five commands, named for the DEPLOYMENT INTENT rather than for the internal split**, so choosing one
 needs no knowledge of how the components divide:
 
-| command | follows the chain | folds into state | serves HTTP | database |
-| --- | --- | --- | --- | --- |
-| **`serve`** | yes | yes | yes | owns it |
-| **`index`** | yes | yes | no | owns it |
-| **`fetch`** | yes | no | no | none |
-| **`ingest`** | no | yes | yes | owns it |
-| **`query`** | no | no | yes | reads one written elsewhere |
+| command | follows the chain | folds into state | serves HTTP | terminates | database |
+| --- | --- | --- | --- | --- | --- |
+| **`serve`** | yes | yes | yes | no | owns it |
+| **`build`** | yes | yes | no | at the tip | owns it |
+| **`fetch`** | yes | no | no | no | none |
+| **`index`** | no | yes | yes | no | owns it |
+| **`query`** | no | no | yes | no | reads one written elsewhere |
 
-The compositional story is the point, and it is true rather than a slogan: **`serve` is `fetch` plus
-`ingest` in one process**, which is precisely what `createDirectIngestion` already expresses — the same
-`LogFetcher` and the same `StreamBuilder`, with the transport as the only difference (`CONTEXT.md`,
-"the wire is a deployment choice, not two implementations"). No component is implemented twice, and no
-command is a special case of another's code.
+Two compositions, and both are true of the CODE rather than slogans: **`serve` is `fetch` plus `index`
+in one process**, which is precisely what `createDirectIngestion` expresses — the same `LogFetcher` and
+the same `StreamBuilder`, with the transport as the only difference (`CONTEXT.md`, "the wire is a
+deployment choice, not two implementations"); and **`build` is `serve` without the serving, stopping at
+the tip**. No component is implemented twice, and no command is a special case of another's code.
 
 **`serve` is the priority and the default thing to reach for.** It is the one that must work on any
 Node runtime, and it is the one this spec exists to create.
@@ -73,8 +73,8 @@ and a reader should not assume it is imminent.
    splitting is a deployment decision I can defer and then reverse.
 4. As an operator, I want to run a read-only endpoint over a database something else writes, so the
    serving tier can scale or move without carrying an indexer with it.
-5. As the snapshot pipeline, I want the one-shot index-to-tip path to keep working, because
-   `stratagems-snapshots` shells out to it and a rename that silently drops it breaks a consumer we own.
+5. As a developer or a CI job, I want a command that follows the chain, folds, and EXITS at the tip, so
+   I can produce a database or a publishable artifact reproducibly without running a server.
 6. As an operator, I want `/status` to tell me the cursor, the reorg counters and the schema version, so
    a running deployment is observable without a query layer existing yet.
 7. As a developer choosing a command, I want the NAMES to describe what the process does for me, so I do
@@ -88,21 +88,30 @@ through `createDirectIngestion`, gives the stream-builder an `EntityEventProcess
 `getDB`, and drives the whole thing with `runFetcherLoop`. Every one of those exists. If a task finds
 itself designing a component, it has left this spec.
 
-**`index` KEEPS its current meaning** — follow the chain, fold, stop at the tip, exit — because
-`stratagems-snapshots` depends on that behaviour. What changes is only that it must accept an ENTITY
-processor, which is `index-to-a-store-from-the-cli`'s job and why that task lands first.
+**The names are chosen freely, and NOTHING in the existing CLI constrains them.** Say so explicitly,
+because the opposite was assumed once already: an earlier draft of this spec preserved `index`'s
+current meaning on the ground that `stratagems-snapshots` shells out to it. That is not a constraint.
+Nothing is published, stratagems is a CAPABILITY REFERENCE rather than a compatibility constraint
+(`CONTEXT.md`), and any consumer we own is ours to update in the same change. Renaming and re-meaning
+every command is free; the only cost is a changeset and a README.
 
-**`fetch` is NOT called `index`, and the distinction is worth defending.** A fetch-only process does
-not index: it holds no cursor, no state and no database, and ADR-0003 made it stateless on purpose.
-Naming it `index` would attach the project's central verb to the one component that does none of it,
-and would leave the thing that DOES index without a name. `fetch` also matches the domain term
-(`log-fetcher`) exactly. Note the retired word: this component used to be the "watcher" and ADR-0003
-renamed it; do not bring that back.
+**`index` is the FOLDING half, because indexing is turning logs into state.** The half that fetches
+holds no cursor, no state and no database — ADR-0003 made it stateless on purpose — so it has the
+weakest claim to the project's central verb, and naming it `index` would leave the component that
+actually indexes without a name. `fetch` matches the domain term (`log-fetcher`) exactly. Note the
+retired word: that component used to be the "watcher" and ADR-0003 renamed it; do not bring it back.
 
-**`ingest` is named for the route and the type it already has** (`/ingest`, `LogIngestion`), which is
-what a reader will meet in the code. It serves HTTP as well as folding, so the name undersells it
-slightly; that is accepted, because the alternative names either collide with `serve` or describe the
-internal split the table exists to hide.
+**`build` is the one-shot, and it is named for what it PRODUCES.** Follow the chain, fold, stop at the
+tip, exit — for CI, for a reproducible local database, and later for producing an artifact a browser
+can seed from (a captured stream or a state snapshot, `a-generation-can-be-seeded-from-a-published-artifact`).
+"Run my indexer" and "make a thing, then stop" are different intents and each has users, which is why
+this is a command rather than a flag on `serve`.
+
+**`query` is defined now and earns its keep later.** With no query layer it would serve `/status` and
+nothing else, which is not much of a product. It is specified here so the SHAPE is fixed — a serving
+tier that holds no processor and writes nothing — and so that `serve` and `index` are not accidentally
+built in a way that assumes the writer and the reader are the same process. Do not let its thinness
+today argue for folding it into `serve` as a flag.
 
 **`query` expects a remote database, and libSQL makes that free.** `createClient` takes `libsql:`,
 `http(s):` and `ws(s):` URLs, so a read tier connects to a Turso database the writer also uses with no
@@ -124,8 +133,8 @@ deployment change and never a rewrite. That is story 12 of `one-processor-everyw
 - **`serve` and `fetch` + `ingest` produce identical state** from the same fixture, which is the
   concrete form of "the split is a deployment choice": the same components, the transport as the only
   difference.
-- **`index` still terminates at the tip and exits non-zero on failure**, because a snapshot pipeline
-  shells out to it and reads the exit code.
+- **`build` terminates at the tip and exits non-zero on failure**, so a CI job can depend on its exit
+  code rather than on parsing output.
 - **`query` serves reads against a database it did not write**, and refuses to write.
 - **No command silently degrades**: a missing node URL, an unreachable database or an absent processor
   is a refusal that names the flag, not a process that starts and does nothing.
@@ -140,7 +149,7 @@ deployment change and never a rewrite. That is story 12 of `one-processor-everyw
 - **The log FEED and its two views**, which are `indexer-server-feed`.
 - **Generations, the canonical pointer and multi-indexer hosting**, which are
   `a-reconfigure-is-not-an-outage` and `the-server-and-cli-hold-generations-too`. This spec is one
-  indexer per process; `ingest` and `query` gain the indexer-name route segment when that lands.
+  indexer per process; `index` and `query` gain the indexer-name route segment when that lands.
 - **Triggers**, which are a separate deliverable entirely (ADR-0005).
 - **A serverless shape for `serve` or `fetch`.** A cron cannot follow a chain (`CONTEXT.md`); the
   chain-facing half needs a host that can hold a process.
@@ -148,7 +157,10 @@ deployment change and never a rewrite. That is story 12 of `one-processor-everyw
 ## Further Notes
 
 The tasks this emits should be `blockedBy` `index-to-a-store-from-the-cli`, which is what makes the CLI
-accept an entity processor at all and is currently unblocked in `work/tasks/backlog/`.
+accept an ENTITY processor at all (today it throws `this processor do not support "keepState" config`)
+and is currently unblocked in `work/tasks/backlog/`. Note that task is written against the CLI's
+current `index` command; under this spec's names its work lands in `build` and `serve`, which is a
+rename of where it goes and not a change to what it does.
 
 `server-platform-adapters` records that both host adapters are already built and that its one remaining
 criterion — D1's statement and size limits reaching the store's chunk bound — was blocked on the server
