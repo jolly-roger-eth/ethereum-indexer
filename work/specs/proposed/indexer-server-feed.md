@@ -6,6 +6,10 @@ taskedAfter: [historical-state-database, a-reconfigure-is-not-an-outage]
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 
+> **MOVED BACK to `specs/proposed/` on 2026-09-01, because `ready/` MEANS taskable and this spec is not.** It carries `taskedAfter: [historical-state-database, a-reconfigure-is-not-an-outage]` and the second of those is still in `specs/proposed/`, so residence in the auto-task pool was a claim the frontmatter contradicts. Left there it invited exactly the outcome the Implementation Decisions spend three paragraphs preventing: a tasker emitting the emission table keyed on a stream digest that does not exist yet.
+>
+> **The edge is a CHOICE and can be broken deliberately, which is the useful half.** As the `taskedAfter` justification below already records, it rests on building the digest rule ONCE rather than on migration cost: with no data and no consumers this table could legitimately be built on a placeholder key and re-keyed later. So if the server tier needs to move before the browser generation model does, drop the `a-reconfigure-is-not-an-outage` edge and accept a second digest implementation (or a placeholder), rather than moving this file back into `ready/` with the edge still on it.
+
 > Split out of `historical-state-database` at tasking time. That spec's user stories cover state queries, the ingestion wire and running serverlessly. The scope here (storing the log stream and serving it as a feed) arrived later, via `docs/adr/0006`, and is not covered by any of its stories. Tasking is atomic per spec, so this scope becomes its own spec rather than being smuggled into that one.
 
 > **NARROWED: the REBUILD is no longer here.** Stories 9-11 moved to `work/specs/proposed/the-server-and-cli-hold-generations-too.md`, which supersedes them (see the note where they were). This spec owns the STORAGE and the FEED and nothing about upgrades; that spec is `taskedAfter` this one because it consumes the table this one creates.

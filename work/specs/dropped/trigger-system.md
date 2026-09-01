@@ -12,7 +12,7 @@ slug: trigger-system
 >
 > **WHAT THIS REPO STILL OWES IT is the point of keeping this file**, and it is small and already
 > owned: a FEED, and HISTORIC QUERY. The consumer contract is written out below so a platform change
-> can be checked against it rather than against memory. `work/specs/ready/indexer-server-feed.md`
+> can be checked against it rather than against memory. `work/specs/proposed/indexer-server-feed.md`
 > carries the feed half and `work/specs/tasked/historical-state-database.md` the query half; two
 > genuine gaps found while writing this contract are recorded in that feed spec's Implementation
 > Decisions rather than left here.
