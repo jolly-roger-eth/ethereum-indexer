@@ -90,6 +90,35 @@ The seam's only set read is a **prefix of the declared id plus a required limit*
 
 This is the modelling rule the spec states as *"key children by something naturally unique, never by a dense array position"*, met in the smallest real case.
 
+## The same processor, on a server
+
+The claim this example exists to make is that `src/entities.ts` names no backend. Here is that claim as a command: the file the tab runs, run by `etherfold index` into SQLite, with **not one line of it changed**.
+
+```sh
+pnpm --filter event-processor-nfts build
+NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000 \
+  pnpm --filter event-processor-nfts index -n https://rpc.mevblocker.io
+```
+
+`src/cli.ts` is the whole difference, and it adds no indexing logic: it imports `NFTProcessor` as-is, tags it `{kind: 'entities', processor}` so the CLI knows which of the two authoring paths this is, and says what to index per chain. A browser page needs neither, because `browser/main.ts` passes both at the call site.
+
+What you should see: block counters climbing (`21000123 / 21456789`), then the process **exits 0** at the tip — it is a one-shot, not a server. What lands is `nfts.db`, holding the same two entities the tab keeps in IndexedDB:
+
+```sh
+sqlite3 nfts.db 'select * from counter'          # transfers, and the refused ERC-20 lookalikes
+sqlite3 nfts.db 'select * from nft limit 5'      # who owns which token, with its block-validity range
+```
+
+| flag | |
+| --- | --- |
+| `--store sqlite` | REQUIRED, and it names where the state goes. `file` is the free-form path (`src/index.ts`), and it refuses this processor: an entity processor's state *and* its sync cursor live in the store ([ADR-0027](../../docs/adr/0027-the-sync-cursor-lives-behind-the-storage-seam-as-an-opaque-string.md)) |
+| `--db file:./nfts.db` | a libSQL url. `libsql://…` points the same command at Turso |
+| `--retention <blocks>` | how far back superseded versions are kept, in BLOCK numbers. Nothing prunes automatically: pruning is a call a host schedules ([ADR-0022](../../docs/adr/0022-pruning-is-a-call-the-host-schedules-not-a-side-effect-of-a-write.md)) |
+
+Stop it with `Ctrl-C` half way and run it again: it continues from the cursor in the database rather than re-indexing, for the same reason the tab resumes on reload. `test/cli.test.ts` runs this whole path against a fake node, so "the browser's processor runs under the CLI" is checked rather than claimed.
+
+**One collection, not every address.** The browser app indexes *one account's* tokens across every collection, which it does with a topic filter it passes to the indexer; a command line has no way to express that, so the CLI entry indexes one contract instead. Point `NFT_CONTRACT` anywhere; `NFT_START_BLOCK` is a recent block rather than the collection's deployment, because the first sync is what you wait for.
+
 ## The two processors in `src/`
 
 | file | authoring API | state |
@@ -97,7 +126,7 @@ This is the modelling rule the spec states as *"key children by something natura
 | `entities.ts` | `EntityProcessor` (`@etherfold/processor-entities`) | declared entities, written through a `MutationContext`, kept in whichever `StateStore` the deployment chose |
 | `index.ts` | `JSProcessor` (`@etherfold/js-processor`) | one free-form object, mutated as an immer draft, persisted whole by a `KeepState` keeper |
 
-`entities.ts` is what the browser app runs, and it is the same object a server runs against SQLite: nothing in it names a backend.
+`entities.ts` is what the browser app runs, and it is the same object a server runs against SQLite: nothing in it names a backend. `cli.ts` is not a third processor — it is the entry `etherfold index` loads, and it imports `entities.ts` unchanged (see above).
 
 `index.ts` is the original, kept because the free-form path is not deprecated and `examples/web-demo` consumes it. Having both is deliberate: this is the one place in the repository where the same indexing question is written in both styles, so the cost of porting between them is readable in a diff.
 

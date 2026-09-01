@@ -38,6 +38,13 @@ yalc.lock
 # CLI example output
 output.json
 indexed/
+# ...and what `etherfold index --store sqlite` writes: a libSQL database file
+# (plus the -wal / -shm SQLite leaves beside it) is indexed STATE, rebuildable
+# from the chain, so it is never source
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Docs (vitepress)
 /docs/.vitepress/*

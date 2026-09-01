@@ -1,0 +1,203 @@
+import type {EntityProcessor} from '@etherfold/processor-entities';
+import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
+
+// ---------------------------------------------------------------------------------------------------
+// A CHAIN, TWO PROCESSOR MODULES
+// ---------------------------------------------------------------------------------------------------
+// Everything the CLI tests need to drive `etherfold index` without a node: raw
+// ERC-721 `Transfer` logs served by a fake provider, and the two shapes of
+// processor module the command must tell apart -- one tagged `'entities'`, one
+// untagged (which is what `'js-object'` looks like on disk).
+// ---------------------------------------------------------------------------------------------------
+
+export const abi = [
+	{
+		anonymous: false,
+		inputs: [
+			{indexed: true, internalType: 'address', name: 'from', type: 'address'},
+			{indexed: true, internalType: 'address', name: 'to', type: 'address'},
+			{indexed: true, internalType: 'uint256', name: 'id', type: 'uint256'},
+		],
+		name: 'Transfer',
+		type: 'event',
+	},
+] as const;
+
+/** Digits only, so the decoder's EIP-55 checksum casing cannot change what an assertion must quote. */
+export const CONTRACT = '0x0000000000000000000000000000000000000099';
+export const ALICE = '0x0000000000000000000000000000000000000011';
+export const BOB = '0x0000000000000000000000000000000000000022';
+export const CAROL = '0x0000000000000000000000000000000000000033';
+export const ZERO = '0x0000000000000000000000000000000000000000';
+
+/**
+ * Realistic block numbers, deliberately.
+ *
+ * The unconfirmed window reaches `latestBlock - finality` (17 by default), so a
+ * chain living at block 100 would put every resume back at block 0 and make
+ * "did this run resume?" unanswerable. A start block well above the finality
+ * depth is what makes the resumed fetch observable.
+ */
+export const START_BLOCK = 1_000_000;
+
+const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+export type RawLog = {
+	blockNumber: string;
+	blockHash: string;
+	transactionIndex: string;
+	removed: boolean;
+	address: string;
+	data: string;
+	topics: string[];
+	transactionHash: string;
+	logIndex: string;
+	blockTimestamp: string;
+};
+
+const hex = (value: number | bigint) => `0x${value.toString(16)}`;
+const addressTopic = (address: string) => `0x${address.slice(2).toLowerCase().padStart(64, '0')}`;
+
+/** A plausible timestamp for a block: 12s slots from a fixed epoch, so a store can record blocks. */
+export const timestampOf = (blockNumber: number) => 1_600_000_000 + blockNumber * 12;
+
+let logCounter = 0;
+
+export function transfer(
+	blockNumber: number,
+	blockHash: string,
+	from: string,
+	to: string,
+	id: bigint,
+	logIndex = 0,
+): RawLog {
+	logCounter++;
+	return {
+		blockNumber: hex(blockNumber),
+		blockHash,
+		transactionIndex: '0x0',
+		removed: false,
+		address: CONTRACT,
+		// every argument is indexed on this ABI, so the data is empty and the id rides in topic 3
+		data: '0x',
+		topics: [TRANSFER_TOPIC, addressTopic(from), addressTopic(to), `0x${id.toString(16).padStart(64, '0')}`],
+		transactionHash: `0x${logCounter.toString(16).padStart(64, '0')}`,
+		logIndex: hex(logIndex),
+		blockTimestamp: hex(timestampOf(blockNumber)),
+	};
+}
+
+/** A node that serves one branch of one chain at a time, and remembers what it was asked. */
+export function fakeChain(chainId = 1) {
+	const calls: {method: string; params?: any}[] = [];
+	let served: RawLog[] = [];
+	let tip = 0;
+	return {
+		calls,
+		/** Every `eth_getLogs` this chain was asked for, in order. */
+		get logRanges(): {from: number; to: number}[] {
+			return calls
+				.filter((call) => call.method === 'eth_getLogs')
+				.map((call) => ({
+					from: parseInt(call.params[0].fromBlock.slice(2), 16),
+					to: parseInt(call.params[0].toBlock.slice(2), 16),
+				}));
+		},
+		serve(logs: RawLog[], latestBlock: number) {
+			served = logs;
+			tip = latestBlock;
+			return this;
+		},
+		provider: {
+			async request(args: {method: string; params?: any}): Promise<any> {
+				calls.push(args);
+				switch (args.method) {
+					case 'eth_chainId':
+						return hex(chainId);
+					case 'eth_blockNumber':
+						return hex(tip);
+					case 'eth_getLogs': {
+						const from = parseInt(args.params[0].fromBlock.slice(2), 16);
+						const to = parseInt(args.params[0].toBlock.slice(2), 16);
+						return served.filter((log) => {
+							const blockNumber = parseInt(log.blockNumber.slice(2), 16);
+							return blockNumber >= from && blockNumber <= to;
+						});
+					}
+				}
+				throw new Error(`unexpected method ${args.method}`);
+			},
+		} as any,
+	};
+}
+
+/** A provider that answers nothing, so a test can assert a refusal cost no RPC call. */
+export function noChain() {
+	const calls: string[] = [];
+	return {
+		calls,
+		provider: {
+			async request(args: {method: string}): Promise<never> {
+				calls.push(args.method);
+				throw new Error(`the CLI called ${args.method} before it had refused an impossible configuration`);
+			},
+		} as any,
+	};
+}
+
+// ---------------------------------------------------------------------------------------------------
+// the processors
+// ---------------------------------------------------------------------------------------------------
+
+/** "Who owns this token", plus a counter that a reorg must be able to bring DOWN. */
+export const nftProcessor: EntityProcessor<typeof abi> = {
+	version: '1.0.0',
+	entities: [
+		{name: 'nft', id: ['tokenID'], fields: {owner: 'text'}},
+		{name: 'counter', id: ['name'], fields: {value: 'integer'}},
+	],
+	async onTransfer(state, event) {
+		const tokenID = event.args.id.toString().padStart(78, '0');
+		const to = event.args.to.toLowerCase();
+		if (to === ZERO) {
+			state.delete('nft', {tokenID});
+		} else {
+			state.set('nft', {tokenID}, {owner: to});
+		}
+		const counter = await state.get<{value: number}>('counter', {name: 'transfers'});
+		state.set('counter', {name: 'transfers'}, {value: (counter?.value ?? 0) + 1});
+	},
+};
+
+type JSData = {transfers: number; owners: Record<string, string>};
+
+const jsProcessor: JSProcessor<typeof abi, JSData> = {
+	version: '1.0.0',
+	construct(): JSData {
+		return {transfers: 0, owners: {}};
+	},
+	onTransfer(data, event) {
+		data.transfers++;
+		data.owners[event.args.id.toString()] = event.args.to.toLowerCase();
+	},
+};
+
+const contractsDataPerChain = {'1': [{abi, address: CONTRACT, startBlock: START_BLOCK}]};
+
+/**
+ * The module an ENTITY deployment ships: `createProcessor` returns the tag.
+ *
+ * The same `{kind, processor}` shape `@etherfold/browser` takes, and the same
+ * two words. What it carries is the AUTHORING object, because the store is the
+ * deployment's choice: the CLI builds the runtime around it.
+ */
+export const entityModule = {
+	createProcessor: () => ({kind: 'entities', processor: nftProcessor}) as const,
+	contractsDataPerChain,
+};
+
+/** The module every shipped deployment has: no tag at all, which means `'js-object'`. */
+export const jsObjectModule = {
+	createProcessor: fromJSProcessor(jsProcessor),
+	contractsDataPerChain,
+};

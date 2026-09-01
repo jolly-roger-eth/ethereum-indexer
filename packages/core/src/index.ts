@@ -8,6 +8,15 @@ export * from './directIngestion.js';
 export type {RetryPolicy} from './internal/utils/retry.js';
 export * from './utils/index.js';
 export type {ReorgCause, ReorgDetection} from './internal/engine/utils.js';
+/**
+ * Exported because a HOST has to size things against the finality this stream
+ * actually runs with, and there is exactly one implementation of that default
+ * (see the function). A host that re-stated `finality` to configure, say, a
+ * store's retention floor would be pinning a number that the wire identity is
+ * hashed from, so it would keep working right up until the default moved and
+ * then silently fork the config hash.
+ */
+export {resolveStreamConfig} from './internal/engine/utils.js';
 export * from './stream/fixture.js';
 export * from './stream/capture.js';
 

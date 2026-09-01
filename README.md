@@ -16,6 +16,16 @@ pnpm --filter event-processor-nfts browser
 
 Opens a tab that indexes an ERC-721 collection off a real chain, with no server and no database to provision: one processor, its state in IndexedDB, and a reload that CONTINUES from its cursor instead of starting again. [`examples/event-processor-nfts`](https://github.com/wighawag/etherfold/blob/main/examples/event-processor-nfts/README.md) says what to expect and how to swap the storage backend in one line.
 
+The same processor file, on a server, into SQLite — not a port of it, the file itself:
+
+```sh
+pnpm --filter event-processor-nfts build
+NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000 \
+  pnpm --filter event-processor-nfts index -n https://rpc.mevblocker.io
+```
+
+`etherfold index --store sqlite --db <libsql url>` runs an entity processor into versioned rows and exits at the tip; `--store file` keeps the free-form state blob the CLI has always written. Which of the two a module is comes from the MODULE, never from a flag.
+
 ## Main features:
 
 - written in typescript, run both in a browser context and node

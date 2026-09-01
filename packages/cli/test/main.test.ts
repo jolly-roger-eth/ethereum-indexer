@@ -5,6 +5,9 @@ import type {Options} from '../src/types.js';
 const OPTIONS: Options = {
 	processor: '/this/module/does/not/exist.js',
 	nodeUrl: 'http://localhost:0',
+	// `--store` is required now, and this is the arm that keeps the free-form
+	// behaviour: what is under test here is the exit-code contract, not the store
+	store: 'file',
 	folder: '/tmp/ei-cli-main-test',
 };
 
@@ -15,6 +18,11 @@ const OPTIONS: Options = {
 describe('run() — characterization (current behaviour)', () => {
 	it('rejects when the processor module cannot be imported', async () => {
 		await expect(run(OPTIONS)).rejects.toBeTruthy();
+	});
+
+	it('rejects before anything else when no store was chosen', async () => {
+		const {store, ...noStore} = OPTIONS;
+		await expect(run(noStore)).rejects.toThrow(/--store/);
 	});
 });
 
