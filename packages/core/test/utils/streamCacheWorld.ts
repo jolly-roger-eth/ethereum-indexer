@@ -1,0 +1,278 @@
+import type {Abi} from 'abitype';
+import {EthereumIndexer} from '../../src/indexer.js';
+import type {ExistingStream, IndexingSource, LastSync, LogEvent} from '../../src/types.js';
+
+/**
+ * The world the stream-cache tests drive: a fake chain, a stream keeper with the
+ * shipped keeper's semantics, and a processor that persists inside `process()`.
+ *
+ * It lives beside the tests rather than inside them because three files ask the
+ * same questions of it (the engine's cache arithmetic, the load path, the reorg
+ * shapes) and a second copy of the fake chain is a second definition of what the
+ * node was asked for -- which is the only thing several of those assertions can
+ * be made against.
+ */
+
+export const ADDRESS = '0x0000000000000000000000000000000000000001';
+export const START_BLOCK = 100;
+export const FINALITY = 3;
+
+export const SOURCE: IndexingSource<Abi> = {
+	chainId: '1',
+	contracts: [{abi: [] as unknown as Abi, address: ADDRESS, startBlock: START_BLOCK}],
+};
+
+/** A log, as the fake chain serves it and as the stream stores it. */
+export function makeLog(blockNumber: number, blockHash: string, logIndex = 0): LogEvent<Abi> {
+	return {
+		blockNumber,
+		blockHash,
+		transactionIndex: 0,
+		removed: false,
+		address: ADDRESS,
+		data: '0x',
+		topics: [],
+		transactionHash: `0x${`${blockHash}${logIndex}`.replace(/[^0-9a-f]/g, '').padStart(64, '0')}`,
+		logIndex,
+		extra: undefined,
+	} as unknown as LogEvent<Abi>;
+}
+
+/** What an event IS, for an assertion that has to tell two copies of one apart. */
+export const idOf = (event: LogEvent<Abi>) => `${event.blockHash}:${event.logIndex}`;
+/** The same, saying whether it arrived as an application or as a retraction. */
+export const shapeOf = (event: LogEvent<Abi>) => `${event.removed ? 'R' : 'A'}:${idOf(event)}`;
+
+/**
+ * A chain that serves one branch at a time and records what it was asked for.
+ *
+ * Mirrors `packages/browser/browser/workload.ts`'s fake chain, minus the ABI:
+ * these tests are about the engine's cache arithmetic, so the logs stay raw and
+ * the log fetcher is replaced rather than decoding anything. The RANGES are the
+ * point: "did this reload re-fetch what the cache already held" is a question
+ * about what the node was asked for, and nothing in the resulting state can
+ * answer it.
+ */
+export function fakeChain(logs: LogEvent<Abi>[] = [], tip = 105) {
+	const ranges: {from: number; to: number}[] = [];
+	let served = logs;
+	let latest = tip;
+	return {
+		ranges,
+		get tip() {
+			return latest;
+		},
+		serve(newLogs: LogEvent<Abi>[], newTip: number) {
+			served = newLogs;
+			latest = newTip;
+		},
+		provider: {
+			async request(args: {method: string; params?: any}): Promise<any> {
+				switch (args.method) {
+					case 'eth_chainId':
+						return '0x1';
+					case 'eth_blockNumber':
+						return `0x${latest.toString(16)}`;
+				}
+				throw new Error(`unexpected method ${args.method}`);
+			},
+		} as any,
+		/** What `logEventFetcher` is replaced with; the range recorder lives here. */
+		fetcher: {
+			async getLogEvents({fromBlock, toBlock}: {fromBlock: number; toBlock: number}) {
+				ranges.push({from: fromBlock, to: toBlock});
+				return {
+					events: served.filter((log) => log.blockNumber >= fromBlock && log.blockNumber <= toBlock),
+					toBlockUsed: toBlock,
+				};
+			},
+			reparse: (events: LogEvent<Abi>[]) => events.map((event) => ({...event})),
+		},
+	};
+}
+
+/**
+ * A stream keeper with the SHIPPED keeper's semantics, in memory.
+ *
+ * `keepStreamOnIndexedDB` is one blob: a save concatenates onto what is stored
+ * and rewrites the cursor, a fetch filters by block, and a clear drops
+ * everything. That is what the engine is asserted against here; the browser
+ * suite runs the same shapes through the real keeper on `fake-indexeddb`.
+ */
+export function memoryStream(initial?: {lastSync: LastSync<Abi>; eventStream: LogEvent<Abi>[]}) {
+	let stored = initial ? (JSON.parse(JSON.stringify(initial)) as typeof initial) : undefined;
+	let failWith: (() => Error | undefined) | undefined;
+	const writes: {events: LogEvent<Abi>[]; lastSync: LastSync<Abi>}[] = [];
+	let clears = 0;
+	const keeper: ExistingStream<Abi> = {
+		fetchFrom: async (_source, fromBlock) =>
+			stored
+				? {
+						eventStream: stored.eventStream.filter((event) => event.blockNumber >= fromBlock),
+						lastSync: JSON.parse(JSON.stringify(stored.lastSync)),
+					}
+				: undefined,
+		saveNewEvents: async (_source, {eventStream, lastSync}) => {
+			const failure = failWith?.();
+			if (failure) {
+				throw failure;
+			}
+			writes.push({events: eventStream.map((event) => ({...event})), lastSync: JSON.parse(JSON.stringify(lastSync))});
+			stored = {
+				lastSync: JSON.parse(JSON.stringify(lastSync)),
+				eventStream: [...(stored?.eventStream ?? []), ...eventStream.map((event) => ({...event}))],
+			};
+		},
+		clear: async () => {
+			// clearing nothing is not a clear: a fresh index with a keeper takes
+			// `indexer.ts`'s clear-on-absent branch, and counting that would make
+			// "the subtree was never cleared" unassertable
+			if (stored) {
+				clears++;
+			}
+			stored = undefined;
+		},
+	};
+	return {
+		keeper,
+		writes,
+		get clears() {
+			return clears;
+		},
+		get cursor() {
+			return stored?.lastSync;
+		},
+		get events() {
+			return stored?.eventStream ?? [];
+		},
+		/** Every write fails, until told otherwise. */
+		failEvery(error: () => Error) {
+			failWith = error;
+		},
+		/** Exactly one write fails: the transient case. */
+		failOnce(error: Error) {
+			let done = false;
+			failWith = () => {
+				if (done) {
+					return undefined;
+				}
+				done = true;
+				return error;
+			};
+		},
+		succeed() {
+			failWith = undefined;
+		},
+	};
+}
+
+/** Where a processor's state and cursor survive an indexer instance. */
+export type ProcessorStore = {saved?: {lastSync: LastSync<Abi>; state: string[]}};
+
+/**
+ * A processor that persists inside `process()`, exactly as the real ones do.
+ *
+ * That is what makes "the tab died between the two writes" reachable: a
+ * `process` that never returns never writes its cursor, so a fresh indexer over
+ * the same stores comes up with the state BEHIND the stream.
+ */
+export function fakeProcessor(store: ProcessorStore = {}, options: {persist?: boolean} = {}) {
+	const persist = options.persist !== false;
+	let state: string[] = [];
+	const batches: LogEvent<Abi>[][] = [];
+	let throwing = false;
+	const processor: any = {
+		getVersionHash: () => 'proc',
+		getCodeFingerprint: () => undefined,
+		load: async () => {
+			if (!persist || !store.saved) {
+				return undefined;
+			}
+			state = [...store.saved.state];
+			return {lastSync: JSON.parse(JSON.stringify(store.saved.lastSync)), state};
+		},
+		process: async (list: LogEvent<Abi>[], lastSync: LastSync<Abi>) => {
+			if (throwing) {
+				throw new Error('processor blew up');
+			}
+			batches.push(list.map((event) => ({...event})));
+			for (const event of list) {
+				if (event.removed) {
+					const at = state.lastIndexOf(idOf(event));
+					if (at >= 0) {
+						state.splice(at, 1);
+					}
+				} else {
+					state.push(idOf(event));
+				}
+			}
+			store.saved = {lastSync: JSON.parse(JSON.stringify(lastSync)), state: [...state]};
+			return state;
+		},
+		reset: async () => {
+			state = [];
+			store.saved = undefined;
+		},
+		clear: async () => {
+			state = [];
+			store.saved = undefined;
+		},
+	};
+	return {
+		processor,
+		batches,
+		store,
+		get state() {
+			return state;
+		},
+		throwOnProcess(value: boolean) {
+			throwing = value;
+		},
+	};
+}
+
+export type StreamWriteRetry = {maxConsecutiveFailures?: number; delaySeconds?: number};
+
+export function makeIndexer(
+	chain: ReturnType<typeof fakeChain>,
+	processor: any,
+	keepStream?: ExistingStream<Abi>,
+	streamWriteRetry: StreamWriteRetry = {delaySeconds: 0},
+) {
+	const indexer = new EthereumIndexer<Abi, string[]>(chain.provider, processor, SOURCE, {
+		stream: {finality: FINALITY},
+		...(keepStream ? {keepStream} : {}),
+		streamWriteRetry,
+	});
+	(indexer as any).logEventFetcher = chain.fetcher;
+	return indexer;
+}
+
+/**
+ * Drive to the tip the way every driver in this repo does, with a bound so a
+ * spin is a red line rather than a hang.
+ */
+export async function indexToTip(indexer: EthereumIndexer<Abi, string[]>, maxRounds = 30): Promise<number> {
+	let rounds = 0;
+	let lastSync = await indexer.indexMore();
+	while (lastSync.lastToBlock < lastSync.latestBlock) {
+		if (rounds++ >= maxRounds) {
+			throw new Error(`did not reach the tip in ${maxRounds} rounds (lastToBlock ${lastSync.lastToBlock})`);
+		}
+		lastSync = await indexer.indexMore();
+	}
+	return rounds;
+}
+
+/** Branch A: three blocks carrying logs, the tip just above them. */
+export const BRANCH_A = [
+	makeLog(100, '0xa100', 0),
+	makeLog(100, '0xa100', 1),
+	makeLog(102, '0xa102'),
+	makeLog(104, '0xa104'),
+];
+export const BRANCH_A_TIP = 105;
+
+/** The same chain after a reorg at 104: same 100 and 102, a DIFFERENT 104. */
+export const BRANCH_B = [BRANCH_A[0], BRANCH_A[1], BRANCH_A[2], makeLog(104, '0xb104')];
+export const BRANCH_B_TIP = 106;

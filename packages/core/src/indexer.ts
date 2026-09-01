@@ -37,11 +37,52 @@ import {
 } from './internal/engine/utils.js';
 import {sourceHashesOf} from './internal/engine/eventRanges.js';
 import {CancelOperations, createAction} from './internal/utils/promises.js';
+import {isOutOfSpace} from './errors.js';
 import {simple_hash} from './utils/index.js';
 
 const namedLogger = logs('@etherfold/core');
 
+/**
+ * Whether two entries of an emission stream are the same emission.
+ *
+ * A log is identified by its block HASH and its index in that block -- never by
+ * its block NUMBER, which a reorg reuses for a different block. The retraction
+ * flag is part of the identity because retracting an event and applying it are
+ * two different emissions of the same log.
+ */
+function sameEvent<ABI extends Abi>(a: LogEvent<ABI>, b: LogEvent<ABI>): boolean {
+	return a.blockHash === b.blockHash && a.logIndex === b.logIndex && !!a.removed === !!b.removed;
+}
+
 export type LoadingState = 'Loading' | 'FetchingEventStream' | 'ProcessingEventStream' | 'Loaded';
+
+/**
+ * What one attempt to write the cached stream DID, which is what decides whether
+ * the batch may be processed.
+ *
+ * The whole of the hole fix is in this enum being consulted: the cursor moves
+ * only for an outcome that leaves the stream covering the batch.
+ */
+export type StreamWriteOutcome =
+	/** The batch (or the part of it not already stored) is on disk. */
+	| 'written'
+	/** Nothing to write: no keeper, or every event of this batch is already stored. */
+	| 'skipped'
+	/**
+	 * Not attempted, because the stream is BEHIND the state and this batch does
+	 * not reach back to it: writing it would put a HOLE behind a cursor claiming
+	 * to cover it, and nothing detects one afterwards.
+	 */
+	| 'declined'
+	/** The keeper threw, and the cache has not given up yet: do not process. */
+	| 'failed'
+	/** The keeper threw once too often: the cache is frozen and indexing goes on without it. */
+	| 'frozen';
+
+/** Consecutive failed writes before the cache is frozen; see `streamWriteRetry`. */
+const DEFAULT_STREAM_WRITE_FAILURE_LIMIT = 3;
+/** Seconds between attempts while writes are failing; see `streamWriteRetry`. */
+const DEFAULT_STREAM_WRITE_RETRY_DELAY = 1;
 
 /**
  * What a reconfigure DID, for the caller that has to react to it.
@@ -161,6 +202,59 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	 */
 	protected blockTimestampCache: BlockTimestampCache = new Map();
 
+	/**
+	 * How far the STORED stream claims to reach, as this session last saw it, or
+	 * `undefined` when there is no stream (none kept, absent, or just cleared).
+	 *
+	 * This is the whole of the no-hole rule. A batch is a DELTA against the
+	 * STATE's cursor, so it is only safe to append when the stream is at or AHEAD
+	 * of that cursor: then everything between what is stored and what the batch
+	 * carries is already stored. When the stream is BEHIND -- which only a frozen
+	 * cache can produce -- the blocks in between were emitted to nobody, and
+	 * appending would claim coverage of them forever after.
+	 *
+	 * Comparing the two BLOCK RANGES instead would not do: the batch's fetch range
+	 * reaches back into the finality window on every cycle, so it OVERLAPS a
+	 * stream the state has already run past, while the events it carries start
+	 * above the gap. That is the shape a keeper-side guard cannot see, which is
+	 * why this lives here.
+	 */
+	protected streamLastToBlock: number | undefined;
+
+	/**
+	 * The batch that IS written but that the processor has not accepted yet.
+	 *
+	 * The in-memory slot the deleted `streamNotYetSaved` list occupied, inverted:
+	 * a high-water mark of what is written rather than a buffer of what is not,
+	 * which is the honest thing to remember once the cursor can no longer run
+	 * ahead of the write. A processor that throws leaves the events on disk and
+	 * the cursor put, so the next cycle re-derives the same delta -- and without
+	 * this the cache would grow by one duplicate copy per retry.
+	 *
+	 * In-memory is the right scope: it only has to survive the retry loop, and a
+	 * reload is covered by the load path catching the state up to the stream.
+	 */
+	protected streamWrittenNotProcessed: LogEvent<ABI>[] | undefined;
+
+	/** Consecutive failed writes, reset by any successful one. */
+	protected streamWriteFailures: number = 0;
+
+	/**
+	 * The cache has failed too often and is no longer allowed to stop the indexer.
+	 *
+	 * FROZEN, not cleared: what is on disk is a contiguous prefix with a cursor
+	 * that describes it honestly, which replays as a partial seed. Throwing it
+	 * away would cost a re-fetch from the source's first block, which on a public
+	 * node can be impossible.
+	 */
+	protected streamFrozen: boolean = false;
+
+	/** So the decline is said once rather than once per cycle. */
+	protected streamDeclineReported: boolean = false;
+
+	protected streamWriteFailureLimit: number = DEFAULT_STREAM_WRITE_FAILURE_LIMIT;
+	protected streamWriteRetryDelay: number = DEFAULT_STREAM_WRITE_RETRY_DELAY;
+
 	// ------------------------------------------------------------------------------------------------------------------
 	// ACTIONS
 	// ------------------------------------------------------------------------------------------------------------------
@@ -170,9 +264,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	);
 	protected _load = createAction<LastSync<ABI>>(this.promiseToLoad.bind(this));
 	protected _save = createAction<
-		void,
-		{source: IndexingSource<ABI>; eventStream: LogEvent<ABI>[]; lastSync: LastSync<ABI>},
-		LogEvent<ABI>[]
+		StreamWriteOutcome,
+		{source: IndexingSource<ABI>; eventStream: LogEvent<ABI>[]; lastSync: LastSync<ABI>}
 	>(this.promiseToSave.bind(this));
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -204,6 +297,16 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 
 		this.streamConfigHash = simple_hash(this.config.stream || 'undefined');
 		this.finality = this.config.stream.finality;
+
+		this.streamWriteFailureLimit =
+			this.config.streamWriteRetry?.maxConsecutiveFailures ?? DEFAULT_STREAM_WRITE_FAILURE_LIMIT;
+		this.streamWriteRetryDelay = this.config.streamWriteRetry?.delaySeconds ?? DEFAULT_STREAM_WRITE_RETRY_DELAY;
+		// What is on DISK is deliberately NOT forgotten here. A reconfigure that
+		// keeps the state cannot have invalidated the stream (an invalid stream is
+		// always an invalid state too), so the extent still describes the stream this
+		// indexer is about to go on writing -- and dropping it would remove the one
+		// thing that stops a frozen cache being appended to. A reconfigure that DOES
+		// discard reloads, and `load` re-reads the stored cursor on both branches.
 
 		this.logEventFetcher = new LogEventFetcher(this.provider, source.contracts, config?.fetch, config.stream?.parse);
 
@@ -449,6 +552,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this._load.reset();
 
 		await this.config.keepStream?.clear(this.source);
+		this.forgetStoredStream();
 		await this.processor.clear().then(() => this.load());
 		// Unconditional, and the only one of the three that is: `reset` IS the discard.
 		return {stateDiscarded: true};
@@ -458,8 +562,19 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// INTERNALS
 	// ------------------------------------------------------------------------------------------------------------------
 
-	protected async save(source: IndexingSource<ABI>, eventStream: LogEvent<ABI>[], lastSync: LastSync<ABI>) {
+	protected async save(
+		source: IndexingSource<ABI>,
+		eventStream: LogEvent<ABI>[],
+		lastSync: LastSync<ABI>,
+	): Promise<StreamWriteOutcome> {
 		return this._save.next({source, eventStream, lastSync});
+	}
+
+	/** There is no stream on disk any more, so nothing constrains the next write. */
+	protected forgetStoredStream() {
+		this.streamLastToBlock = undefined;
+		this.streamWrittenNotProcessed = undefined;
+		this.streamDeclineReported = false;
 	}
 
 	protected async promiseToLoad(): Promise<LastSync<ABI>> {
@@ -563,37 +678,87 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 							// a `logValues` projection dropped the raw log, so this stream cannot be
 							// re-read and must not be replayed on trust
 							await this.config.keepStream.clear(this.source);
+							this.forgetStoredStream();
 						} else {
 							// we update the processorHash in case it was changed
 							currentLastSync.context.processor = processorHash;
+							this.streamLastToBlock = lastSyncFetched.lastToBlock;
 							if (replayable.length > 0) {
 								await this._onLoad('ProcessingEventStream');
 								await this.feed(replayable, lastSyncFetched);
+							} else {
+								// A stream that holds a CURSOR and no events -- the ordinary state of a
+								// deployment whose contracts have emitted nothing yet, and what an empty
+								// save writes. Adopting it only as a side effect of feeding left the
+								// in-memory cursor at `freshLastSync`, whose `latestBlock` is 0, so the
+								// scan restarted from the start block on every reload, forever. The empty
+								// WINDOW is correct rather than lossy: there are no stored events, so
+								// there is nothing a reorg could retract, and the next fetch rebuilds it.
+								this.lastSync = {
+									context: currentLastSync.context,
+									lastFromBlock: lastSyncFetched.lastFromBlock,
+									lastToBlock: lastSyncFetched.lastToBlock,
+									latestBlock: lastSyncFetched.latestBlock,
+									unconfirmedBlocks: [],
+								};
+								currentLastSync = this.lastSync;
+								this._onLastSyncUpdated();
 							}
 						}
 					} else {
 						await this.config.keepStream.clear(this.source);
+						this.forgetStoredStream();
 					}
 				} else {
 					await this.config.keepStream.clear(this.source);
+					this.forgetStoredStream();
 				}
 			}
 		} else {
+			// BEFORE the stream is consulted, not after: feeding below moves the cursor
+			// to where the stream reaches, and an assignment after the block would throw
+			// that catch-up away.
+			this.lastSync = currentLastSync;
+			this._onLastSyncUpdated();
 			if (this.config.keepStream) {
+				await this._onLoad('FetchingEventStream');
+				const fromBlock = getFromBlock(currentLastSync, this.defaultFromBlock, this.finality);
 				// we still need to clear if it does not matches, as otherwise it will be written as if it contained all logs
-				const existingStreamData = await this.config.keepStream.fetchFrom(
-					this.source,
-					getFromBlock(currentLastSync, this.defaultFromBlock, this.finality),
-				);
+				const existingStreamData = await this.config.keepStream.fetchFrom(this.source, fromBlock);
 				if (existingStreamData) {
-					const {lastSync: lastSyncFetched} = existingStreamData;
+					const {eventStream: eventsFetched, lastSync: lastSyncFetched} = existingStreamData;
+					// the requested `fromBlock`, assigned onto the fetched cursor exactly as the
+					// discarded branch does: `generateStreamToAppend` refuses a batch whose
+					// `lastFromBlock` is not the one the current cursor asks for, and the stored
+					// cursor's own is whatever the last fetch used
+					lastSyncFetched.lastFromBlock = fromBlock;
 					if (!this.streamMatches(lastSyncFetched.lastToBlock, lastSyncFetched.context)) {
 						await this.config.keepStream.clear(this.source);
+						this.forgetStoredStream();
+					} else {
+						this.streamLastToBlock = lastSyncFetched.lastToBlock;
+						if (lastSyncFetched.lastToBlock > currentLastSync.lastToBlock) {
+							// The stream is AHEAD of the state, which is what the tab closing between
+							// the write and the process leaves behind, and it is the benign direction
+							// only because the processor catches up FROM THE CACHE. Fetching those
+							// blocks from the node instead would append them to the stream a second
+							// time, and the next rebuild would see every one of them twice.
+							//
+							// Re-decoded on the way through, like the discarded branch: the stored
+							// `args` are what SOME earlier ABI made of those bytes (ADR-0034), and one
+							// decoding rule for a replayed stream is better than two.
+							const replayable = this.logEventFetcher.reparse(eventsFetched);
+							if (!replayable) {
+								await this.config.keepStream.clear(this.source);
+								this.forgetStoredStream();
+							} else if (replayable.length > 0) {
+								await this._onLoad('ProcessingEventStream');
+								await this.feed(replayable, lastSyncFetched);
+							}
+						}
 					}
 				}
 			}
-			this.lastSync = currentLastSync;
-			this._onLastSyncUpdated();
 		}
 		await this._onLoad('Loaded');
 		return this.lastSync;
@@ -669,30 +834,141 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return this.lastSync;
 	}
 
+	/**
+	 * Write the batch to the cached stream, and SAY what happened.
+	 *
+	 * It reports rather than swallows, because the caller's next move depends on
+	 * it: a batch that was not written must not be processed, or the state
+	 * advances past events the stream never received and the cursor claims
+	 * coverage of a range whose events are simply absent.
+	 *
+	 * What used to be here was an in-memory list of unsaved events carried to the
+	 * next save on the save action's promise CONTEXT. It never fired -- the
+	 * context survives only when a save is queued onto one still in flight, and
+	 * the index cycle awaits its save, so the list was empty at push time every
+	 * time. It existed only to compensate for processing first; with the order
+	 * flipped and the cursor held back, the next cycle re-derives those events
+	 * from the same cursor, so it is redundant and it is gone.
+	 */
 	protected async promiseToSave(params: {
 		source: IndexingSource<ABI>;
 		eventStream: LogEvent<ABI>[];
 		lastSync: LastSync<ABI>;
-	}) {
+	}): Promise<StreamWriteOutcome> {
 		const {eventStream, source, lastSync} = params;
-		// we use the promise context to get any non-saved events
-		// this work as long as this is executed synchronously
-		let streamNotYetSaved = this._save.getContext();
-		if (!streamNotYetSaved) {
-			streamNotYetSaved = [];
-			this._save.setContext(streamNotYetSaved);
+		const keepStream = this.config.keepStream;
+		if (!keepStream) {
+			return 'skipped';
 		}
-		streamNotYetSaved.push(...eventStream);
+
+		if (!this.streamCanReceive()) {
+			if (!this.streamDeclineReported) {
+				this.streamDeclineReported = true;
+				namedLogger.error(
+					`the cached stream stops here: it holds blocks up to ${this.streamLastToBlock} and the state has ` +
+						`moved on to ${this.lastSync?.lastToBlock}, so appending this batch would claim coverage of blocks ` +
+						`the stream never received. What is stored is a contiguous prefix and is kept as one; it is replayed ` +
+						`and the remainder re-fetched the next time the state is rebuilt.`,
+				);
+			}
+			return 'declined';
+		}
+
+		const toWrite = this.streamRemainderOf(eventStream);
 		try {
-			await this.config.keepStream?.saveNewEvents(source, {
-				eventStream: streamNotYetSaved,
-				lastSync,
-			});
-			streamNotYetSaved.splice(0, streamNotYetSaved.length);
+			await keepStream.saveNewEvents(source, {eventStream: toWrite, lastSync});
 		} catch (e) {
-			namedLogger.error(`could not save stream, ${e}`);
-			// ignore error
+			return this.onStreamWriteFailed(e, source);
 		}
+		if (this.streamWriteFailures > 0 || this.streamFrozen) {
+			namedLogger.info(`the cached stream is writable again after ${this.streamWriteFailures} failed write(s)`);
+		}
+		this.streamWriteFailures = 0;
+		this.streamFrozen = false;
+		this.streamLastToBlock = lastSync.lastToBlock;
+		this.streamWrittenNotProcessed = eventStream;
+		return toWrite.length === 0 && eventStream.length > 0 ? 'skipped' : 'written';
+	}
+
+	/**
+	 * Whether the stream is at or AHEAD of the state, which is the only position
+	 * from which an append cannot leave a hole. See `streamLastToBlock`.
+	 */
+	protected streamCanReceive(): boolean {
+		if (this.streamLastToBlock === undefined || !this.lastSync) {
+			return true;
+		}
+		return this.streamLastToBlock >= this.lastSync.lastToBlock;
+	}
+
+	/**
+	 * The part of this batch that is not already on disk, with a retraction for
+	 * anything written that the chain has since moved under.
+	 *
+	 * The batch handed to a save is a delta against the IN-MEMORY cursor, and that
+	 * cursor only advances after `process` RETURNS -- so a processor that throws
+	 * leaves its events written and the next cycle re-derives the same list plus
+	 * whatever the tip has added. Appending that again would grow the cache by one
+	 * duplicate copy per retry, and those duplicates would replay twice once the
+	 * handler is fixed.
+	 *
+	 * Where the two lists DIVERGE, the chain reorged under events the processor
+	 * never accepted: the state cannot retract them (it never applied them), and a
+	 * replay of the stream would apply a dead branch. So they are retracted HERE,
+	 * at their original block, which is exactly what the emission stream is for.
+	 */
+	protected streamRemainderOf(eventStream: LogEvent<ABI>[]): LogEvent<ABI>[] {
+		const written = this.streamWrittenNotProcessed;
+		if (!written || written.length === 0) {
+			return eventStream;
+		}
+		let common = 0;
+		while (common < written.length && common < eventStream.length && sameEvent(written[common], eventStream[common])) {
+			common++;
+		}
+		const superseded = written.slice(common).filter((event) => !event.removed);
+		const retractions = superseded.map((event) => ({...event, removed: true}) as LogEvent<ABI>);
+		return [...retractions, ...eventStream.slice(common)];
+	}
+
+	/**
+	 * A write that threw: count it, clear ONLY for the cause the cache itself is,
+	 * and give up on the cache once it has failed too often.
+	 */
+	protected async onStreamWriteFailed(e: unknown, source: IndexingSource<ABI>): Promise<StreamWriteOutcome> {
+		this.streamWriteFailures++;
+		if (isOutOfSpace(e)) {
+			// the one cause where the cache IS the problem: freezing preserves it,
+			// deleting frees it
+			namedLogger.error(
+				`the store is out of space, so the cached stream is being cleared rather than kept: ${e}. ` +
+					`Indexing continues and the stream rebuilds from here.`,
+			);
+			try {
+				await this.config.keepStream?.clear(source);
+				this.forgetStoredStream();
+			} catch (clearError) {
+				namedLogger.error(`could not clear the cached stream after an out-of-space write: ${clearError}`);
+			}
+		} else {
+			namedLogger.error(
+				`could not save the stream (${this.streamWriteFailures} consecutive failure(s) of ` +
+					`${this.streamWriteFailureLimit}): ${e}. The batch is NOT processed and the cursor does not move, so ` +
+					`the next cycle re-derives it and nothing is lost.`,
+			);
+		}
+		if (this.streamWriteFailures >= this.streamWriteFailureLimit) {
+			if (!this.streamFrozen) {
+				namedLogger.error(
+					`the cached stream is FROZEN after ${this.streamWriteFailures} consecutive failed writes. Indexing ` +
+						`carries on WITHOUT the cache: a cache is an optimisation and must never wedge the indexer. What is ` +
+						`already stored is kept as a contiguous prefix and is not cleared, so it still seeds a rebuild.`,
+				);
+			}
+			this.streamFrozen = true;
+			return 'frozen';
+		}
+		return 'failed';
 	}
 
 	protected async promiseToIndex({unlessCancelled}: CancelOperations): Promise<LastSync<ABI>> {
@@ -732,13 +1008,40 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		}
 
 		// ----------------------------------------------------------------------------------------
+		// WRITE THE STREAM FIRST, AND DO NOT PROCESS A BATCH THAT WAS NOT WRITTEN
+		// ----------------------------------------------------------------------------------------
+		// A cache must never be behind the thing it exists to replay into. The state
+		// advances inside `process` (a processor persists its own state there), so
+		// processing first and saving after means a failed save leaves the stream a
+		// batch behind -- and the NEXT cycle computes its delta from the already
+		// advanced cursor, so the stream's cursor jumps over a range its events never
+		// received. Nothing detects that afterwards.
+		const written = await unlessCancelled(this.save(this.source, eventStream, newLastSync));
+		if (written === 'failed') {
+			// The cycle achieves nothing and the next one tries again, which is the
+			// whole recovery: nothing is lost, nothing is skipped, and the stream
+			// cannot fall behind the state even by one batch. Paced, because a driver
+			// that loops until the tip advances would otherwise spin hot on a store
+			// that is refusing.
+			await unlessCancelled(wait(this.streamWriteRetryDelay));
+			// The CURSOR did not move -- the in-memory one is untouched, so the next
+			// fetch asks for exactly the same range -- but the tip this cycle observed
+			// is not a secret. A driver that loops until `lastToBlock` reaches
+			// `latestBlock` has to keep looping rather than conclude it is done, and on
+			// the very first cycle of a fresh index the stored cursor still says
+			// `latestBlock: 0`. Returned as a VALUE and not assigned: `getFromBlock`
+			// reads `latestBlock === 0` as "nothing indexed yet", so writing this one
+			// back would drag the next fetch below the source's start block.
+			return {...(this.lastSync as LastSync<ABI>), latestBlock: newLastSync.latestBlock};
+		}
+
+		// ----------------------------------------------------------------------------------------
 		// MAKE THE PROCESSOR PROCESS IT
 		// ----------------------------------------------------------------------------------------
 		const outcome = await unlessCancelled(this.processor.process(eventStream, newLastSync));
-
-		// this does not throw, but we could be stuck here ?
-		// TODO timeout ?
-		await this.save(this.source, eventStream, newLastSync);
+		// accepted: the cursor is about to move past this batch, so the written
+		// high-water mark has done its job
+		this.streamWrittenNotProcessed = undefined;
 
 		this.lastSync = newLastSync;
 		this._onLastSyncUpdated();

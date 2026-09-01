@@ -355,6 +355,31 @@ export type ProvidedIndexerConfig<ABI extends Abi> = {
 	providerSupportsETHBatch?: boolean;
 	feedBatchSize?: number;
 	keepStream?: ExistingStream<ABI>;
+	/**
+	 * What the engine does about a cached-stream write that FAILS.
+	 *
+	 * A failed write means the batch is NOT processed and the cursor does not
+	 * move, so the next cycle re-derives the same delta and tries again: nothing
+	 * is lost and the stream cannot fall behind the state. But a store can be
+	 * PERMANENTLY unwritable (a quota, a private window, an evicted database), and
+	 * retrying forever would leave an application showing stale data indefinitely
+	 * because an OPTIONAL cache failed. So the retry is bounded and paced, and
+	 * both numbers are here rather than in `stream` because `stream` is HASHED
+	 * into the wire and cache identity -- a deployment that tuned its retry must
+	 * not thereby invalidate its stream.
+	 */
+	streamWriteRetry?: {
+		/**
+		 * Consecutive failed writes before the cache is FROZEN and indexing carries
+		 * on without it. Defaults to 3.
+		 */
+		maxConsecutiveFailures?: number;
+		/**
+		 * Seconds to wait after a failed write, so a driver looping to the tip
+		 * cannot spin hot on a store that is refusing. Defaults to 1.
+		 */
+		delaySeconds?: number;
+	};
 	skipGenesisCheck?: boolean;
 	/**
 	 * Turn a processor-drift report into a refusal to start (`load()` rejects).

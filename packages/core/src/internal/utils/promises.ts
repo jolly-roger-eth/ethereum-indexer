@@ -118,13 +118,12 @@ export type ActionOperations<T> = CancelOperations & {
 /**
  * An action is a special object that manage an underlying promise to ensure it is executed in a proper manner
  */
-export function createAction<T, U = undefined, C = undefined>(
+export function createAction<T, U = undefined>(
 	// Non-distributive, for the same reason as `Func` above.
 	execute: [U] extends [undefined]
 		? (action: ActionOperations<T>) => void | Promise<T>
 		: (args: U, action: ActionOperations<T>) => void | Promise<T>,
 ) {
-	let _context: C | undefined;
 	let _promise: CancellablePromise<T> | undefined;
 	let _blocked: boolean = false;
 
@@ -152,7 +151,6 @@ export function createAction<T, U = undefined, C = undefined>(
 					_promise.cancel();
 				} else if (mode === 'queue') {
 					const p = _promise;
-					// context is preserved in a queue
 					_promise = _promise.then(() => {
 						return createCancellablePromise(
 							(resolve, reject, unlessCancelled, cancel) => {
@@ -177,8 +175,6 @@ export function createAction<T, U = undefined, C = undefined>(
 				}
 			}
 		}
-		// we reset the context for each new promise;
-		_context = undefined;
 		_promise = createCancellablePromise((resolve, reject, unlessCancelled, cancel) => {
 			const promiseAction = {resolve, reject, unlessCancelled, cancel};
 			const result = callExecutor(execute as any, promiseAction);
@@ -217,12 +213,6 @@ export function createAction<T, U = undefined, C = undefined>(
 			}
 			return _promise;
 		},
-		setContext(context: C) {
-			_context = context;
-		},
-		getContext(): C | undefined {
-			return _context;
-		},
 	} as unknown as {
 		next: Func<T, U>;
 		ifNotExecuting: Func<T, U>;
@@ -233,7 +223,5 @@ export function createAction<T, U = undefined, C = undefined>(
 		block(): void;
 		unblock(): void;
 		get executing(): Promise<T> | undefined;
-		setContext(context: C): void;
-		getContext(): C | undefined;
 	};
 }
