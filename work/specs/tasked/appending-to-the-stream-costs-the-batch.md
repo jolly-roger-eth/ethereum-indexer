@@ -63,13 +63,12 @@ signature and its semantics. A spec implying segments make READS cheaper would p
 model forbids.
 
 **What this spec fixes is the CURSOR CONTRACT; WHERE a keeper puts the cursor is ITS OWN business.**
-Four properties every keeper must satisfy and a conformance test can check: exactly ONE authoritative
-cursor per stream; a save is atomic in the CURSOR-AHEAD direction; no unconfirmed WINDOW accumulates
-per sealed segment; an empty save costs nothing proportional to the history. The two shipped keepers
-satisfy them DIFFERENTLY on purpose — the filesystem keeps the cursor in its open tail because it has
-no multi-file transaction, IndexedDB keeps a separate cursor record because it has an atomic
-multi-key write — and that separation of contract from placement is the decision, recorded in
-ADR-0035 with the reasoning and the consequences.
+Three properties every keeper must satisfy and a conformance test can check: exactly ONE
+authoritative cursor per stream; a save is atomic in the CURSOR-AHEAD direction; an empty save costs
+nothing proportional to the history. Separating the contract from the PLACEMENT is the decision, and
+it is what lets a SQL keeper and an OPFS keeper follow without re-deciding anything. A fourth
+property about accumulating unconfirmed windows was withdrawn once it was established that a stream
+keeper should not store the window at all — ADR-0035 and its amendment carry the reasoning.
 
 **Sealed segments are immutable and independently readable**, both stated so a test can FAIL them:
 no write ever targets a sealed segment's key, and any sealed segment is readable BY ITS OWN KEY
@@ -97,9 +96,9 @@ that wants a second reader over a prefix of this stream has nothing to stand on 
 ## Where the detail went
 
 TRIMMED at tasking time, per `TASKING-PROTOCOL` section 6. The Implementation and Testing detail this
-spec carried now lives in its two tasks (`segment-the-stream-behind-one-core-helper`,
-`the-browser-stream-keeper-appends-in-segments`), and the durable rationale — the four-property
-CURSOR CONTRACT, why placement is left to each keeper, the shared segment record, the five keeper
+spec carried now lives in its task (`the-stream-appends-in-segments-on-indexeddb`), and the durable
+rationale — the CURSOR CONTRACT (three properties,
+after its amendment), why placement is left to each keeper, the shared segment record, the keeper
 operations and the truncation recovery's order — is `docs/adr/0035-the-stream-cursor-contract-is-four-properties-and-placement-is-the-keepers.md`.
 
 ## Out of Scope

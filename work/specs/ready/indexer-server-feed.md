@@ -121,15 +121,15 @@ widening to several live contexts is an ADDITIVE field rather than a change to t
 type. This keeps the existing injection design rather than bending it — a host still supplies
 exactly what it was built with, which is precisely what a deploy-time `upload` manifest produces —
 and it leaves ADR-0004's wire ENVELOPE untouched, so the `{source, config}` assertion and its refusal
-families (`409` resumable, `400` otherwise) are unchanged. The alternative of carrying the name IN the
+families (`409` resumable, `400` otherwise) are unchanged.
+
 **The SENDING side moves with it, and is named here because it is otherwise unowned.**
 `packages/core/src/ingestClient.ts` hard-codes `/ingest` and `/ingest/expected-from-block`, and the
 platform and fetcher-host deployment tests post to them, so a build that changed only the server
 would ship one no fetcher can reach. The client takes the indexer name alongside the base URL it
 already takes, and this needs a changeset for `@etherfold/core`.
 
-The alternative of carrying the name IN the
-envelope was rejected: it would make the wire format carry tenancy and turn a misdirected batch into
+The alternative of carrying the name IN the envelope was rejected: it would make the wire format carry tenancy and turn a misdirected batch into
 a payload error rather than a routing one.
 
 **The consumer CURSOR is OPAQUE and carries the indexer name, the STREAM and the position.** Four

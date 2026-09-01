@@ -32,3 +32,41 @@ So the contract is shared and the placement is not:
 - **The contract is what a conformance test asserts**, against the KEEPER and never against a layout, following ADR-0020's precedent of testing each backend against its own claim.
 
 Recorded from `work/specs/tasked/appending-to-the-stream-costs-the-batch.md`, whose implementation detail lives in its two tasks.
+
+### Amended: the window is not stored, so property 3 and the seal are withdrawn
+
+Three things in the original are WRONG in their premise rather than their reasoning, and the
+correction removes machinery rather than adding it. The title's "four properties" is left as the
+stable reference; the contract is now THREE.
+
+**Property 3 ("no unconfirmed WINDOW accumulates per sealed segment") is WITHDRAWN, because the
+window should not be stored by a stream keeper AT ALL.** The property was a careful rule for managing
+data that nothing reads. Evidence already in the repo settles it: `captureStream` persists
+`unconfirmedBlocks: []` and `replayStream` returns `[]` (`packages/core/src/stream/capture.ts`,
+`stream/fixture.ts`) — a shipped, tested third implementation of this same `ExistingStream` seam that
+stores no window and works. The window has two homes that ARE read (`KeepState.save` takes
+`{state, lastSync}`; the entity path's `serializeLastSync` is `JSON.stringify` of the whole
+`LastSync`, written in the block's transaction per ADR-0027), while the stream's copy is read by
+nobody: `promiseToFeed` takes only the three block numbers and `generateStreamToAppend` rebuilds the
+window from the replayed events. A keeper stores the SCANNED EXTENT and the context, and returns
+`unconfirmedBlocks: []`.
+
+**`seal-segment` goes with it**, and so does the seal itself. Sealing existed ONLY to strip the
+window on the one keeper that stored it inside its open tail. No stored window, no strip, no seal, no
+threshold, no "a SEAL is safe to fail" ordering rule. The seam is THREE operations:
+commit-segment-with-cursor, read-cursor, write-cursor-only.
+
+**The FILESYSTEM keeper is withdrawn entirely, and with it the TAIL strategy this ADR was half
+about.** `keepStreamOnFile` had zero callers, the CLI never used `@etherfold/fs` (it has its own
+`keepState`), and the package's only consumer is a fixture loader. The open tail existed to make a
+save ONE write on a substrate with no transaction; with that substrate gone, so is the tail. The
+remaining keeper writes ONE SEGMENT PER BATCH and never rewrites anything, so a segment is immutable
+from birth and an empty save writes only the cursor record.
+
+**What SURVIVES, and is the durable part of this ADR:** that the contract is a set of PROPERTIES
+rather than a storage layout; that cursor PLACEMENT is the keeper's, subject to the cursor living
+within its stream's subtree; that the address is HIERARCHICAL, which is what deleted the anchored
+pattern, the cross-chain hazard, the temp-name rule and `clear-cursor`; that the scanned extent has
+exactly one reader, the truncation recovery; and that the recovery composes its cursor from the
+surviving top segment's extent with the pre-recovery context carried forward. A SQL keeper and an
+OPFS keeper are the expected next consumers, and they inherit exactly those.

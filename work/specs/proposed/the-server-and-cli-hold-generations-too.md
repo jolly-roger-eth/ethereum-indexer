@@ -59,15 +59,14 @@ Three things this runtime supplies that the browser one does not:
 - **The canonical pointer as a table row**, which is what ADR-0008's `current_version` row becomes.
 
 **This runtime is the SECOND cursor-record keeper, not the first.**
-`appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of four properties and leaves
-PLACEMENT to each keeper precisely so a substrate with atomic multi-row updates is not forced into a
-layout invented for a filesystem. A SQL keeper holds its cursor in its own ROW and updates it in the
-SAME transaction as the segment insert: that satisfies property 1 and property 2 directly, makes
-property 3 (no unconfirmed window per sealed segment) vacuous because there is nothing to strip, and
-gives property 4 for free with no tail rewrite on an empty save. The shipped IndexedDB keeper already
-does exactly this with `setMany`, so there is prior art rather than novelty — which is itself the
-argument for the shared conformance material, since a third implementation is where it earns its
-keep. Do not port the FILESYSTEM's tail strategy here.
+`appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of three properties and leaves
+PLACEMENT to each keeper, subject to the cursor living within its stream's subtree. A SQL keeper holds
+its cursor in its own ROW and updates it in the SAME transaction as the segment insert, which
+satisfies all three directly. The IndexedDB keeper already does exactly this with `setMany`, writing
+one segment per batch and never rewriting anything, so there is prior art rather than novelty — which
+is itself the argument for the shared conformance material, since a SECOND implementation is where it
+earns its keep. Note there is no tail and no seal to port: those were a filesystem strategy and
+filesystem storage is not supported.
 
 ## User Stories
 
@@ -220,8 +219,8 @@ recorded on the ADR; this spec is the thing it points at for the server.
   progress is distinguishable from an empty result.
 - **The pointer moves back** and the previous generation answers exactly as before, with no
   re-ingestion.
-- **The cursor contract is satisfied by the SQL keeper**, asserted against the same four properties
-  as the key/value keepers rather than against a layout — ideally through the shared conformance
+- **The cursor contract is satisfied by the SQL keeper**, asserted against the same three properties
+  as the IndexedDB keeper rather than against a layout — ideally through the shared conformance
   material `appending-to-the-stream-costs-the-batch` names, which is where a third implementation
   earns its keep.
 - **Two NAMED INDEXERS with identical sources never touch each other's data**: same chain, same

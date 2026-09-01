@@ -146,17 +146,24 @@ so appending an event above the cursor is FREE today, and digest inequality alon
 exactly the case ADR-0034 made free. So: the verdict decides whether anything is invalid; the digests
 decide WHICH stream and WHICH generation the result belongs to. Both, at different jobs.
 
-**The hash is WIDE and SYNCHRONOUS, and is not `simple_hash`.** As a change DETECTOR a collision
-costs one missed invalidation; as a KEY it means one generation silently adopting another's stream, under
-a filter that does not match it, so logs are missing and nothing reports it. `simple_hash` is 32 bits
+**The hash is WIDE and SYNCHRONOUS, and is not `simple_hash`.** As a change DETECTOR a collision costs
+one missed invalidation; as a KEY it means one generation silently adopting another's stream, under a
+filter that does not match it, so logs are missing and nothing reports it. `simple_hash` is 32 bits
 (`(hash << 5) - hash + char`, masked to 32), which is a coin-flip collision around 65,000 distinct
 filters. Use a **128-bit synchronous** digest.
 
-Not sha-256, deliberately: the browser's only built-in is `crypto.subtle.digest`, which is ASYNC and
-requires a SECURE CONTEXT, so an app served over plain HTTP would fail to derive a key at all
-(`localhost` IS a secure context, so this bites non-localhost plain HTTP specifically). This is
-a collision-resistance problem against accidental collisions, not an adversarial one, so the secure
-context buys nothing and costs a deployment constraint.
+**Use `viem`'s `sha256`, truncated. It is already a direct dependency of `@etherfold/core` and it is
+SYNCHRONOUS.** An earlier draft rejected sha-256 on the ground that "the browser's only built-in is
+`crypto.subtle.digest`, which is ASYNC and requires a SECURE CONTEXT" — true of the BUILT-IN and
+irrelevant, because the package already ships an audited pure-JS implementation that needs neither.
+That mistake would have invited hand-rolling or vendoring a digest; do not.
+
+**One implementation, not a fast path with a fallback.** Trying `crypto.subtle` first and falling back
+was considered and REJECTED: the input is a small list of hashes so native buys nothing measurable,
+making the derivation async would infect every call site that wants a key, and two implementations
+that must agree BYTE FOR BYTE are a fork risk — any difference in truncation or encoding gives
+different stream addresses on different browsers, which is silent history-orphaning of exactly the
+kind this digest exists to prevent.
 
 ### The stream
 
@@ -187,11 +194,13 @@ named indexers. That spec also answers where the name comes from (it arrives on 
 browser never has to.
 
 **The CURSOR is the PREREQUISITE's business, not this spec's.**
-`appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of four properties — exactly one
+`appending-to-the-stream-costs-the-batch` fixes a CURSOR CONTRACT of three properties — exactly one
 authoritative cursor per stream; a save never leaves a cursor claiming coverage the stored events
-lack; no unconfirmed WINDOW on a sealed segment; an empty save costing nothing proportional to
-history — and leaves PLACEMENT to each keeper. Both shipped keepers put the cursor in the OPEN TAIL
-and empty its window on seal; a keeper with atomic multi-row updates may hold a cursor row instead.
+lack; an empty save costing nothing proportional to history — and leaves PLACEMENT to each keeper,
+subject to the cursor living within its stream's subtree. The IndexedDB keeper holds a cursor RECORD
+committed with its segment in one transaction; a SQL keeper holds a cursor ROW the same way. (A
+fourth property about unconfirmed windows on sealed segments was withdrawn with the seal itself: a
+stream keeper stores no window at all.)
 
 **All this spec adds is the SCOPE: one cursor per STREAM, and a stream is now addressed
 `[<indexer-name>, <streamDigest>]` with its segments and its cursor beneath.** Everything else about cursors — where they live, how a save
@@ -400,7 +409,7 @@ matters because it is destructive and capability-gated; and resume is simply rem
 
 ### Multi-tenancy is NOT here
 
-A browser page carries one indexer, so this spec has no tenancy discriminator and needs none: the existing
+A browser page carries one indexer AT A TIME and an app may run several under different NAMES (an NFT viewer naming one per watched account), which the stream address already handles because the name is its top level. So this spec needs no ADDITIONAL discriminator: the existing
 `name` (and `databaseName` on the entities path) already separates two unrelated indexers sharing an
 origin, and nothing here changes that.
 
