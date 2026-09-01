@@ -27,21 +27,57 @@ export type BatchBounds = {
 	 * list of row ids, and this is the bound.
 	 *
 	 * It is also a bound on BOUND PARAMETERS, since each row id is one, so it must
-	 * stay under the engine's variable limit (999 on a stock SQLite build).
+	 * stay under the tightest per-query variable limit of any backend it may run
+	 * against. A stock SQLite build allows 999; the tightest hosted backend allows
+	 * only 100, which is what the default is set by. See `DEFAULT_BATCH_BOUNDS`.
+	 *
+	 * `dropVersionsStatement` is the only statement whose parameter count scales
+	 * with this bound, and it carries NO other bound parameter, so the default may
+	 * sit exactly on the cap. If a parameter is ever added to that statement, this
+	 * default must drop by the same amount -- `batch.test.ts` guards the coupling.
 	 */
 	maxRowsPerStatement: number;
 };
 
 /**
- * Deliberately conservative: small enough to fit inside the tightest hosted
- * limits we are aware of, so that the default never surprises anyone in
- * production. It is a throughput knob, not a correctness one: on a local file
- * database, raise both freely to pack more blocks per round-trip.
+ * The default targets the TIGHTEST documented limits, on the FREE tier, of any
+ * hosted backend this store is expected to run behind, so that a deployment that
+ * configures nothing works everywhere. It is mostly a throughput knob: on a local
+ * file database, or on a paid tier, raise all three freely to pack more blocks
+ * per round-trip.
+ *
+ * **`maxRowsPerStatement` is the exception -- there it is a CORRECTNESS bound.**
+ * The tightest hosted backend caps bound parameters per query at 100, and a
+ * previous default of 500 made `prune` emit a query it rejects, so retention
+ * enforcement failed on that backend while passing on every other one. That is
+ * the shape that runs locally and fails only in production, which is why the
+ * default is now set by the tightest backend rather than by the most permissive.
+ *
+ * `maxStatementsPerBatch` of 50 comes from a per-INVOCATION query budget on the
+ * same backend's free tier. Two honest caveats, stated rather than papered over:
+ * that budget is per invocation and not per batch, and its documentation does not
+ * settle whether one `batch()` of N statements counts as N queries or as one
+ * subrequest, so 50 is the pessimistic reading under which a single batch is
+ * issuable either way. What NO batch bound can fix is one invocation issuing
+ * several batches plus its surrounding reads: keeping a request inside a
+ * per-invocation budget is the HOST's job, and `prune`'s explicit budget
+ * parameter is the lever that exists for it.
+ *
+ * `maxBytesPerBatch` is unchanged and is NOT what satisfies any per-STATEMENT
+ * size cap: those are different quantities that happen not to collide.
+ *
+ * **Where the vendor's numbers actually live: `work/notes/findings/`, and
+ * deliberately not here.** This package targets the `remote-sql` interface, so a
+ * hosted backend is one backend among several and never the target;
+ * `test/no-platform-leakage.test.ts` asserts that no source file in this package
+ * names one. The findings note (grep for "bound parameters per query") carries the
+ * vendor, the exact limits, the dated source and the plan split; a host adapter is
+ * the only place allowed to name its own backend and pass `{bounds}` accordingly.
  */
 export const DEFAULT_BATCH_BOUNDS: BatchBounds = {
-	maxStatementsPerBatch: 100,
+	maxStatementsPerBatch: 50,
 	maxBytesPerBatch: 90_000,
-	maxRowsPerStatement: 500,
+	maxRowsPerStatement: 100,
 };
 
 /** Rough payload cost of a statement: enough to stay under a size cap. */

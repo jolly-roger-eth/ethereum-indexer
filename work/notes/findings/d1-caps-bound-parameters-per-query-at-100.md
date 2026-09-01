@@ -48,13 +48,34 @@ Only ONE other statement's parameter count scales with a list, and it is safe: t
 100. An entity wide enough to breach the parameter limit on insert has already breached the column
 limit, so it fails at `migrate()` rather than silently at write time.
 
-## The claim this corrects
+## The claim this corrected, and what was done about it
 
-`batching.ts` says `DEFAULT_BATCH_BOUNDS` is "deliberately conservative: small enough to fit inside
-the tightest hosted limits we are aware of, so that the default never surprises anyone in
-production." That is FALSE for D1 on `maxRowsPerStatement`, and D1 is the backend the Worker host
-exists to serve. The correction belongs with the task that wires the Worker adapter's limits into the
-store, not here.
+`batching.ts` used to say `DEFAULT_BATCH_BOUNDS` was "deliberately conservative: small enough to fit
+inside the tightest hosted limits we are aware of, so that the default never surprises anyone in
+production." That was FALSE for D1 on `maxRowsPerStatement`, and D1 is the backend the Worker host
+exists to serve.
+
+**ACTED ON 2026-09-01, by maintainer decision: the shipped default now targets the D1 FREE tier, so
+an unconfigured deployment works everywhere.** `maxRowsPerStatement` 500 -> **100**,
+`maxStatementsPerBatch` 100 -> **50**, `maxBytesPerBatch` unchanged. `maxRowsPerStatement` was a
+CORRECTNESS bug rather than a tuning choice, so it is a fix; the other is a deliberate throughput
+trade, and both stay configurable via `{bounds}` for a local database or a paid tier.
+
+**The numbers moved into the package; the VENDOR NAME did not, and could not.**
+`packages/state-store-sqlite/test/no-platform-leakage.test.ts` asserts that no source file in that
+package matches `/\bD1\b/` or `/cloudflare/i` -- "a review criterion that is easy to state and easy
+to erode, so it is asserted instead". A first attempt at this change documented the defaults by
+naming the vendor and that test caught it immediately, which is the rule working exactly as intended:
+the store targets `remote-sql`, so a hosted backend is one backend among several and never the
+target. The docstring there therefore describes the CONSTRAINT ("the tightest hosted backend caps
+bound parameters per query at 100") and points here for the vendor, the plan split and the dated
+source. **This note is the only home for those specifics, which is why it must not be deleted while
+those defaults stand.**
+
+What remains undelivered is the other half: a HOST adapter stating its own backend's limits and
+passing `{bounds}`, which is `work/tasks/backlog/d1-limits-reach-the-stores-batch-bounds.md`. A host
+is the one place allowed to name its backend, so a Paid-tier deployment raises
+`maxStatementsPerBatch` there rather than everyone paying the Free tier's price forever.
 
 ## Why it is a finding rather than an observation
 

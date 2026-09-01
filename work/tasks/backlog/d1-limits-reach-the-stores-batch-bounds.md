@@ -15,24 +15,33 @@ This is the one undelivered piece of `server-platform-adapters` (now in `work/ta
 whose other six criteria were delivered by `agnostic-server-skeleton`). It is re-minted as a forward
 task because it has since acquired something that task only assumed: a MEASURED reason.
 
-### The defect, which is concrete and currently shipping
+### The DEFAULT half is already done. This task is the ADAPTER half.
 
-`work/notes/findings/d1-caps-bound-parameters-per-query-at-100.md` records D1's documented limits.
-Two of the three `BatchBounds` defaults are wrong for D1:
+**Read this before planning: the scope shrank on 2026-09-01.** The finding
+`work/notes/findings/d1-caps-bound-parameters-per-query-at-100.md` established that two of the three
+`BatchBounds` defaults were wrong for D1 — `maxRowsPerStatement: 500` against a cap of 100 bound
+parameters per query (a CORRECTNESS bug that broke retention enforcement on D1 alone), and
+`maxStatementsPerBatch: 100` against 50 queries per Worker invocation on Free. By maintainer
+decision the shipped default now targets the **D1 FREE tier**, so an unconfigured deployment works
+everywhere: 100 and 50 respectively, with the docstring, the README, the value-pinning test and a
+changeset landed alongside.
 
-- **`maxRowsPerStatement: 500` against D1's cap of 100 BOUND PARAMETERS PER QUERY.** Five times over.
-  `dropVersionsStatement` (`packages/state-store-sqlite/src/statements.ts:269-274`) emits one `?` per
-  row id, and `prune` (`src/store.ts:323`) fills it with up to that many. So **retention enforcement
-  is broken on D1 under the shipped default** — and it passes on every other backend, which is the
-  shape that runs locally and fails only in production.
-- **`maxStatementsPerBatch: 100` against 50 queries per Worker invocation on the FREE plan** (1,000
-  on Paid, where it is fine).
+So do NOT re-fix the defaults. What is left is the half that genuinely needs the seam:
 
-And `batching.ts`'s own docstring claims `DEFAULT_BATCH_BOUNDS` is "deliberately conservative: small
-enough to fit inside the tightest hosted limits we are aware of, so that the default never surprises
-anyone in production". That sentence is false for D1, which is the backend the Worker host exists to
-serve. **Correcting it is in scope**; a comment asserting a safety property the numbers do not have is
-worse than no comment.
+- **A host adapter states its OWN backend's limits and passes `{bounds}`**, which nothing anywhere
+  does today (the only readers of `BatchBounds` are the store and its tests).
+- **A Paid-tier deployment can therefore stop paying the Free tier's price.** That is the real value
+  now: the default is safe but deliberately pessimistic, and 50 statements per batch is 20x below
+  what Paid allows. Without this task everyone is capped at the free tier forever.
+
+### The constraint that shapes where the numbers may live
+
+`packages/state-store-sqlite/test/no-platform-leakage.test.ts` asserts that NO source file in that
+package matches `/\bD1\b/` or `/cloudflare/i`, because the store targets `remote-sql` and a hosted
+backend is one backend among several. This is not advisory — it failed on the first attempt at the
+defaults change and forced the vendor specifics out into the finding, which is where they still live.
+**A host adapter is the only place allowed to name its backend.** That is the whole architectural
+point of this task, so do not weaken the test to make the wiring easier.
 
 ### Where the limits must live, and where they must not
 
@@ -71,20 +80,20 @@ around it.
 
 - [ ] D1's per-request limits are expressed as CONFIGURATION in `platforms/cf-worker` and reach the
       store's `BatchBounds`, with no provider constant added to `@etherfold/state-store-sqlite` or to
-      any other shared package.
-- [ ] **A prune on D1 issues no query with more than 100 bound parameters**, asserted rather than
-      assumed. This is the defect that motivates the task, so it gets the test: drive a prune whose
-      budget exceeds the bound and assert the parameter count of every emitted statement, at the
-      statement seam rather than through the network.
-- [ ] The `maxStatementsPerBatch` value a Worker deployment uses is correct for its PLAN, and which
-      plan it assumes is stated rather than implied (the Free and Paid caps differ by 20x).
-- [ ] **The shipped `DEFAULT_BATCH_BOUNDS` and its docstring are reconciled with the finding.**
-      Either lower `maxRowsPerStatement` so the "fits inside the tightest hosted limits" claim
-      becomes true, or narrow the claim to name the engine it is true of. Say which you chose and why
-      in `## Decisions`; do not leave a comment asserting a property the numbers lack.
-- [ ] `packages/state-store-sqlite/test/batch.test.ts` pins the defaults by value
-      (`maxStatementsPerBatch` 100, `maxBytesPerBatch` 90_000) and must be updated DELIBERATELY if a
-      default moves, still asserting what it was written to assert.
+      any other shared package, and `no-platform-leakage.test.ts` still passing UNWEAKENED.
+- [ ] **A Paid-tier deployment can raise `maxStatementsPerBatch` above the Free-tier default**, which
+      is the capability this task adds; asserted by a deployment configuring it and the store
+      actually batching to the raised bound.
+- [ ] Which PLAN the adapter assumes is stated rather than implied, and changing it is a
+      configuration change rather than a code change (the Free and Paid caps differ by 20x).
+- [ ] **The per-INVOCATION budget is addressed or explicitly deferred.** D1's 50/1,000 is per Worker
+      invocation, not per batch, so no batch bound alone keeps a request inside it — the finding says
+      so and the store's docstring says so. Either bound how much work one invocation does (`prune`
+      already takes a budget for exactly this) or record it as a named follow-up. Do not leave it
+      implied.
+- [ ] The value-pinning test in `packages/state-store-sqlite/test/batch.test.ts` still asserts what it
+      was written to assert, including the bound-parameter guard that ties `maxRowsPerStatement` to
+      `dropVersionsStatement` carrying no other parameter.
 - [ ] The Worker adapter's existing tests still pass under `@cloudflare/vitest-pool-workers`, and
       `wrangler deploy --dry-run` still succeeds.
 - [ ] A changeset for every published package whose surface changed (a changed DEFAULT is a
@@ -104,11 +113,16 @@ around it.
 > limits, in the `etherfold` monorepo, with those limits stated by the HOST rather than baked into
 > shared code.
 >
+> The DEFAULTS half is ALREADY DONE (they now target the D1 Free tier, so an unconfigured deployment
+> works everywhere). Your job is the adapter half: let a host state its own backend's limits, so a
+> Paid-tier deployment stops paying the Free tier's price.
+>
 > FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED). Two
 > things specifically. (1) Re-fetch D1's limits: `work/notes/findings/d1-caps-bound-parameters-per-query-at-100.md`
 > records them with a dated source, and they are per-plan and revised by Cloudflare, so treat the
 > finding as correctable rather than as fact. If they have moved, update the finding in the same
-> change. (2) Confirm a store can actually be reached from a host's configuration; the predecessor
+> change — and note the defaults are now DERIVED from it, so a moved limit may mean a changed default
+> too. (2) Confirm a store can actually be reached from a host's configuration; the predecessor
 > task was blocked for exactly that reason. If it cannot, do NOT invent the seam — route to
 > needs-attention with the discrepancy (WORK-CONTRACT.md, "Drift is a needs-attention signal"),
 > because inventing one pre-empts the `run` design in `work/specs/ready/one-command-runs-the-whole-pipeline.md`.
@@ -133,9 +147,11 @@ around it.
 >
 > - Putting D1's numbers in `@etherfold/state-store-sqlite`. That package targets `remote-sql`; D1 is
 >   one backend among several, and a provider constant in shared code is the thing this task exists
->   to avoid.
+>   to avoid. `test/no-platform-leakage.test.ts` ASSERTS this and has already caught one attempt — do
+>   not weaken it to make the wiring easier; if it fires, the wiring is wrong.
 > - Testing the parameter count through the network. Assert it at the statement seam, where you can
 >   count `args` per statement; a D1 rejection in an integration test tells you it broke, not where.
+> - Re-fixing the defaults. They are already correct for Free; what is missing is a host RAISING them.
 > - Treating `maxBytesPerBatch` as the answer to D1's 100 KB cap. That cap is per STATEMENT and this
 >   bound is per BATCH; they are different quantities that happen not to collide today.
 > - Assuming the Free and Paid plans are interchangeable. `maxStatementsPerBatch` is fine on Paid and

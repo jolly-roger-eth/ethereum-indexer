@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {DEFAULT_BATCH_BOUNDS, VersionedStateStore, planBatches} from '../src/index.js';
+import {normalizeEntity} from '@etherfold/state-store';
+import {DEFAULT_BATCH_BOUNDS, VersionedStateStore, dropVersionsStatement, planBatches} from '../src/index.js';
 import {FailingTailSQL, RecordingSQL, createTestDB, rows, sqlOf} from './utils/db.js';
 import {TOKEN, block, owns} from './utils/fixtures.js';
 
@@ -68,9 +69,28 @@ describe('applying a block', () => {
 });
 
 describe('the batch chunk bound', () => {
-	it('has a conservative documented default', () => {
-		expect(DEFAULT_BATCH_BOUNDS.maxStatementsPerBatch).toBe(100);
+	it('defaults to the tightest supported backend and plan, which is D1 Free', () => {
+		// Each of these is a DOCUMENTED D1 limit, not a taste: see
+		// work/notes/findings/d1-caps-bound-parameters-per-query-at-100.md.
+		// Raising one silently is how retention enforcement broke on D1 before.
+		expect(DEFAULT_BATCH_BOUNDS.maxStatementsPerBatch).toBe(50); // D1 Free: 50 queries per Worker invocation
 		expect(DEFAULT_BATCH_BOUNDS.maxBytesPerBatch).toBe(90_000);
+		expect(DEFAULT_BATCH_BOUNDS.maxRowsPerStatement).toBe(100); // D1: 100 bound parameters per query
+	});
+
+	it('emits no prune statement with more bound parameters than D1 allows', () => {
+		// The DEFAULT sits EXACTLY on D1's cap, which is only safe because this
+		// statement carries no other bound parameter. That coupling is invisible at
+		// the default's definition site, so it is asserted here: add an argument to
+		// dropVersionsStatement and this fails, which is the point.
+		const D1_MAX_BOUND_PARAMETERS_PER_QUERY = 100;
+		const rowids = Array.from({length: DEFAULT_BATCH_BOUNDS.maxRowsPerStatement}, (_, i) => i + 1);
+		const statement = dropVersionsStatement(normalizeEntity(TOKEN), rowids);
+
+		expect(statement.args.length).toBe(rowids.length);
+		expect(statement.args.length).toBeLessThanOrEqual(D1_MAX_BOUND_PARAMETERS_PER_QUERY);
+		// and the placeholder count agrees with the argument count
+		expect((statement.sql.match(/\?/g) ?? []).length).toBe(statement.args.length);
 	});
 
 	it('never splits an indivisible group across batches', () => {
