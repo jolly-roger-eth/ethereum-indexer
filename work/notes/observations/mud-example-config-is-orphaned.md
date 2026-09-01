@@ -1,5 +1,6 @@
 ---
 title: '`examples/mud/src/config.ts` is imported by nothing and imported a module that never existed'
+slug: mud-example-config-is-orphaned
 observed: 2026-08-27
 source: 'found by turning the acceptance gate on for examples/ (ADR-0030): svelte-check on examples/mud failed on `Cannot find module ./lib/utils/web`. History read from `git log -- examples/mud/src/lib/utils/`.'
 ---
