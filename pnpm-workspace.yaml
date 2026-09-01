@@ -2,3 +2,16 @@ packages:
   - "packages/*"
   - "examples/*"
   - "platforms/*"
+
+# Kept in step with the `pnpm.overrides` block in the root package.json, DELIBERATELY duplicated
+# across the two homes rather than moved, because the two pnpm majors read different files:
+# pnpm 10 reads `pnpm.overrides` from package.json, and pnpm 11 IGNORES it (printing `The "pnpm"
+# field in package.json is no longer read by pnpm`) and reads this file instead. With only the
+# package.json copy, a fresh install on pnpm 11 resolves abitype to 1.2.3 inside viem while
+# @etherfold/core keeps 1.2.4 -- the exact two-copies situation the override exists to prevent --
+# and `packages/core/test/abitypeIdentity.test.ts` goes RED on a clean install with no source
+# change, bouncing whatever unrelated task happens to be building.
+#
+# The values MUST match. If you change one, change the other.
+overrides:
+  abitype: "1.2.4"

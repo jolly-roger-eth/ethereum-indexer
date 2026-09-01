@@ -58,10 +58,26 @@ jobs:
       - name: Build packages and platforms
         run: pnpm build
 
+      # THIS STEP IS LOAD-BEARING: it must not be dropped again.
+      # `dorfl.json`'s acceptance gate runs `typecheck` and CI did not, and that
+      # asymmetry is the whole mechanism by which 3143293 (which widened the root
+      # `typecheck` filter to `examples/*`) passed its own PR and then left the
+      # gate RED on `main` for two days, bouncing two unrelated tasks that had
+      # nothing to do with examples. A gate step that only one of the two runners
+      # executes is protecting nothing: whatever CI does not check, only a
+      # dorfl-driven land checks, and plenty lands by other routes.
+      # Runs AFTER build, deliberately: cross-package types resolve through each
+      # package's `dist/`, so `typecheck` on an unbuilt tree reports missing
+      # modules (CONTEXT.md, Conventions).
+      - name: Typecheck
+        run: pnpm typecheck
+
       - name: Test
         run: pnpm test
 
       # The docs embed the demo, and the examples import the published packages,
       # so they are the closest thing to a consumer of this workspace.
+      # Note the converse gap this does NOT close: `verify` does not run this, so
+      # an example whose `tsc` emit breaks passes the gate and fails here.
       - name: Build examples
         run: pnpm build:examples
