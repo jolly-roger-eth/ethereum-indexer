@@ -21,6 +21,34 @@ import type {WireContext} from './types.js';
 export type RetryableError = Error & {readonly retryable: boolean};
 
 /**
+ * A store that refused a write because it is FULL.
+ *
+ * The one cache failure whose remedy is DELETION rather than patience: every
+ * other persistent failure leaves the stored stream alone (it is a contiguous
+ * prefix, and a usable partial seed), but out of space the cache IS the problem,
+ * so freezing preserves the cause and clearing frees it.
+ *
+ * Said by the KEEPER, on the error it throws, and read STRUCTURALLY here for the
+ * same reason `retryable` is (above): an error crossing a package boundary from
+ * a second copy of this module still classifies correctly. The Web platform's
+ * own `QuotaExceededError` counts as saying it, because IndexedDB is the
+ * substrate every stream keeper in this repository is built on and its
+ * `DOMException` is standardised rather than a vendor string -- a keeper that
+ * lets one through unwrapped meant it. Nothing else is recognised by NAME: a
+ * list of platform spellings kept here would be exactly the drifting list the
+ * `retryable` note above refuses, so any other substrate says it with the flag.
+ */
+export type OutOfSpaceError = Error & {readonly outOfSpace: true};
+
+/** Whether a keeper said its write failed for want of SPACE. */
+export function isOutOfSpace(error: unknown): boolean {
+	if ((error as OutOfSpaceError | undefined)?.outOfSpace === true) {
+		return true;
+	}
+	return (error as Error | undefined)?.name === 'QuotaExceededError';
+}
+
+/**
  * A batch that did not start where the receiver said it must.
  *
  * ## Why this is a TYPE and not a message
