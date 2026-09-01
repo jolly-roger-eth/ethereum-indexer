@@ -1,0 +1,126 @@
+{
+  "measuredAt": "2026-09-01T19:00:04.941Z",
+  "commit": "5e0f4555535e5422e119e6a0539eb9f652657b7c",
+  "runtime": {
+    "node": "v24.13.1",
+    "cpu": "AMD Ryzen 7 PRO 6850U with Radeon Graphics",
+    "cores": 16,
+    "machine": "Linux 6.12.96+deb13-amd64"
+  },
+  "fixture": {
+    "path": "docs/spikes/replay-parse-cost/results/stratagems-alpha1-full.stream.json.gz",
+    "events": 31330,
+    "blocks": 1040,
+    "provenance": {
+      "what": "stratagems on Base (deployments/alpha1): Stratagems + Gems + GemsGenerator, every log in the range, BOTH the raw and the decoded half",
+      "deployment": "alpha1",
+      "stratagemsRepo": "github.com/wighawag/stratagems",
+      "stratagemsCommit": "3d5a0b3f46bcc0d8370643b8382f11f99f81df00",
+      "contracts": [
+        {
+          "address": "0x5ab6d5bb8012fc60ab3653e025be4a59b4406ff2",
+          "startBlock": 13499257
+        },
+        {
+          "address": "0xb2d822732347e3dc60258dcf6cf0d4c7a432b678",
+          "startBlock": 12082307
+        },
+        {
+          "address": "0xb0855eaf94bf7f122af4f444141e83b7408cc7a7",
+          "startBlock": 12082311
+        }
+      ],
+      "node": "base-mainnet.g.alchemy.com",
+      "chainHeadAtCapture": 50749669,
+      "capturedBy": "docs/spikes/replay-parse-cost/capture-full.mjs",
+      "captureMethod": "one captureStream call PER CONTRACT (the merged three-contract ABI is refused by LogEventFetcher's ambiguity guard since #28), merged in stream order (blockNumber, then logIndex) and verified event-for-event against the committed fixture",
+      "companionTo": "packages/conformance-workload-stratagems/fixtures/stratagems-alpha1.stream.json.gz (same pinned range, data/topics omitted there)",
+      "fromBlock": 12082307,
+      "toBlock": 23400000,
+      "capturedAt": "2026-09-01T18:52:50.985Z",
+      "chainId": "8453"
+    }
+  },
+  "methodology": {
+    "warmup": 2,
+    "runs": 5,
+    "note": "median of runs; each decode run parses all events, each process run replays all blocks"
+  },
+  "correctness": {
+    "checkedEvents": 31330,
+    "sampledVsCapture": 63
+  },
+  "timingsMs": {
+    "read": {
+      "label": "read (gunzip + JSON.parse + reviver)",
+      "runs": [
+        566.5339669999994,
+        488.1441560000003,
+        500.1328909999993,
+        468.27675499999896,
+        476.5120360000001
+      ],
+      "medianMs": 488.1441560000003
+    },
+    "decodeRawOnly": {
+      "label": "decode: reparse(raw-only) — the proposed stored shape",
+      "runs": [
+        1962.050326999999,
+        1975.0651329999982,
+        1911.9839530000027,
+        1976.8131219999996,
+        1911.6444469999988
+      ],
+      "medianMs": 1962.050326999999
+    },
+    "decodeFull": {
+      "label": "decode: reparse(full) — today's stored shape",
+      "runs": [
+        1921.1850030000023,
+        1921.3440360000022,
+        1932.6432709999972,
+        1923.6268049999999,
+        1940.139009999999
+      ],
+      "medianMs": 1923.6268049999999
+    },
+    "process": {
+      "label": "process: the vendored stratagems JSProcessor over every block",
+      "runs": [
+        707.6849480000019,
+        732.4840209999966,
+        739.5218710000045,
+        734.5459780000019,
+        736.4985489999963
+      ],
+      "medianMs": 734.5459780000019
+    }
+  },
+  "perThousandEvents": {
+    "read": 15.580726332588583,
+    "decodeRawOnly": 62.62528972231085,
+    "decodeFull": 61.398876635812314,
+    "process": 23.44545094158959
+  },
+  "replayComposition": {
+    "read": 488.1441560000003,
+    "decode": 1962.050326999999,
+    "process": 734.5459780000019,
+    "total": 3184.7404610000012
+  },
+  "sizes": {
+    "events": 31330,
+    "full": {
+      "jsonBytes": 27831853,
+      "gzBytes": 976232
+    },
+    "rawOnly": {
+      "jsonBytes": 21123584,
+      "gzBytes": 632999
+    },
+    "decodedOnly": {
+      "jsonBytes": 17041188,
+      "gzBytes": 580470
+    }
+  }
+}
