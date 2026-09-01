@@ -178,9 +178,18 @@ pattern.
       and ADR-0032 rules it out on a loaded machine.
 - [ ] **A save commits the segment AND the cursor record in ONE `setMany` transaction.**
 - [ ] **An empty save writes ONLY the cursor record**, no segment.
-- [ ] **NOTHING stores `unconfirmedBlocks`** — not a segment, not the cursor record — and `fetchFrom`
-      returns a `LastSync` whose window is `[]`. Assert a full load-and-replay still produces the same
-      state, which is what proves the window was redundant rather than merely unread.
+- [ ] **THE STREAM KEEPER stores no `unconfirmedBlocks`** — not in a segment, not in the cursor
+      record — and `fetchFrom` returns a `LastSync` whose window is `[]`. Assert a full load-and-replay
+      still produces the same state, which is what proves the window was redundant HERE rather than
+      merely unread.
+- [ ] **The STATE side still stores it, and this is asserted as a GUARD, not assumed.** The scope
+      above is the stream keeper ONLY. `KeepState.save` takes `{state, lastSync}` and the entity
+      path's `serializeLastSync` is `JSON.stringify` of the whole `LastSync`, both including the
+      window, and both are READ: `checkTxInclusion` is answered from `LastSync.unconfirmedBlocks` and
+      nothing else, and a deployment with NO stream configured recovers its window from that cursor on
+      reload. Assert `checkTxInclusion` still answers correctly across a reload with no stream keeper
+      configured — that is the test that fails loudly if someone reads the criterion above as global
+      and strips the window everywhere.
 - [ ] **The cursor comes from the CURSOR RECORD**, with no competing copy, addressed inside the
       stream's subtree.
 - [ ] **`clear` removes the subtree and nothing else**: assert an unrelated key in the same store
