@@ -38,12 +38,21 @@ cross-chain corruption hazard, a temp-name rule and an extra keeper operation. *
 consequence of the flat namespace.** Comparing key ELEMENTS cannot confuse chain `1` with chain `10`,
 so the hazard is gone rather than guarded.
 
-- **`chainId` is NOT in the address.** It is already inside the stream digest (the block-0 skeleton
-  entry hashes `chainId` and `genesisHash`), so two chains produce different digests and cannot
-  collide.
-- **The `<digest>` level is present with a PLACEHOLDER value.** `a-reconfigure-is-not-an-outage`
-  computes the real digest; do not invent one. Keep it a level so the successor fills it rather than
-  re-keying. Record the constant in `## Decisions`.
+- **`chainId` is not a level of its own**, because the digest that occupies the third position
+  distinguishes chains by itself — the real one because the block-0 skeleton entry hashes `chainId`
+  and `genesisHash`, and the placeholder because it is derived from `chainId` (above). Never let that
+  position collapse to a value shared across chains.
+- **The `<digest>` level is present, and its PLACEHOLDER value is DERIVED FROM `chainId`** (for
+  example `chain-<chainId>`). `a-reconfigure-is-not-an-outage` computes the real digest and replaces
+  the level; do not invent one here. But it must not be a bare constant: the reason `chainId` is
+  absent from the address is that the REAL digest already contains it (the block-0 skeleton entry
+  hashes `chainId` and `genesisHash`), and that is FALSE of a constant placeholder. With a constant,
+  every chain under one indexer name would share one subtree — a REGRESSION against the shipped
+  keeper, which separates them with `stream_<name>_<chainId>`, and against `keepStateOnIndexedDB`,
+  which still keys `${name}_${chainId}`. Two tabs on two chains would interleave writes into one
+  subtree, which is the cross-chain corruption hierarchical addressing is supposed to have deleted.
+  Deriving the placeholder from `chainId` preserves the isolation with no extra level and no change of
+  shape when the real digest lands. Record the exact form in `## Decisions`.
 - **`<indexer-name>` is supplied by the caller**, and a browser app may legitimately run SEVERAL (an
   NFT viewer naming one per watched account). It is the same discriminator the server gets from
   `upload`.
@@ -66,6 +75,14 @@ dependency or a new idea.
 - **ONE SEGMENT PER BATCH. There is no open tail.** A save writes its batch as a new segment at the
   next ordinal, together with the cursor record, in ONE `setMany` transaction. Nothing already
   written is ever touched again.
+- **The NEXT ORDINAL is carried IN THE CURSOR RECORD**, not derived by scanning. Say so, because
+  nothing else stored holds position metadata any more and the alternatives differ asymptotically: an
+  in-memory counter breaks across tabs, and a `getAllKeys` over the range is O(segments) PER SAVE,
+  which would leave the append quadratic in key reads while passing a cost criterion that only
+  watches `setMany`. The cursor record is written in the same transaction as the segment, so the two
+  cannot drift, and allocation is O(1). (If a future keeper cannot extend its cursor record, the
+  fallback is a reverse key cursor — `openCursor(range, 'prev')`, O(log n) — for which
+  `packages/state-store-indexeddb/src/store.ts` is the repo's precedent. Do not use a full scan.)
 - **An empty save writes ONLY the cursor record**, no segment.
 - **A segment is immutable from BIRTH**, unconditionally.
 - **Ordinals key the segments and the read is a full ordered scan.** The stored stream is an EMISSION
@@ -122,9 +139,17 @@ pattern.
 with a cursor, DELETE THE SUBTREE and let it rebuild.** That covers every case:
 
 - a GAP in the ordinals (`0`, `1`, `3`);
-- a cursor with NO segments beneath it;
-- segments with NO cursor (presence is the cursor, so these are unreachable anyway);
+- SEGMENTS with no cursor — unreachable by construction, since presence IS the cursor, so they would
+  be replayed by nothing and re-appended over;
 - a segment that fails to parse.
+
+**A CURSOR WITH NO SEGMENTS IS LEGAL AND MUST NOT BE CLEARED.** It is the ordinary state of a stream
+that has been scanned but found nothing yet: an empty save writes exactly that, and a deployment whose
+contracts have not emitted anything is in it for as long as that lasts. Clearing it would wipe the
+cursor on every reload and re-scan from the start block forever, which is the bug this rule most has
+to avoid. `fetchFrom` returns a DEFINED result with no events, which is precisely what stops
+`indexer.ts` taking its clear branch. Distinguishing it costs nothing: the cursor says how far the
+scan got, and "no events in that range" is a fact about the chain rather than damage.
 
 An earlier draft kept the contiguous PREFIX beneath a gap and resumed from it, which needed a
 per-segment scanned extent, a recovery sequence with a pinned write-then-delete order, a rule for
@@ -171,9 +196,11 @@ deletion and corruption. The check is nearly free because the ordinals are being
 - [ ] **Segments are read by KEY RANGE, not a whole-store scan.** Assert that reading one stream does
       not read keys belonging to another, by count at the instrumented seam — this is what keeps
       `fetchFrom` O(stream) rather than O(store) once several streams exist.
-- [ ] **Two streams under one indexer name with different digests do not see each other**, and two
-      different indexer names likewise: writing, reading and clearing one leaves the other complete
-      and readable.
+- [ ] **Two CHAINS under one indexer name do not see each other**, which during the placeholder period
+      is what the digest level is carrying: index the same name on two chains, and assert writing,
+      reading and clearing one leaves the other complete and readable, and that its replay is
+      unpolluted. This is the successor to the shipped keeper's `stream_<name>_<chainId>` isolation
+      and it must not regress. Two different indexer NAMES likewise.
 - [ ] **A save writes exactly its BATCH plus the cursor record, and NOTHING already written**,
       asserted as WORK at a module-level mock of `idb-keyval`'s **`setMany`** (naming only `set` makes
       this pass vacuously, because the commit path is `setMany`). Assert the bytes written on the
@@ -201,17 +228,29 @@ deletion and corruption. The check is nearly free because the ordinals are being
       survives, that after `clear` read-cursor returns NOTHING and presence is FALSE, and that a
       legacy flat-key blob is DELETED (not adopted) with the deletion logged.
 - [ ] **Any inconsistency CLEARS the subtree**, asserted for each shape: a hole punched at ordinal
-      `k`, a cursor with no segments, segments with no cursor, and an unparseable segment. In every
-      case nothing raises, the subtree is gone, presence reads FALSE, the clear is logged, and the
-      next load takes `indexer.ts`'s existing clear branch. Assert the paired negative too: a HEALTHY
-      stream is never cleared.
+      `k`, segments with no cursor, and an unparseable segment. In every case nothing raises, the
+      subtree is gone, presence reads FALSE, the clear is logged, and the next load takes
+      `indexer.ts`'s existing clear branch.
+- [ ] **A CURSOR WITH NO SEGMENTS IS NOT CLEARED**, and this is the paired negative that matters most:
+      write an empty first save, reload, and assert the cursor SURVIVES, `fetchFrom` returns a DEFINED
+      result with no events, and the indexer resumes from that cursor rather than the start block.
+      Then do it repeatedly, as a deployment whose contracts have emitted nothing does, and assert the
+      scan position keeps ADVANCING across reloads. A keeper that treats this as damage re-scans from
+      the start block forever.
+- [ ] **The next ORDINAL comes from the cursor record**, asserted by instrumenting reads: a save
+      performs NO range scan or `getAllKeys` to decide where to write. This is what keeps the append
+      linear in key reads as well as in bytes.
 - [ ] **A segment is never written twice.**
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order. Strict equality — this task changes no event shape.
 - [ ] **`fetchFrom` returns a DEFINED result** for a stream saved with no events.
 - [ ] **Replay across a reorg** returns retractions in APPEND order.
-- [ ] **The migration**: a stream in the shipped blob format is deleted and re-indexed rather than
-      adopted, visibly; separately, a legacy blob with a dropped raw half is cleared per ADR-0034.
+- [ ] **The migration**: a stream in the shipped flat-key blob format is DELETED and re-indexed rather
+      than adopted, and the deletion is logged. Detect it in `fetchFrom` (not only in `clear`):
+      `indexer.ts`'s state-kept branch guards its `clear` behind `if (existingStreamData)`, so a blob
+      found only by `clear` would survive indefinitely. There is no dropped-raw-half case to test
+      here — ADR-0034's clearing mandate is about a blob that is READ and cannot be re-decoded, and
+      this design never reads one.
 - [ ] `packages/browser/test/invalidation.test.ts` reaches into the old stream key and is updated
       DELIBERATELY for the new address, still asserting what it was written to assert.
 - [ ] `pnpm build && pnpm typecheck && pnpm test` green.
@@ -269,7 +308,9 @@ unrelated keys in the same store survive a `clear`.
 **Scope fence.** Do NOT make the stream raw-only (that is `the-stream-stores-only-what-the-node-said`).
 Do NOT compute a real stream digest or write a canonical pointer (those are
 `a-reconfigure-is-not-an-outage`'s); use a placeholder for the digest level. Do NOT add per-segment
-block-range metadata. Do NOT add a filesystem keeper.
+block-range metadata. Do NOT add a filesystem keeper — and equally, do NOT DELETE `packages/fs`: it still exists at HEAD and
+its removal is owned by `drop-filesystem-storage-and-rehome-the-fixture-loader`, which is unblocked
+and may run in parallel. Touching it here would collide.
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (the
 placeholder digest constant; the key-range construction and its upper bound; how you mocked `setMany`

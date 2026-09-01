@@ -67,7 +67,11 @@ from birth and an empty save writes only the cursor record.
 kept the contiguous prefix beneath a gap and resumed from it, which required an extent on every
 segment (with exactly one reader, that recovery), an ordered write-then-delete sequence, a rule for
 carrying the `context` forward, and a separate no-survivors branch. It is replaced by ONE rule:
-anything that is not a complete, contiguous stream with a cursor is CLEARED and rebuilt. The
+anything that is not a complete, contiguous stream with a cursor is CLEARED and rebuilt — with one
+case explicitly OUTSIDE it, because collapsing it in is a live bug: a cursor with NO segments is the
+ordinary state of a stream that has been scanned and found nothing, which an empty save writes and a
+deployment whose contracts have not emitted yet stays in. Clearing that would wipe the cursor on every
+reload and re-scan from the start block forever. The
 justification for keeping a prefix was that a full re-index can be impossible on a public node, which
 is true and is the SEEDING spec's problem to solve properly rather than this keeper's to hedge
 against; the source spec's story 5 always permitted the cheap branch ("or be rebuilt deliberately and
