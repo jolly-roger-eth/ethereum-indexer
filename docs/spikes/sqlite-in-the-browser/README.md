@@ -47,14 +47,14 @@ npx tsx run/summarise.ts               # results/*.json -> results/summary.md
 Re-capturing the stream needs `CHAIN_8453` in the repo's `.env.local` and is deliberately a separate, manual step:
 
 ```sh
-node capture/capture-stratagems-base.mjs                    # alpha1, the launched game
-node capture/capture-stratagems-base.mjs --deployment base  # the abandoned early one
-node capture/capture-stratagems-base.mjs --full             # keep `data`/`topics` too
+npx tsx capture/capture-stratagems-base.mjs                    # alpha1, the launched game
+npx tsx capture/capture-stratagems-base.mjs --deployment base  # the abandoned early one
+npx tsx capture/capture-stratagems-base.mjs --full             # keep `data`/`topics` too
 ```
 
 The committed fixture omits each log's `data` and `topics`, which are the encoded form of the `args` it already carries decoded: keeping both took the file from 20.5 MB to 32.5 MB, and the provenance records exactly which contracts and blocks to re-fetch if they are ever wanted. The omission is recorded inside the fixture itself, as `provenance.omittedFields`.
 
-The launched game's fixture is stored **gzipped** (`.json.gz`, 0.6 MB against 20.5 MB of JSON; git stores both at about 0.6 MB, so the compressed form costs nothing in the repository and saves 20 MB in every working tree). `@etherfold/fs`'s `loadStreamFixture` gunzips by extension, and the browser side does it with the native `DecompressionStream` (`src/workload/load-fixture.ts`). The abandoned deployment's fixture stays plain JSON because it is small enough to read. The derived `*.trace.json` files are gitignored: `run/verify-port.ts` regenerates them, identically, in about three seconds. The golden `*.state.json` IS committed, because it is the oracle and a diff on it means the processor changed meaning. All of them now live in `packages/conformance-workload-stratagems/fixtures/`, which carries their labels and provenance in its own README.
+The launched game's fixture is stored **gzipped** (`.json.gz`, 0.6 MB against 20.5 MB of JSON; git stores both at about 0.6 MB, so the compressed form costs nothing in the repository and saves 20 MB in every working tree). `loadStreamFixture` (promoted with the fixtures, now `packages/conformance-workload-stratagems/src/fixture-file.ts`) gunzips by extension, and the browser side does it with the native `DecompressionStream` (`src/workload/load-fixture.ts`). The abandoned deployment's fixture stays plain JSON because it is small enough to read. The derived `*.trace.json` files are gitignored: `run/verify-port.ts` regenerates them, identically, in about three seconds. The golden `*.state.json` IS committed, because it is the oracle and a diff on it means the processor changed meaning. All of them now live in `packages/conformance-workload-stratagems/fixtures/`, which carries their labels and provenance in its own README.
 
 The full Chromium sweep takes about 15 minutes; `sweep` and `large` are the slow ones, and they are the two that matter.
 

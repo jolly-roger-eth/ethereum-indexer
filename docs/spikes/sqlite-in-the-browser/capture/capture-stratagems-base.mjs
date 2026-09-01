@@ -6,7 +6,7 @@
  * candidate sees the same bytes and no measurement is at the mercy of a
  * rate limiter.
  *
- *   node capture/capture-stratagems-base.mjs [--deployment <dir>] [--to-block <n>]
+ *   npx tsx capture/capture-stratagems-base.mjs [--deployment <dir>] [--to-block <n>]
  *
  * Needs `CHAIN_8453` in the repo's `.env.local` (a Base JSON-RPC endpoint).
  *
@@ -22,7 +22,10 @@ import * as path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {captureStream} from '../../../../packages/core/dist/index.js';
-import {saveStreamFixture} from '../../../../packages/fs/dist/index.js';
+// The fixture-file IO now lives in the workload package's own source (it moved
+// when `@etherfold/fs` was deleted), so this script runs under tsx to read it:
+// the run/ scripts already import that package's TS sources the same way.
+import {saveStreamFixture} from '../../../../packages/conformance-workload-stratagems/src/fixture-file.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../../..');

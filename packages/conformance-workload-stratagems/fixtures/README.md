@@ -17,7 +17,7 @@
 
 ## What each file is
 
-- **`*.stream.json[.gz]`** — the golden INPUT: a `StreamFixture` (`@etherfold/core`), which is every log the three contracts emitted plus the `IndexingSource` they were captured for and the `LastSync` at the end of the capture. Its own `provenance` block carries the capture date, the chain head at capture, the block range and `omittedFields`; read it out of the file rather than trusting this table. Replay it with `loadStreamFixture` (`@etherfold/fs`, which gunzips on the `.gz` extension) or `replayStream` (`@etherfold/core`).
+- **`*.stream.json[.gz]`** — the golden INPUT: a `StreamFixture` (`@etherfold/core`), which is every log the three contracts emitted plus the `IndexingSource` they were captured for and the `LastSync` at the end of the capture. Its own `provenance` block carries the capture date, the chain head at capture, the block range and `omittedFields`; read it out of the file rather than trusting this table. Replay it with `loadStreamFixture` (this package's own `src/fixture-file.ts`, which gunzips on the `.gz` extension) or `replayStream` (`@etherfold/core`).
 - **`*.state.json`** — the golden OUTPUT: the state the **ORIGINAL** stratagems `JSProcessor` computed from that stream (stratagems commit `3d5a0b3f`, 2024-12-18), key-sorted and with bigints in the repo's TAGGED convention. **A diff on it means the processor changed meaning, and that is a finding, not a fixture to update.**
 
 ## The encoding both files carry, and the one time it changed
@@ -28,7 +28,7 @@ A BigInt is written as `{"__bigint__": "123"}`, because a decoded `uint256` argu
 
 ## Why the alpha1 stream is gzipped, and why `data` and `topics` are gone
 
-0.6 MB against 20.5 MB of JSON, and git stores both at about 0.6 MB either way, so the compressed form costs nothing in the repository and saves 20 MB in every working tree. `@etherfold/fs`'s `loadStreamFixture` gunzips by extension, so no caller has to know.
+0.6 MB against 20.5 MB of JSON, and git stores both at about 0.6 MB either way, so the compressed form costs nothing in the repository and saves 20 MB in every working tree. `loadStreamFixture` (`src/fixture-file.ts`) gunzips by extension, so no caller has to know.
 
 Each log's `data` and `topics` are omitted, because they are the encoded form of the `args` the fixture already carries decoded: keeping both took the file from 20.5 MB to 32.5 MB. The omission is recorded INSIDE the fixture as `provenance.omittedFields`, and the provenance says exactly which contracts and blocks to re-fetch if they are ever wanted.
 

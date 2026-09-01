@@ -22,6 +22,7 @@ Not published, and that is deliberate: see [Licence](#licence-gpl-30-in-an-mit-r
 | | |
 | --- | --- |
 | `fixtures/` | the two captured deployments and their golden states. **Read [`fixtures/README.md`](./fixtures/README.md) first**: `base` is not "the Base deployment" |
+| `src/fixture-file.ts` | the fixture-file IO (`loadStreamFixture` / `saveStreamFixture`, gzip chosen by the `.gz` extension) that `fixtures/` is written and read through. It moved here when `@etherfold/fs` was deleted (ADR-0041): a fixture loader is test material and needs no storage package |
 | `vendor/stratagems/` | the ORACLE, copied verbatim, GPL-3.0 ([why](./vendor/stratagems/README.md)) |
 | `src/entities.ts` | the state, declared as entities, on the idiomatic model |
 | `src/processor.ts` `src/stratagems-contract.ts` | the port: `on<EventName>` handlers over a `MutationContext` |
