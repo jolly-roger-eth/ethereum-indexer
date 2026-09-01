@@ -2,7 +2,7 @@
 title: 'The stream appends in segments, behind one core helper, on IndexedDB'
 slug: the-stream-appends-in-segments-on-indexeddb
 spec: appending-to-the-stream-costs-the-batch
-blockedBy: []
+blockedBy: [the-indexer-and-its-stream-cache-agree-on-who-is-ahead]
 covers: [1, 2, 3, 4, 5, 6, 7]
 ---
 
@@ -70,19 +70,42 @@ building these. `@etherfold/state-store-indexeddb` already drives raw IndexedDB 
 ranges, cursors and multi-store transactions, so this is the repo's existing practice, not a new
 dependency or a new idea.
 
+**The keyspace stays in `idb-keyval`'s DEFAULT store**, which is `createStore('keyval-store',
+'keyval')` — the same database and object store the bare `get`/`set` calls reach today, and therefore
+the one already holding `keepStateOnIndexedDB`'s rows, the legacy flat-key blob and the keys
+`invalidation.test.ts` reaches into. `defaultGetStore` is module-private, so re-deriving it from those
+two names is the ONLY way to get a `UseStore` over it. This is load-bearing rather than incidental,
+and a keeper that quietly opened a store of its own would break three things at once: it would never
+SEE the legacy blob it is required to delete (and the test would pass vacuously, because the test
+would write the blob through the keeper's own store); it would make "an unrelated key in the same
+store survives `clear`" vacuous; and it would remove the whole ground for banning `idb-keyval`'s
+`clear()`, which is dangerous exactly BECAUSE the stream shares one store with every other keeper.
+Record the two names in `## Decisions`.
+
 ### The shape
 
 - **ONE SEGMENT PER BATCH. There is no open tail.** A save writes its batch as a new segment at the
-  next ordinal, together with the cursor record, in ONE `setMany` transaction. Nothing already
+  next ordinal, together with the cursor record, in ONE `readwrite` transaction. Nothing already
   written is ever touched again.
-- **The NEXT ORDINAL is carried IN THE CURSOR RECORD**, not derived by scanning. Say so, because
-  nothing else stored holds position metadata any more and the alternatives differ asymptotically: an
-  in-memory counter breaks across tabs, and a `getAllKeys` over the range is O(segments) PER SAVE,
-  which would leave the append quadratic in key reads while passing a cost criterion that only
-  watches `setMany`. The cursor record is written in the same transaction as the segment, so the two
-  cannot drift, and allocation is O(1). (If a future keeper cannot extend its cursor record, the
-  fallback is a reverse key cursor — `openCursor(range, 'prev')`, O(log n) — for which
-  `packages/state-store-indexeddb/src/store.ts` is the repo's precedent. Do not use a full scan.)
+- **The NEXT ORDINAL is carried IN THE CURSOR RECORD, and it is READ INSIDE THE COMMIT
+  TRANSACTION.** Both halves matter and the second one is easy to drop. Carrying it in the record is
+  forced because nothing else stored holds position metadata any more, and the alternatives differ
+  asymptotically: an in-memory counter breaks across tabs, and a `getAllKeys` over the range is
+  O(segments) PER SAVE, which would leave the append quadratic in key reads while passing a cost
+  criterion that only watches the writes. Reading it in the SAME transaction that writes is what makes
+  the allocation safe: `idb-keyval`'s `setMany` opens its own transaction, so a `get` before it is a
+  separate one, and two tabs saving at once would both read next-ordinal `5`, both `put` segment `5`,
+  and one batch would be lost — with the ordinals still CONTIGUOUS, so the gap check below can never
+  detect it. That is silent, permanent data loss, and it is the precise hazard the cursor record was
+  chosen over an in-memory counter to avoid, so do not reintroduce it at the transaction boundary.
+  **commit-segment-with-cursor is therefore one `readwrite` transaction over the raw store — read the
+  cursor, `put` the segment, `put` the cursor — and NOT a call to `setMany`.** IndexedDB serialises
+  overlapping `readwrite` transactions on one object store, across tabs, so that is all the mutual
+  exclusion this needs; `packages/state-store-indexeddb/src/idb.ts` is the precedent, including its
+  rule that inside a transaction you may await only IndexedDB's own promises. Allocation stays O(1).
+  (If a future keeper cannot extend its cursor record, the fallback is a reverse key cursor —
+  `openCursor(range, 'prev')`, O(log n) — for which `packages/state-store-indexeddb/src/store.ts` is
+  the repo's precedent. Do not use a full scan.)
 - **An empty save writes ONLY the cursor record**, no segment.
 - **A segment is immutable from BIRTH**, unconditionally.
 - **Ordinals key the segments and the read is a full ordered scan.** The stored stream is an EMISSION
@@ -109,8 +132,9 @@ window has two other homes that ARE read (`KeepState.save` takes `{state, lastSy
 path's `serializeLastSync` is `JSON.stringify` of the whole `LastSync`, written in the block's
 transaction), and the stream's copy is read by nobody: `promiseToFeed` reads only the three block
 numbers, and `generateStreamToAppend` rebuilds the window from the replayed events. The cursor record
-therefore holds the three block numbers plus the `context`, and `fetchFrom` returns
-`unconfirmedBlocks: []`.
+therefore holds the three block numbers plus the `context` — plus two numbers that are the keeper's
+own bookkeeping rather than part of a `LastSync`: the NEXT ORDINAL (above) and the stream's own
+`startBlock` (below). `fetchFrom` returns `unconfirmedBlocks: []`.
 
 ### THREE keeper operations, and the cursor contract
 
@@ -120,7 +144,8 @@ cannot orphan one.
 
 1. **commit-segment-with-cursor** — write a segment and make the cursor current, together.
 2. **read-cursor** — the live cursor, or nothing. This is also what PRESENCE is.
-3. **write-cursor-only** — move the cursor with NO segment (an empty save; the truncation rewrite).
+3. **write-cursor-only** — move the cursor with NO segment. An empty save, and nothing else: the
+   truncation rewrite that used to share this operation went with the gap recovery.
 
 There is deliberately no seal and no clear-cursor. Sealing existed only to strip a window that is no
 longer stored; clear-cursor existed only because a flat key put the cursor outside the enumerable
@@ -130,7 +155,8 @@ pattern.
 
 1. **Exactly ONE authoritative cursor per stream.**
 2. **A save is atomic in the CURSOR-AHEAD direction.** A cursor claiming coverage the stored events
-   do not have is silent data loss. Here it holds through the `setMany` transaction.
+   do not have is silent data loss. Here it holds through the one `readwrite` transaction that reads
+   the cursor and writes both records.
 3. **An empty save costs nothing proportional to the history.** Here it is one small record.
 
 ### Inconsistency is CLEARED, not repaired
@@ -139,8 +165,13 @@ pattern.
 with a cursor, DELETE THE SUBTREE and let it rebuild.** That covers every case:
 
 - a GAP in the ordinals (`0`, `1`, `3`);
-- SEGMENTS with no cursor — unreachable by construction, since presence IS the cursor, so they would
-  be replayed by nothing and re-appended over;
+- SEGMENTS with no cursor. Do NOT reason that this one is unreachable and skip the check: read-cursor
+  returning nothing is ALSO what a never-written stream looks like, so `fetchFrom` must delete the
+  subtree UNCONDITIONALLY before reporting absent. "They would be replayed by nothing and re-appended
+  over" is false — with no cursor there is nothing to allocate from, so the next save takes ordinal
+  `0` again, overwrites the old segment `0` and leaves every higher ordinal in place to be replayed as
+  part of the new stream. And nothing else will clean it up: `indexer.ts` only clears on absence in
+  its state-DISCARDED branch;
 - a segment that fails to parse.
 
 **A CURSOR WITH NO SEGMENTS IS LEGAL AND MUST NOT BE CLEARED.** It is the ordinary state of a stream
@@ -150,6 +181,15 @@ cursor on every reload and re-scan from the start block forever, which is the bu
 to avoid. `fetchFrom` returns a DEFINED result with no events, which is precisely what stops
 `indexer.ts` taking its clear branch. Distinguishing it costs nothing: the cursor says how far the
 scan got, and "no events in that range" is a fact about the chain rather than damage.
+
+**Not clearing it is only HALF of it, and the other half is NOT this task's.** Keeping the cursor
+stops the clear branch; it does not by itself make the indexer RESUME from it, because in the
+state-discarded load branch the fetched cursor is adopted only as a side effect of feeding events (the
+`feed` call sits behind a `replayable.length > 0` guard). A stream holding a cursor and no events
+therefore leaves the in-memory cursor at `freshLastSync` and the scan restarts from the start block on
+every reload. That is the same bug arriving through the consumer, and it is fixed in
+`the-indexer-and-its-stream-cache-agree-on-who-is-ahead`, which this task is `blockedBy`. Build
+against it as done: the keeper's job here is only to keep the cursor and report the stream present.
 
 An earlier draft kept the contiguous PREFIX beneath a gap and resumed from it, which needed a
 per-segment scanned extent, a recovery sequence with a pinned write-then-delete order, a rule for
@@ -164,6 +204,63 @@ explicitly permits this branch: "or be rebuilt deliberately and visibly".
 records `FAILED_TO_LOAD` and rethrows, so a throw makes the indexer permanently unloadable — for a
 LOCAL CACHE whose correct recovery is to re-fetch. Clear, log, return nothing, let the indexer take
 its existing clear branch.
+
+**But that clear branch exists in only ONE of the two load branches, which is why the cursor record
+also carries the stream's own START BLOCK.** `indexer.ts` clears on an absent stream when the STATE
+was discarded; its state-KEPT branch guards everything behind `if (existingStreamData)` and has no
+`else`, so a self-clear there is followed by no re-fetch at all. Indexing simply carries on from the
+STATE's cursor, and the next save opens a NEW subtree whose first segment begins mid-history. Nothing
+marks that stream as partial — `streamMatches` compares the source hashes against `lastToBlock` and
+nothing else — so a later state discard REPLAYS it as though it were the whole history and rebuilds
+silently wrong state. Every self-clear the rule above adds reaches this: a gap, an unparseable
+segment, orphan segments, and the legacy blob, which is the one every existing local profile hits on
+its first upgrade.
+
+So the cursor record ALSO holds `startBlock`: the `lastFromBlock` of the FIRST save into this subtree,
+written once and never updated. **`fetchFrom(source, fromBlock)` refuses a stream it cannot serve**:
+if `startBlock > fromBlock`, the subtree is CLEARED, the clear is logged, and it reports absent, like
+any other inconsistency. In the state-kept branch that test passes and costs nothing (the requested
+`fromBlock` IS the resume point); on the next load that discards state the request is for
+`defaultFromBlock`, the partial stream is cleared, and the indexer re-fetches the history instead of
+trusting a stream that starts above it. One number and one comparison, and it is what makes "clear it
+and let it rebuild" safe on BOTH branches rather than on one.
+
+**Compare against the REQUESTED `fromBlock`, never against the source's own minimum**, even though
+the two coincide exactly where it matters. `defaultFromBlock` IS `defaultFromBlockOf(source)` — the
+lowest `startBlock` among the source's contracts, `0` if any contract declares none — and a healthy
+first-ever save records precisely that as its `startBlock`, since the first fetch runs from there. So
+in practice the rule reads: a stream that does not reach back to the source's earliest start block is
+not served for a REBUILD. But a keeper that re-derived that minimum itself would hold a second copy
+of a rule the indexer owns, and it would apply it in the wrong place: the state-kept branch asks from
+the RESUME point, so a keeper comparing to the source minimum would clear the partial stream on every
+reload and the next save would recreate it partial — a clear-and-recreate loop that never converges,
+and a re-index nobody asked for on a deployment whose state is perfectly good. Comparing to what was
+ASKED defers the clear to the one moment it changes an outcome. (A source that GAINS a contract with
+an earlier `startBlock` lowers `defaultFromBlock` and therefore clears the stream on the next
+rebuild, which is correct; `streamMatches` will usually have failed first, since that is a filter
+growth.)
+
+**One guard on the WRITE side, and it REFUSES rather than destroys.** A batch whose `lastFromBlock` is
+above the stored cursor's `lastToBlock + 1` would put a HOLE in the middle of the stream, and no
+segment-level check can see it afterwards: segments are keyed by save rather than by block, so a save
+that never happened leaves the ordinals perfectly contiguous. That hole's real cause is an engine one
+(a state that advanced past events the stream never received) and it is FIXED there, by
+`the-indexer-and-its-stream-cache-agree-on-who-is-ahead`. So this is not the fix; it is what makes the
+fix's FREEZE safe.
+
+On a forward jump: **write nothing, keep everything, log it once rather than once per cycle.** Do NOT
+clear. What is on disk is a contiguous prefix with a cursor that describes it honestly, which is a
+usable partial seed (it replays, and the remainder is re-fetched from its cursor), and destroying it
+would cost the user a re-fetch from the source's first block for no gain. Refusing is also what makes
+the cache REVIVE by itself: the engine keeps attempting the write, an append that is contiguous or
+overlapping is accepted and the stream is whole again, and one that would jump is simply declined.
+This guard is the arbiter of both, which is why it is one comparison and not a policy.
+
+**Only a forward jump** — an OVERLAP (`lastFromBlock` at or below the stored `lastToBlock`) is the
+ordinary reorg re-scan, since every cycle at the tip re-reads the last `finality` blocks, and treating
+that as damage would refuse almost every save. The one exception that DOES clear is a keeper that
+knows its write failed for want of SPACE: there the cache is itself the problem, so freeing it is the
+remedy rather than a loss.
 
 **Gaps are NOT routine, which is why hedging against them earned so little.** `delMany` is one
 transaction so a partial `clear` cannot happen, nothing rewrites a segment, and IndexedDB eviction is
@@ -192,7 +289,11 @@ deletion and corruption. The check is nearly free because the ordinals are being
       `keepStreamOnIndexedDB` supplies them. Core's `index.ts` re-exports the helper, so **ship a
       changeset** for `@etherfold/core` and `@etherfold/browser`.
 - [ ] **The address is an ARRAY KEY** with the digest level present and a placeholder value. Assert no
-      string-prefix matching exists anywhere, and that `chainId` appears nowhere in the address.
+      string-prefix matching exists anywhere, and that `chainId` is not a LEVEL of the address. It is
+      NOT absent from the address altogether — the placeholder digest is derived from it, which is
+      what keeps two chains apart until the real digest lands — so an assertion that the string never
+      appears anywhere in the key is the wrong test and would push the placeholder back to the bare
+      constant this task rejects.
 - [ ] **Segments are read by KEY RANGE, not a whole-store scan.** Assert that reading one stream does
       not read keys belonging to another, by count at the instrumented seam — this is what keeps
       `fetchFrom` O(stream) rather than O(store) once several streams exist.
@@ -202,13 +303,18 @@ deletion and corruption. The check is nearly free because the ordinals are being
       unpolluted. This is the successor to the shipped keeper's `stream_<name>_<chainId>` isolation
       and it must not regress. Two different indexer NAMES likewise.
 - [ ] **A save writes exactly its BATCH plus the cursor record, and NOTHING already written**,
-      asserted as WORK at a module-level mock of `idb-keyval`'s **`setMany`** (naming only `set` makes
-      this pass vacuously, because the commit path is `setMany`). Assert the bytes written on the
-      100th save match the 100th batch and grow with neither the history NOR any threshold, and that
-      no previously-written segment key is ever written again. Wall-clock cannot be the yardstick:
+      asserted as WORK at the INSTRUMENTED OBJECT STORE — wrap the `UseStore` and count the `put`s and
+      their keys. Mocking `idb-keyval`'s `set` or `setMany` measures nothing now that the commit is a
+      raw transaction, and a criterion naming either would pass vacuously. Assert exactly TWO puts per
+      non-empty save (its segment, its cursor), that the bytes written on the 100th save match the
+      100th batch and grow with neither the history NOR any threshold, and that no previously-written
+      segment key is ever written again. Wall-clock cannot be the yardstick:
       `fake-indexeddb` is itself quadratic (`work/notes/observations/fake-indexeddb-write-cost-grows-quadratically.md`)
       and ADR-0032 rules it out on a loaded machine.
-- [ ] **A save commits the segment AND the cursor record in ONE `setMany` transaction.**
+- [ ] **A save reads the cursor and writes both records in ONE `readwrite` transaction**, and
+      **two keepers cannot lose a batch**: drive two keeper instances over one store with interleaved
+      saves and assert no ordinal is ever written twice and no batch goes missing. A `get` followed by
+      `setMany` passes every other criterion here and fails this one, which is the point of having it.
 - [ ] **An empty save writes ONLY the cursor record**, no segment.
 - [ ] **THE STREAM KEEPER stores no `unconfirmedBlocks`** — not in a segment, not in the cursor
       record — and `fetchFrom` returns a `LastSync` whose window is `[]`. Assert a full load-and-replay
@@ -231,15 +337,37 @@ deletion and corruption. The check is nearly free because the ordinals are being
       `k`, segments with no cursor, and an unparseable segment. In every case nothing raises, the
       subtree is gone, presence reads FALSE, the clear is logged, and the next load takes
       `indexer.ts`'s existing clear branch.
+- [ ] **A stream that does not reach back to the requested `fromBlock` is CLEARED, not served.** Build
+      the case end to end rather than by hand, because it is the one a self-clear creates: with state
+      KEPT, make `fetchFrom` clear (a legacy blob is the cheapest trigger), index further so a new
+      subtree is written from mid-history, then discard the state and reload. Assert the partial
+      stream is cleared rather than replayed, that the indexer re-fetches from the start block, and
+      that the rebuilt state equals a from-scratch index. Without the `startBlock` check this test
+      produces state that is silently WRONG and everything else stays green. Assert the NEGATIVE too,
+      in the same test: while the state is still kept, reloading repeatedly does NOT clear the partial
+      stream, because a keeper that compares `startBlock` against the source's minimum instead of
+      against the requested `fromBlock` passes the first half of this criterion and then re-indexes
+      on every reload forever.
+- [ ] **A FORWARD JUMP on save is REFUSED, not cleared, and an OVERLAP is accepted**: hand the keeper
+      a batch starting above the stored cursor's `lastToBlock + 1` and assert nothing is written, the
+      existing segments and cursor are untouched, and it is logged; hand it an ordinary tip re-fetch
+      that dips back into the finality window and assert it is appended normally with its retractions.
+      Then hand it a contiguous batch and assert the stream accepts it and is whole again, which is
+      the revival path the engine task depends on.
 - [ ] **A CURSOR WITH NO SEGMENTS IS NOT CLEARED**, and this is the paired negative that matters most:
       write an empty first save, reload, and assert the cursor SURVIVES, `fetchFrom` returns a DEFINED
       result with no events, and the indexer resumes from that cursor rather than the start block.
       Then do it repeatedly, as a deployment whose contracts have emitted nothing does, and assert the
       scan position keeps ADVANCING across reloads. A keeper that treats this as damage re-scans from
-      the start block forever.
+      the start block forever. **Run it with NO `keepState` configured**, which is the only shape
+      where the stream's cursor is what resumption depends on; with state kept the state's cursor
+      carries it and the criterion passes without testing anything. The resumption half of this is
+      delivered by `the-indexer-and-its-stream-cache-agree-on-who-is-ahead`; assert it here anyway, as
+      the check that the two halves met.
 - [ ] **The next ORDINAL comes from the cursor record**, asserted by instrumenting reads: a save
-      performs NO range scan or `getAllKeys` to decide where to write. This is what keeps the append
-      linear in key reads as well as in bytes.
+      performs NO range scan or `getAllKeys` to decide where to write, and its one cursor read happens
+      INSIDE the commit transaction. This is what keeps the append linear in key reads as well as in
+      bytes, and what keeps two tabs from colliding on an ordinal.
 - [ ] **A segment is never written twice.**
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order. Strict equality — this task changes no event shape.
@@ -257,7 +385,11 @@ deletion and corruption. The check is nearly free because the ordinals are being
 
 ## Blocked by
 
-- None — can start immediately.
+- `the-indexer-and-its-stream-cache-agree-on-who-is-ahead`: it fixes the engine side of the same
+  invariant — the stream is written BEFORE the state advances, a failed write drops the cache instead
+  of holing it, a stream ahead of the state is replayed rather than re-fetched, and a present-but-empty
+  stream's cursor is adopted. Two criteria here cannot pass until it lands, and the clear-on-damage
+  rule below is only safe once the write order is fixed.
 
 ## Prompt
 
@@ -271,6 +403,12 @@ dependency landed differently, or an ADR superseded an assumption here, do NOT b
 premise — route to needs-attention with the discrepancy (WORK-CONTRACT.md, "Drift is a
 needs-attention signal").
 
+**The code that exists is EVIDENCE, not authority.** Read it to learn what is true today, not to
+infer what must stay. Nothing here is published (`CONTEXT.md`), and this review already found one
+mechanism in the engine that looks like a safety net and never fires. If a shape in your way is
+wrong, refactor it rather than building around it; the only fixed points are this task's acceptance
+criteria, its scope fence, and the ADRs it names.
+
 **Where to look.** `packages/browser/src/storage/stream/OnIndexedDB.ts` is the keeper.
 `packages/state-store-indexeddb/src/idb.ts` and `src/keys.ts` are the repo's existing raw-IndexedDB
 practice (promise wrappers, `IDBKeyRange.bound`, cursors, multi-store transactions) and are the model
@@ -281,7 +419,8 @@ re-append and `generateStreamToAppend` are in `packages/core/src/internal/engine
 
 **Domain vocabulary.** A *segment* is `{events}`. The *cursor* is a `LastSync` MINUS its window, kept
 as its own *cursor record* inside the stream's subtree and committed with its segment in one
-transaction; it is the ONLY place the three block numbers and the `context` live. The
+transaction; it is the ONLY place the three block numbers and the `context` live, and it carries two
+numbers of the keeper's own beside them: the NEXT ORDINAL and the stream's `startBlock`. The
 stored stream is an *emission stream*, so a later segment can hold LOWER block numbers and no segment
 may be skipped on a block bound. There is no *tail* and no *seal* — those were a filesystem strategy
 and the filesystem keeper is gone.
@@ -290,6 +429,11 @@ and the filesystem keeper is gone.
 
 - Use a KEY RANGE. `keys()` reads the whole store; with several streams that is the quadratic problem
   moved from the write path to the read path.
+- Keep the keyspace in `idb-keyval`'s DEFAULT store (`createStore('keyval-store', 'keyval')`). A store
+  of its own silently hides the legacy blob and makes two `clear` criteria vacuous.
+- The commit is a raw `readwrite` transaction that READS the cursor and writes both records, not a
+  `get` followed by `setMany`. The split version loses a batch across two tabs, contiguously, so
+  nothing detects it afterwards.
 - `idb-keyval`'s `clear()` wipes the WHOLE store, destroying every other stream and every other
   keeper's rows. It is a capability, NOT the implementation of `ExistingStream.clear`.
 - Do not store `unconfirmedBlocks` anywhere, and do not "helpfully" reconstruct it into the stored
@@ -305,7 +449,10 @@ and the filesystem keeper is gone.
 **Tests must not touch the real environment.** IndexedDB tests run against `fake-indexeddb`; assert
 unrelated keys in the same store survive a `clear`.
 
-**Scope fence.** Do NOT make the stream raw-only (that is `the-stream-stores-only-what-the-node-said`).
+**Scope fence.** Do NOT edit `packages/core/src/indexer.ts`: the engine changes this task depends on
+(the write order, the failed-write drop, feeding a stream that is ahead, adopting an empty cursor) are
+`the-indexer-and-its-stream-cache-agree-on-who-is-ahead`'s, they land first, and touching that file
+here would collide. Do NOT make the stream raw-only (that is `the-stream-stores-only-what-the-node-said`).
 Do NOT compute a real stream digest or write a canonical pointer (those are
 `a-reconfigure-is-not-an-outage`'s); use a placeholder for the digest level. Do NOT add per-segment
 block-range metadata. Do NOT add a filesystem keeper — and equally, do NOT DELETE `packages/fs`: it still exists at HEAD and
@@ -313,8 +460,10 @@ its removal is owned by `drop-filesystem-storage-and-rehome-the-fixture-loader`,
 and may run in parallel. Touching it here would collide.
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (the
-placeholder digest constant; the key-range construction and its upper bound; how you mocked `setMany`
-for the cost assertion; the exact shape of the three keeper operations). That block is the ONE
+placeholder digest constant; the two store names and how you obtained a `UseStore` over the default
+store; the key-range construction and its upper bound; how you instrumented the object store for the
+cost and allocation assertions; the exact shape of the three keeper operations and of the cursor
+record, `startBlock` and next-ordinal included). That block is the ONE
 sanctioned channel for build-time rationale and the runner transcribes it into the done record. Do NOT
 write the done record, the commit message or the PR body.
 
