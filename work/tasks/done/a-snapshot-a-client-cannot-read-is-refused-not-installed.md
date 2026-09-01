@@ -3,7 +3,6 @@ title: 'A published snapshot a client cannot read is REFUSED, not installed as s
 slug: a-snapshot-a-client-cannot-read-is-refused-not-installed
 covers: []
 blockedBy: []
-needsAnswers: true
 ---
 
 ## What to build
