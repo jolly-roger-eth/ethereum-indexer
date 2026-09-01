@@ -600,20 +600,36 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
    breaks (story 12). Small, but it was unowned, and story 12 is the guard that stops a corrupt
    stream taking the app down with it.
 
-8. **RUNNING a non-canonical generation** — a second generation that actually INDEXES: its own
-   fetch-and-fold loop, its own cursor and stream, alongside the canonical one. Named separately
-   because it was UNOWNED and is the capability the headline rests on. Landable 4's container HOLDS
-   generations and landable 2's registry CREATES them (both explicitly testable with no indexer
-   running); landable 5 owns only PAUSING one; landable 6's promotion TRIGGER — the successor
-   reaching the cursor the canonical generation had — presupposes a successor that is moving. So
-   stories 1, 3, 13 and 14 all need this and none of the other landables delivers it.
+8. **RUNNING a non-canonical generation** — a second generation that actually advances, alongside the
+   canonical one. Named separately because it was UNOWNED and is the capability the headline rests
+   on: landable 2's registry CREATES generations and landable 4's container HOLDS them (both testable
+   with no indexer running), landable 5 owns only PAUSING one, and landable 6's promotion TRIGGER
+   presupposes a successor that is moving. Stories 1, 3, 13 and 14 all need this.
 
-   It owns the duplicated head-following fetch the Solution section prices ("indexing costs a
-   duplicated head-following fetch"), and it must decide ONE thing the prose leaves open: whether the
-   two generations poll INDEPENDENTLY or share one head fetch fanned out to both folds. Independent
-   is the honest default because two generations may sit on different STREAMS with different
-   filters, and sharing is only expressible where they sit on the SAME stream. Do not build the
-   shared path first. `blockedBy` 2 and 4; landable 6 is `blockedBy` this.
+   **HOW it advances is DETERMINED by whether it shares a stream, not chosen by configuration.** This
+   is the load-bearing rule and an earlier draft got it wrong by offering it as a knob:
+
+   - **SAME stream** (a processor-only change — the free case): the successor FETCHES NOTHING. It
+     re-folds the stored stream from the start, then FOLLOWS it as the canonical generation's indexer
+     appends. Anything else breaks three things at once. The spec's own test says a processor-only
+     change re-fetches NOTHING, "Zero, not fewer", and a head-following poller makes it fewer. The
+     one-writer rule breaks by construction, because `indexer.ts` calls `keepStream.saveNewEvents`
+     UNCONDITIONALLY, so an ordinary indexer pointed at that stream appends to it. And most
+     seriously, the successor's state would become a function of ITS OWN FETCH rather than of the
+     stream, so a later re-fold of the stored stream yields a DIFFERENT state — which stops the
+     generation being "a stream plus a fold over it", and breaks story 4's promise that moving the
+     pointer back restores answers EXACTLY, and the server's rebuild-from-the-stored-stream story
+     with it.
+   - **DIFFERENT streams** (a filter change): the successor fetches its own, because it must — the
+     logs it needs were never requested under the old filter. Nothing new is built here: that is an
+     ordinary indexer with a different stream address.
+
+   **So the genuinely new mechanism is the SAME-STREAM follower, and it needs something this design
+   removed.** A pure reader is NOT expressible by simply not writing, because `saveNewEvents` is
+   unconditional; it needs a READ-ONLY STREAM VIEW whose `saveNewEvents` is a no-op. That view existed
+   in an earlier option and was deleted in the option-D rewrite as "existing only to serve option B"
+   (`work/notes/ideas/stream-grafting-what-we-established.md`). It is needed again. Build it here, and
+   assert the follower issues no `eth_getLogs` at all and writes no segment.
 
 Landables 3, 4, 5, 6, 7 and 8 all edit `packages/browser/src/IndexerState.ts` (`SyncingState` at the
 top, `createIndexerState`, three `stateDiscarded` sites, and the container is what it returns), so

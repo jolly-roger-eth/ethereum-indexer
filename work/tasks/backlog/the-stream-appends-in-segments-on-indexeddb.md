@@ -80,20 +80,19 @@ dependency or a new idea.
 
 ### The SEGMENT RECORD
 
-**A segment is `{events, extent}`**, the extent being the SCANNED extent
-`{lastFromBlock, lastToBlock, latestBlock}` current after those events. It is NOT a cursor: it exists
-so a truncated prefix can say where it got to, and `lastToBlock` is not derivable from the events
-because a range that yielded no events leaves no trace.
+**A segment is `{events}` and nothing else.** No extent, no cursor, no `lastSync`. An earlier draft
+carried a per-segment SCANNED EXTENT whose only reader was a gap-recovery that no longer exists (see
+below), so it goes with it.
 
-**NO segment stores `unconfirmedBlocks`, and neither does the cursor record.** This is the decision
-that removes the most machinery, and it is settled by evidence already in the repo rather than by
-argument: `captureStream` persists `unconfirmedBlocks: []` and `replayStream` returns `[]`
-(`packages/core/src/stream/capture.ts`, `stream/fixture.ts`) — a shipped, tested third implementation
-of this same `ExistingStream` seam that stores no window and works. The window has two other homes
-that ARE read (`KeepState.save` takes `{state, lastSync}`; the entity path's `serializeLastSync` is
-`JSON.stringify` of the whole `LastSync`, written in the block's transaction), and the stream's copy
-is read by nobody: `promiseToFeed` takes only the three block numbers, and `generateStreamToAppend`
-rebuilds the window from the replayed events. So store the extent and the context, and return
+**No segment and no cursor record stores `unconfirmedBlocks`**, and this is settled by evidence
+already in the repo rather than by argument: `captureStream` persists `unconfirmedBlocks: []` and
+`replayStream` returns `[]` (`packages/core/src/stream/capture.ts`, `stream/fixture.ts`) — a shipped,
+tested third implementation of this same `ExistingStream` seam that stores no window and works. The
+window has two other homes that ARE read (`KeepState.save` takes `{state, lastSync}`; the entity
+path's `serializeLastSync` is `JSON.stringify` of the whole `LastSync`, written in the block's
+transaction), and the stream's copy is read by nobody: `promiseToFeed` reads only the three block
+numbers, and `generateStreamToAppend` rebuilds the window from the replayed events. The cursor record
+therefore holds the three block numbers plus the `context`, and `fetchFrom` returns
 `unconfirmedBlocks: []`.
 
 ### THREE keeper operations, and the cursor contract
@@ -117,43 +116,34 @@ pattern.
    do not have is silent data loss. Here it holds through the `setMany` transaction.
 3. **An empty save costs nothing proportional to the history.** Here it is one small record.
 
-### Recovery
+### Inconsistency is CLEARED, not repaired
 
-- **A gap in the ordinals is REFUSED, the refusal CLEARS FROM THE GAP UPWARD, and the PREFIX BENEATH
-  SURVIVES.** Replaying what remains as if it were whole is silent wrong state. Not a throw:
-  `indexer.ts` calls `fetchFrom` with no `try`/`catch` and the browser wrapper only records
-  `FAILED_TO_LOAD` and rethrows, so a throw makes the indexer permanently unloadable — for a LOCAL
-  CACHE whose correct recovery is to re-fetch. Not a whole-stream wipe either: that discards a good
-  prefix (story 5).
-- **Gaps are NOT routine.** `delMany` is one transaction so a partial clear cannot happen, and nothing
-  rewrites a segment. What remains is external deletion, eviction and corruption. The check is nearly
-  free because the ordinals are being read anyway.
-- **The recovery is ORDERED, not atomic: write-cursor-only FIRST, then delete from the gap upward.**
-  That is ADR-0035's rule and it is safe by construction — an interrupted recovery leaves the gap
-  still detectable, so the next load simply repeats it. Do NOT make it one transaction: that would
-  need a fourth keeper operation carrying deletes, and the seam is deliberately three. (Atomicity IS
-  reachable here — `createStore` hands the raw object store inside one transaction, so "IndexedDB has
-  no delete-plus-put" is false — but it buys nothing the order does not already give, and it would
-  cost the substrate-neutrality that lets a SQL or OPFS keeper reuse this helper.) Compose the
-  recovered cursor from the surviving top segment's EXTENT plus the `context` of the cursor read
-  before the recovery. Carry the context FORWARD rather than fabricating one: an extent has no context,
-  `LastSync` requires one, and `indexer.ts` reads it through `streamMatches` on both load branches, so
-  a fabricated one CLEARS the very prefix this exists to keep.
-- **THE MIRROR CASE: read-cursor returns NOTHING but segments EXIST — remove the subtree.** Reachable
-  from this task's own threat model (external deletion, eviction), and silently destructive if left
-  unhandled: presence is the CURSOR, so `fetchFrom` reports absent, `indexer.ts`'s state-kept branch
-  has no `else` so nothing clears, and the next save is treated as a first-ever one — either
-  overwriting ordinal 0 or appending above the survivors, after which the next load replays stale
-  segments as one contiguous stream while `streamMatches` passes on the fresh context. So: segments
-  without a cursor are UNUSABLE, not a prefix to resume; delete them and let the stream rebuild.
-- **IF NOTHING SURVIVES** (a gap at ordinal 0) the stream is GONE, not empty-but-present: remove the
-  subtree so presence reads FALSE. Say it explicitly because presence is the CURSOR, so a surviving
-  cursor over no events would be the worst state in this design.
-- **KEEPING THE PREFIX IS ISOLATED AND REMOVABLE.** One seam, one call site, so replacing it with
-  "detect the gap, clear the stream" is local; and the scanned extent has EXACTLY ONE READER, that
-  recovery.
-- **A save that would create a HOLE clears instead.** A save whose `fromBlock` sits above the
-  surviving top segment's `lastToBlock + 1` would leave the stream claiming coverage it lacks.
+**One rule replaces a whole recovery machine: if what is stored is not a complete, contiguous stream
+with a cursor, DELETE THE SUBTREE and let it rebuild.** That covers every case:
+
+- a GAP in the ordinals (`0`, `1`, `3`);
+- a cursor with NO segments beneath it;
+- segments with NO cursor (presence is the cursor, so these are unreachable anyway);
+- a segment that fails to parse.
+
+An earlier draft kept the contiguous PREFIX beneath a gap and resumed from it, which needed a
+per-segment scanned extent, a recovery sequence with a pinned write-then-delete order, a rule for
+carrying the `context` forward, a separate no-survivors branch, a would-create-a-HOLE guard, and about
+four acceptance criteria — all for a state only a test can manufacture. **It is deleted.** The
+justification for keeping a prefix was that a full re-index might be impossible on a public node; that
+is a real concern, and it is the SEEDING spec's to answer
+(`a-generation-can-be-seeded-from-a-published-artifact`), not this keeper's to hedge against. Story 5
+explicitly permits this branch: "or be rebuilt deliberately and visibly".
+
+**Not a throw.** `indexer.ts` calls `fetchFrom` with no `try`/`catch` and the browser wrapper only
+records `FAILED_TO_LOAD` and rethrows, so a throw makes the indexer permanently unloadable — for a
+LOCAL CACHE whose correct recovery is to re-fetch. Clear, log, return nothing, let the indexer take
+its existing clear branch.
+
+**Gaps are NOT routine, which is why hedging against them earned so little.** `delMany` is one
+transaction so a partial `clear` cannot happen, nothing rewrites a segment, and IndexedDB eviction is
+per-origin rather than per-key so it cannot punch a hole in the ordinals. What remains is external
+deletion and corruption. The check is nearly free because the ordinals are being read anyway.
 
 ### `clear`, and no legacy adoption
 
@@ -210,19 +200,11 @@ pattern.
 - [ ] **`clear` removes the subtree and nothing else**: assert an unrelated key in the same store
       survives, that after `clear` read-cursor returns NOTHING and presence is FALSE, and that a
       legacy flat-key blob is DELETED (not adopted) with the deletion logged.
-- [ ] **A gap CLEARS FROM THE GAP UPWARD AND KEEPS THE PREFIX**: after punching a hole at `k`, nothing
-      raises, `fetchFrom` returns a DEFINED result whose events are exactly `0..k-1`, and the resumed
-      cursor is composed from the surviving top segment's extent with the pre-recovery `context`
-      carried forward. Assert the ORDER (cursor written before the deletes) by interrupting between
-      them: what remains still shows the gap and the next load repeats the recovery. Assert a recovery
-      leaving no segment removes the subtree so presence reads FALSE.
-- [ ] **Segments with NO cursor are removed, not resumed.** Delete the cursor record leaving segments
-      in place, then load: assert the subtree is removed and presence reads FALSE, and that the next
-      save does not overwrite ordinal 0 or append above the survivors. This is the mirror of the
-      nothing-survives case and it is the one that corrupts silently.
-- [ ] **A save that would create a HOLE clears instead.**
-- [ ] **The prefix-keeping recovery is REMOVABLE**: one seam, one call site, and the scanned extent
-      has exactly one reader. Record in `## Decisions` what deleting it would take.
+- [ ] **Any inconsistency CLEARS the subtree**, asserted for each shape: a hole punched at ordinal
+      `k`, a cursor with no segments, segments with no cursor, and an unparseable segment. In every
+      case nothing raises, the subtree is gone, presence reads FALSE, the clear is logged, and the
+      next load takes `indexer.ts`'s existing clear branch. Assert the paired negative too: a HEALTHY
+      stream is never cleared.
 - [ ] **A segment is never written twice.**
 - [ ] **`fetchFrom` answers exactly what it answers today** for the same `fromBlock`: same events,
       same order. Strict equality — this task changes no event shape.
@@ -258,9 +240,9 @@ sites, the clear-on-undefined branch, and the state-kept branch that has no `els
 re-append and `generateStreamToAppend` are in `packages/core/src/internal/engine/utils.ts`.
 `packages/browser/test/invalidation.test.ts` reaches into the stream key.
 
-**Domain vocabulary.** A *segment* is `{events, extent}`, the *scanned extent* being the three block
-numbers current after those events. The *cursor* is a `LastSync` MINUS its window, kept as its own
-*cursor record* inside the stream's subtree and committed with its segment in one transaction. The
+**Domain vocabulary.** A *segment* is `{events}`. The *cursor* is a `LastSync` MINUS its window, kept
+as its own *cursor record* inside the stream's subtree and committed with its segment in one
+transaction; it is the ONLY place the three block numbers and the `context` live. The
 stored stream is an *emission stream*, so a later segment can hold LOWER block numbers and no segment
 may be skipped on a block bound. There is no *tail* and no *seal* — those were a filesystem strategy
 and the filesystem keeper is gone.

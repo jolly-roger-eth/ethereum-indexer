@@ -8,7 +8,8 @@ covers: []
 ## What to build
 
 Delete `@etherfold/js-processor` and the free-form JS-object authoring path, leaving the **ENTITY
-path** as the only way to write a processor. This is a deletion task: the goal is that the repo has
+path** as the only way to write a processor. The decision and its consequences are ADR-0037; this task
+is its execution. This is a deletion task: the goal is that the repo has
 ONE processor model, not two.
 
 **Why it is worth doing rather than tolerating.** The JS-object path is what SHIPPED, but the entity

@@ -63,10 +63,19 @@ save ONE write on a substrate with no transaction; with that substrate gone, so 
 remaining keeper writes ONE SEGMENT PER BATCH and never rewrites anything, so a segment is immutable
 from birth and an empty save writes only the cursor record.
 
+**Also withdrawn: the per-segment SCANNED EXTENT and the prefix-keeping gap recovery.** The original
+kept the contiguous prefix beneath a gap and resumed from it, which required an extent on every
+segment (with exactly one reader, that recovery), an ordered write-then-delete sequence, a rule for
+carrying the `context` forward, and a separate no-survivors branch. It is replaced by ONE rule:
+anything that is not a complete, contiguous stream with a cursor is CLEARED and rebuilt. The
+justification for keeping a prefix was that a full re-index can be impossible on a public node, which
+is true and is the SEEDING spec's problem to solve properly rather than this keeper's to hedge
+against; the source spec's story 5 always permitted the cheap branch ("or be rebuilt deliberately and
+visibly"). A segment is therefore `{events}` and the cursor record is the only thing holding the
+block numbers and the context.
+
 **What SURVIVES, and is the durable part of this ADR:** that the contract is a set of PROPERTIES
 rather than a storage layout; that cursor PLACEMENT is the keeper's, subject to the cursor living
 within its stream's subtree; that the address is HIERARCHICAL, which is what deleted the anchored
-pattern, the cross-chain hazard, the temp-name rule and `clear-cursor`; that the scanned extent has
-exactly one reader, the truncation recovery; and that the recovery composes its cursor from the
-surviving top segment's extent with the pre-recovery context carried forward. A SQL keeper and an
-OPFS keeper are the expected next consumers, and they inherit exactly those.
+pattern, the cross-chain hazard, the temp-name rule and `clear-cursor`; and that an inconsistent stream is CLEARED rather than repaired. A SQL keeper and an OPFS keeper are
+the expected next consumers, and they inherit exactly those.
