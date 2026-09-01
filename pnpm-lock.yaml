@@ -188,15 +188,24 @@ importers:
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
+      etherfold:
+        specifier: workspace:*
+        version: link:../../packages/cli
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@25.9.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(tsx@4.22.4)(yaml@2.9.0))
 
   examples/mud:
     dependencies:
@@ -407,15 +416,27 @@ importers:
       '@etherfold/core':
         specifier: workspace:*
         version: link:../core
+      '@etherfold/fetcher-host':
+        specifier: workspace:*
+        version: link:../fetcher-host
       '@etherfold/platform-nodejs':
         specifier: workspace:*
         version: link:../../platforms/nodejs
+      '@etherfold/processor-entities':
+        specifier: workspace:*
+        version: link:../processor-entities
+      '@etherfold/state-store-sqlite':
+        specifier: workspace:*
+        version: link:../state-store-sqlite
       '@etherfold/utils':
         specifier: workspace:*
         version: link:../utils
       commander:
         specifier: ^15.0.0
         version: 15.0.0
+      eip-1193:
+        specifier: ^0.6.5
+        version: 0.6.6
       eip-1193-jsonrpc-provider:
         specifier: ^0.4.3
         version: 0.4.3
@@ -428,7 +449,19 @@ importers:
       named-logs-console:
         specifier: ^0.5.1
         version: 0.5.1
+      remote-sql:
+        specifier: ^0.0.7
+        version: 0.0.7
     devDependencies:
+      '@etherfold/js-processor':
+        specifier: workspace:*
+        version: link:../js-processor
+      '@etherfold/state-store':
+        specifier: workspace:*
+        version: link:../state-store
+      '@libsql/client':
+        specifier: ^0.17.3
+        version: 0.17.4
       '@types/fs-extra':
         specifier: ^11.0.4
         version: 11.0.4
@@ -438,12 +471,12 @@ importers:
       as-soon:
         specifier: ^0.1.5
         version: 0.1.6
-      eip-1193:
-        specifier: ^0.6.5
-        version: 0.6.6
       fs-extra:
         specifier: ^11.3.5
         version: 11.3.5
+      remote-sql-libsql:
+        specifier: ^0.0.7
+        version: 0.0.7(@libsql/core@0.17.4)
       tsx:
         specifier: ^4.21.0
         version: 4.22.4

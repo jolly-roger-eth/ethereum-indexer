@@ -25,20 +25,28 @@
 	},
 	"dependencies": {
 		"@etherfold/core": "workspace:*",
+		"@etherfold/fetcher-host": "workspace:*",
 		"@etherfold/platform-nodejs": "workspace:*",
+		"@etherfold/processor-entities": "workspace:*",
+		"@etherfold/state-store-sqlite": "workspace:*",
 		"@etherfold/utils": "workspace:*",
 		"commander": "^15.0.0",
+		"eip-1193": "^0.6.5",
 		"eip-1193-jsonrpc-provider": "^0.4.3",
 		"ldenv": "^0.5.0",
 		"named-logs": "^0.4.1",
-		"named-logs-console": "^0.5.1"
+		"named-logs-console": "^0.5.1",
+		"remote-sql": "^0.0.7"
 	},
 	"devDependencies": {
+		"@etherfold/js-processor": "workspace:*",
+		"@etherfold/state-store": "workspace:*",
+		"@libsql/client": "^0.17.3",
 		"@types/fs-extra": "^11.0.4",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
-		"eip-1193": "^0.6.5",
 		"fs-extra": "^11.3.5",
+		"remote-sql-libsql": "^0.0.7",
 		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.8"

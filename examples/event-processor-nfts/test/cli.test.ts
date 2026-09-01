@@ -1,0 +1,132 @@
+import {prepareIndexing} from 'etherfold';
+import {describe, expect, it} from 'vitest';
+
+// ---------------------------------------------------------------------------------------------------
+// THE SAME PROCESSOR, UNDER THE CLI
+// ---------------------------------------------------------------------------------------------------
+// `src/entities.ts` is what `browser/main.ts` runs against IndexedDB in a tab.
+// This drives THAT FILE, unchanged, through `etherfold index --store sqlite`
+// into versioned rows -- which is the whole claim of "one processor,
+// everywhere", checked rather than asserted.
+//
+// The chain is a fake node; everything above it is the shipped pipeline
+// (`LogFetcher` -> `createDirectIngestion` -> `StreamBuilder` ->
+// `EntityEventProcessor` -> a real libSQL database), and the processor object is
+// the one the browser demo imports.
+// ---------------------------------------------------------------------------------------------------
+
+const CONTRACT = '0x0000000000000000000000000000000000000099';
+const ALICE = '0x0000000000000000000000000000000000000011';
+const BOB = '0x0000000000000000000000000000000000000022';
+const ZERO = '0x0000000000000000000000000000000000000000';
+const START_BLOCK = 1_000_000;
+const TIP = START_BLOCK + 100;
+
+// read by `src/cli.ts` at import time, so the fake chain and the module agree on
+// what is being indexed
+process.env.NFT_CONTRACT = CONTRACT;
+process.env.NFT_START_BLOCK = String(START_BLOCK);
+
+const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+const hex = (value: number | bigint) => `0x${value.toString(16)}`;
+const addressTopic = (address: string) => `0x${address.slice(2).toLowerCase().padStart(64, '0')}`;
+
+let logCounter = 0;
+function log(blockNumber: number, blockHash: string, topics: string[], logIndex = 0) {
+	logCounter++;
+	return {
+		blockNumber: hex(blockNumber),
+		blockHash,
+		transactionIndex: '0x0',
+		removed: false,
+		address: CONTRACT,
+		data: '0x',
+		topics,
+		transactionHash: `0x${logCounter.toString(16).padStart(64, '0')}`,
+		logIndex: hex(logIndex),
+		blockTimestamp: hex(1_600_000_000 + blockNumber * 12),
+	};
+}
+
+const tokenTopic = (id: bigint) => `0x${id.toString(16).padStart(64, '0')}`;
+
+const transfer = (blockNumber: number, blockHash: string, from: string, to: string, id: bigint, logIndex = 0) =>
+	log(blockNumber, blockHash, [TRANSFER_TOPIC, addressTopic(from), addressTopic(to), tokenTopic(id)], logIndex);
+
+/**
+ * An ERC-20 transfer: the SAME `topic0`, three topics instead of four.
+ *
+ * It is here because it is the interesting half of this example -- the decoder
+ * fails rather than reading a balance as a token id, and the processor counts
+ * the refusal in `handleUnparsedEvent`. That path has to work under the CLI too.
+ */
+const erc20Transfer = (blockNumber: number, blockHash: string, logIndex = 0) =>
+	log(blockNumber, blockHash, [TRANSFER_TOPIC, addressTopic(ALICE), addressTopic(BOB)], logIndex);
+
+const LOGS = [
+	transfer(START_BLOCK + 10, '0xa10', ZERO, ALICE, 7n),
+	erc20Transfer(START_BLOCK + 10, '0xa10', 1),
+	transfer(START_BLOCK + 90, '0xa90', ALICE, BOB, 7n),
+];
+
+function fakeChain() {
+	return {
+		async request(args: {method: string; params?: any}): Promise<any> {
+			switch (args.method) {
+				case 'eth_chainId':
+					return '0x1';
+				case 'eth_blockNumber':
+					return hex(TIP);
+				case 'eth_getLogs': {
+					const from = parseInt(args.params[0].fromBlock.slice(2), 16);
+					const to = parseInt(args.params[0].toBlock.slice(2), 16);
+					return LOGS.filter((entry) => {
+						const blockNumber = parseInt(entry.blockNumber.slice(2), 16);
+						return blockNumber >= from && blockNumber <= to;
+					});
+				}
+			}
+			throw new Error(`unexpected method ${args.method}`);
+		},
+	} as any;
+}
+
+describe('etherfold index --store sqlite, over src/entities.ts', () => {
+	it('indexes the browser demo’s processor into a database, unchanged', async () => {
+		const prepared = await prepareIndexing(
+			{
+				processor: './dist/cli.js',
+				nodeUrl: 'http://localhost:0',
+				store: 'sqlite',
+				db: ':memory:',
+			},
+			{
+				// the module the CLI would import; imported here directly so the test does
+				// not depend on the build output's location
+				importModule: async () => import('../src/cli.js'),
+				provider: fakeChain(),
+				sleep: async () => {},
+			},
+		);
+		await prepared.index();
+
+		const store = prepared.store;
+		if (!store) throw new Error('the sqlite arm must build a store');
+
+		const tokenID = '7'.padStart(78, '0');
+
+		// who owns the token, from the entity keyed by the token
+		expect(await store.getCurrent('nft', {tokenAddress: CONTRACT, tokenID})).toMatchObject({owner: BOB});
+
+		// ...and the SAME fact from the entity keyed by the owner, which is the one
+		// that makes "which tokens does this account own" a prefix listing
+		const listing = await store.listCurrent<{tokenAddress: string; tokenID: string}>('ownership', {owner: BOB}, 25);
+		expect(listing.rows.map((row) => row.tokenID)).toEqual([tokenID]);
+		expect(await store.listCurrent('ownership', {owner: ALICE}, 25)).toMatchObject({rows: []});
+
+		expect(await store.getCurrent('counter', {name: 'transfers'})).toMatchObject({value: 2});
+		// the ERC-20 log with the same topic0: refused by the decoder, counted by
+		// `handleUnparsedEvent`, exactly as in the tab
+		expect(await store.getCurrent('counter', {name: 'undecodable'})).toMatchObject({value: 1});
+	});
+});
