@@ -168,7 +168,7 @@ kind this digest exists to prevent.
 ### The stream
 
 **Streams are separate keyspaces and share nothing.** The prerequisite already addresses a stream
-HIERARCHICALLY as `[<indexer-name>, <streamDigest>, <ordinal>]` and leaves the digest level as a
+HIERARCHICALLY as `['stream', <indexer-name>, <streamDigest>, <ordinal>]` and leaves the digest level as a
 PLACEHOLDER; this spec fills it with the real value. So there is no re-keying and no migration: the
 address shape does not change, only what occupies one level of it. A server holds several named
 indexers over the same shape — see the sibling spec. `chainId` is deliberately absent throughout,
@@ -203,12 +203,13 @@ fourth property about unconfirmed windows on sealed segments was withdrawn with 
 stream keeper stores no window at all.)
 
 **All this spec adds is the SCOPE: one cursor per STREAM, and a stream is now addressed
-`[<indexer-name>, <streamDigest>]` with its segments and its cursor beneath.** Everything else about cursors — where they live, how a save
+`['stream', <indexer-name>, <streamDigest>]` with its segments and its cursor beneath.** Everything else about cursors — where they live, how a save
 commits, what happens after a crash — is settled there and must not be restated here, because a
 second statement is a second source of truth that can drift. An earlier draft of this section
-specified a separate cursor record with orphan discard; that design was withdrawn in the prerequisite
-after four review rounds found defects in it and nowhere else, and its tasks are already emitted
-against the tail strategy.
+specified a separate cursor record with ORPHAN DISCARD; the orphan-discard machinery was withdrawn in
+the prerequisite after four review rounds found defects in it and nowhere else. The cursor RECORD
+itself was not: it is exactly what the prerequisite's task builds, committed with its segment in one
+transaction, with no tail anywhere.
 
 Two consequences to carry, both of them the prerequisite's rules applied to a generation:
 
@@ -216,8 +217,12 @@ Two consequences to carry, both of them the prerequisite's rules applied to a ge
   the other reads. That is the existing one-writer situation, not a new rule, because the two
   generations have DIFFERENT stream keys unless they share a filter and config — in which case they
   are the same stream and the non-canonical one is a reader.
-- **`unconfirmedBlocks` stays in the TAIL.** Do not strip it here: the prerequisite explicitly forbids
-  it, and removing it entirely is `the-stream-stores-only-what-the-node-said`'s job.
+- **A stream keeper stores NO `unconfirmedBlocks`, and this spec must not reintroduce one.** The
+  prerequisite requires it: neither a segment nor the cursor record carries a window, and `fetchFrom`
+  returns one that is empty. What still stores the window is the STATE side (the state keeper's saved
+  `lastSync`, and the entity path's serialized sync cursor), which is where `checkTxInclusion` reads
+  it from and how a deployment with no stream keeper recovers one on reload — do not strip it THERE.
+  Narrowing the stored EVENT type is separately `the-stream-stores-only-what-the-node-said`'s job.
 
 ### Generations
 
@@ -460,7 +465,7 @@ in `work/specs/dropped/`.)
   ADR-0034 established. An event appended above the cursor is the regression guard.
 - **The cursor contract is the PREREQUISITE's to assert**, not this spec's. Do not restate it here;
   the only thing to assert is the SCOPE, that a cursor belongs to exactly one
-  `[<indexer-name>, <streamDigest>]` subtree and two generations on different streams never share one.
+  `['stream', <indexer-name>, <streamDigest>]` subtree and two generations on different streams never share one.
 - **The stream digest is STABLE UNDER A DECODE-ONLY CHANGE.** This is the assertion that catches the
   ordering trap: rename a non-indexed parameter, and the digest must not move even though every
   entry's `hash` did and the entry list therefore reordered. Also stable under ABI reordering and
@@ -497,7 +502,7 @@ in `work/specs/dropped/`.)
 EIGHT separable landables. Cutting them together produces one task nobody can review.
 
 1. **Stream identity and the keyspace** — the STREAM DIGEST, the wide sync hash, and the
-   `[<indexer-name>, <streamDigest>, <ordinal>]` address, filling the digest level the prerequisite
+   `['stream', <indexer-name>, <streamDigest>, <ordinal>]` address, filling the digest level the prerequisite
    left as a placeholder. Owns the hash choice and its collision test. Everything depends on it.
 
    **The digest is the deduplicated `streamHash` digest PLUS the stream config hash, and both halves
@@ -518,7 +523,7 @@ EIGHT separable landables. Cutting them together produces one task nobody can re
 
    **There is NO MIGRATION and no sweep, because the prerequisite already left the level empty.**
    `appending-to-the-stream-costs-the-batch` addresses a stream as
-   `[<indexer-name>, <streamDigest>, <ordinal>]` with a PLACEHOLDER in the digest position. This
+   `['stream', <indexer-name>, <streamDigest>, <ordinal>]` with a PLACEHOLDER in the digest position. This
    landable computes the real digest and writes it there. Streams under the placeholder are simply
    streams under a different digest: they are unreachable by a filter that now resolves elsewhere,
    so they are REAPED by the ordinary stream-reaping rule (landable 2), not by a bespoke migration

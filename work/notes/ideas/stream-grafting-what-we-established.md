@@ -77,7 +77,7 @@ RECONSTRUCTIBLE from the events themselves. Not verified: whether blocks with NO
 (`packages/fs/src/storage/stream/OnFile.ts`, `packages/browser/src/storage/stream/OnIndexedDB.ts`)
 read the whole stream, concat, and write it all back, and `save` runs once per index cycle. So a
 backfill is QUADRATIC today. Recorded separately in
-`work/notes/observations/the-stream-is-a-monolithic-blob-rewritten-on-every-append.md`.
+an observation since discharged and deleted.
 
 **Stream keys are `stream_<name>_<chainId>`.** So a bare prefix filter COLLIDES ACROSS CHAINS:
 `stream_tag_1` is a prefix of `stream_tag_10_0`. Any enumeration must be anchored with a numeric

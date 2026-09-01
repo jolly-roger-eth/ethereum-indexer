@@ -37,6 +37,6 @@ ever written:
 
 ## What it does NOT change
 
-The address (`[<indexer-name>, <streamDigest>, <ordinal>]`), the read being a full ordered scan, the
+The address (`['stream', <indexer-name>, <streamDigest>, <ordinal>]`), the read being a full ordered scan, the
 contiguity refusal and its recovery, or the three cursor-contract properties. Any file-shaped keeper
 inherits all of those unchanged, which is the point.

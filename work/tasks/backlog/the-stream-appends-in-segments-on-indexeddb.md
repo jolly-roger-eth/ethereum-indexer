@@ -51,8 +51,13 @@ so the hazard is gone rather than guarded.
 **Read segments with a KEY RANGE, not a whole-store scan.** `idb-keyval`'s `keys()` is an unbounded
 read of every key in the store, so with several streams it costs O(store) per `fetchFrom` and per
 `clear`. Use `createStore`'s escape hatch — `UseStore = (txMode, cb: (store: IDBObjectStore) => T)` —
-with `IDBKeyRange.bound(['stream', name, digest, 0], ['stream', name, digest, []])` to read exactly
-one stream's segments. `@etherfold/state-store-indexeddb` already drives raw IndexedDB with key
+with an `IDBKeyRange` over the stream's prefix. Note the two ranges are NOT the same and using the
+wrong one is a real bug: IndexedDB orders `number < string < array`, so
+`bound([...prefix, 0], [...prefix, []])` spans the WHOLE SUBTREE and returns the `'cursor'` record
+along with the ordinals — which is what `clear` wants. For a SEGMENTS-ONLY read exclude the string
+bound: `bound([...prefix, 0], [...prefix, 'cursor'], false, true)`, or filter on
+`typeof key[3] === 'number'`. `packages/state-store-indexeddb/src/keys.ts` is the repo's precedent for
+building these. `@etherfold/state-store-indexeddb` already drives raw IndexedDB with key
 ranges, cursors and multi-store transactions, so this is the repo's existing practice, not a new
 dependency or a new idea.
 
@@ -123,14 +128,24 @@ pattern.
 - **Gaps are NOT routine.** `delMany` is one transaction so a partial clear cannot happen, and nothing
   rewrites a segment. What remains is external deletion, eviction and corruption. The check is nearly
   free because the ordinals are being read anyway.
-- **The recovery is ONE ATOMIC TRANSACTION here**, which is available and should be used: through
-  `createStore` a callback holds the raw object store, so the cursor rewrite and the deletes commit
-  together. ("IndexedDB gives no delete-plus-put primitive" is false — same class of claim as "the
-  browser keeper cannot enumerate", which was inferred from an import line.) Compose the recovered
-  cursor from the surviving top segment's EXTENT plus the `context` of the cursor read before the
-  recovery. Carry the context FORWARD rather than fabricating one: an extent has no context,
+- **The recovery is ORDERED, not atomic: write-cursor-only FIRST, then delete from the gap upward.**
+  That is ADR-0035's rule and it is safe by construction — an interrupted recovery leaves the gap
+  still detectable, so the next load simply repeats it. Do NOT make it one transaction: that would
+  need a fourth keeper operation carrying deletes, and the seam is deliberately three. (Atomicity IS
+  reachable here — `createStore` hands the raw object store inside one transaction, so "IndexedDB has
+  no delete-plus-put" is false — but it buys nothing the order does not already give, and it would
+  cost the substrate-neutrality that lets a SQL or OPFS keeper reuse this helper.) Compose the
+  recovered cursor from the surviving top segment's EXTENT plus the `context` of the cursor read
+  before the recovery. Carry the context FORWARD rather than fabricating one: an extent has no context,
   `LastSync` requires one, and `indexer.ts` reads it through `streamMatches` on both load branches, so
   a fabricated one CLEARS the very prefix this exists to keep.
+- **THE MIRROR CASE: read-cursor returns NOTHING but segments EXIST — remove the subtree.** Reachable
+  from this task's own threat model (external deletion, eviction), and silently destructive if left
+  unhandled: presence is the CURSOR, so `fetchFrom` reports absent, `indexer.ts`'s state-kept branch
+  has no `else` so nothing clears, and the next save is treated as a first-ever one — either
+  overwriting ordinal 0 or appending above the survivors, after which the next load replays stale
+  segments as one contiguous stream while `streamMatches` passes on the fresh context. So: segments
+  without a cursor are UNUSABLE, not a prefix to resume; delete them and let the stream rebuild.
 - **IF NOTHING SURVIVES** (a gap at ordinal 0) the stream is GONE, not empty-but-present: remove the
   subtree so presence reads FALSE. Say it explicitly because presence is the CURSOR, so a surviving
   cursor over no events would be the worst state in this design.
@@ -198,8 +213,13 @@ pattern.
 - [ ] **A gap CLEARS FROM THE GAP UPWARD AND KEEPS THE PREFIX**: after punching a hole at `k`, nothing
       raises, `fetchFrom` returns a DEFINED result whose events are exactly `0..k-1`, and the resumed
       cursor is composed from the surviving top segment's extent with the pre-recovery `context`
-      carried forward. Assert the recovery COMMITS ATOMICALLY (one transaction), and that a recovery
+      carried forward. Assert the ORDER (cursor written before the deletes) by interrupting between
+      them: what remains still shows the gap and the next load repeats the recovery. Assert a recovery
       leaving no segment removes the subtree so presence reads FALSE.
+- [ ] **Segments with NO cursor are removed, not resumed.** Delete the cursor record leaving segments
+      in place, then load: assert the subtree is removed and presence reads FALSE, and that the next
+      save does not overwrite ordinal 0 or append above the survivors. This is the mirror of the
+      nothing-survives case and it is the one that corrupts silently.
 - [ ] **A save that would create a HOLE clears instead.**
 - [ ] **The prefix-keeping recovery is REMOVABLE**: one seam, one call site, and the scanned extent
       has exactly one reader. Record in `## Decisions` what deleting it would take.

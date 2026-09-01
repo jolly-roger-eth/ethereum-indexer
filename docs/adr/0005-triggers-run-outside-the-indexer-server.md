@@ -2,7 +2,7 @@
 
 Trigger evaluation and action delivery (webhooks, push notifications) do **not** run inside the indexer-server. They run in N independent consumer services, each owning its own database, its own cursor, its own gate, its own delivery outbox and its own auth. The indexer-server holds no trigger state whatsoever: no registrations, no subscriptions, no per-consumer cursors, no delivery table. We chose this to keep the indexer-server simple and to allow different trigger purposes, run by different entities, to exist without any change to it.
 
-This **reverses** `work/specs/ready/trigger-system.md`, which records that "triggers evaluate in the log-processor component (it has the events + historical state + DB)" and asks its open question 5 to confirm that. The answer is no.
+This **reverses** `work/specs/dropped/trigger-system.md`, which records that "triggers evaluate in the log-processor component (it has the events + historical state + DB)" and asks its open question 5 to confirm that. The answer is no.
 
 ## Considered Options
 
