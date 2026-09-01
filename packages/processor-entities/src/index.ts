@@ -39,11 +39,11 @@ export type {
  * it (the conformance suite asserts it of all of them).
  */
 export {
+	ENTITY_SNAPSHOT_FORMAT,
 	openSnapshotAware,
 	RevertBeyondSnapshotError,
 	SnapshotFormatError,
 	SnapshotProcessorMismatchError,
-	SNAPSHOT_FORMAT,
 	SNAPSHOT_ORIGIN_KEY,
 } from '@etherfold/state-store';
 

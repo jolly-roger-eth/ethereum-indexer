@@ -4,6 +4,8 @@ import type {LastSync} from './types.js';
 /**
  * ## The BLOB snapshot envelope, and why its version number lives HERE
  *
+ * The decision, with the alternatives it beat, is ADR-0040.
+ *
  * A `KeepState` keeper on the free-form path persists the whole state as ONE
  * blob. `@etherfold/cli`'s file keeper writes that blob into an envelope --
  * `{format, processor, savedAt, lastSync, state, history}` -- and publishes it,
@@ -63,6 +65,12 @@ export type BlobSnapshotEnvelope<ABI extends Abi, ProcessResultType, Extra = unk
 	savedAt?: string;
 	lastSync: LastSync<ABI>;
 	state: ProcessResultType;
+	/**
+	 * The free-form path's revert medium (immer reverse patches, carried beside
+	 * the state they can undo). The ENTITY path has no counterpart: its store owns
+	 * reversion, so its envelope (`@etherfold/state-store`) has no such field.
+	 */
+	history?: unknown;
 } & Extra;
 
 /**

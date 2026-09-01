@@ -1,7 +1,7 @@
 import type {Abi, LastSync} from '@etherfold/core';
 import {
 	openSnapshotAware,
-	SNAPSHOT_FORMAT,
+	ENTITY_SNAPSHOT_FORMAT,
 	type BlockPointer,
 	type Mutation,
 	type SnapshotAwareStateStore,
@@ -149,7 +149,7 @@ export function createSnapshot<ABI extends Abi>(snapshot: {
 	readonly savedAt?: string;
 }): StateSnapshot {
 	return {
-		format: SNAPSHOT_FORMAT,
+		format: ENTITY_SNAPSHOT_FORMAT,
 		processor: snapshot.processor,
 		savedAt: snapshot.savedAt ?? new Date().toISOString(),
 		takenAt: snapshot.takenAt,
@@ -335,7 +335,7 @@ function isReadableHead(value: unknown): value is SnapshotHead {
 	const head = value as SnapshotHead | undefined;
 	return (
 		!!head &&
-		head.format === SNAPSHOT_FORMAT &&
+		head.format === ENTITY_SNAPSHOT_FORMAT &&
 		typeof head.processor === 'string' &&
 		typeof head.takenAt?.number === 'number'
 	);

@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
+import {BLOB_SNAPSHOT_FORMAT} from '@etherfold/core';
 import {prepareIndexing} from '../src/index.js';
-import {SNAPSHOT_FORMAT} from '../src/keepState.js';
 import type {Options} from '../src/types.js';
 import {ALICE, BOB, fakeChain, jsObjectModule, START_BLOCK, transfer, ZERO} from './utils/chain.js';
 
@@ -65,7 +65,7 @@ describe('--store file', () => {
 		expect(prepared.store).toBeUndefined();
 
 		const snapshot = snapshotIn(folder);
-		expect(snapshot.format).toBe(SNAPSHOT_FORMAT);
+		expect(snapshot.format).toBe(BLOB_SNAPSHOT_FORMAT);
 		expect(snapshot.state).toEqual({transfers: 2, owners: {'1': BOB}});
 		expect(snapshot.lastSync.lastToBlock).toBe(TIP);
 	});

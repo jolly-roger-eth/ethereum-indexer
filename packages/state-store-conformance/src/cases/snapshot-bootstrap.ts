@@ -1,9 +1,9 @@
 import {
 	BlockNotRetainedError,
+	ENTITY_SNAPSHOT_FORMAT,
 	openSnapshotAware,
 	RevertBeyondSnapshotError,
 	SnapshotProcessorMismatchError,
-	SNAPSHOT_FORMAT,
 	type StateSnapshot,
 	type StateStore,
 	type StateStoreCapabilities,
@@ -54,7 +54,7 @@ export function snapshotBootstrapCases(
 	/** The minimal producer: the rows a test knows it wants, in the published shape. */
 	function snapshot(at: number, overrides: Partial<StateSnapshot> = {}): StateSnapshot {
 		return {
-			format: SNAPSHOT_FORMAT,
+			format: ENTITY_SNAPSHOT_FORMAT,
 			processor: 'conformance-processor-v1',
 			savedAt: '2026-08-24T00:00:00.000Z',
 			takenAt: block(at),

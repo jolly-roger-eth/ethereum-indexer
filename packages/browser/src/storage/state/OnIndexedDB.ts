@@ -1,4 +1,13 @@
-import {Abi, AllData, simple_hash, LastSync, ProcessorContext, taggedBnReviver} from '@etherfold/core';
+import {
+	Abi,
+	AllData,
+	BLOB_SNAPSHOT_FORMAT,
+	isReadableBlobSnapshot,
+	simple_hash,
+	LastSync,
+	ProcessorContext,
+	taggedBnReviver,
+} from '@etherfold/core';
 // the subpath, not the barrel: the barrel re-exports the CLI-side modules, whose
 // top-level `node:fs` / `node:path` / `node:module` imports make this package
 // unbundleable for a browser. See the note at the top of `utils/src/indexer.ts`.
@@ -32,6 +41,53 @@ function getURL(remote: IndexedStateLocation | string, context: ProcessorContext
 }
 
 /**
+ * Fetch the snapshot a mirror publishes, REFUSING an encoding this build cannot
+ * read rather than installing it.
+ *
+ * The file is `@etherfold/cli`'s keeper's envelope, `{format, processor,
+ * savedAt, lastSync, state, history}`, and the format number says which BigInt
+ * convention the bytes are in. It lives in `@etherfold/core`
+ * (`BLOB_SNAPSHOT_FORMAT`) rather than with the writer, because this package
+ * cannot depend on the CLI's (a tab must be able to bundle this code, which
+ * `bundlesForABrowser.test.ts` pins) and a second constant here kept in step
+ * with the CLI's by attention is the outcome the shared home exists to avoid.
+ *
+ * A format this build does not recognise -- 1, or the bare pre-envelope form
+ * that reads as `undefined` -- is not translated and not mined for the fields
+ * that happen to be recognisable: translating is the guess ADR-0029 removed,
+ * and a snapshot understood in part is state a client cannot tell apart from
+ * state understood fully. So it is refused as a whole, LOUDLY (the location and
+ * both numbers, so a mis-published mirror is diagnosable from the tab), and the
+ * caller's recovery ladder takes over: the next mirror, then local state, then
+ * a cold start. That is the same answer the CLI's own reader gives the same
+ * bytes locally, where its recovery is the cold start alone.
+ */
+async function fetchReadableSnapshot<ABI extends Abi, ProcessResultType, ProcessorConfig>(
+	remote: IndexedStateLocation | string,
+	context: ProcessorContext<ABI, ProcessorConfig>,
+): Promise<StateData<ABI, ProcessResultType, unknown> | undefined> {
+	const url = getURL(remote, context);
+	try {
+		const response = await fetch(url);
+		const text = await response.text();
+		const json: unknown = JSON.parse(text, taggedBnReviver);
+		if (!isReadableBlobSnapshot<ABI, ProcessResultType>(json)) {
+			// See the note above: refused whole, never translated, never half-read.
+			console.error(
+				`the snapshot at ${url} is format ${(json as any)?.format}, and this build reads ` +
+					`${BLOB_SNAPSHOT_FORMAT}: refusing it. Installing it would resume from a state whose ` +
+					`every uint256 had quietly become a string, so this mirror cannot serve this client.`,
+			);
+			return undefined;
+		}
+		return json as unknown as StateData<ABI, ProcessResultType, unknown>;
+	} catch (err) {
+		console.error(`failed to fetch remote-state at ${url}`, err);
+		return undefined;
+	}
+}
+
+/**
  * State kept in IndexedDB, optionally hydrated from a published snapshot.
  *
  * ## Which half of this needs a BigInt convention
@@ -48,16 +104,31 @@ function getURL(remote: IndexedStateLocation | string, context: ProcessorContext
  * for a contract to emit, so the decoder guessed, and a snapshot carries decoded
  * event args and `context` digests in one document.
  *
- * A snapshot published by an older build is not translated: it comes back with
- * its BigInts as the `"123n"` strings they now are. Note the gap that leaves,
- * because it is KNOWN rather than overlooked: a published state file DOES carry
- * a format number (`SNAPSHOT_FORMAT`, which the CLI's keeper bumped to 2 for
- * exactly this) and nothing here reads it, so a legacy remote snapshot is
- * installed as state rather than refused the way the CLI refuses it locally.
- * Closing that means the number has to live somewhere both packages can see it,
- * which is a seam decision rather than a line of code, and a bare remote
- * `lastSync` file has no format to check at all. Re-publish rather than
+ * ## A snapshot this build cannot read is refused, and the refusal has a ladder
+ *
+ * A published snapshot carries a format number, and it is now CHECKED here as it
+ * already was on the CLI's own reader (which is why that reader cold starts on a
+ * format-1 file while this one, for too long, installed the same bytes and
+ * indexed on top of `uint256`s that had quietly become `"123n"` strings). An
+ * unreadable mirror is a mirror that cannot serve this client, so it is treated
+ * exactly as an unreachable one already is: skipped when it loses, failed over
+ * from when it wins. Local state that is already ahead still wins over any
+ * remote, readable or not. What is never done is translating an older format:
+ * the translation IS the guess ADR-0029 ruled out. Re-publish rather than
  * translate.
+ *
+ * ## The bare `lastSync` file is selection data only
+ *
+ * `getURL(remote, context, true)` fetches a prefix-form mirror's separate
+ * `lastSync` file to compare mirrors before downloading any payload, and that
+ * file carries NO format -- the CLI writes it bare beside the enveloped state
+ * file. It is read without a format check, deliberately: the one field used
+ * from it is `lastToBlock`, a plain number identical under every encoding of
+ * the envelope, and nothing from it is ever installed. The file that IS
+ * installed is the state file, which carries the check, so a stale head can
+ * mis-order the mirrors but cannot smuggle an unreadable payload past them.
+ * Refusing the head instead would make every mirror the CLI publishes
+ * unselectable, which is a guard placed where the damage is not.
  */
 export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, ProcessorConfig>(
 	name: string,
@@ -71,45 +142,35 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 			let remoteState: StateData<ABI, ProcessResultType, unknown> | undefined;
 			if (remote) {
 				if (Array.isArray(remote)) {
-					let latest: {index: number; lastSync?: LastSync<Abi>} | undefined;
+					// SELECTION: ask each mirror how far it has got, installing nothing. A
+					// mirror's POSITION is all that is compared, so that is all this holds.
+					let latest: {index: number; lastSync?: {lastToBlock: number}} | undefined;
 					for (let i = 0; i < remote.length; i++) {
 						if (typeof remote[i] === 'string' || 'url' in remote[i]) {
-							const urlOfRemote = getURL(remote[i], context);
-							try {
-								const response = await fetch(urlOfRemote);
-								const text = await response.text();
-								const json: {
-									state: ProcessResultType;
-									lastSync: LastSync<Abi>;
-								} = JSON.parse(text, taggedBnReviver);
-
-								if (
-									!latest ||
+							// The location IS the snapshot, so comparing means downloading it
+							// -- which is also where an unreadable one is refused, BEFORE it
+							// can win selection on a block number this build cannot read.
+							const json = await fetchReadableSnapshot<ABI, ProcessResultType, ProcessorConfig>(remote[i], context);
+							if (
+								json &&
+								(!latest ||
 									!latest.lastSync ||
-									(json.lastSync && json.lastSync.lastToBlock > latest.lastSync.lastToBlock)
-								) {
-									latest = {
-										index: i,
-										lastSync: json.lastSync,
-									};
-								}
-							} catch (err) {
-								console.error(`failed to fetch remote lastSync`, err);
+									(json.lastSync && json.lastSync.lastToBlock > latest.lastSync.lastToBlock))
+							) {
+								latest = {index: i, lastSync: json.lastSync};
 							}
 						} else {
+							// the bare `lastSync` file: selection data only (see the module note)
 							const urlOfLastSync = getURL(remote[i], context, true);
 							try {
 								const response = await fetch(urlOfLastSync);
 								const text = await response.text();
 								const json: LastSync<Abi> = JSON.parse(text, taggedBnReviver);
 								if (!latest || !latest.lastSync || json.lastToBlock > latest.lastSync.lastToBlock) {
-									latest = {
-										index: i,
-										lastSync: json,
-									};
+									latest = {index: i, lastSync: json};
 								}
 							} catch (err) {
-								console.error(`failed to fetch remote lastSync`, err);
+								console.error(`failed to fetch remote lastSync at ${urlOfLastSync}`, err);
 							}
 						}
 					}
@@ -120,7 +181,9 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 						latest.lastSync &&
 						latest.lastSync.lastToBlock < existingState.lastSync.lastToBlock
 					) {
-						// console.log(`Existing State`)
+						// Local state is already ahead of every mirror: keep it, exactly as
+						// a client with usable local state must not be dragged back by a
+						// stale published file, readable or not.
 						return existingState;
 					}
 
@@ -130,41 +193,24 @@ export function keepStateOnIndexedDB<ABI extends Abi, ProcessResultType, Process
 							index: 0,
 						};
 					}
-					// else {
-					// 	console.log(`Using ${latest.index}`)
-					// }
-					const url = getURL(remote[latest.index], context);
-					// console.log(`fetching ${url}`);
-					try {
-						const response = await fetch(url);
-						const text = await response.text();
-						const json = JSON.parse(text, taggedBnReviver);
-						remoteState = json;
-					} catch (err) {
-						console.error(`failed to fetch remote-state, try second`, err);
-
-						const url = getURL(remote[(latest.index + 1) % remote.length], context);
-						try {
-							const response = await fetch(url);
-							const text = await response.text();
-							const json = JSON.parse(text, taggedBnReviver);
-							remoteState = json;
-						} catch (err) {
-							console.error(`failed to fetch second remote-state`, err);
-							// TODO more than 2
-						}
+					remoteState = await fetchReadableSnapshot<ABI, ProcessResultType, ProcessorConfig>(
+						remote[latest.index],
+						context,
+					);
+					if (!remoteState) {
+						// The winner could not serve this client -- unreachable, or an
+						// encoding this build refuses -- so fail over to the next mirror,
+						// exactly as an unreachable winner already is. (Still one step:
+						// walking every remaining candidate is the entity path's
+						// behaviour, `bootstrapFromSnapshot`; converging the two belongs
+						// to the free-form path's retirement, not to this fix.)
+						remoteState = await fetchReadableSnapshot<ABI, ProcessResultType, ProcessorConfig>(
+							remote[(latest.index + 1) % remote.length],
+							context,
+						);
 					}
 				} else {
-					const url = getURL(remote, context);
-					// console.log(`fetching single remote ${url}`);
-					try {
-						const response = await fetch(url);
-						const text = await response.text();
-						const json = JSON.parse(text, taggedBnReviver);
-						remoteState = json;
-					} catch (err) {
-						console.error(`failed to fetch remote-state`, err);
-					}
+					remoteState = await fetchReadableSnapshot<ABI, ProcessResultType, ProcessorConfig>(remote, context);
 				}
 			}
 

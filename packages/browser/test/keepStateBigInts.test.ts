@@ -129,9 +129,10 @@ describe('keepStateOnIndexedDB', () => {
 	it('round-trips them through a REMOTE snapshot too, which is where a codec is needed', async () => {
 		// The remote half reads JSON over HTTP (a snapshot published by the CLI's
 		// keeper), so it is the half that crosses a text boundary and needs a
-		// convention. Encode it the way that keeper does and read it back.
-		const {taggedBnReplacer} = await import('@etherfold/core');
-		const body = JSON.stringify(payload(), taggedBnReplacer);
+		// convention. Encode it the way that keeper does -- an ENVELOPE carrying the
+		// format number -- and read it back.
+		const {BLOB_SNAPSHOT_FORMAT, taggedBnReplacer} = await import('@etherfold/core');
+		const body = JSON.stringify({format: BLOB_SNAPSHOT_FORMAT, ...payload()}, taggedBnReplacer);
 		expect(body).toContain('"value":{"__bigint__":"123"}');
 		expect(body).toContain('"memo":"123n"');
 
@@ -142,14 +143,18 @@ describe('keepStateOnIndexedDB', () => {
 		expectTypesIntact(await keeper.fetch(CONTEXT));
 	});
 
-	it('does not revive a legacy `"123n"` remote snapshot into BigInts', async () => {
+	it('REFUSES a legacy (format-less) remote snapshot instead of installing it as strings', async () => {
+		// A published snapshot carries a format number precisely so a reader can
+		// refuse an encoding it cannot read. The pre-envelope form has none, which
+		// reads as `format === undefined`, and it used to be installed as state --
+		// with every `uint256` as the string `"123n"`. Now, as on the CLI's own
+		// reader, it is refused and the client cold starts rather than indexes on
+		// top of silently mistyped state. See `remoteSnapshotFormat.test.ts`.
 		const body = JSON.stringify({state: {total: '123n'}, lastSync: {lastToBlock: 1}});
 		vi.stubGlobal('fetch', async () => ({text: async () => body}));
 		const keeper = keepStateOnIndexedDB('state-legacy', {url: 'https://example.invalid/state.json'});
 		await keeper.clear(CONTEXT);
 
-		const fetched: any = await keeper.fetch(CONTEXT);
-		expect(fetched.state.total).toBe('123n');
-		expect(typeof fetched.state.total).toBe('string');
+		expect(await keeper.fetch(CONTEXT)).toBeUndefined();
 	});
 });

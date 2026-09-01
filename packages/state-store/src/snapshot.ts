@@ -61,14 +61,22 @@ import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.j
  */
 
 /**
- * The on-the-wire version of the snapshot envelope.
+ * The on-the-wire version of the ENTITY snapshot envelope.
+ *
+ * Named for its envelope because this is not the only format number a snapshot
+ * carries in this repo: the free-form path's blob envelope has its own
+ * (`BLOB_SNAPSHOT_FORMAT`, `@etherfold/core`), and a reader can hold both at
+ * once (`@etherfold/browser` depends on both packages). The two version
+ * DIFFERENT file shapes and revise independently, so they are separate
+ * constants with separate names rather than one number a change to either
+ * would falsely invalidate the other.
  *
  * Bumped when the SHAPE changes in a way an older reader would misread. An
  * unknown format is refused (`SnapshotFormatError`) rather than parsed for the
  * fields that happen to be recognisable, because a snapshot half-understood is
  * state a client would accept and act on.
  */
-export const SNAPSHOT_FORMAT = 1;
+export const ENTITY_SNAPSHOT_FORMAT = 1;
 
 /**
  * State computed elsewhere, as of one block, ready to be installed.
@@ -144,7 +152,7 @@ export class SnapshotFormatError extends Error {
 
 	constructor(
 		readonly found: unknown,
-		readonly supported: number = SNAPSHOT_FORMAT,
+		readonly supported: number = ENTITY_SNAPSHOT_FORMAT,
 	) {
 		super(
 			`snapshot format ${JSON.stringify(found)} is not one this build reads (it reads ${supported}). Reading the ` +
@@ -354,7 +362,7 @@ export class SnapshotAwareStateStore implements StateStore {
 	 * the safe one.
 	 */
 	async bootstrap(snapshot: StateSnapshot, options: {readonly processor?: string} = {}): Promise<void> {
-		if (snapshot.format !== SNAPSHOT_FORMAT) throw new SnapshotFormatError(snapshot.format);
+		if (snapshot.format !== ENTITY_SNAPSHOT_FORMAT) throw new SnapshotFormatError(snapshot.format);
 		if (options.processor !== undefined && options.processor !== snapshot.processor) {
 			throw new SnapshotProcessorMismatchError(options.processor, snapshot.processor, snapshot.takenAt.number);
 		}
@@ -369,7 +377,7 @@ export class SnapshotAwareStateStore implements StateStore {
 			}
 		}
 
-		const marker: SnapshotOrigin = {format: SNAPSHOT_FORMAT, block: snapshot.takenAt.number};
+		const marker: SnapshotOrigin = {format: ENTITY_SNAPSHOT_FORMAT, block: snapshot.takenAt.number};
 		await this.inner.writeCursor(SNAPSHOT_ORIGIN_KEY, JSON.stringify(marker));
 		this.origin = snapshot.takenAt.number;
 		this.knownTip = snapshot.takenAt.number;
@@ -506,7 +514,7 @@ export async function openSnapshotAware(store: StateStore): Promise<SnapshotAwar
 				`re-bootstrap.`,
 		);
 	}
-	if (origin?.format !== SNAPSHOT_FORMAT || typeof origin.block !== 'number') {
+	if (origin?.format !== ENTITY_SNAPSHOT_FORMAT || typeof origin.block !== 'number') {
 		throw new SnapshotFormatError(origin?.format);
 	}
 	return new SnapshotAwareStateStore(store, origin.block);
