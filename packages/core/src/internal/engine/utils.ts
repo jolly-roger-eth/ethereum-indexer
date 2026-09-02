@@ -36,6 +36,18 @@ export function wait(seconds: number): Promise<void> {
 
 export type BlockOfEvents<ABI extends Abi> = {hash: string; number: number; events: LogEvent<ABI>[]};
 
+/**
+ * Group the logs of a FETCH, which is a complete re-read of a block range and
+ * carries no verdicts.
+ *
+ * This is the FETCH rule and it is NOT the replay rule -- a distinction worth
+ * stating because reading it as one is precisely the defect ADR-0042 closes. A
+ * `removed` marker is dropped here because a stateless `eth_getLogs` cannot
+ * produce one, so its presence means the input is not a fetch; a stored
+ * EMISSION stream, where the marker IS the retraction, is grouped by
+ * `groupStreamPerBlock` and walked by `generateStreamFromReplay`, and
+ * `EthereumIndexer.feed` refuses one rather than quietly handing it here.
+ */
 export function groupLogsPerBlock<ABI extends Abi>(logEvents: LogEvent<ABI>[]): BlockOfEvents<ABI>[] {
 	const groups: {[hash: string]: BlockOfEvents<ABI>} = {};
 	const logEventsGroupedPerBlock: BlockOfEvents<ABI>[] = [];
@@ -75,24 +87,171 @@ export function groupLogsPerBlock<ABI extends Abi>(logEvents: LogEvent<ABI>[]): 
  * re-fetch that still contains one of them re-applies it under the same hash.
  * Merging those two into one group would hand the processor a block that is
  * simultaneously retracted and applied.
+ *
+ * The grouping is over CONSECUTIVE RUNS and not over the whole list, which
+ * matters as soon as the stream being grouped is a whole STORED stream rather
+ * than one generated batch. A stream that spans many cycles can apply a block,
+ * retract it and apply it again under the same hash (the chain went A, then B,
+ * then back to A), and keying a map by `{removed, hash}` alone would fold that
+ * third emission back into the FIRST group -- delivering the re-application
+ * before the retraction it undoes. A run boundary is exactly one emission, which
+ * is the unit the stream is written in.
  */
 export function groupStreamPerBlock<ABI extends Abi>(
 	stream: LogEvent<ABI>[],
 ): (BlockOfEvents<ABI> & {removed: boolean})[] {
-	const groups = new Map<string, BlockOfEvents<ABI> & {removed: boolean}>();
 	const ordered: (BlockOfEvents<ABI> & {removed: boolean})[] = [];
+	let current: (BlockOfEvents<ABI> & {removed: boolean}) | undefined;
 	for (const event of stream) {
 		const removed = event.removed ? true : false;
-		const key = `${removed ? 'R' : 'A'}:${event.blockHash}`;
-		let group = groups.get(key);
-		if (!group) {
-			group = {hash: event.blockHash, number: event.blockNumber, events: [], removed};
-			groups.set(key, group);
-			ordered.push(group);
+		if (!current || current.hash !== event.blockHash || current.removed !== removed) {
+			current = {hash: event.blockHash, number: event.blockNumber, events: [], removed};
+			ordered.push(current);
 		}
-		group.events.push(event);
+		current.events.push(event);
 	}
 	return ordered;
+}
+
+/**
+ * Turn a STORED emission stream back into the stream to deliver, honouring the
+ * verdicts it already carries.
+ *
+ * This is the IN direction of the same seam `groupStreamPerBlock` is the OUT
+ * direction of, and it exists because a REPLAY is not a FETCH.
+ * `generateStreamToAppend` takes raw logs from a stateless `eth_getLogs` -- a
+ * complete re-read of a range, carrying no verdicts -- and DERIVES every
+ * retraction by comparing the cursor's unconfirmed window against the incoming
+ * blocks by number. A stored stream is the opposite kind of input: it is a
+ * DELTA that already records what was applied and what was taken back, at the
+ * original block, flagged `removed`.
+ *
+ * Routing one through the other is the defect this closes. A rebuild starts from
+ * a fresh cursor whose window is EMPTY, so there was nothing to derive a
+ * retraction from, and `groupLogsPerBlock` drops the `removed` events out of
+ * what it is handed (rightly: in a fetch such a marker has no business
+ * existing). A stream containing a reorg therefore replayed as both branches
+ * applied as live blocks, with no revert anywhere.
+ *
+ * ## The WINDOW is rebuilt by walking the stream, not by filtering it
+ *
+ * The cursor a replay leaves behind must be the one the live run held, window
+ * included, or the first tip cycle after it re-reads the finality window, finds
+ * the replacement block missing from the window, and applies it a SECOND time.
+ * So the walk maintains the window as it goes: an applied block enters it, a
+ * retracted block LEAVES it. Filtering the stream for its non-`removed` entries
+ * instead would leave both branches of a reorg at one height -- a window no live
+ * run ever held.
+ *
+ * The walk deliberately does NOT prune by finality as it goes, only at the end:
+ * the stored stream records no per-batch chain tip, and keeping every live block
+ * in hand until the end is what guarantees a retraction always finds the block
+ * it retracts. The final prune uses `newLastToBlock`, which is the carry-forward
+ * rule `generateStreamToAppend` applies to a block it is keeping.
+ *
+ * ## Why the window is also what DE-DUPLICATES
+ *
+ * A replay has two shapes. A REBUILD hands over the whole stream against an
+ * empty window. A CATCH-UP hands over the part of it above a kept state's resume
+ * point, which reaches back over the finality window and therefore re-offers
+ * blocks that state already applied -- and those are exactly the blocks in its
+ * window. So an applied block whose hash is already there is SKIPPED rather than
+ * delivered twice. That is the same job `startingBlockForNewEvent` does on the
+ * fetch path, decided by block HASH instead of by block NUMBER, because a stream
+ * says which block it means and a re-fetched range only says where it looked.
+ */
+export function generateStreamFromReplay<ABI extends Abi>(
+	lastSync: LastSync<ABI>,
+	defaultFromBlock: number,
+	storedStream: LogEvent<ABI>[],
+	{
+		newLatestBlock,
+		newLastFromBlock,
+		newLastToBlock,
+		finality,
+	}: {newLatestBlock: number; newLastFromBlock: number; newLastToBlock: number; finality: number},
+): {eventStream: LogEvent<ABI>[]; newLastSync: LastSync<ABI>} {
+	const expectedFromBlock = getFromBlock(lastSync, defaultFromBlock, finality);
+	if (newLastFromBlock !== expectedFromBlock) {
+		// The same refusal `generateStreamToAppend` makes, for the same reason: a
+		// stream that does not reach back to where this cursor resumes would leave a
+		// hole behind a cursor claiming to cover it.
+		throw new UnexpectedFromBlockError(expectedFromBlock, newLastFromBlock);
+	}
+
+	// Keyed by block HASH, and ORDERED by first appearance. A hash names one block;
+	// a height names whichever branch won, which is the thing under dispute here.
+	const live = new Map<string, EventBlock<ABI>>();
+	const order: string[] = [];
+	for (const unconfirmedBlock of lastSync.unconfirmedBlocks) {
+		if (!live.has(unconfirmedBlock.hash)) {
+			order.push(unconfirmedBlock.hash);
+		}
+		live.set(unconfirmedBlock.hash, unconfirmedBlock);
+	}
+
+	const eventStream: LogEvent<ABI>[] = [];
+	for (const group of groupStreamPerBlock(storedStream)) {
+		if (group.removed) {
+			if (!live.has(group.hash)) {
+				// nothing to take back: this block was never applied under this cursor, so
+				// telling the processor to revert it would be an instruction about state it
+				// does not hold
+				continue;
+			}
+			live.delete(group.hash);
+			eventStream.push(...group.events);
+		} else {
+			if (live.has(group.hash)) {
+				// already applied: a catch-up replay re-offers the window it reached back over
+				continue;
+			}
+			live.set(group.hash, {
+				hash: group.hash,
+				number: group.number,
+				events: group.events.map((event) => ({...event})),
+			});
+			order.push(group.hash);
+			eventStream.push(...group.events);
+		}
+	}
+
+	// The finality prune happens ONCE, here, and not during the walk: a stored
+	// stream records no per-batch chain tip, and keeping every live block in hand
+	// until the end is what guarantees a retraction always finds the block it
+	// retracts. `newLastToBlock` is the bound `generateStreamToAppend` carries a
+	// block forward on, which is what a replayed block is.
+	const newUnconfirmedBlocks: EventBlock<ABI>[] = [];
+	const kept = new Set<string>();
+	for (const hash of order) {
+		const block = live.get(hash);
+		if (!block || kept.has(hash)) {
+			// retracted on the way through, or already taken: a hash that was applied,
+			// retracted and applied again appears in `order` twice
+			continue;
+		}
+		kept.add(hash);
+		if (newLastToBlock - block.number <= finality) {
+			newUnconfirmedBlocks.push(block);
+		}
+	}
+	// ASCENDING, which is what the next fetch reads it as: `generateStreamToAppend`
+	// walks this list in order and stops at the first block the incoming range
+	// contradicts, so a window out of block order would conclude the wrong fork
+	// point. First-appearance order is already ascending for every stream a fetch
+	// path writes; the sort says so rather than assuming it.
+	newUnconfirmedBlocks.sort((a, b) => a.number - b.number);
+
+	return {
+		eventStream,
+		newLastSync: {
+			context: lastSync.context,
+			lastFromBlock: newLastFromBlock,
+			latestBlock: newLatestBlock,
+			lastToBlock: newLastToBlock,
+			unconfirmedBlocks: newUnconfirmedBlocks,
+		},
+	};
 }
 
 export function generateStreamToAppend<ABI extends Abi>(

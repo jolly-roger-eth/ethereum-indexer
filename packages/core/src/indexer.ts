@@ -26,6 +26,7 @@ import {LogEventFetcher} from './internal/decoding/LogEventFetcher.js';
 import type {Abi} from 'abitype';
 import {
 	defaultFromBlockOf,
+	generateStreamFromReplay,
 	generateStreamToAppend,
 	getFromBlock,
 	groupStreamPerBlock,
@@ -37,7 +38,7 @@ import {
 } from './internal/engine/utils.js';
 import {sourceHashesOf} from './internal/engine/eventRanges.js';
 import {CancelOperations, createAction} from './internal/utils/promises.js';
-import {isOutOfSpace} from './errors.js';
+import {InvalidBatchError, isOutOfSpace} from './errors.js';
 import {simple_hash} from './utils/index.js';
 
 const namedLogger = logs('@etherfold/core');
@@ -259,9 +260,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 	// ACTIONS
 	// ------------------------------------------------------------------------------------------------------------------
 	protected _index = createAction<LastSync<ABI>>(this.promiseToIndex.bind(this));
-	protected _feed = createAction<LastSync<ABI>, {newEvents: LogEvent<ABI>[]; lastSyncFetched: LastSync<ABI>}>(
-		this.promiseToFeed.bind(this),
-	);
+	protected _feed = createAction<
+		LastSync<ABI>,
+		{newEvents: LogEvent<ABI>[]; lastSyncFetched: LastSync<ABI>; replay?: boolean}
+	>(this.promiseToFeed.bind(this));
 	protected _load = createAction<LastSync<ABI>>(this.promiseToLoad.bind(this));
 	protected _save = createAction<
 		StreamWriteOutcome,
@@ -367,6 +369,16 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		return this._load.once();
 	}
 
+	/**
+	 * Hand over a FETCH: raw logs, complete over the range the cursor asks for,
+	 * carrying no verdicts of their own.
+	 *
+	 * Every retraction is DERIVED here, by comparing the cursor's unconfirmed
+	 * window against the incoming blocks, exactly as the live path derives it --
+	 * which is why a batch carrying `removed` markers is refused rather than
+	 * accepted with them dropped. A stream that already knows what it took back is
+	 * a REPLAY and goes through `replay()`.
+	 */
 	async feed(eventStream: LogEvent<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
 		// we first check if this valid to be called
 		if (this._index.executing) {
@@ -377,12 +389,56 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			throw new Error(`already feeding... should not feed`);
 		}
 
+		const retracted = eventStream.find((event) => event.removed);
+		if (retracted) {
+			// Loud rather than silent, and this is the whole shape of the bug being
+			// closed: `groupLogsPerBlock` DROPS these, so a stored stream fed through
+			// here replayed both branches of a reorg as live blocks and reverted
+			// nothing. The same refusal `assertWellFormed` makes on the wire, for the
+			// same reason -- a fetch cannot know what was taken back.
+			throw new InvalidBatchError(
+				`a log at block ${retracted.blockNumber} (${retracted.blockHash}) is marked removed, so this is an ` +
+					`emission STREAM and not a fetch. \`feed()\` derives every retraction from the cursor's unconfirmed ` +
+					`window and would DISCARD the ones carried here. Replay a stored stream with \`replay()\`, which ` +
+					`honours the verdicts it already carries.`,
+			);
+		}
+
 		// we do next but as we check first that it is not executing the feed
 		// we could as well say feed.ifNotExecuting
 		return this._feed.next({
 			newEvents: eventStream,
 			lastSyncFetched: lastSyncFetched || this.freshLastSync(this.processor.getVersionHash()),
 		});
+	}
+
+	/**
+	 * Hand over a STORED emission stream, verdicts included.
+	 *
+	 * The counterpart of `feed()`, and the entry a rebuild off a cached stream
+	 * takes (`promiseToLoad`, both branches). What arrives here is not a re-read of
+	 * a block range: it is the sequence of applies and retractions some earlier run
+	 * already decided, so the engine HONOURS it instead of recomputing it from a
+	 * window a rebuild does not have. It shares `promiseToFeed`'s delivery -- the
+	 * per-block batching, and the rule that every retraction goes in ONE batch --
+	 * and differs only in how the stream and the new cursor are derived; see
+	 * `generateStreamFromReplay`.
+	 *
+	 * `lastSyncStored` is the stream's OWN cursor, whose `lastFromBlock` must be
+	 * the block this indexer asked the keeper for. Its `unconfirmedBlocks` is
+	 * ignored and may be empty: no stream keeper stores the window (ADR-0035), and
+	 * the replay rebuilds it from the stream itself.
+	 */
+	async replay(eventStream: LogEvent<ABI>[], lastSyncStored: LastSync<ABI>): Promise<LastSync<ABI>> {
+		if (this._index.executing) {
+			throw new Error(`indexing... should not replay`);
+		}
+
+		if (this._feed.executing) {
+			throw new Error(`already feeding... should not replay`);
+		}
+
+		return this._feed.next({newEvents: eventStream, lastSyncFetched: lastSyncStored, replay: true});
 	}
 
 	indexMore(): Promise<LastSync<ABI>> {
@@ -685,7 +741,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 							this.streamLastToBlock = lastSyncFetched.lastToBlock;
 							if (replayable.length > 0) {
 								await this._onLoad('ProcessingEventStream');
-								await this.feed(replayable, lastSyncFetched);
+								// REPLAY and not feed: this stream carries its own verdicts, and this
+								// cursor is FRESH, so there is no window to derive them from. Fed as
+								// a fetch, a stored reorg replayed as two live branches at one height.
+								await this.replay(replayable, lastSyncFetched);
 							} else {
 								// A stream that holds a CURSOR and no events -- the ordinary state of a
 								// deployment whose contracts have emitted nothing yet, and what an empty
@@ -753,7 +812,10 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 								this.forgetStoredStream();
 							} else if (replayable.length > 0) {
 								await this._onLoad('ProcessingEventStream');
-								await this.feed(replayable, lastSyncFetched);
+								// The catch-up shape of the same replay: this cursor DOES hold a
+								// window, and it is what stops the events it already applied from
+								// being applied a second time on the way back through.
+								await this.replay(replayable, lastSyncFetched);
 							}
 						}
 					}
@@ -768,6 +830,8 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		params: {
 			newEvents: LogEvent<ABI>[];
 			lastSyncFetched: LastSync<ABI>;
+			/** The events are a stored STREAM carrying its own verdicts, not a fetch. */
+			replay?: boolean;
 		},
 		{unlessCancelled}: CancelOperations,
 	): Promise<LastSync<ABI>> {
@@ -779,21 +843,29 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			this._onLastSyncUpdated();
 		}
 
-		const {eventStream, newLastSync} = generateStreamToAppend(this.lastSync, this.defaultFromBlock, newEvents, {
+		const bounds = {
 			newLatestBlock: lastSyncFetched.latestBlock,
 			newLastToBlock: lastSyncFetched.lastToBlock,
 			newLastFromBlock: lastSyncFetched.lastFromBlock,
 			finality: this.finality,
-		});
+		};
+		// The IN direction splits on the KIND of what arrived, and only here. A fetch
+		// carries no verdicts, so they are derived from the cursor's window; a stored
+		// stream carries its own, so they are honoured. Routing the second through the
+		// first is what made a rebuild replay a reorged history as if both branches
+		// were live -- `groupLogsPerBlock` drops the `removed` events, which is right
+		// for a fetch (that rule is untouched) and wrong for a replay.
+		const {eventStream, newLastSync} = params.replay
+			? generateStreamFromReplay(this.lastSync, this.defaultFromBlock, newEvents, bounds)
+			: generateStreamToAppend(this.lastSync, this.defaultFromBlock, newEvents, bounds);
 
 		// Retractions are delivered, not dropped. `groupLogsPerBlock` skips `removed`
 		// events, which is right for logs coming in from a fetch and wrong here: this
 		// stream is what the PROCESSOR consumes, and a `removed` marker is the only
 		// instruction it ever gets to revert. Dropping them meant the feed path could
 		// apply a reorged-out block and never take it back, so a processor fed through
-		// `feed()` (the kept-stream replay on load, and the server's import route)
-		// silently kept state derived from a dead branch, while the same stream through
-		// `indexMore()` reverted correctly.
+		// `feed()` silently kept state derived from a dead branch, while the same
+		// stream through `indexMore()` reverted correctly.
 		const eventsInGroups = groupStreamPerBlock(eventStream);
 		const batchSize = this.config.feedBatchSize;
 		let currentLastSync = {...newLastSync};

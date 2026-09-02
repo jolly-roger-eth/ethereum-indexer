@@ -7,8 +7,11 @@ import type {IndexingSource, LastSync, LogEvent} from '../src/types.js';
 // ---------------------------------------------------------------------------
 // The feed path must deliver retractions
 // ---------------------------------------------------------------------------
-// `feed()` is how a processor is driven when the events do not come from a live
-// fetch: the kept-stream replay on load, and the indexer-server's import route.
+// `feed()` is how a processor is driven from a FETCH this indexer did not make
+// itself: a host hands over raw logs, complete over a range, and every retraction
+// is derived here. (A stored STREAM, which carries its own, goes through
+// `replay()` instead -- see `replay.test.ts` and ADR-0042. The kept-stream replay
+// on load used to come through here, which is the defect that split them.)
 // It used to batch the generated stream with `groupLogsPerBlock`, which SKIPS
 // `removed` events because it is written for logs coming IN from a fetch, where
 // a retraction has no business existing.

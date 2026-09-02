@@ -484,7 +484,7 @@ describe('a stream that does not reach back to the requested fromBlock', () => {
  * the control for dropping it: if a rebuild off a stream that carries the window
  * lands where a rebuild off one that does not lands, the window was REDUNDANT
  * here rather than merely unread. (It is: `promiseToFeed` takes the three block
- * numbers and `generateStreamToAppend` rebuilds the window from the events.)
+ * numbers and `generateStreamFromReplay` rebuilds the window from the events.)
  *
  * A SUPERSEDED block is dropped, and that is not a detail. The stored stream is
  * an EMISSION stream, so a reorged-out block appears TWICE in it -- once as it
@@ -529,7 +529,7 @@ describe('a reorg, replayed', () => {
 		await indexToTip(live as never);
 		chain.serve(BRANCH_B, BRANCH_B_TIP);
 		await indexToTip(live as never);
-		const applied = keysOf(await appliedIn(live.state.$state));
+		const applied = await appliedIn(live.state.$state);
 		live.dispose();
 		return {chain, stream, applied};
 	}
@@ -568,32 +568,50 @@ describe('a reorg, replayed', () => {
 	});
 
 	/**
-	 * A rebuild off a stream that CONTAINS a reorg is REFUSED, and that is a
-	 * characterization of a defect rather than a design.
+	 * A rebuild off a stream that CONTAINS a reorg lands on the state the LIVE run
+	 * landed on, which is the whole claim ADR-0008 rests a processor upgrade on.
 	 *
-	 * `generateStreamToAppend` derives retractions from the CURSOR's unconfirmed
-	 * window and `groupLogsPerBlock` drops `removed` events out of what it is
-	 * given, so a rebuild -- which starts from a fresh cursor with an EMPTY window
-	 * -- silently discards the retractions the stream itself carries and replays
-	 * both branches of the reorg as live blocks. The store refuses the second block
-	 * at that height, which is the store doing exactly its job.
+	 * This case used to assert the opposite, and the inversion is the regression
+	 * proof. `generateStreamToAppend` derives retractions from the CURSOR's
+	 * unconfirmed window and `groupLogsPerBlock` drops `removed` events out of what
+	 * it is given, so a rebuild -- which starts from a fresh cursor with an EMPTY
+	 * window -- silently discarded the retractions the stream itself carries and
+	 * replayed both branches of the reorg as live blocks. The store refused the
+	 * second block at that height (`block 104 is already recorded`), which was the
+	 * store doing exactly its job, and on any path that TOLERATED the double-apply
+	 * the result was silently wrong state derived partly from a dead branch.
 	 *
-	 * It is pinned here because the refusal is the only thing making it visible:
-	 * the free-form path this suite used to drive applied both branches without
-	 * complaint and rebuilt a state derived from a dead branch. See
-	 * `work/notes/observations/a-rebuild-off-a-cached-stream-drops-its-retractions.md`.
-	 * When that is fixed this case goes red, which is the point.
+	 * The replay now goes through `EthereumIndexer.replay`, which honours the
+	 * verdicts the stream carries instead of recomputing them from a window a
+	 * rebuild does not have. Asserted as an EQUALITY against the live state rather
+	 * than as the absence of a throw, because a no-throw says nothing about which
+	 * branch the state came from.
 	 */
-	it('is REFUSED on a rebuild, because the replay drops the stored retractions', async () => {
-		const {chain, stream} = await liveRunThroughAReorg(freshName());
+	it('reaches the SAME state as the live run, applying the replacement block once', async () => {
+		const {chain, stream, applied} = await liveRunThroughAReorg(freshName());
 
 		const definition = applyingProcessor();
 		const rebuilt = indexerOver(definition, await browserStore(freshName(), definition), {keepStream: stream});
 
 		await rebuilt.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 
-		// the replay happens inside `load`, which the first `indexMore` runs
-		await expect(indexToTip(rebuilt as never)).rejects.toThrow(/block 104 is already recorded/);
+		// the replay happens inside `load`, which the first `indexMore` runs -- and
+		// the same call goes on to run the first TIP CYCLE after it
+		await indexToTip(rebuilt as never);
+
+		const rebuiltApplied = await appliedIn(rebuilt.state.$state);
+		expect(rebuiltApplied).toEqual(applied);
+		// the dead branch is not in it, the replacement is, and nothing was applied
+		// twice -- `times` is what would show a double application through a write
+		// that merely looks idempotent
+		expect(keysOf(rebuiltApplied)).toContain('0xb104:0');
+		expect(keysOf(rebuiltApplied).filter((key) => key.startsWith('0xa104'))).toEqual([]);
+		expect(rebuiltApplied.map((row) => row.times)).toEqual(rebuiltApplied.map(() => 1));
+
+		// and the cycle AFTER that one re-reads the finality window without applying
+		// the replacement block a second time: the replay left it IN the window
+		await indexToTip(rebuilt as never);
+		expect(await appliedIn(rebuilt.state.$state)).toEqual(applied);
 
 		rebuilt.dispose();
 	});
