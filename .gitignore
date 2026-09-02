@@ -68,9 +68,12 @@ playwright-report/
 .pi-subagents/
 
 # Copied in at pack/publish time by each package's `prepack`, because npm reads
-# a README and a LICENSE only from the package DIRECTORY, never from the repo
-# root. Generated, so not source: committed, they would be 19 copies free to
-# drift from the single file they mirror.
-/packages/cli/README.md
+# a LICENSE only from the package DIRECTORY, never from the repo root.
+# Generated, so not source: committed, they would be 19 copies free to drift
+# from the single file they mirror.
+#
+# A README is NOT in this list: every package now has its OWN, describing that
+# package, so there is nothing being mirrored. `packages/cli/README.md` used to
+# be a copy of the root one and is now the CLI's own committed file.
 /packages/*/LICENSE
 /platforms/*/LICENSE

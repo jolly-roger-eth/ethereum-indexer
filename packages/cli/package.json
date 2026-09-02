@@ -1,6 +1,7 @@
 {
 	"name": "etherfold",
 	"version": "0.7.0",
+	"description": "The etherfold command line: run a processor over a chain and write the derived state into a libSQL database (one shot, exits at the tip), or serve the indexer-server over HTTP.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -52,7 +53,7 @@
 	},
 	"scripts": {
 		"build": "rm -rf dist && tsc",
-		"prepack": "cp ../../README.md README.md && cp ../../LICENSE LICENSE",
+		"prepack": "cp ../../LICENSE LICENSE",
 		"typecheck": "tsc -p tsconfig.typecheck.json",
 		"dev": "as-soon -w src pnpm build",
 		"test": "vitest run",
