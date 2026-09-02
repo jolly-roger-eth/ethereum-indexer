@@ -1,13 +1,11 @@
 import type {EntityProcessor} from '@etherfold/processor-entities';
-import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
 
 // ---------------------------------------------------------------------------------------------------
-// A CHAIN, TWO PROCESSOR MODULES
+// A CHAIN AND A PROCESSOR MODULE
 // ---------------------------------------------------------------------------------------------------
 // Everything the CLI tests need to drive `etherfold index` without a node: raw
-// ERC-721 `Transfer` logs served by a fake provider, and the two shapes of
-// processor module the command must tell apart -- one tagged `'entities'`, one
-// untagged (which is what `'js-object'` looks like on disk).
+// ERC-721 `Transfer` logs served by a fake provider, and the module shape the
+// command loads.
 // ---------------------------------------------------------------------------------------------------
 
 export const abi = [
@@ -169,35 +167,23 @@ export const nftProcessor: EntityProcessor<typeof abi> = {
 	},
 };
 
-type JSData = {transfers: number; owners: Record<string, string>};
-
-const jsProcessor: JSProcessor<typeof abi, JSData> = {
-	version: '1.0.0',
-	construct(): JSData {
-		return {transfers: 0, owners: {}};
-	},
-	onTransfer(data, event) {
-		data.transfers++;
-		data.owners[event.args.id.toString()] = event.args.to.toLowerCase();
-	},
-};
-
 const contractsDataPerChain = {'1': [{abi, address: CONTRACT, startBlock: START_BLOCK}]};
 
 /**
- * The module an ENTITY deployment ships: `createProcessor` returns the tag.
+ * The module a deployment ships: `createProcessor` returns the AUTHORING object.
  *
- * The same `{kind, processor}` shape `@etherfold/browser` takes, and the same
- * two words. What it carries is the AUTHORING object, because the store is the
- * deployment's choice: the CLI builds the runtime around it.
+ * Declarations plus handlers, and no store, because WHERE the state lives is the
+ * deployment's choice: the CLI builds the runtime around what comes back. It
+ * used to return a `{kind, processor}` tag, which is gone with the second
+ * authoring path it discriminated (ADR-0037).
  */
 export const entityModule = {
-	createProcessor: () => ({kind: 'entities', processor: nftProcessor}) as const,
+	createProcessor: () => nftProcessor,
 	contractsDataPerChain,
 };
 
-/** The module every shipped deployment has: no tag at all, which means `'js-object'`. */
-export const jsObjectModule = {
-	createProcessor: fromJSProcessor(jsProcessor),
+/** A module still returning the retired KIND TAG, which must be refused rather than unwrapped. */
+export const taggedModule = {
+	createProcessor: () => ({kind: 'entities', processor: nftProcessor}) as const,
 	contractsDataPerChain,
 };

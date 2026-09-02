@@ -4,22 +4,31 @@
  * Origin: github.com/wighawag/stratagems, `indexer/src/index.ts`
  * @ commit 3d5a0b3f46bcc0d8370643b8382f11f99f81df00 (2024-12-18), GPL-3.0.
  *
- * This is the ORACLE. Its handler bodies are byte-for-byte the ones that
- * computed the state the port is compared against, which is the whole point:
- * an expected value computed by our own reimplementation would prove nothing.
+ * This is the PROVENANCE of the golden states. Its handler bodies are
+ * byte-for-byte the ones that computed the state the port is compared against,
+ * which is the whole point: an expected value computed by our own
+ * reimplementation would prove nothing.
+ *
+ * **Nothing runs it any more.** The free-form authoring path that drove it
+ * (`fromJSProcessor`) is deleted (ADR-0037), so the golden states are a FROZEN
+ * expectation rather than a recomputable one -- see `../../fixtures/README.md`.
+ * This file stays because deleting it would leave the goldens as numbers with no
+ * stated origin, which is the one property that made them worth their weight.
  *
  * Changes, all mechanical:
  *   - `contractsInfo` (a build-time generated module) is replaced by the
  *     vendored `stratagemsABI`, so `ContractsABI` is a literal type here.
- *   - imports point at the vendored files and at `@etherfold/js-processor`
- *     (the package `ethereum-indexer-js-processor` was renamed).
+ *   - imports point at the vendored files, including `JSProcessor` itself, whose
+ *     package (`@etherfold/js-processor`, once `ethereum-indexer-js-processor`)
+ *     is deleted: the type is vendored beside this file as
+ *     `js-processor-type.ts`.
  *   - the `version` string keeps the spike's spelling, because CHANGING it would
  *     change nothing about what this computes and would break the link between
  *     the committed golden states and the run that produced them.
  *   - `version` is a literal rather than the `__VERSION_HASH__` placeholder
  *     that stratagems' build substitutes.
  */
-import type {JSProcessor} from '@etherfold/js-processor';
+import type {JSProcessor} from './js-processor-type.js';
 import {StratagemsContract, bigIntIDToXY} from './stratagems.js';
 import {Color} from './types.js';
 import type {ContractCell} from './types.js';

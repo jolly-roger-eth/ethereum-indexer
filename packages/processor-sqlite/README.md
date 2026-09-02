@@ -24,7 +24,7 @@ await view.getAsOf('token', {id: '1'}, {hash: '0x...'}); // state as it was at t
 
 ## What is different from the in-memory path
 
-`@etherfold/js-processor` reverts a reorg with immer reverse-patches, because reverting by replay needs the state as of the fork block and the in-browser path cannot get it. ADR-0001 records that and names the condition for revisiting it: a store that can answer "state as of block N". This is that store. Reverting here is a single `revertTo(forkPoint)`, two SQL moves per table over the validity ranges, with no patch history and no replay.
+The retired free-form processor path reverted a reorg with immer reverse-patches, because reverting by replay needs the state as of the fork block and the in-browser path could not get it. ADR-0001 records that and names the condition for revisiting it: a store that can answer "state as of block N". This is that store. Reverting here is a single `revertTo(forkPoint)`, two SQL moves per table over the validity ranges, with no patch history and no replay.
 
 The observable behaviour is meant to be identical, and that is checked rather than claimed. `test/reorg.test.ts` runs the same scenarios as the in-memory package's characterization tests, and `test/equivalence.test.ts` runs both processors over the same streams and compares the resulting states directly, so divergence is a test failure rather than a discovery in production.
 

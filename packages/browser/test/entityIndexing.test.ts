@@ -185,13 +185,15 @@ describe('closing the tab and opening it again', () => {
 	});
 });
 
-describe('the two IndexedDB seams stay apart', () => {
-	it('createBrowserStateStore builds a StateStore, not a KeepState keeper', async () => {
+describe('what a browser deployment gets when it names its storage', () => {
+	it('createBrowserStateStore builds a StateStore, and not a whole-blob keeper', async () => {
 		const store = await createBrowserStateStore(processor.entities, {databaseName: freshName()});
 
 		expect(store).toBeInstanceOf(IndexedDBStateStore);
-		// a `KeepState` is `fetch` / `save` / `clear`; a `StateStore` is the seam.
-		// They are not two spellings of one thing, and neither has the other's verbs.
+		// There were two IndexedDB seams here until ADR-0037: this one, and a
+		// `KeepState` keeper (`fetch` / `save` / `clear`) that wrote the whole state
+		// object under one key. Only the seam is left, and it has none of the keeper's
+		// verbs -- which is what stops the two being read as one thing again.
 		expect((store as unknown as {save?: unknown}).save).toBeUndefined();
 		expect(typeof store.applyBlock).toBe('function');
 	});

@@ -2,8 +2,8 @@
  * The stratagems processor, as an `EntityProcessor` over `MutationContext`.
  *
  * DERIVED WORK of github.com/wighawag/stratagems `indexer/src/index.ts`
- * @ 3d5a0b3f (GPL-3.0); see `../vendor/stratagems/README.md`. The oracle it is
- * checked against is that file, vendored verbatim.
+ * @ 3d5a0b3f (GPL-3.0); see `../vendor/stratagems/README.md`. What it is checked
+ * against is the state that file computed, committed under `../fixtures/`.
  *
  * Read this next to `../vendor/stratagems/js-processor.ts`. Handlers that touch
  * flat keyed maps (`onCommitmentMade`, the reward handlers, the pokes) port

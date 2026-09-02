@@ -6,10 +6,10 @@ import {NFTProcessor} from './entities.js';
  *
  * `entities.ts` is UNCHANGED and is imported as-is: this file adds no handler,
  * no declaration and no backend, because there is nothing about the CLI for a
- * processor to know. It exists only to say two things a module has to say to a
- * host that loads it -- which KIND of processor this is, and what to index --
- * neither of which a browser page needs, since an app passes both at the call
- * site (`browser/main.ts`).
+ * processor to know. It exists only to say the two things a module has to say to
+ * a host that loads it -- WHICH processor to run, and what to index -- neither of
+ * which a browser page needs, since an app passes both at the call site
+ * (`browser/main.ts`).
  *
  * ```sh
  * pnpm --filter event-processor-nfts build
@@ -21,16 +21,16 @@ import {NFTProcessor} from './entities.js';
  */
 
 /**
- * The KIND, said by the module in the same two words `@etherfold/browser` takes.
+ * The processor, handed over bare.
  *
- * `{kind: 'entities', processor}` is the tag; a module that returns a bare
- * processor means `'js-object'`, which is why `index.ts` next door needs no tag
- * at all. What travels here is the AUTHORING object -- declarations plus
- * handlers -- because WHERE the state lives is the deployment's choice: the CLI
- * builds the store named by `--store` and wraps this in the runtime that writes
- * to it. A `--kind` flag would have been a second source of truth for one fact.
+ * What travels is the AUTHORING object -- declarations plus handlers -- because
+ * WHERE the state lives is the deployment's choice: the CLI builds the store
+ * named by `--store` and wraps this in the runtime that writes to it. It used to
+ * be wrapped in a `{kind: 'entities', processor}` tag saying which of two
+ * authoring paths this was; there is one (ADR-0037), so there is nothing left to
+ * say.
  */
-export const createProcessor = () => ({kind: 'entities', processor: NFTProcessor}) as const;
+export const createProcessor = () => NFTProcessor;
 
 /**
  * WHAT to index, per chain.

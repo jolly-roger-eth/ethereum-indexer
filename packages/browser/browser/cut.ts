@@ -159,19 +159,15 @@ async function hotProcessorCase(params: Params, timings: Timing[]): Promise<Reco
 	const before = await readState(indexer.state.$state);
 
 	// (1) the edit, with `version` left alone: the core cannot see it
-	const unbumped = await indexer.updateProcessor({
-		kind: 'entities',
-		processor: entityProcessorOver(store, processorVariant({version: '1.0.0', countBy: 10})),
-	});
+	const unbumped = await indexer.updateProcessor(
+		entityProcessorOver(store, processorVariant({version: '1.0.0', countBy: 10})),
+	);
 	await indexToTip(indexer);
 	const afterUnbumped = await readState(indexer.state.$state);
 
 	// (2) the same edit with `version` bumped: discarded and recomputed
 	const bumped = await timed('bumped-swap', timings, () =>
-		indexer.updateProcessor({
-			kind: 'entities',
-			processor: entityProcessorOver(store, processorVariant({version: '2.0.0', countBy: 10})),
-		}),
+		indexer.updateProcessor(entityProcessorOver(store, processorVariant({version: '2.0.0', countBy: 10}))),
 	);
 	await indexToTip(indexer);
 	const afterBumped = await readState(indexer.state.$state);

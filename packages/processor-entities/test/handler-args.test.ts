@@ -7,10 +7,8 @@ import type {InputValues} from '../src/types.js';
 /**
  * ONE handler name can cover TWO wire events, and the type must say so.
  *
- * The same claim `@etherfold/js-processor`'s `test/handlerArgs.test.ts` makes,
- * asserted again HERE because this package holds its OWN copy of `InputValues`:
- * an author on either surface meets the same handler, so a fix to one copy is
- * not a fix for the other.
+ * The claim the retired free-form path's `handlerArgs.test.ts` made, asserted
+ * HERE because this package holds the only remaining copy of `InputValues`.
  *
  * An upgraded contract can emit `Transfer(address,address,uint256)` before the
  * upgrade block and `Transfer(address,address,uint256,bytes)` after it. They

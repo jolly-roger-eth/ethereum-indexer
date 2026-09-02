@@ -4,7 +4,7 @@
 	"entryPoints": [
 		"packages/core",
 		"packages/browser",
-		"packages/js-processor"
+		"packages/processor-entities"
 	],
 	"out": "docs/api",
 	"docsRoot": "docs"

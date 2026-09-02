@@ -168,8 +168,7 @@ export type ReplayOptions<ABI extends Abi> = {
 	 *
 	 * `'live'` (the default) says the block being applied IS the tip, which is
 	 * what it was when the events first arrived, and therefore what keeps a
-	 * processor's reorg-eligible path (in the js-processor, its immer reverse
-	 * patches) doing the work it did live. `'final'` says the capture's own last
+	 * processor's reorg-eligible path doing the work it did live. `'final'` says the capture's own last
 	 * block is the tip, so every block is already past finality and a processor
 	 * may take its cheaper, no-history path.
 	 */
@@ -186,9 +185,9 @@ export type ReplayOptions<ABI extends Abi> = {
  * that never occurs at the tip, and splitting one across two calls would let a
  * half-applied block be observed, which live indexing never does.
  *
- * The caller is expected to have configured the processor already (`configure`,
- * `keepState`); this drives `load` and then `process`, and returns the cursor as
- * it stands at the end.
+ * The caller is expected to have configured the processor already (`configure`);
+ * this drives `load` and then `process`, and returns the cursor as it stands at
+ * the end.
  */
 export async function replayFixtureInto<ABI extends Abi, ProcessResultType>(
 	processor: EventProcessor<ABI, ProcessResultType>,

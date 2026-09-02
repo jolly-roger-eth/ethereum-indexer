@@ -3,7 +3,6 @@
 'etherfold': patch
 '@etherfold/core': patch
 '@etherfold/fetcher-host': patch
-'@etherfold/js-processor': patch
 '@etherfold/processor-entities': patch
 '@etherfold/processor-sqlite': patch
 '@etherfold/server': patch

@@ -100,9 +100,10 @@ export type IndexedDBStateStoreOptions = RetentionOptions & {
  * answer to change, and the five things that would overturn it, are in
  * **ADR-0024**, from `work/notes/findings/sqlite-in-the-browser.md`.
  *
- * What this is NOT is a speed-up over the incumbent whole-state blob
- * (`keepStateOnIndexedDB`), which is the FASTEST writer at today's sizes (2.0
- * ms/block on Chromium against 45.6 for row-level writes at 4,072 live rows).
+ * What this is NOT is a speed-up over the whole-state blob it replaced
+ * (`keepStateOnIndexedDB`, deleted with the free-form path by ADR-0037), which
+ * was the FASTEST writer at today's sizes (2.0 ms/block on Chromium against 45.6
+ * for row-level writes at 4,072 live rows).
  * What row-level writes buy is history, reorg revert, a cold start that reads
  * only what it needs, and a write cost proportional to what CHANGED rather than
  * to total state. Sold as a speed-up, the first benchmark contradicts it.

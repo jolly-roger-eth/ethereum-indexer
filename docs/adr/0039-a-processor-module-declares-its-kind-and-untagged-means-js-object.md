@@ -1,4 +1,11 @@
+---
+status: superseded by ADR-0037
+---
+
 # A processor module declares its KIND by returning a tag, and an untagged module means `js-object`
+
+> **SUPERSEDED (2026-09-02) by the execution of ADR-0037.** There is one authoring path now, so a module has no kind to declare: `createProcessor` returns the AUTHORING object itself and `instantiateProcessor` (`@etherfold/utils`) REFUSES a module that still returns `{kind, processor}` rather than unwrapping it. What survives is the reasoning under "Why a tag and not a sniff" and "What the tag CARRIES differs from the browser's": a module hands over declarations plus handlers and NOT a runtime, because where the state lives is the deployment's choice. Read the rest as history.
+
 
 A processor module loaded by a host says which of the two authoring paths it carries by having `createProcessor` return **`{kind: 'entities', processor}`** — the same two words and the same shape `@etherfold/browser` already takes from a caller (`ProcessorKind` / `TaggedProcessor`). A module that returns a bare processor means `'js-object'`, which is what every module that ships today does, so none of them changes. `etherfold index` reads that tag and checks it against `--store`; a mismatch is refused, naming both, before any RPC call.
 

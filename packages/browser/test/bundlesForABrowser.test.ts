@@ -11,9 +11,10 @@ import {describe, expect, it} from 'vitest';
  * application's bundler. That is exactly what happened: `@etherfold/utils`'
  * barrel re-exports the CLI's processor loader (`node:module`, `node:path`) and
  * the deployment reader (`node:fs`), so `import '@etherfold/browser'` could not
- * be built for a browser at all, by esbuild or by vite. The fix was to import
- * the platform-free subpath (`@etherfold/utils/indexer`); this is what stops it
- * coming back.
+ * be built for a browser at all, by esbuild or by vite. That dependency is gone
+ * entirely now (it was there for the published blob snapshot's file naming, which
+ * went with the free-form path, ADR-0037); this is what stops the class of
+ * failure coming back through any other one.
  *
  * `platform: 'browser'` with no `external` is the whole assertion: esbuild
  * refuses to resolve a node built-in in that mode, so a leak is a failed build

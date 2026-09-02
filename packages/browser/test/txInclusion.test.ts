@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import type {Abi, EventProcessorWithInitialState, IndexingSource} from '@etherfold/core';
-import {createIndexerState} from '../src/IndexerState.js';
+import type {Abi, IndexingSource, LogEvent} from '@etherfold/core';
+import {createIndexerState, type EntityEventProcessorLike} from '../src/IndexerState.js';
 
 /**
  * The app-facing half of tx reconciliation: after indexing, an app asks whether
@@ -23,15 +23,15 @@ const TX = '0x00000000000000000000000000000000000000000000000000000000000000aa';
 
 type State = {count: number};
 
-function makeProcessor(): EventProcessorWithInitialState<Abi, State, undefined> {
+function makeProcessor(): EntityEventProcessorLike<Abi, State, undefined> {
 	let count = 0;
 	return {
 		getVersionHash: () => 'v1',
 		getCodeFingerprint: () => undefined,
-		createInitialState: () => ({count: 0}),
+		state: {count: 0},
 		configure: () => {},
 		load: async () => undefined,
-		process: async (events) => {
+		process: async (events: LogEvent<Abi>[]) => {
 			count += events.length;
 			return {count};
 		},

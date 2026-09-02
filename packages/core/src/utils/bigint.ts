@@ -36,9 +36,9 @@
  * ending in `n` would refuse legitimate event data. Where a persisted artifact
  * carries a FORMAT number the number was bumped instead, so a file written under
  * the old convention is refused AS A FILE by its own reader rather than
- * half-decoded here: `STREAM_FIXTURE_FORMAT` (`stream/fixture.ts`) and the
- * blob snapshot's `BLOB_SNAPSHOT_FORMAT` (`snapshot.ts`, the number the CLI's
- * keeper writes) both went to 2.
+ * half-decoded here: `STREAM_FIXTURE_FORMAT` (`stream/fixture.ts`) went to 2,
+ * as did the blob snapshot envelope's number before that envelope was deleted
+ * with the free-form processor path (ADR-0037).
  *
  * The one place `"123n"` still appears is INSIDE `simple_hash`, which renders a
  * BigInt that way purely to have bytes to hash. Nothing ever decodes that, so

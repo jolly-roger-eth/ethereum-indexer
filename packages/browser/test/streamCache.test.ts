@@ -1,8 +1,8 @@
 import 'fake-indexeddb/auto';
 import {describe, expect, it} from 'vitest';
-import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
 import type {ExistingStream, LastSync} from '@etherfold/core';
-import {createIndexerState, keepStateOnIndexedDB, keepStreamOnIndexedDB} from '../src/index.js';
+import {keepStreamOnIndexedDB} from '../src/index.js';
+import {appliedIn, applyingProcessor, browserStore, indexerOver, keysOf} from './utils/applied.js';
 import {
 	BRANCH_A,
 	BRANCH_A_EXTENDED,
@@ -29,22 +29,6 @@ import {
 
 let counter = 0;
 const freshName = () => `stream-cache-${counter++}-${Math.random().toString(36).slice(2, 8)}`;
-
-type Applied = {applied: string[]};
-
-/** A handler that records what it applied, and that can be made to blow up. */
-function applyingProcessor(control: {failFromBlock?: number} = {}): JSProcessor<TestABI, Applied> {
-	return {
-		version: '1.0.0',
-		construct: () => ({applied: []}),
-		onTransfer(json, event) {
-			if (control.failFromBlock !== undefined && event.blockNumber >= control.failFromBlock) {
-				throw new Error('handler blew up');
-			}
-			json.applied.push(`${event.blockHash}:${event.logIndex}`);
-		},
-	};
-}
 
 /** A stream keeper that can be told to refuse its writes, wrapping the real one. */
 function failableStream(name: string) {
@@ -81,13 +65,6 @@ function failableStream(name: string) {
 	};
 }
 
-function indexerOver(control: {failFromBlock?: number}, keepers: {keepState?: unknown; keepStream?: unknown}) {
-	return createIndexerState<TestABI, Applied>(fromJSProcessor(applyingProcessor(control))(), {
-		...(keepers.keepState ? {keepState: keepers.keepState as never} : {}),
-		...(keepers.keepStream ? {keepStream: keepers.keepStream as never} : {}),
-	});
-}
-
 const CONFIG = {stream: {finality: FINALITY}};
 
 /** Far enough above the last log that the finality re-read cannot reach the missing blocks. */
@@ -98,13 +75,15 @@ describe('a tab that dies between the two writes', () => {
 		const tag = freshName();
 		const chain = fakeChain();
 		const control: {failFromBlock?: number} = {};
+		const definition = applyingProcessor(control);
 		const stream = keepStreamOnIndexedDB<TestABI>(tag);
+		const store = await browserStore(tag, definition);
 
-		// a healthy run to the tip, both keepers wired
-		const first = indexerOver(control, {keepState: keepStateOnIndexedDB(tag), keepStream: stream});
+		// a healthy run to the tip, the stream cached beside the state
+		const first = indexerOver(definition, store, {keepStream: stream});
 		await first.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(first as never);
-		expect(first.state.$state.applied).toHaveLength(BRANCH_A.length);
+		expect(await appliedIn(first.state.$state)).toHaveLength(BRANCH_A.length);
 
 		// The chain moves on well past the finality window, and the handler dies on
 		// the new block: the STREAM write has landed by then, the state write never
@@ -118,7 +97,7 @@ describe('a tab that dies between the two writes', () => {
 		// a new tab, the same two stores, a handler that works again
 		control.failFromBlock = undefined;
 		const rangesBefore = chain.ranges.length;
-		const reloaded = indexerOver(control, {keepState: keepStateOnIndexedDB(tag), keepStream: stream});
+		const reloaded = indexerOver(definition, store, {keepStream: stream});
 		await reloaded.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(reloaded as never);
 
@@ -130,16 +109,17 @@ describe('a tab that dies between the two writes', () => {
 		}
 
 		// exactly once, in the stream and in the state
-		const applied = reloaded.state.$state.applied;
-		expect(applied).toEqual([...new Set(applied)]);
+		const applied = await appliedIn(reloaded.state.$state);
+		expect(applied.map((row) => row.times)).toEqual(applied.map(() => 1));
 		expect(applied).toHaveLength(BRANCH_A_EXTENDED.length);
 
 		// and a from-scratch index of the same chain agrees
 		const scratchChain = fakeChain(BRANCH_A_EXTENDED, DIVERGED_TIP);
-		const scratch = indexerOver({}, {});
+		const scratchDefinition = applyingProcessor();
+		const scratch = indexerOver(scratchDefinition, await browserStore(freshName(), scratchDefinition));
 		await scratch.init({provider: scratchChain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(scratch as never);
-		expect(applied).toEqual(scratch.state.$state.applied);
+		expect(keysOf(applied)).toEqual(keysOf(await appliedIn(scratch.state.$state)));
 
 		reloaded.dispose();
 		scratch.dispose();
@@ -151,8 +131,10 @@ describe('a store that refuses to be written to', () => {
 		const tag = freshName();
 		const chain = fakeChain();
 		const stream = failableStream(tag);
+		const definition = applyingProcessor();
+		const store = await browserStore(tag, definition);
 
-		const first = indexerOver({}, {keepState: keepStateOnIndexedDB(tag), keepStream: stream.keeper});
+		const first = indexerOver(definition, store, {keepStream: stream.keeper});
 		await first.init({
 			provider: chain.provider,
 			source: SOURCE,
@@ -168,7 +150,7 @@ describe('a store that refuses to be written to', () => {
 		await indexToTip(first as never);
 
 		// indexing RESUMED, and what was on disk survived untouched
-		expect(first.state.$state.applied).toHaveLength(BRANCH_A_EXTENDED.length);
+		expect(await appliedIn(first.state.$state)).toHaveLength(BRANCH_A_EXTENDED.length);
 		expect(await stream.storedEvents()).toEqual(prefix);
 		first.dispose();
 
@@ -176,7 +158,10 @@ describe('a store that refuses to be written to', () => {
 		// remainder, landing where a from-scratch index lands
 		stream.succeed();
 		const rangesBefore = chain.ranges.length;
-		const reloaded = indexerOver({}, {keepStream: stream.keeper});
+		const reloadedDefinition = applyingProcessor();
+		const reloaded = indexerOver(reloadedDefinition, await browserStore(freshName(), reloadedDefinition), {
+			keepStream: stream.keeper,
+		});
 		await reloaded.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(reloaded as never);
 
@@ -184,17 +169,18 @@ describe('a store that refuses to be written to', () => {
 			expect(range.from).toBeGreaterThan(START_BLOCK);
 		}
 		const scratchChain = fakeChain(BRANCH_A_EXTENDED, DIVERGED_TIP);
-		const scratch = indexerOver({}, {});
+		const scratchDefinition = applyingProcessor();
+		const scratch = indexerOver(scratchDefinition, await browserStore(freshName(), scratchDefinition));
 		await scratch.init({provider: scratchChain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(scratch as never);
-		expect(reloaded.state.$state.applied).toEqual(scratch.state.$state.applied);
+		expect(keysOf(await appliedIn(reloaded.state.$state))).toEqual(keysOf(await appliedIn(scratch.state.$state)));
 
 		reloaded.dispose();
 		scratch.dispose();
 	});
 });
 
-describe('a stream with a cursor and no events, and NO state keeper', () => {
+describe('a stream with a cursor and no events, and NO state of its own yet', () => {
 	it('resumes from the stored cursor rather than the start block, and keeps advancing', async () => {
 		const tag = freshName();
 		const stream = keepStreamOnIndexedDB<TestABI>(tag);
@@ -202,7 +188,8 @@ describe('a stream with a cursor and no events, and NO state keeper', () => {
 		/** One tab's whole life: open over the same stream store, scan to the tip, go away. */
 		async function scanTo(tip: number) {
 			const chain = fakeChain([], tip);
-			const indexer = indexerOver({}, {keepStream: stream});
+			const definition = applyingProcessor();
+			const indexer = indexerOver(definition, await browserStore(freshName(), definition), {keepStream: stream});
 			await indexer.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 			await indexToTip(indexer as never);
 			indexer.dispose();
@@ -227,14 +214,16 @@ describe('the WINDOW still lives on the state side', () => {
 		const tag = freshName();
 		const chain = fakeChain();
 		const tx = BRANCH_A[BRANCH_A.length - 1].transactionHash as `0x${string}`;
+		const definition = applyingProcessor();
+		const store = await browserStore(tag, definition);
 
-		const first = indexerOver({}, {keepState: keepStateOnIndexedDB(tag)});
+		const first = indexerOver(definition, store);
 		await first.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(first as never);
 		expect(first.checkTxInclusion([{txHash: tx}])[tx].status).toBe('included');
 		first.dispose();
 
-		const reloaded = indexerOver({}, {keepState: keepStateOnIndexedDB(tag)});
+		const reloaded = indexerOver(definition, store);
 		await reloaded.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await reloaded.indexMore();
 

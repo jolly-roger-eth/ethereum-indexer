@@ -1,13 +1,7 @@
 import 'fake-indexeddb/auto';
 import {describe, expect, it} from 'vitest';
-import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
-import type {EntityProcessor} from '@etherfold/processor-entities';
-import {
-	createBrowserStateStore,
-	createIndexerState,
-	keepStateOnIndexedDB,
-	keepStreamOnIndexedDB,
-} from '../src/index.js';
+import type {EntityProcessor, EntityStateView} from '@etherfold/processor-entities';
+import {createBrowserStateStore, createIndexerState, keepStreamOnIndexedDB} from '../src/index.js';
 import {
 	BRANCH_A_EXTENDED,
 	BRANCH_A_EXTENDED_TIP,
@@ -84,7 +78,7 @@ describe('axis one: swapping in an edited processor', () => {
 		// the developer edited the handler (now counts 10 per transfer) and did NOT
 		// touch `version`, which is the default state of an edited file.
 		const edited = processorVariant({version: '1.0.0', countBy: 10});
-		const outcome = await indexer.updateProcessor({kind: 'entities', processor: entityProcessorOver(store, edited)});
+		const outcome = await indexer.updateProcessor(entityProcessorOver(store, edited));
 
 		// and it SAYS it kept the state, which is what a caller branches on
 		expect(outcome.stateDiscarded).toBe(false);
@@ -117,7 +111,7 @@ describe('axis one: swapping in an edited processor', () => {
 		const rangesBefore = chain.ranges.length;
 
 		const edited = processorVariant({version: '2.0.0', countBy: 10});
-		const outcome = await indexer.updateProcessor({kind: 'entities', processor: entityProcessorOver(store, edited)});
+		const outcome = await indexer.updateProcessor(entityProcessorOver(store, edited));
 		expect(outcome.stateDiscarded).toBe(true);
 
 		// the swap cleared the store, so the very next fetch goes back to the start
@@ -144,10 +138,7 @@ describe('axis one: swapping in an edited processor', () => {
 		const {store, indexer} = await indexedWith();
 
 		const edited = processorVariant({version: '1.0.0', countBy: 10});
-		const outcome = await indexer.updateProcessor(
-			{kind: 'entities', processor: entityProcessorOver(store, edited)},
-			{force: true},
-		);
+		const outcome = await indexer.updateProcessor(entityProcessorOver(store, edited), {force: true});
 		expect(outcome.stateDiscarded).toBe(true);
 		await indexToTip(indexer);
 
@@ -259,7 +250,7 @@ describe('axis two: a new implementation behind the same address', () => {
 		const {store, indexer} = await indexedWith();
 		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 
-		await indexer.updateProcessor({kind: 'entities', processor: entityProcessorOver(store, spanningUpgrade)});
+		await indexer.updateProcessor(entityProcessorOver(store, spanningUpgrade));
 		await indexToTip(indexer);
 
 		// blocks 100 and 102 carry three transfers under the OLD meaning, block 104
@@ -286,31 +277,23 @@ describe('axis two: a new implementation behind the same address', () => {
  * that rendered once) went on showing the discarded state until an event
  * happened to arrive and overwrite it.
  *
- * These run on the free-form kind because that is where it is unambiguous: its
- * `$state` is the state VALUE, so a stale copy shows stale numbers. The entity
- * kind publishes a read HANDLE, which hides the same defect behind a store that
- * was cleared underneath it -- until the handle points at a different store,
- * which is what a declarations change makes it do.
+ * `$state` here is a read HANDLE rather than a state value, so "the subscriber
+ * is holding the old thing" is read through the handle: the store behind it was
+ * wiped by the reset, so the ROWS are what says whether the discard was
+ * published. These used to run on the free-form kind, whose `$state` was the
+ * value itself; the rows are the same claim through the surviving path.
  */
-type NFTState = {transfers: number; owners: {[id: string]: string}};
-
-function jsProcessor(version: string, countBy: number): JSProcessor<TestABI, NFTState> {
-	return {
-		version,
-		construct: () => ({transfers: 0, owners: {}}),
-		onTransfer(json, event) {
-			json.owners[event.args.id.toString()] = event.args.to;
-			json.transfers += countBy;
-		},
-	};
-}
-
-async function jsIndexerOnBranchA(chain = fakeChain()) {
-	const indexer = createIndexerState<TestABI, NFTState>(fromJSProcessor(jsProcessor('1.0.0', 1))());
+async function indexerOnBranchA(chain = fakeChain(), countBy = 1) {
+	const definition = processorVariant({countBy});
+	const store = await createBrowserStateStore(definition.entities, {databaseName: freshName()});
+	const indexer = indexerForProcessor(store, definition);
 	await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
-	await indexToTip(indexer as never);
-	return {indexer, chain};
+	await indexToTip(indexer);
+	return {indexer, chain, store};
 }
+
+/** What an EMPTY state reads as through the handle: no owners, no counter row. */
+const EMPTY = {owners: {'1': undefined, '2': undefined, '3': undefined, '4': undefined}, transfers: 0};
 
 describe('the state a subscriber is holding, after a discard', () => {
 	/**
@@ -325,29 +308,29 @@ describe('the state a subscriber is holding, after a discard', () => {
 	 * and looking exactly like a working app.
 	 */
 	it('does not keep publishing the old state when a redeploy has nothing to replay', async () => {
-		const {indexer, chain} = await jsIndexerOnBranchA();
-		expect(indexer.state.$state.transfers).toBe(5);
+		const {indexer, chain} = await indexerOnBranchA();
+		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 
 		// redeployed behind the proxy: a new ABI at the same address, and a chain
 		// that has not emitted anything through it yet.
 		chain.serve([], 120);
 		await indexer.updateIndexer({source: SOURCE_V2 as never});
-		await indexToTip(indexer as never);
+		await indexToTip(indexer);
 
-		expect(indexer.state.$state).toEqual({transfers: 0, owners: {}});
+		expect(await readState(indexer.state.$state)).toEqual(EMPTY);
 		indexer.dispose();
 	});
 
 	/** The same, reached through the other axis: an edited processor, bumped. */
 	it('does not keep publishing the old state after a processor swap with nothing to replay', async () => {
-		const {indexer, chain} = await jsIndexerOnBranchA();
-		expect(indexer.state.$state.transfers).toBe(5);
+		const {indexer, chain, store} = await indexerOnBranchA();
+		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 
 		chain.serve([], 120);
-		await indexer.updateProcessor(fromJSProcessor(jsProcessor('2.0.0', 10))());
-		await indexToTip(indexer as never);
+		await indexer.updateProcessor(entityProcessorOver(store, processorVariant({version: '2.0.0', countBy: 10})));
+		await indexToTip(indexer);
 
-		expect(indexer.state.$state).toEqual({transfers: 0, owners: {}});
+		expect(await readState(indexer.state.$state)).toEqual(EMPTY);
 		indexer.dispose();
 	});
 
@@ -360,11 +343,11 @@ describe('the state a subscriber is holding, after a discard', () => {
 	 * re-indexed block paints the old contract's numbers.
 	 */
 	it('publishes the discard immediately, before anything is re-indexed', async () => {
-		const {indexer} = await jsIndexerOnBranchA();
+		const {indexer, store} = await indexerOnBranchA();
 
-		await indexer.updateProcessor(fromJSProcessor(jsProcessor('2.0.0', 10))());
+		await indexer.updateProcessor(entityProcessorOver(store, processorVariant({version: '2.0.0', countBy: 10})));
 
-		expect(indexer.state.$state).toEqual({transfers: 0, owners: {}});
+		expect(await readState(indexer.state.$state)).toEqual(EMPTY);
 		indexer.dispose();
 	});
 
@@ -377,15 +360,15 @@ describe('the state a subscriber is holding, after a discard', () => {
 	 * empties itself when a developer saves a file that changed nothing.
 	 */
 	it('leaves the state alone when the reconfigure did not discard it', async () => {
-		const {indexer} = await jsIndexerOnBranchA();
+		const {indexer, store} = await indexerOnBranchA();
 
 		// same version: the core skips the swap and keeps the running processor
-		await indexer.updateProcessor(fromJSProcessor(jsProcessor('1.0.0', 10))());
-		expect(indexer.state.$state.transfers).toBe(5);
+		await indexer.updateProcessor(entityProcessorOver(store, processorVariant({version: '1.0.0', countBy: 10})));
+		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 
 		// a source that hashes the same: no reset, so no discard
 		await indexer.updateIndexer({source: SOURCE_REDEPLOYED_SAME_ABI});
-		expect(indexer.state.$state.transfers).toBe(5);
+		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 
 		indexer.dispose();
 	});
@@ -408,21 +391,23 @@ describe('the state a subscriber is holding, after a discard', () => {
 	it('keeps the state the rebuild produced when a cached stream was replayed', async () => {
 		const tag = `stream-${counter++}`;
 		const chain = fakeChain();
-		const indexer = createIndexerState<TestABI, NFTState>(fromJSProcessor(jsProcessor('1.0.0', 1))(), {
-			keepState: keepStateOnIndexedDB(tag) as never,
+		const store = await createBrowserStateStore(processor.entities, {databaseName: freshName()});
+		const indexer = createIndexerState<TestABI, EntityStateView>(entityProcessorOver(store, processor), {
 			keepStream: keepStreamOnIndexedDB(tag) as never,
 		});
 		await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
-		await indexToTip(indexer as never);
-		expect(indexer.state.$state.transfers).toBe(5);
+		await indexToTip(indexer);
+		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 		const fetchesBefore = chain.ranges.length;
 
 		// the edited processor, version bumped: the state goes, the stream stays
-		const outcome = await indexer.updateProcessor(fromJSProcessor(jsProcessor('2.0.0', 10))());
+		const outcome = await indexer.updateProcessor(
+			entityProcessorOver(store, processorVariant({version: '2.0.0', countBy: 10})),
+		);
 		expect(outcome.stateDiscarded).toBe(true);
 
 		// rebuilt under the NEW logic, from the cache, before the call returned
-		expect(indexer.state.$state.transfers).toBe(50);
+		expect((await readState(indexer.state.$state)).transfers).toBe(50);
 		// and without going back to the node for the history it already had
 		expect(chain.ranges.length).toBe(fetchesBefore);
 
@@ -431,13 +416,13 @@ describe('the state a subscriber is holding, after a discard', () => {
 
 	/** `reset()` is a discard by definition, and was silent in the same way. */
 	it('publishes the discard on an explicit reset', async () => {
-		const {indexer, chain} = await jsIndexerOnBranchA();
-		expect(indexer.state.$state.transfers).toBe(5);
+		const {indexer, chain} = await indexerOnBranchA();
+		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 
 		chain.serve([], 120);
 		await indexer.reset();
 
-		expect(indexer.state.$state).toEqual({transfers: 0, owners: {}});
+		expect(await readState(indexer.state.$state)).toEqual(EMPTY);
 		indexer.dispose();
 	});
 });

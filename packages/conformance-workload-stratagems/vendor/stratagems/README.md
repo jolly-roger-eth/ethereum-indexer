@@ -10,9 +10,12 @@ Everything in this folder is copied from [github.com/wighawag/stratagems](https:
 | `types.ts` | `common/src/types.ts` + `ContractSimpleCell` from `common/src/grid.ts` | only the types the indexing path touches |
 | `constants.ts` | `common/src/constants.ts` | verbatim |
 | `js-processor.ts` | `indexer/src/index.ts` | imports re-pointed, generated `contracts` module replaced by `abi.ts`, `__VERSION_HASH__` placeholder replaced by a literal; every handler body verbatim |
+| `js-processor-type.ts` | `@etherfold/js-processor` (this repository) | the `JSProcessor` type the file above is written against, vendored when that package was deleted (ADR-0037) so this folder still typechecks |
 | `abi.ts` | `contracts/deployments/base/{Stratagems,Gems,GemsGenerator}.json` (+ three events from `deployments/alpha1/GemsGenerator.json`) | generated |
 
-**Where this came from, and what runs it.** These files were vendored by `docs/spikes/sqlite-in-the-browser` and PROMOTED here with it, because they are the equality oracle of the conformance workload rather than evidence for a finished measurement. `src/oracle.ts` drives `js-processor.ts` over the committed streams through `@etherfold/core`'s own replay path; `test/oracle.test.ts` asserts it still reproduces the committed golden state, so this folder is executed rather than merely stored.
+**Where this came from, and what it is now.** These files were vendored by `docs/spikes/sqlite-in-the-browser` and PROMOTED here with it, because they are the origin of the conformance workload's golden states rather than evidence for a finished measurement.
+
+**Nothing executes them any more, and that is a deliberate trade.** `src/oracle.ts` drove `js-processor.ts` over the committed streams through the free-form authoring path; that path is deleted (ADR-0037) and the oracle went with it, so the committed golden states are now a FROZEN expectation rather than a recomputable one. See `../../fixtures/README.md`. This folder is kept because the goldens' whole claim is that they were computed by the code that ran on Base, and deleting the code would leave that claim resting on a commit message. It still TYPECHECKS (`js-processor-type.ts`, above), so it is readable as the shape it was rather than as a folder of `any`.
 
 **Why copied rather than imported.** A spike that only runs while a sibling checkout happens to exist at a particular path is not re-runnable, and the equality oracle has to be the same bytes that computed the state being compared against, not a paraphrase of them.
 

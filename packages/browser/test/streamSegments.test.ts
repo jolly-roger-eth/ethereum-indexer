@@ -2,18 +2,12 @@ import 'fake-indexeddb/auto';
 import {describe, expect, it, vi} from 'vitest';
 import {createStore, get, keys as allKeys, set, type UseStore} from 'idb-keyval';
 import type {LastSync} from '@etherfold/core';
-import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
-import {
-	createIndexerState,
-	keepStateOnIndexedDB,
-	keepStreamOnIndexedDB,
-	KEYVAL_DATABASE,
-	KEYVAL_OBJECT_STORE,
-	streamAddress,
-} from '../src/index.js';
+import {keepStreamOnIndexedDB, KEYVAL_DATABASE, KEYVAL_OBJECT_STORE, streamAddress} from '../src/index.js';
+import {appliedIn, applyingProcessor, browserStore, indexerOver, keysOf} from './utils/applied.js';
 import {
 	BRANCH_A,
 	BRANCH_A_EXTENDED,
+	BRANCH_A_EXTENDED_TIP,
 	BRANCH_A_TIP,
 	BRANCH_B,
 	BRANCH_B_TIP,
@@ -367,7 +361,7 @@ describe('clear removes the subtree and nothing else', () => {
 		await keeper.clear(SOURCE);
 
 		// `idb-keyval`'s `clear()` would have taken this with it, along with every
-		// other stream and every row `keepStateOnIndexedDB` wrote
+		// other stream and every row any other keeper wrote
 		expect(await get(neighbourKey)).toEqual({mine: true});
 		expect(await keeper.fetchFrom(SOURCE, 100)).toBeUndefined();
 		expect((await allKeys()).filter((key) => Array.isArray(key) && key[1] === tag)).toEqual([]);
@@ -409,23 +403,6 @@ describe('the legacy flat-key blob', () => {
 // The START BLOCK, end to end.
 // ---------------------------------------------------------------------------
 
-type Applied = {applied: string[]};
-
-const applyingProcessor: JSProcessor<TestABI, Applied> = {
-	version: '1.0.0',
-	construct: () => ({applied: []}),
-	onTransfer(json, event) {
-		json.applied.push(`${event.blockHash}:${event.logIndex}`);
-	},
-};
-
-function indexerOver(keepers: {keepState?: unknown; keepStream?: unknown}) {
-	return createIndexerState<TestABI, Applied>(fromJSProcessor(applyingProcessor)(), {
-		...(keepers.keepState ? {keepState: keepers.keepState as never} : {}),
-		...(keepers.keepStream ? {keepStream: keepers.keepStream as never} : {}),
-	});
-}
-
 const CONFIG = {stream: {finality: FINALITY}};
 const DIVERGED_TIP = 120;
 
@@ -435,19 +412,21 @@ describe('a stream that does not reach back to the requested fromBlock', () => {
 		const chain = fakeChain();
 		const stream = keepStreamOnIndexedDB<TestABI>(tag);
 		const address = streamAddress(tag, SOURCE.chainId);
+		const definition = applyingProcessor();
+		const store = await browserStore(tag, definition);
 
 		// A tab whose stream was the shipped blob: the state is good, the blob is
 		// deleted on load, and nothing re-fetches -- so the NEXT save opens a subtree
 		// whose first segment begins mid-history. This is the state a self-clear
 		// creates, and it is why the cursor record carries a start block at all.
-		const first = indexerOver({keepState: keepStateOnIndexedDB(tag)});
+		const first = indexerOver(definition, store);
 		await first.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(first as never);
 		first.dispose();
 		await set(address.legacy, {lastSync: cursorAt(START_BLOCK, BRANCH_A_TIP), eventStream: []});
 
 		chain.serve(BRANCH_A_EXTENDED, DIVERGED_TIP);
-		const second = indexerOver({keepState: keepStateOnIndexedDB(tag), keepStream: stream});
+		const second = indexerOver(definition, store, {keepStream: stream});
 		await second.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(second as never);
 		second.dispose();
@@ -462,7 +441,7 @@ describe('a stream that does not reach back to the requested fromBlock', () => {
 		// next save would recreate it partial, and it would re-index on every reload
 		// forever.
 		for (let reload = 0; reload < 3; reload++) {
-			const kept = indexerOver({keepState: keepStateOnIndexedDB(tag), keepStream: stream});
+			const kept = indexerOver(definition, store, {keepStream: stream});
 			await kept.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 			await indexToTip(kept as never);
 			kept.dispose();
@@ -470,22 +449,28 @@ describe('a stream that does not reach back to the requested fromBlock', () => {
 		}
 		expect((await get<{startBlock: number}>(address.cursor))!.startBlock).toBe(partial!.startBlock);
 
-		// now DISCARD the state: the rebuild asks from the source's first block, and
+		// now DISCARD the state -- a store this deployment has never written to, which
+		// is what a cleared one is: the rebuild asks from the source's first block, and
 		// this stream cannot serve it. Replaying it would rebuild state that is
 		// silently missing every block below its start.
 		const rangesBefore = chain.ranges.length;
-		const rebuilt = indexerOver({keepStream: stream});
+		const rebuiltDefinition = applyingProcessor();
+		const rebuilt = indexerOver(rebuiltDefinition, await browserStore(freshName(), rebuiltDefinition), {
+			keepStream: stream,
+		});
 		await rebuilt.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(rebuilt as never);
 
 		expect(chain.ranges.slice(rangesBefore).some((range) => range.from === START_BLOCK)).toBe(true);
 
 		const scratchChain = fakeChain(BRANCH_A_EXTENDED, DIVERGED_TIP);
-		const scratch = indexerOver({});
+		const scratchDefinition = applyingProcessor();
+		const scratch = indexerOver(scratchDefinition, await browserStore(freshName(), scratchDefinition));
 		await scratch.init({provider: scratchChain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(scratch as never);
-		expect(rebuilt.state.$state.applied).toEqual(scratch.state.$state.applied);
-		expect(rebuilt.state.$state.applied).toHaveLength(BRANCH_A_EXTENDED.length);
+		const rebuiltApplied = await appliedIn(rebuilt.state.$state);
+		expect(keysOf(rebuiltApplied)).toEqual(keysOf(await appliedIn(scratch.state.$state)));
+		expect(rebuiltApplied).toHaveLength(BRANCH_A_EXTENDED.length);
 
 		rebuilt.dispose();
 		scratch.dispose();
@@ -500,6 +485,13 @@ describe('a stream that does not reach back to the requested fromBlock', () => {
  * lands where a rebuild off one that does not lands, the window was REDUNDANT
  * here rather than merely unread. (It is: `promiseToFeed` takes the three block
  * numbers and `generateStreamToAppend` rebuilds the window from the events.)
+ *
+ * A SUPERSEDED block is dropped, and that is not a detail. The stored stream is
+ * an EMISSION stream, so a reorged-out block appears TWICE in it -- once as it
+ * was emitted and once at its original height flagged `removed` -- and a
+ * reconstruction that only skipped the `removed` entries would put two entries
+ * at one height in the window. That is a window no keeper ever wrote, and it
+ * makes the engine re-emit a block the replay already applied.
  */
 function withWindowReattached(keeper: ReturnType<typeof keepStreamOnIndexedDB<TestABI>>) {
 	return {
@@ -508,9 +500,15 @@ function withWindowReattached(keeper: ReturnType<typeof keepStreamOnIndexedDB<Te
 			const fetched = await keeper.fetchFrom(source, fromBlock);
 			if (!fetched) return fetched;
 			const floor = fetched.lastSync.latestBlock - FINALITY;
+			const events = fetched.eventStream as unknown as {
+				blockNumber: number;
+				blockHash: string;
+				removed?: boolean;
+			}[];
+			const superseded = new Set(events.filter((e) => e.removed).map((e) => e.blockHash));
 			const blocks: {number: number; hash: string; events: unknown[]}[] = [];
-			for (const e of fetched.eventStream as unknown as {blockNumber: number; blockHash: string; removed?: boolean}[]) {
-				if (e.removed || e.blockNumber <= floor) continue;
+			for (const e of events) {
+				if (e.removed || superseded.has(e.blockHash) || e.blockNumber <= floor) continue;
 				let block = blocks.find((b) => b.hash === e.blockHash);
 				if (!block) blocks.push((block = {number: e.blockNumber, hash: e.blockHash, events: []}));
 				block.events.push(e);
@@ -525,14 +523,29 @@ describe('a reorg, replayed', () => {
 	async function liveRunThroughAReorg(tag: string) {
 		const chain = fakeChain();
 		const stream = keepStreamOnIndexedDB<TestABI>(tag);
-		const live = indexerOver({keepStream: stream});
+		const definition = applyingProcessor();
+		const live = indexerOver(definition, await browserStore(tag, definition), {keepStream: stream});
 		await live.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(live as never);
 		chain.serve(BRANCH_B, BRANCH_B_TIP);
 		await indexToTip(live as never);
-		const applied = [...live.state.$state.applied];
+		const applied = keysOf(await appliedIn(live.state.$state));
 		live.dispose();
 		return {chain, stream, applied};
+	}
+
+	/** The same shape with NO reorg in it: branch A, then one more block on top. */
+	async function liveRunWithoutAReorg(tag: string) {
+		const chain = fakeChain();
+		const stream = keepStreamOnIndexedDB<TestABI>(tag);
+		const definition = applyingProcessor();
+		const live = indexerOver(definition, await browserStore(tag, definition), {keepStream: stream});
+		await live.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(live as never);
+		chain.serve(BRANCH_A_EXTENDED, BRANCH_A_EXTENDED_TIP);
+		await indexToTip(live as never);
+		live.dispose();
+		return {chain, stream};
 	}
 
 	it('returns the retractions in APPEND order', async () => {
@@ -554,19 +567,56 @@ describe('a reorg, replayed', () => {
 		expect(stored?.lastSync.unconfirmedBlocks).toEqual([]);
 	});
 
-	it('rebuilds the same state whether or not the cursor carries a window', async () => {
-		const withoutWindow = await liveRunThroughAReorg(freshName());
-		const withWindow = await liveRunThroughAReorg(freshName());
+	/**
+	 * A rebuild off a stream that CONTAINS a reorg is REFUSED, and that is a
+	 * characterization of a defect rather than a design.
+	 *
+	 * `generateStreamToAppend` derives retractions from the CURSOR's unconfirmed
+	 * window and `groupLogsPerBlock` drops `removed` events out of what it is
+	 * given, so a rebuild -- which starts from a fresh cursor with an EMPTY window
+	 * -- silently discards the retractions the stream itself carries and replays
+	 * both branches of the reorg as live blocks. The store refuses the second block
+	 * at that height, which is the store doing exactly its job.
+	 *
+	 * It is pinned here because the refusal is the only thing making it visible:
+	 * the free-form path this suite used to drive applied both branches without
+	 * complaint and rebuilt a state derived from a dead branch. See
+	 * `work/notes/observations/a-rebuild-off-a-cached-stream-drops-its-retractions.md`.
+	 * When that is fixed this case goes red, which is the point.
+	 */
+	it('is REFUSED on a rebuild, because the replay drops the stored retractions', async () => {
+		const {chain, stream} = await liveRunThroughAReorg(freshName());
 
-		const plain = indexerOver({keepStream: withoutWindow.stream});
+		const definition = applyingProcessor();
+		const rebuilt = indexerOver(definition, await browserStore(freshName(), definition), {keepStream: stream});
+
+		await rebuilt.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+
+		// the replay happens inside `load`, which the first `indexMore` runs
+		await expect(indexToTip(rebuilt as never)).rejects.toThrow(/block 104 is already recorded/);
+
+		rebuilt.dispose();
+	});
+
+	it('rebuilds the same state whether or not the cursor carries a window', async () => {
+		const withoutWindow = await liveRunWithoutAReorg(freshName());
+		const withWindow = await liveRunWithoutAReorg(freshName());
+
+		const plainDefinition = applyingProcessor();
+		const plain = indexerOver(plainDefinition, await browserStore(freshName(), plainDefinition), {
+			keepStream: withoutWindow.stream,
+		});
 		await plain.init({provider: withoutWindow.chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(plain as never);
 
-		const windowed = indexerOver({keepStream: withWindowReattached(withWindow.stream)});
+		const windowedDefinition = applyingProcessor();
+		const windowed = indexerOver(windowedDefinition, await browserStore(freshName(), windowedDefinition), {
+			keepStream: withWindowReattached(withWindow.stream),
+		});
 		await windowed.init({provider: withWindow.chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(windowed as never);
 
-		expect(plain.state.$state.applied).toEqual(windowed.state.$state.applied);
+		expect(keysOf(await appliedIn(plain.state.$state))).toEqual(keysOf(await appliedIn(windowed.state.$state)));
 		plain.dispose();
 		windowed.dispose();
 	});
@@ -578,7 +628,8 @@ describe('`fetchFrom` answers what it answered before', () => {
 		const chain = fakeChain();
 		const stream = keepStreamOnIndexedDB<TestABI>(tag);
 
-		const indexer = indexerOver({keepStream: stream});
+		const definition = applyingProcessor();
+		const indexer = indexerOver(definition, await browserStore(tag, definition), {keepStream: stream});
 		await indexer.init({provider: chain.provider, source: SOURCE, config: CONFIG});
 		await indexToTip(indexer as never);
 		indexer.dispose();

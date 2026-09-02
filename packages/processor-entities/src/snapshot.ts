@@ -15,20 +15,20 @@ import {parseStoredCursor, serializeLastSync, SYNC_CURSOR_KEY} from './cursor.js
 const logger = logs('@etherfold/processor-entities');
 
 /**
- * ## Starting near the tip: the entity path's half of a capability the
- * free-form path already had
+ * ## Starting near the tip: the capability the retired free-form path had first
  *
- * `keepStateOnIndexedDB(name, remote)` in `@etherfold/browser` takes a URL or an
- * ARRAY of them, asks each mirror how far it has got, uses the one that has got
- * furthest, prefers the LOCAL state when local is already further along, and
- * fails over to the next mirror when one is unreachable rather than dying. That
- * is what lets a new tab of a shipped app come up in a second instead of
- * replaying every log the contract ever emitted.
+ * That path's `keepStateOnIndexedDB(name, remote)` took a URL or an ARRAY of
+ * them, asked each mirror how far it had got, used the one that had got
+ * furthest, preferred the LOCAL state when local was already further along, and
+ * failed over to the next mirror when one was unreachable rather than dying.
+ * That is what let a new tab of a shipped app come up in a second instead of
+ * replaying every log the contract ever emitted. It is deleted (ADR-0037), and
+ * this module is where the behaviour lives now.
  *
- * This module is the same behaviour for a store of versioned rows. What differs
- * is only the shape of what is downloaded (`StateSnapshot`, at the seam, whose
- * payload is the LIVE rows rather than one blob) and one thing that has no
- * free-form counterpart, because a blob has no history to lie about: a
+ * This is that behaviour for a store of versioned rows. What differs is only the
+ * shape of what is downloaded (`StateSnapshot`, at the seam, whose payload is
+ * the LIVE rows rather than one blob) and one thing the blob shape had no
+ * counterpart for, because a blob has no history to lie about: a
  * bootstrapped store must report the floor its snapshot gives it, which
  * `openSnapshotAware` is responsible for and which this module simply must not
  * bypass.

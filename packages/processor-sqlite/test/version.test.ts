@@ -8,10 +8,9 @@ import {finality, freshProcessor, lastSync, processor, SOURCE, transfer, type Te
 // ---------------------------------------------------------------------------
 // A PROCESSOR'S VERSION HASH CANNOT SILENTLY LIE: the SQL path
 // ---------------------------------------------------------------------------
-// The mirror of `@etherfold/js-processor/test/version.test.ts`. This
-// implementation reproduced the in-memory path's `unknown` fallback on the day
-// it was written, which is why the task covers both: a fix in one is a fix in
-// one.
+// Ported from the retired in-memory path's `version.test.ts`. This
+// implementation reproduced that path's `unknown` fallback on the day it was
+// written, which is why the task that removed it covered both.
 //
 // What differs here is where the cursor lives. `lastSync` is ALWAYS persisted (a
 // single `_sync` row, not a keeper the author may or may not configure), and it

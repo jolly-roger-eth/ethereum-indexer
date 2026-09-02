@@ -79,7 +79,7 @@ A template with hot contract replacement has **two** things that get replaced wh
 So editing a reducer and leaving `version` alone is not a change the core can see: the swap is **skipped**, the old processor object keeps running, and your edit never executes. The only complaint is a `named-logs` warning most apps never route anywhere.
 
 ```ts
-const outcome = await indexer.updateProcessor({kind: 'entities', processor: next});
+const outcome = await indexer.updateProcessor(next);
 outcome.stateDiscarded; // false => the swap was SKIPPED, your edit is not running
 ```
 

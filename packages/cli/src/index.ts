@@ -5,7 +5,6 @@ import {
 	type Abi,
 	type EventProcessor,
 	type IndexingSource,
-	type KeepState,
 	type ProvidedStreamConfig,
 } from '@etherfold/core';
 import {
@@ -18,20 +17,15 @@ import {
 	type Sleep,
 } from '@etherfold/fetcher-host';
 import type {EntityProcessor, StateStore} from '@etherfold/processor-entities';
-import {instantiateProcessorWithKind, loadContracts, loadProcessorModule, resolveSource} from '@etherfold/utils';
+import {instantiateProcessor, loadContracts, loadProcessorModule, resolveSource} from '@etherfold/utils';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
-import {createFileKeepState} from './keepState.js';
 import {resolveIndexOptions} from './options.js';
 import type {Options, StoreTarget} from './types.js';
 
 const logger = logs('etherfold');
-
-type ProcessorWithKeepState<ABI extends Abi> = {
-	keepState(keeper: KeepState<ABI, any, {history: any}, any>): void;
-};
 
 /**
  * The stream configuration this command indexes under.
@@ -51,7 +45,7 @@ export type IndexingDependencies = {
 	importModule?: (specifier: string) => Promise<any>;
 	/** The chain. Defaults to the rate-limited JSON-RPC provider this CLI owns. */
 	provider?: EIP1193ProviderWithoutEvents;
-	/** Builds the libSQL handle for `--store sqlite`. Defaults to `createNodeDB`. */
+	/** Builds the libSQL handle for the store. Defaults to `createNodeDB`. */
 	createDB?: (url: string) => RemoteSQL;
 	/** The wait between cycles. Defaults to a real sleep. */
 	sleep?: Sleep;
@@ -71,8 +65,8 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
 	streamBuilder: StreamBuilder<ABI, ProcessResultType>;
 	/** The sending half, plus the policy for reading what a cycle did. */
 	host: FetcherHost<ABI>;
-	/** The entity store, on `--store sqlite` only: the free-form path has a keeper instead. */
-	store?: StateStore;
+	/** The store the processor folds into. */
+	store: StateStore;
 	/** Run cycles until the tip, and return what the run did. Throws on a `fatal` report. */
 	index(): Promise<RunSummary>;
 };
@@ -81,7 +75,7 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
  * Assemble the two ADR-0003 halves in one process, with the transport removed.
  *
  * ```
- * LogFetcher -> createDirectIngestion -> StreamBuilder -> EventProcessor -> (a keeper | a StateStore)
+ * LogFetcher -> createDirectIngestion -> StreamBuilder -> EventProcessor -> StateStore
  * ```
  *
  * ## Why this and not `EthereumIndexer`
@@ -100,11 +94,10 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
  *
  * ## The order of what happens here is part of the contract
  *
- * The processor is loaded, its KIND is read off the module and checked against
- * `--store`, and the state destination is built -- all BEFORE the source is
- * resolved, which is the first thing that can touch the chain. So a mismatch
- * fails without first issuing `eth_chainId`, exactly as the keeper-less refusal
- * this replaces did.
+ * The processor is loaded and the state destination is built -- both BEFORE the
+ * source is resolved, which is the first thing that can touch the chain. So a
+ * module this command cannot drive, or a store it cannot open, fails without
+ * first issuing `eth_chainId`.
  */
 export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 	options: Options,
@@ -127,16 +120,13 @@ export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 	const processorModule = await loadProcessorModule<ABI, ProcessResultType>(resolved.processor, {
 		...(deps.importModule ? {importModule: deps.importModule} : {}),
 	});
-	const declared = instantiateProcessorWithKind<ABI, ProcessResultType, EntityProcessor<ABI, any>>(processorModule, {
+	const declared = instantiateProcessor<ABI, ProcessResultType, EntityProcessor<ABI, any>>(processorModule, {
 		processorPath: resolved.processor,
 	});
-
-	assertKindMatchesStore(declared.kind, resolved.target, resolved.processor);
 
 	const streamConfig = resolveStreamConfig(STREAM_CONFIG);
 	const {processor, store} = await buildProcessor<ABI, ProcessResultType>(declared, resolved.target, {
 		finalityDepth: streamConfig.finality,
-		processorPath: resolved.processor,
 		...(deps.createDB ? {createDB: deps.createDB} : {}),
 	});
 
@@ -175,7 +165,7 @@ export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 		processor,
 		streamBuilder,
 		host,
-		...(store ? {store} : {}),
+		store,
 		index: () => indexToTip(host, deps),
 	};
 }
@@ -232,69 +222,18 @@ async function indexToTip<ABI extends Abi>(host: FetcherHost<ABI>, deps: Indexin
 }
 
 /**
- * The kind the MODULE declares against the store the OPERATOR named.
- *
- * A mismatch is refused loudly, naming both, and it is refused HERE -- before
- * the source is resolved -- so it never costs an RPC call. It is not repaired by
- * guessing which of the two the user meant: an entity processor writing into a
- * state blob and a free-form object writing into entity tables are not
- * near-misses, they are two different persistence models.
- */
-function assertKindMatchesStore(kind: 'js-object' | 'entities', target: StoreTarget, processorPath: string): void {
-	if (kind === 'entities' && target.store === 'file') {
-		throw new Error(
-			`the processor module at ${processorPath} declares kind 'entities', and --store file keeps a free-form ` +
-				`state blob through a keepState keeper. An entity processor has no keepState: its state AND its sync ` +
-				`cursor live in a StateStore, written in one transaction (ADR-0027). Run it with ` +
-				`--store sqlite --db <libsql url>.`,
-		);
-	}
-	if (kind === 'js-object' && target.store === 'sqlite') {
-		throw new Error(
-			`the processor module at ${processorPath} is a 'js-object' processor (an untagged module is one), and ` +
-				`--store sqlite keeps versioned ENTITY rows. A free-form object declares no entities, so there is ` +
-				`nothing for the store to lay out. Run it with --store file --folder <path>, or port it to an ` +
-				`EntityProcessor and have the module return {kind: 'entities', processor}.`,
-		);
-	}
-}
-
-/**
  * Build the `EventProcessor` the stream-builder drives, plus the store it writes
- * to where there is one.
+ * to.
  *
- * Both arms hand back an `EventProcessor`, which is why the fetch-and-fold
- * wiring above is written once: what changes between `--store file` and
- * `--store sqlite` is the processor and where its state lives, never how logs
- * reach it.
- *
- * The sqlite arm's imports are dynamic so that `--store file` does not pay for
- * libSQL, matching how `serve` keeps the server's dependency tree off this
- * command.
+ * The imports are dynamic so that a command that never opens a database does not
+ * pay for libSQL, matching how `serve` keeps the server's dependency tree off
+ * this command.
  */
 async function buildProcessor<ABI extends Abi, ProcessResultType>(
-	declared:
-		| {kind: 'js-object'; processor: EventProcessor<ABI, ProcessResultType>}
-		| {kind: 'entities'; processor: EntityProcessor<ABI, any>},
+	declared: EntityProcessor<ABI, any>,
 	target: StoreTarget,
-	context: {finalityDepth: number; processorPath: string; createDB?: (url: string) => RemoteSQL},
-): Promise<{processor: EventProcessor<ABI, ProcessResultType>; store?: StateStore}> {
-	if (declared.kind === 'js-object' && target.store === 'file') {
-		const processor = declared.processor;
-		if (!(processor as any).keepState) {
-			throw new Error(`this processor do not support "keepState" config`);
-		}
-		(processor as unknown as ProcessorWithKeepState<ABI>).keepState(createFileKeepState<ABI>(target.folder));
-		return {processor};
-	}
-
-	if (declared.kind !== 'entities' || target.store !== 'sqlite') {
-		// `assertKindMatchesStore` ran first and refuses every other pairing, naming
-		// both. Reaching here would mean it and this function disagree about what the
-		// pairs are, which is worth a loud line rather than a silent branch.
-		throw new Error(`unreachable: a '${declared.kind}' processor on --store ${target.store} is not a wiring`);
-	}
-
+	context: {finalityDepth: number; createDB?: (url: string) => RemoteSQL},
+): Promise<{processor: EventProcessor<ABI, ProcessResultType>; store: StateStore}> {
 	const [{EntityEventProcessor}, {VersionedStateStore}, {createNodeDB}] = await Promise.all([
 		import('@etherfold/processor-entities'),
 		import('@etherfold/state-store-sqlite'),
@@ -305,16 +244,15 @@ async function buildProcessor<ABI extends Abi, ProcessResultType>(
 	// The finality depth is the stream's own, resolved once above: a retention
 	// window is validated against the depth a reorg can actually reach, and a
 	// number written here instead would be a second opinion about it.
-	const store = new VersionedStateStore(handle, declared.processor.entities, {
+	const store = new VersionedStateStore(handle, declared.entities, {
 		retention: target.retention,
 		finalityDepth: context.finalityDepth,
 	});
-	// No keeper, and no cursor of our own: the store holds the rows and the cursor
-	// in one transaction, and the stream-builder reads that persisted cursor on
-	// every call. Nothing here prunes: pruning is a call a host schedules
-	// (ADR-0022), and one inside the index loop would stall whichever block
-	// crossed the threshold.
-	const processor = new EntityEventProcessor<ABI, any>(store, declared.processor, {
+	// No cursor of our own: the store holds the rows and the cursor in one
+	// transaction, and the stream-builder reads that persisted cursor on every
+	// call. Nothing here prunes: pruning is a call a host schedules (ADR-0022), and
+	// one inside the index loop would stall whichever block crossed the threshold.
+	const processor = new EntityEventProcessor<ABI, any>(store, declared, {
 		finalityDepth: context.finalityDepth,
 	});
 	return {processor: processor as unknown as EventProcessor<ABI, ProcessResultType>, store};

@@ -12,10 +12,10 @@ import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.j
  * A client that replays the chain from the start block pays for every log the
  * contract ever emitted. A client that BOOTSTRAPS downloads the rows another
  * indexer already computed, installs them with the cursor that belongs to them,
- * and carries on from there. The free-form path has had this since it existed
- * (`keepStateOnIndexedDB(name, remote)` in `@etherfold/browser`, and the CLI's
- * file envelope); this is the same capability for the entity path, where the
- * contents are versioned rows rather than one blob.
+ * and carries on from there. The retired free-form path had this from the start
+ * (`keepStateOnIndexedDB(name, remote)` plus the CLI's file envelope, both
+ * deleted by ADR-0037); this is the same capability where the contents are
+ * versioned rows rather than one blob.
  *
  * ## The trap, which is the whole reason this module is careful
  *
@@ -63,13 +63,14 @@ import type {BlockPointer, EntityId, Mutation, NormalizedEntity} from './types.j
 /**
  * The on-the-wire version of the ENTITY snapshot envelope.
  *
- * Named for its envelope because this is not the only format number a snapshot
- * carries in this repo: the free-form path's blob envelope has its own
- * (`BLOB_SNAPSHOT_FORMAT`, `@etherfold/core`), and a reader can hold both at
- * once (`@etherfold/browser` depends on both packages). The two version
- * DIFFERENT file shapes and revise independently, so they are separate
- * constants with separate names rather than one number a change to either
- * would falsely invalidate the other.
+ * Named for its envelope because it was not always the only format number a
+ * snapshot carried in this repo: the free-form path's blob envelope had its own
+ * (`BLOB_SNAPSHOT_FORMAT`, `@etherfold/core`) and a reader could hold both at
+ * once, so they were separate constants with separate names rather than one
+ * number a change to either would falsely invalidate the other. That envelope
+ * is deleted with its path (ADR-0037) and this is the only one left; the NAME
+ * stays, because a bare `SNAPSHOT_FORMAT` would be the coin toss the split
+ * existed to prevent if a second artifact ever earns a number again.
  *
  * Bumped when the SHAPE changes in a way an older reader would misread. An
  * unknown format is refused (`SnapshotFormatError`) rather than parsed for the

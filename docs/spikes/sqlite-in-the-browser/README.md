@@ -4,6 +4,8 @@ Evidence for [`work/notes/findings/sqlite-in-the-browser.md`](../../../work/note
 
 Task: `work/tasks/done/spike-sqlite-in-the-browser.md`. Spec whose open questions this answers: `work/specs/tasked/one-processor-everywhere.md`.
 
+> **FIVE SCRIPTS HERE NO LONGER RUN, deliberately (2026-09-02).** `run/verify-port.ts`, `run/build-traces.ts`, `run/measure-patch-replay.ts`, `run/sharing-probe.ts` and `browser/patch-cut.ts` import `../../../../packages/js-processor/dist/...`, and that package is DELETED (ADR-0037, `work/tasks/done/retire-the-js-object-processor-path.md`): the free-form authoring path it provided is gone, so the import does not resolve and those five cannot be re-run as written. They are KEPT rather than pruned, because this folder is the evidence store behind `work/notes/findings/sqlite-in-the-browser.md` and a measurement whose harness has been deleted is a number with no method. What they measured is still readable, and what they drove (the vendored stratagems `JSProcessor`) is still committed, at `packages/conformance-workload-stratagems/vendor/stratagems/js-processor.ts`; what is gone is the runtime that could execute it. Anyone re-running them would have to supply that runtime first. `docs/spikes/` is not a workspace package, so `pnpm typecheck` does not see this and will not tell you: this paragraph is the marker.
+
 > **Two of these folders were PROMOTED and no longer live here.** `promote-stratagems-conformance-workload` moved the captured streams, the golden states and the vendored oracle into **[`packages/conformance-workload-stratagems`](../../../packages/conformance-workload-stratagems)**, where they are production test material rather than evidence, and rewrote the port onto the idiomatic model (children keyed by their parent, read through the bounded id-prefix listing: three entities instead of six, no CSV index, no hand-maintained count) while still landing on the byte-identical golden state. The scripts below read them from their new home; `src/port/` STAYS here, unchanged, because it is the exhibit the finding's contortion list describes.
 
 ## What is here
@@ -32,12 +34,12 @@ vendor/      stratagems source, copied verbatim, GPL-3.0 (see its vendor/stratag
 npm install
 npx playwright install chromium firefox webkit
 
-npx tsx run/verify-port.ts             # port == JSProcessor on the launched game (alpha1)
-npx tsx run/verify-port.ts base        # ... and on the abandoned early deployment
-npx tsx run/build-traces.ts            # port == JSProcessor on generated streams, + trace shapes
+npx tsx run/verify-port.ts             # BROKEN: needs @etherfold/js-processor, deleted by ADR-0037
+npx tsx run/verify-port.ts base        # BROKEN, same reason
+npx tsx run/build-traces.ts            # BROKEN, same reason
 npx tsx run/verify-store.ts            # the trace applies to the REAL versioned SQLite store (libSQL)
-npx tsx run/measure-patch-replay.ts    # the light path's backwards-replay cost, in node
-node --expose-gc --import tsx run/sharing-probe.ts tip|last256|all   # what KEEPING states costs instead
+npx tsx run/measure-patch-replay.ts    # BROKEN, same reason
+node --expose-gc --import tsx run/sharing-probe.ts tip|last256|all   # BROKEN, same reason
 
 npx playwright test --project=chromium # the browser measurements
 SPIKE_SIZES=tiny,small npx playwright test --project=firefox   # a quicker pass
@@ -54,7 +56,7 @@ npx tsx capture/capture-stratagems-base.mjs --full             # keep `data`/`to
 
 The committed fixture omits each log's `data` and `topics`, which are the encoded form of the `args` it already carries decoded: keeping both took the file from 20.5 MB to 32.5 MB, and the provenance records exactly which contracts and blocks to re-fetch if they are ever wanted. The omission is recorded inside the fixture itself, as `provenance.omittedFields`.
 
-The launched game's fixture is stored **gzipped** (`.json.gz`, 0.6 MB against 20.5 MB of JSON; git stores both at about 0.6 MB, so the compressed form costs nothing in the repository and saves 20 MB in every working tree). `loadStreamFixture` (promoted with the fixtures, now `packages/conformance-workload-stratagems/src/fixture-file.ts`) gunzips by extension, and the browser side does it with the native `DecompressionStream` (`src/workload/load-fixture.ts`). The abandoned deployment's fixture stays plain JSON because it is small enough to read. The derived `*.trace.json` files are gitignored: `run/verify-port.ts` regenerates them, identically, in about three seconds. The golden `*.state.json` IS committed, because it is the oracle and a diff on it means the processor changed meaning. All of them now live in `packages/conformance-workload-stratagems/fixtures/`, which carries their labels and provenance in its own README.
+The launched game's fixture is stored **gzipped** (`.json.gz`, 0.6 MB against 20.5 MB of JSON; git stores both at about 0.6 MB, so the compressed form costs nothing in the repository and saves 20 MB in every working tree). `loadStreamFixture` (promoted with the fixtures, now `packages/conformance-workload-stratagems/src/fixture-file.ts`) gunzips by extension, and the browser side does it with the native `DecompressionStream` (`src/workload/load-fixture.ts`). The abandoned deployment's fixture stays plain JSON because it is small enough to read. The derived `*.trace.json` files are gitignored: `run/verify-port.ts` regenerates them, identically, in about three seconds. The golden `*.state.json` IS committed, because it is the expectation and a diff on it means the processor changed meaning. All of them now live in `packages/conformance-workload-stratagems/fixtures/`, which carries their labels and provenance in its own README.
 
 The full Chromium sweep takes about 15 minutes; `sweep` and `large` are the slow ones, and they are the two that matter.
 
@@ -63,7 +65,7 @@ The full Chromium sweep takes about 15 minutes; `sweep` and `large` are the slow
 - **No node is in any measurement loop.** The chain is queried once, by `capture/`, and every run after that replays a file. Two candidates that saw different bytes cannot be compared.
 - **One block is one batch.** Every backend applies a block as a single atomic unit, because that is how blocks arrive. A loop of single-row inserts flatters everything and predicts nothing.
 - **Trace generation is outside every timed section.** It is processor work, identical for all candidates.
-- **The oracle is not ours.** The expected state is computed by the stratagems `JSProcessor`, vendored verbatim, which is code that has been running on Base. An expected value we wrote ourselves would prove nothing.
+- **The oracle is not ours.** The expected state was computed by the stratagems `JSProcessor`, vendored verbatim, which is code that has been running on Base. An expected value we wrote ourselves would prove nothing. (Since ADR-0037 there is no longer a runtime here that can drive it; the golden states it produced are committed in `packages/conformance-workload-stratagems/fixtures/` and are now a frozen expectation.)
 - **A candidate that cannot start is a result, not a broken test.** WebKit has no OPFS under Playwright, so the SQLite route fails there, and the run records what it said rather than going red.
 
 ## What is real and what is generated

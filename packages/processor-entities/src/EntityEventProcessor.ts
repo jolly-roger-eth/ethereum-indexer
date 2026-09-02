@@ -59,7 +59,7 @@ export type EntityEventProcessorOptions = {
  *
  * ## Revert is replay-free, and that is ADR-0001's revisit condition arriving
  *
- * The in-memory path (`JSObjectEventProcessor` + `History`) undoes a reorg with
+ * The retired in-memory path (a free-form object plus a patch `History`) undid a reorg with
  * immer reverse-patches, because reverting by replay needs the state as of the
  * fork block and the in-browser path had no way to get it. ADR-0001 records that
  * choice and names the condition that would justify revisiting it: a store that
@@ -252,10 +252,11 @@ export class EntityEventProcessor<ABI extends Abi, ProcessorConfig = undefined> 
 	/**
 	 * Same as `reset`.
 	 *
-	 * The in-memory path distinguishes the two because it has two places to
-	 * forget: `reset` drops the object it holds, `clear` also asks the `KeepState`
-	 * keeper to drop the persisted copy. Here there is one place, the store, so
-	 * collapsing them is the honest implementation rather than a shortcut. The
+	 * The retired free-form path distinguished the two because it had two places
+	 * to forget: `reset` dropped the object it held, `clear` also asked its
+	 * persistence keeper to drop the saved copy. Here there is one place, the
+	 * store, so collapsing them is the honest implementation rather than a
+	 * shortcut. The
 	 * core calls `clear` on a context mismatch and `reset` on a rebuild, and both
 	 * mean the same thing to a processor whose state is never anywhere else.
 	 */
@@ -299,7 +300,7 @@ export class EntityEventProcessor<ABI extends Abi, ProcessorConfig = undefined> 
 }
 
 /**
- * Mirrors `fromJSProcessor`: a factory, so each indexer gets its own instance.
+ * A factory, so each indexer gets its own instance.
  *
  * It takes the STORE, because that is the deployment's choice and the whole
  * point: the same left-hand side, a different store, and the processor is

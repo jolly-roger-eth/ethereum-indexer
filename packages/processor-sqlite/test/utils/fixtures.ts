@@ -4,15 +4,14 @@ import {VersionedStateEventProcessor, type SQLProcessor} from '../../src/index.j
 import {createTestDB} from './db.js';
 
 /**
- * The SAME fixture as `@etherfold/js-processor/test/reorg.test.ts`, ported
- * to versioned rows: one `Transfer(from, to, id)` event, an owner per token, and
- * a global transfer counter.
+ * The fixture the retired in-memory path's `reorg.test.ts` used, ported to
+ * versioned rows: one `Transfer(from, to, id)` event, an owner per token, and a
+ * global transfer counter.
  *
- * The in-memory state there is `{owners: {[id]: string}, transferCount: number}`.
+ * The in-memory state there was `{owners: {[id]: string}, transferCount: number}`.
  * Here `owners` is the `token` table and `transferCount` is a single row in
- * `counter`, so every assertion in the mirrored tests can quote the SAME numbers
- * the in-memory tests quote. That is the point of the port: if the two paths
- * diverge, one of two files with the same scenarios goes red.
+ * `counter`, so every assertion in the ported tests quotes the SAME numbers that
+ * path quoted.
  *
  * `counter` also carries its weight beyond mirroring. It is an entity that the
  * reorged block touches while `token` may not, and vice versa, so it exercises
@@ -55,7 +54,7 @@ export function timestampOf(blockNumber: number): number {
 
 let logCounter = 0;
 
-/** A Transfer log in the parsed shape a processor sees, mirroring the js-processor fixture. */
+/** A Transfer log in the parsed shape a processor sees. */
 export function transfer(
 	blockNumber: number,
 	blockHash: string,

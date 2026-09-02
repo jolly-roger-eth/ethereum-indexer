@@ -15,8 +15,8 @@ import {createIndexerState} from '../src/index.js';
  * own copy of the chain, or its own copy of the expected answer.
  *
  * The processor mirrors the fixture every other reorg test in this repository
- * quotes (`@etherfold/js-processor`'s `reorg.test.ts`, and its entity port in
- * `@etherfold/processor-sqlite`): a `token` owner per id, and a `counter` row
+ * quotes (`@etherfold/processor-sqlite`'s `reorg.test.ts`): a `token` owner per
+ * id, and a `counter` row
  * counting transfers. The counter is not decoration -- it is the value that must
  * come DOWN when a block is reorged out, which is the canonical bug the whole
  * storage seam exists to make impossible.
@@ -439,10 +439,8 @@ export async function readState(view: EntityStateView): Promise<{
 /**
  * The hook, wired to a store, exactly as an application wires it.
  *
- * Two lines an application author writes, and the reason this whole task exists:
- * the store is the deployment's choice, the processor above is untouched, and
- * `{kind: 'entities'}` is the caller SAYING which kind of processor it is
- * handing over rather than the hook guessing from the fields it finds.
+ * Two lines an application author writes: the store is the deployment's choice
+ * and the processor above is untouched.
  */
 export function indexerFor(store: StateStore) {
 	return indexerForProcessor(store, processor);
@@ -457,10 +455,7 @@ export function indexerFor(store: StateStore) {
  * `indexerFor` is now it with the fixture's own processor.
  */
 export function indexerForProcessor(store: StateStore, definition: EntityProcessor<TestABI>) {
-	return createIndexerState<TestABI, EntityStateView>({
-		kind: 'entities',
-		processor: entityProcessorOver(store, definition),
-	});
+	return createIndexerState<TestABI, EntityStateView>(entityProcessorOver(store, definition));
 }
 
 /**

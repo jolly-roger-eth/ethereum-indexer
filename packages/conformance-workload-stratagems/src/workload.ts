@@ -11,9 +11,12 @@
  *
  * Three properties make it worth the fixture's weight:
  *
- * - **The oracle is not ours.** The expected state was computed by the stratagems
+ * - **The expected state is not ours.** It was computed by the stratagems
  *   `JSProcessor` (commit `3d5a0b3f`), which is the code that has actually been
  *   running on Base. An expected value we wrote ourselves would prove nothing.
+ *   It is FROZEN rather than recomputable: the driver that could re-run that
+ *   processor went with the free-form authoring path (ADR-0037), so what is
+ *   compared against is the committed file.
  * - **The input is fixed.** No node is in the loop: the stream is a committed
  *   capture with its provenance, so two backends cannot be compared on different
  *   bytes and a rerun a year from now sees the same events.

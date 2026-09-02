@@ -9,9 +9,10 @@ import {recordAccess} from './utils/access-path.js';
  * The property this backend exists for: the state is IN the database, so a
  * reload is a new connection rather than a rebuild.
  *
- * The incumbent (`keepStateOnIndexedDB`) hands the whole state object to
- * IndexedDB on every save and reads all of it back on load: measured at 70 ms on
- * Chromium at 44,000 rows, and growing with total state
+ * The incumbent this replaced (`keepStateOnIndexedDB`, deleted by ADR-0037)
+ * handed the whole state object to IndexedDB on every save and read all of it
+ * back on load: measured at 70 ms on Chromium at 44,000 rows, and growing with
+ * total state
  * (`work/notes/findings/sqlite-in-the-browser.md`). Here a cold start reads
  * nothing at all, and the first read reads one row. That -- with history and
  * revert -- is what row-level writes buy, and they are NOT a throughput win at

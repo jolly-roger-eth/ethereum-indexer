@@ -52,7 +52,7 @@ That is a decision, not an omission. Serialising the whole state on every save i
 
 `finalityDepth` is the whole of the retention and therefore the prune floor: `store.prune()` drops the reverse patches of blocks at or below `tip - finalityDepth` and reports `{tip, floor, versionsDeleted, complete}`, where the unit counted is one BLOCK's reversals (this backend's unit of history). Declaring no depth states no floor, so nothing is pruned and the patch log grows with the stream — fine for a test, not what a long-running tab wants.
 
-Pruning is an explicit call the host schedules and never a side effect of a write (ADR-0022), which is a deliberate difference from `@etherfold/js-processor`'s `History`, where the same block-distance pruning happens inside `setBlock`.
+Pruning is an explicit call the host schedules and never a side effect of a write (ADR-0022), which is a deliberate difference from the retired free-form path's `History`, where the same block-distance pruning happened inside `setBlock`.
 
 Two things pruning here does NOT touch:
 
@@ -68,7 +68,7 @@ The bounded id-prefix listing is a **sorted walk** over the entity's own bucket 
 What it is **not**:
 
 - Not `MemoryStateStore`, which keeps versioned rows in a Map and can therefore answer as-of reads. That one is the executable definition of the seam; this one is the cheap deployment.
-- Not the incumbent light path (`@etherfold/js-processor` plus `keepStateOnIndexedDB`), which has no concept of history at the storage layer and would answer a historical read from the tip. The free-form-object ergonomics are kept; the free-form-object blind spot is not.
+- Not the light path this replaced (a free-form object plus a whole-blob IndexedDB keeper, deleted by ADR-0037), which had no concept of history at the storage layer and would have answered a historical read from the tip. The plain-object STORAGE characteristic is kept; the blind spot is not.
 
 ## Tests
 

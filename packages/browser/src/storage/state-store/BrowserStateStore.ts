@@ -19,7 +19,7 @@ import {IndexedDBStateStore} from '@etherfold/state-store-indexeddb';
  * });
  *
  * // ...and either one indexes through the hook, with the processor untouched
- * const indexer = createIndexerState({kind: 'entities', processor: fromEntityProcessor(processor)(store)});
+ * const indexer = createIndexerState(fromEntityProcessor(processor)(store));
  * ```
  *
  * ## Does a RELOAD keep it? Ask the store, at startup
@@ -50,10 +50,9 @@ import {IndexedDBStateStore} from '@etherfold/state-store-indexeddb';
  * ## Starting from a published snapshot instead of replaying the chain
  *
  * A tab does not have to index from the start block. `@etherfold/processor-entities`
- * can install state another indexer already computed, which is the entity path's
- * counterpart of what `keepStateOnIndexedDB(name, remote)` does for the
- * free-form path -- several published locations, the most advanced one wins,
- * local state kept when local is already ahead, an unreachable mirror skipped:
+ * can install state another indexer already computed -- several published
+ * locations, the most advanced one wins, local state kept when local is already
+ * ahead, an unreachable mirror skipped:
  *
  * ```ts
  * const {store} = await openAndBootstrap(
@@ -80,18 +79,17 @@ import {IndexedDBStateStore} from '@etherfold/state-store-indexeddb';
  * engine that can run both, that WebKit cannot run the SQLite route at all, and
  * that three of four tabs fail AT OPEN on both SQLite VFSs.
  *
- * ## It is NOT the same thing as `keepStateOnIndexedDB`
+ * ## What it replaced, and what that cost
  *
- * They both write to IndexedDB and they are different seams, so the two names
- * sitting near each other is worth one sentence. `keepStateOnIndexedDB` is a
- * `KeepState` keeper: it serialises the WHOLE state object of a
- * `JSObjectEventProcessor` on every save, which is the fastest writer at today's
- * sizes (2.0 ms/block on Chromium) precisely because it keeps no history, cannot
- * answer an as-of read and cannot revert. This builds a `StateStore`: the state
- * IS versioned rows, so a write costs what CHANGED, a reload reads only what it
- * asks for, a reorg is a revert, and history is readable to the declared
- * retention. A deployment uses one or the other, according to which processor it
- * runs.
+ * There used to be a second way to write a browser deployment's state to
+ * IndexedDB: `keepStateOnIndexedDB`, a `KeepState` keeper that serialised the
+ * WHOLE state object of a `JSObjectEventProcessor` on every save. It was the
+ * fastest writer at today's sizes (2.0 ms/block on Chromium) precisely because
+ * it kept no history, could not answer an as-of read and could not revert. It is
+ * deleted with the free-form processor path (ADR-0037). This builds a
+ * `StateStore`: the state IS versioned rows, so a write costs what CHANGED, a
+ * reload reads only what it asks for, a reorg is a revert, and history is
+ * readable to the declared retention.
  */
 export type BrowserStateStoreFactory = (declarations: readonly EntityDeclaration[]) => StateStore | Promise<StateStore>;
 

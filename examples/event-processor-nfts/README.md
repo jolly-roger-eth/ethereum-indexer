@@ -100,7 +100,7 @@ NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000
   pnpm --filter event-processor-nfts index -n https://rpc.mevblocker.io
 ```
 
-`src/cli.ts` is the whole difference, and it adds no indexing logic: it imports `NFTProcessor` as-is, tags it `{kind: 'entities', processor}` so the CLI knows which of the two authoring paths this is, and says what to index per chain. A browser page needs neither, because `browser/main.ts` passes both at the call site.
+`src/cli.ts` is the whole difference, and it adds no indexing logic: it imports `NFTProcessor` as-is and says what to index per chain. A browser page needs neither, because `browser/main.ts` passes both at the call site.
 
 What you should see: block counters climbing (`21000123 / 21456789`), then the process **exits 0** at the tip — it is a one-shot, not a server. What lands is `nfts.db`, holding the same two entities the tab keeps in IndexedDB:
 
@@ -111,7 +111,7 @@ sqlite3 nfts.db 'select * from nft limit 5'      # who owns which token, with it
 
 | flag | |
 | --- | --- |
-| `--store sqlite` | REQUIRED, and it names where the state goes. `file` is the free-form path (`src/index.ts`), and it refuses this processor: an entity processor's state *and* its sync cursor live in the store ([ADR-0027](../../docs/adr/0027-the-sync-cursor-lives-behind-the-storage-seam-as-an-opaque-string.md)) |
+| `--store sqlite` | REQUIRED, and it names where the state goes: versioned rows in a libSQL database, with the sync cursor written in the same transaction as the block it describes ([ADR-0027](../../docs/adr/0027-the-sync-cursor-lives-behind-the-storage-seam-as-an-opaque-string.md)) |
 | `--db file:./nfts.db` | a libSQL url. `libsql://…` points the same command at Turso |
 | `--retention <blocks>` | how far back superseded versions are kept, in BLOCK numbers. Nothing prunes automatically: pruning is a call a host schedules ([ADR-0022](../../docs/adr/0022-pruning-is-a-call-the-host-schedules-not-a-side-effect-of-a-write.md)) |
 
@@ -119,16 +119,17 @@ Stop it with `Ctrl-C` half way and run it again: it continues from the cursor in
 
 **One collection, not every address.** The browser app indexes *one account's* tokens across every collection, which it does with a topic filter it passes to the indexer; a command line has no way to express that, so the CLI entry indexes one contract instead. Point `NFT_CONTRACT` anywhere; `NFT_START_BLOCK` is a recent block rather than the collection's deployment, because the first sync is what you wait for.
 
-## The two processors in `src/`
+## What is in `src/`
 
-| file | authoring API | state |
-| --- | --- | --- |
-| `entities.ts` | `EntityProcessor` (`@etherfold/processor-entities`) | declared entities, written through a `MutationContext`, kept in whichever `StateStore` the deployment chose |
-| `index.ts` | `JSProcessor` (`@etherfold/js-processor`) | one free-form object, mutated as an immer draft, persisted whole by a `KeepState` keeper |
+| file | |
+| --- | --- |
+| `entities.ts` | the processor: an `EntityProcessor` (`@etherfold/processor-entities`), declared entities written through a `MutationContext`, kept in whichever `StateStore` the deployment chose |
+| `cli.ts` | the entry `etherfold index` loads. Not a second processor: it imports `entities.ts` unchanged and adds only what to index per chain |
+| `eip721.ts` | the ABI |
 
-`entities.ts` is what the browser app runs, and it is the same object a server runs against SQLite: nothing in it names a backend. `cli.ts` is not a third processor — it is the entry `etherfold index` loads, and it imports `entities.ts` unchanged (see above).
+`entities.ts` is what the browser app runs, and it is the same object a server runs against SQLite: nothing in it names a backend.
 
-`index.ts` is the original, kept because the free-form path is not deprecated and `examples/web-demo` consumes it. Having both is deliberate: this is the one place in the repository where the same indexing question is written in both styles, so the cost of porting between them is readable in a diff.
+This example used to carry a second processor, `index.ts`, writing the same question against a free-form object mutated as an immer draft. That authoring path is deleted ([ADR-0037](../../docs/adr/0037-one-processor-model-retire-the-js-object-path.md)); there is one processor model now, and this is it.
 
 ## Verifying it
 
@@ -143,6 +144,6 @@ Drives the built app in a real Chromium against the live chain, over six scenari
 ## Building
 
 ```sh
-pnpm --filter event-processor-nfts build          # the processors, to dist/
+pnpm --filter event-processor-nfts build          # the processor, to dist/
 pnpm --filter event-processor-nfts browser:build  # the browser app, to dist/browser/
 ```
