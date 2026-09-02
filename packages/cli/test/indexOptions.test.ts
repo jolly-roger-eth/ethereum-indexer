@@ -5,10 +5,10 @@ import type {Options} from '../src/types.js';
 // ---------------------------------------------------------------------------------------------------
 // `--store` NAMES WHERE THE STATE GOES, AND IT IS REQUIRED
 // ---------------------------------------------------------------------------------------------------
-// The two answers are not interchangeable -- one keeps a blob with no history,
-// the other keeps versioned rows that answer as-of reads and survive a reorg --
-// so a default would make the difference invisible at exactly the moment a
-// deployment is choosing it.
+// It named two stores -- a free-form blob with no history, and versioned rows
+// that answer as-of reads and survive a reorg -- until the blob went with the
+// processor path that wrote it (ADR-0037). One value is left, and the flag is
+// kept as the axis a second backend arrives on.
 //
 // Everything below is resolved BEFORE anything is loaded or dialled, which is
 // what lets `etherfold index` refuse a wrong combination without a network call.
@@ -17,37 +17,16 @@ import type {Options} from '../src/types.js';
 const BASE: Options = {processor: './processor.js', nodeUrl: 'http://localhost:8545'};
 
 describe('resolveIndexOptions — the store choice', () => {
-	it('refuses a missing --store, naming both values', () => {
-		expect(() => resolveIndexOptions(BASE)).toThrow(/--store.*file.*sqlite/s);
+	it('refuses a missing --store, naming the value there is', () => {
+		expect(() => resolveIndexOptions(BASE)).toThrow(/--store.*sqlite/s);
 	});
 
 	it('refuses a --store nobody implements', () => {
-		expect(() => resolveIndexOptions({...BASE, store: 'postgres'})).toThrow(/postgres.*file.*sqlite/s);
-	});
-});
-
-describe('resolveIndexOptions — --store file', () => {
-	it('keeps the folder the free-form path has always written to', () => {
-		expect(resolveIndexOptions({...BASE, store: 'file', folder: './state'}).target).toEqual({
-			store: 'file',
-			folder: './state',
-		});
+		expect(() => resolveIndexOptions({...BASE, store: 'postgres'})).toThrow(/postgres.*sqlite/s);
 	});
 
-	it('requires --folder, since that is where the state goes', () => {
-		expect(() => resolveIndexOptions({...BASE, store: 'file'})).toThrow(/--folder/);
-	});
-
-	it('refuses --db, which names a database this store does not have', () => {
-		expect(() => resolveIndexOptions({...BASE, store: 'file', folder: './state', db: 'file:./x.db'})).toThrow(
-			/--db.*--store sqlite/s,
-		);
-	});
-
-	it('refuses --retention, because a state blob keeps no history to retain', () => {
-		expect(() => resolveIndexOptions({...BASE, store: 'file', folder: './state', retention: '500'})).toThrow(
-			/--retention.*--store sqlite/s,
-		);
+	it('refuses the retired free-form store rather than silently keeping a blob', () => {
+		expect(() => resolveIndexOptions({...BASE, store: 'file', folder: './state'} as Options)).toThrow(/file.*sqlite/s);
 	});
 });
 
@@ -62,16 +41,6 @@ describe('resolveIndexOptions — --store sqlite', () => {
 
 	it('requires --db rather than writing a database somewhere nobody named', () => {
 		expect(() => resolveIndexOptions({...BASE, store: 'sqlite'})).toThrow(/--db/);
-	});
-
-	it('does NOT require --folder', () => {
-		expect(() => resolveIndexOptions({...BASE, store: 'sqlite', db: ':memory:'})).not.toThrow();
-	});
-
-	it('refuses --folder rather than accepting one it would ignore', () => {
-		expect(() => resolveIndexOptions({...BASE, store: 'sqlite', db: ':memory:', folder: './state'})).toThrow(
-			/--folder.*--store file/s,
-		);
 	});
 });
 

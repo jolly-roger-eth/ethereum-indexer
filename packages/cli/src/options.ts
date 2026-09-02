@@ -4,23 +4,21 @@ import type {Options, ResolvedOptions, StoreTarget} from './types.js';
 /**
  * Read the flags into the ONE decision this command owns: where the state goes.
  *
- * ## Why `--store` is required rather than defaulted
+ * ## Why `--store` survives with a single value
  *
- * The two answers are not interchangeable. `file` keeps a free-form state blob
- * with no history: it cannot answer an as-of read and it cannot revert. `sqlite`
- * keeps versioned rows that do both, and holds the sync cursor in the same
- * transaction as the block it describes (ADR-0027). A default would make that
- * difference invisible at exactly the moment a deployment is choosing it, so
- * there is none.
+ * It named two stores -- `file`, a free-form state blob with no history, and
+ * `sqlite`, versioned rows -- until the blob went with the processor path that
+ * wrote it (ADR-0037). What is left is one value, and the flag is kept, still
+ * required and still not defaulted, because it is the AXIS a second backend
+ * arrives on rather than a leftover: the value an operator types is the same
+ * word before and after one appears, and a run that wrote a database nobody
+ * named would be the thing this command has never done.
  *
- * ## Why every wrong combination is REFUSED and never ignored
+ * ## Why a wrong combination is REFUSED and never ignored
  *
- * `--folder` used to be a `requiredOption` feeding exactly one call
- * (`createFileKeepState`), which is meaningless on the entity path; `--db` is
- * meaningless on the file path, and `--retention` is meaningless where there is
- * no history to retain. An accepted-and-ignored flag is a deployment believing
- * something that is not true -- a retention window nothing enforces, a database
- * nothing writes -- so each one names the store it belongs to instead.
+ * An accepted-and-ignored flag is a deployment believing something that is not
+ * true -- a retention window nothing enforces, a database nothing writes -- so a
+ * value that names no store is refused rather than shrugged at.
  */
 export function resolveIndexOptions(options: Options): ResolvedOptions {
 	return {
@@ -35,35 +33,12 @@ export function resolveIndexOptions(options: Options): ResolvedOptions {
 function resolveStoreTarget(options: Options): StoreTarget {
 	if (options.store === undefined) {
 		throw new Error(
-			`--store is required, and names where the indexed state goes: 'file' keeps a free-form state blob in a ` +
-				`folder (--folder), 'sqlite' keeps versioned entity rows in a libSQL database (--db). It is not ` +
-				`defaulted, because the two are not interchangeable: only one of them can answer a historical read or ` +
-				`survive a reorg, and a default would hide that at the moment a deployment picks.`,
+			`--store is required, and names where the indexed state goes: 'sqlite' keeps versioned entity rows in a ` +
+				`libSQL database (--db).`,
 		);
-	}
-
-	if (options.store === 'file') {
-		refuse(
-			options.db !== undefined,
-			`--db names a libSQL database, which --store file does not have. Use --store sqlite.`,
-		);
-		refuse(
-			options.retention !== undefined,
-			`--retention bounds how far back superseded VERSIONS are kept, and --store file keeps a single state blob ` +
-				`with no versions. Use --store sqlite.`,
-		);
-		if (options.folder === undefined) {
-			throw new Error(`--store file writes the state to a folder, so -f, --folder <path> is required with it.`);
-		}
-		return {store: 'file', folder: options.folder};
 	}
 
 	if (options.store === 'sqlite') {
-		refuse(
-			options.folder !== undefined,
-			`-f, --folder is where the free-form state FILE goes, and --store sqlite keeps the state (and its sync ` +
-				`cursor) in the database named by --db. Use --store file.`,
-		);
 		if (options.db === undefined) {
 			throw new Error(
 				`--store sqlite writes to a libSQL database, so --db <url> is required with it, e.g. ` +
@@ -74,7 +49,7 @@ function resolveStoreTarget(options: Options): StoreTarget {
 		return {store: 'sqlite', db: options.db, retention: parseRetention(options.retention)};
 	}
 
-	throw new Error(`--store ${JSON.stringify(options.store)} is not a store. It is 'file' or 'sqlite'.`);
+	throw new Error(`--store ${JSON.stringify(options.store)} is not a store. It is 'sqlite'.`);
 }
 
 /**
@@ -100,8 +75,4 @@ function parseRetention(value: string | undefined): RetentionSetting {
 			`'revert-only' (keep only what a reorg revert needs) or 'unbounded' (the default). A duration is refused ` +
 			`because it would prune on wall-clock progress rather than on chain progress (ADR-0019).`,
 	);
-}
-
-function refuse(condition: boolean, message: string): void {
-	if (condition) throw new Error(message);
 }

@@ -24,7 +24,6 @@
 		"entryPoint": "src/index.ts"
 	},
 	"devDependencies": {
-		"@etherfold/js-processor": "workspace:*",
 		"@etherfold/processor-entities": "workspace:*",
 		"@etherfold/state-store-patch": "workspace:*",
 		"@playwright/test": "^1.62.1",
@@ -40,7 +39,6 @@
 		"@etherfold/core": "workspace:*",
 		"@etherfold/state-store": "workspace:*",
 		"@etherfold/state-store-indexeddb": "workspace:*",
-		"@etherfold/utils": "workspace:*",
 		"eip-1193": "^0.6.5",
 		"idb-keyval": "^6.2.4",
 		"named-logs": "^0.4.1",

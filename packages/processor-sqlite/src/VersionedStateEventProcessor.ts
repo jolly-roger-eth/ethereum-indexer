@@ -72,8 +72,8 @@ export type VersionedStateProcessorOptions = Pick<VersionedStateStoreOptions, 'r
  *
  * The reasoning moved with the code, onto `EntityEventProcessor`. The observable
  * contract is unchanged here, and that is asserted rather than asserted-to:
- * `test/reorg.test.ts` runs the same scenarios as
- * `@etherfold/js-processor/test/reorg.test.ts` and expects the same states.
+ * `test/reorg.test.ts` runs the scenarios the retired in-memory path pinned, and
+ * expects the same states.
  */
 export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = undefined> implements EventProcessor<
 	ABI,
@@ -162,7 +162,7 @@ export class VersionedStateEventProcessor<ABI extends Abi, ProcessorConfig = und
 	}
 }
 
-/** Mirrors `fromJSProcessor`: a factory, so each indexer gets its own instance. */
+/** A factory, so each indexer gets its own instance. */
 export function fromSQLProcessor<ABI extends Abi, ProcessorConfig = undefined>(
 	processor: EntityProcessor<ABI, ProcessorConfig> | (() => EntityProcessor<ABI, ProcessorConfig>),
 	options: VersionedStateProcessorOptions = {},

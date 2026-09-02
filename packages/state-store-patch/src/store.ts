@@ -121,9 +121,10 @@ export type PatchStateStoreOptions = {
  *
  * State and patches both live in the process and go with it. Persisting them is
  * a decision this store deliberately does not make: serialising the whole state
- * blob on every save is the incumbent `keepStateOnIndexedDB` strategy, which
- * belongs to the `KeepState` seam ABOVE this one, and row-level persistence is
- * `indexeddb-row-backend-browser-default`'s job. `capabilities.durability` says
+ * blob on every save was the retired `keepStateOnIndexedDB` strategy, which
+ * belonged to the `KeepState` seam ABOVE this one and is deleted with it
+ * (ADR-0037), and row-level persistence is `@etherfold/state-store-indexeddb`'s
+ * job. `capabilities.durability` says
  * `memory-only` so a caller learns it at startup, and a reload is an empty store
  * that must re-index (or hydrate from a snapshot). See ADR-0023.
  *

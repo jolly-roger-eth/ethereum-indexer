@@ -2,19 +2,15 @@ import {describe, expect, it} from 'vitest';
 import {freshProcessor, lastSync, ownerOf, transfer, transferCount} from './utils/fixtures.js';
 
 // ---------------------------------------------------------------------------
-// EQUIVALENCE TESTS — the SQL path against the live path's pinned contract
+// REORG SCENARIOS: the SQL path against a pinned contract
 // ---------------------------------------------------------------------------
-// Every `describe` below is a port of the same-named block in
-// `packages/js-processor/test/reorg.test.ts`, running the SAME
-// streams and asserting the SAME numbers. The in-memory tests are the
-// characterization of what the production path does; these are the check that
-// the database path does it too.
-//
-// That is why the assertions quote the in-memory values (`0xcarol`, count 1,
-// count 2) rather than values derived from what this implementation happens to
-// write: divergence between the two paths has to be a test failure here, not a
-// discovery in production. If a scenario is changed in one file it must be
-// changed in the other, and the header of that file says so as well.
+// Every `describe` below was ported from the retired in-memory path's
+// `reorg.test.ts`, running the SAME streams and asserting the SAME numbers. That
+// path is deleted (ADR-0037) and these numbers are what survived of it: they are
+// the characterization of what a reorg does to a fold, quoted as LITERALS
+// (`0xcarol`, count 1, count 2) rather than derived from what this
+// implementation happens to write, so a change in behaviour is a failure here
+// rather than a discovery in production.
 //
 // `state.owners[id]` is the `token` table and `state.transferCount` is one row
 // of `counter`; `ownerOf` / `transferCount` do that translation so the

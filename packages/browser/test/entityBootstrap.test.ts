@@ -30,11 +30,11 @@ import {createBrowserStateStore} from '../src/index.js';
 /**
  * A tab that comes up from state somebody else computed.
  *
- * This is where the capability is worth having and where parity with the
- * free-form path is judged: `keepStateOnIndexedDB(name, remote)` has always let
- * a new tab of a shipped app download a published snapshot instead of replaying
- * every log the contract emitted, and the entity path would have quietly lost
- * that. The mechanism lives in `@etherfold/processor-entities` (the store's
+ * This is where the capability is worth having, and it is the one the retired
+ * free-form path had first: its `keepStateOnIndexedDB(name, remote)` let a new
+ * tab of a shipped app download a published snapshot instead of replaying every
+ * log the contract emitted, and the entity path would have quietly lost that
+ * when the free-form one was deleted (ADR-0037). The mechanism lives in `@etherfold/processor-entities` (the store's
  * cursor is an opaque string, so only the layer that owns its codec can ask "is
  * local already ahead"), and these cases check it through the hook an
  * application actually wires.

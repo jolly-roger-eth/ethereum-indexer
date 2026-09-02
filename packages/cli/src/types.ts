@@ -5,20 +5,18 @@ import type {RetentionSetting} from '@etherfold/processor-entities';
  *
  * Everything a deployment CHOOSES is a string here, including `--store`, and it
  * is validated by `resolveIndexOptions` rather than by the parser: the refusals
- * are the interesting part of this command's contract (a kind that does not
- * match its store, a `--folder` on a path that has no folder), so they are
- * testable functions and not commander configuration.
+ * are the interesting part of this command's contract (a `--db` nothing writes,
+ * a `--retention` nothing enforces), so they are testable functions and not
+ * commander configuration.
  */
 export type Options = {
 	processor: string;
 	nodeUrl: string;
-	/** `file` or `sqlite`. REQUIRED: see `resolveIndexOptions`. */
+	/** `sqlite`, the one store there is. REQUIRED: see `resolveIndexOptions`. */
 	store?: string;
-	/** Where the free-form state file goes. Required with `--store file`, refused otherwise. */
-	folder?: string;
-	/** A libSQL url. Required with `--store sqlite`, refused otherwise. */
+	/** A libSQL url. Required. */
 	db?: string;
-	/** A number of BLOCKS, `revert-only` or `unbounded`. Only meaningful with `--store sqlite`. */
+	/** A number of BLOCKS, `revert-only` or `unbounded`. */
 	retention?: string;
 	deployments?: string;
 	rps?: number;
@@ -27,15 +25,12 @@ export type Options = {
 /**
  * WHERE the indexed state goes, after the flags have been read.
  *
- * The discriminant is `store` and not `kind`, deliberately: `CONTEXT.md` gives
- * "processor kind" to the `'js-object'` / `'entities'` pair, which is a fact
- * about the MODULE, and this is the fact the operator states on the command
- * line. They are checked against each other (`assertKindMatchesStore`); making
- * them share a word would have made that check read as a tautology.
+ * ONE arm, and still a discriminated shape: `--store` is the axis a second
+ * backend arrives on, and this is the type it arrives in. It named two stores
+ * until the free-form `file` blob went with the processor path that wrote it
+ * (ADR-0037).
  */
-export type StoreTarget =
-	| {readonly store: 'file'; readonly folder: string}
-	| {readonly store: 'sqlite'; readonly db: string; readonly retention: RetentionSetting};
+export type StoreTarget = {readonly store: 'sqlite'; readonly db: string; readonly retention: RetentionSetting};
 
 /** The options with the store choice resolved, which is what the indexing path is built from. */
 export type ResolvedOptions = {

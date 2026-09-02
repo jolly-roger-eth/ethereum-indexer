@@ -12,10 +12,6 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
 		},
-		"./indexer": {
-			"types": "./dist/indexer.d.ts",
-			"import": "./dist/indexer.js"
-		},
 		"./package.json": "./package.json"
 	},
 	"license": "MIT",

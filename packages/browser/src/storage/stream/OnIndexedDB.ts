@@ -22,8 +22,8 @@ const namedLogger = logs('@etherfold/browser');
  * store of its own would never SEE the legacy blob it is required to delete, it
  * would make "an unrelated key in the same store survives `clear`" vacuous, and
  * it would remove the whole ground for banning `idb-keyval`'s `clear()`, which
- * is dangerous exactly BECAUSE the stream shares one store with
- * `keepStateOnIndexedDB`'s rows and everything else this package writes.
+ * is dangerous exactly BECAUSE the stream shares one store with everything else
+ * this package writes.
  */
 export const KEYVAL_DATABASE = 'keyval-store';
 export const KEYVAL_OBJECT_STORE = 'keyval';
@@ -40,8 +40,8 @@ const CURSOR = 'cursor';
  * absent from the address because the REAL digest already contains it (the
  * block-0 skeleton entry hashes `chainId` and `genesisHash`), and that is FALSE
  * of a constant: with one, every chain under a single indexer name would share
- * one subtree, which is a regression against both the shipped keeper
- * (`stream_<name>_<chainId>`) and `keepStateOnIndexedDB` (`${name}_${chainId}`),
+ * one subtree, which is a regression against the shipped keeper
+ * (`stream_<name>_<chainId>`),
  * and precisely the cross-chain corruption hierarchical addressing is supposed
  * to have deleted. Deriving it keeps the isolation with no extra level, and the
  * address does not change SHAPE when the real digest lands.

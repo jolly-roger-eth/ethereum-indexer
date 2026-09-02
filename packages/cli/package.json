@@ -39,7 +39,6 @@
 		"remote-sql": "^0.0.7"
 	},
 	"devDependencies": {
-		"@etherfold/js-processor": "workspace:*",
 		"@etherfold/state-store": "workspace:*",
 		"@libsql/client": "^0.17.3",
 		"@types/fs-extra": "^11.0.4",

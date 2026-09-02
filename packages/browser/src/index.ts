@@ -1,11 +1,8 @@
 export * from './IndexerState.js';
 
 export {simple_hash} from '@etherfold/core';
-// where a browser deployment's ENTITY state lives (the storage seam), which is a
-// different question from how a whole-state blob is kept below
+// where a browser deployment's state lives (the storage seam)
 export * from './storage/state-store/BrowserStateStore.js';
-export * from './storage/state/OnIndexedDB.js';
-export * from './storage/state/OnLocalStorage.js';
 export * from './storage/stream/OnIndexedDB.js';
 
 // convenience : export type from @etherfold/core and incidently from abitype
@@ -28,11 +25,6 @@ export type {
 	LoadingState,
 	LogEvent,
 	LogParseConfig,
-	EventProcessorWithInitialState,
-	AllData,
-	ExistingStateFetcher,
-	StateSaver,
-	ProcessorContext,
 	ExistingStream,
 	TxInclusionQuery,
 	TxInclusionStatus,

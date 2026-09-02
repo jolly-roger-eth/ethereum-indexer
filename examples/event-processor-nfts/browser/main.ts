@@ -219,10 +219,7 @@ async function start() {
 	// 	backend: (entities) => new PatchStateStore(entities, {finalityDepth: 12}),
 	// });
 
-	const indexer = createIndexerState({
-		kind: 'entities',
-		processor: fromEntityProcessor(NFTProcessor)(store),
-	});
+	const indexer = createIndexerState(fromEntityProcessor(NFTProcessor)(store));
 
 	await indexer.init({
 		// cast because `EIP1193ProviderWithoutEvents` enumerates every JSON-RPC method

@@ -2,14 +2,17 @@ import 'fake-indexeddb/auto';
 import {describe, expect, it} from 'vitest';
 import {get, set} from 'idb-keyval';
 import {simple_hash, type LastSync} from '@etherfold/core';
-import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
 import {
-	createBrowserStateStore,
-	createIndexerState,
-	keepStateOnIndexedDB,
-	keepStreamOnIndexedDB,
-	streamAddress,
-} from '../src/index.js';
+	deserializeLastSync,
+	EntityEventProcessor,
+	serializeLastSync,
+	SYNC_CURSOR_KEY,
+	type EntityProcessor,
+	type EntityStateView,
+	type MutationContext,
+} from '@etherfold/processor-entities';
+import type {StateStore} from '@etherfold/state-store';
+import {createBrowserStateStore, createIndexerState, keepStreamOnIndexedDB, streamAddress} from '../src/index.js';
 import {
 	EXPECTED_A,
 	fakeChain,
@@ -102,7 +105,7 @@ describe('an event ADDED to a source that declares no range', () => {
 // The half that needs a CACHED STREAM to be visible at all.
 // ---------------------------------------------------------------------------
 // "The stream survived" is only observable where there is a stream to survive,
-// so these run the free-form path with both keepers wired, exactly as
+// so these wire a stream keeper beside the store, exactly as
 // `reconfigure.test.ts` does for the replay case.
 
 /**
@@ -116,35 +119,51 @@ describe('an event ADDED to a source that declares no range', () => {
  */
 type NamesState = {underOldName: number; underNewName: number; transfers: number};
 
-const namesProcessor = (version: string): JSProcessor<TestABI, NamesState> => ({
+async function bump(state: MutationContext, name: string): Promise<void> {
+	const row = await state.get<{value: number}>('names', {name});
+	state.set('names', {name}, {value: (row?.value ?? 0) + 1});
+}
+
+const namesProcessor = (version: string): EntityProcessor<TestABI> => ({
 	version,
-	construct: () => ({underOldName: 0, underNewName: 0, transfers: 0}),
-	onTransfer(json, event) {
+	entities: [{name: 'names', id: ['name'], fields: {value: 'integer'}}],
+	async onTransfer(state, event) {
 		const args = event.args as {id?: bigint; tokenId?: bigint};
 		if (args.tokenId !== undefined) {
-			json.underNewName++;
+			await bump(state, 'underNewName');
 		} else if (args.id !== undefined) {
-			json.underOldName++;
+			await bump(state, 'underOldName');
 		}
-		json.transfers++;
+		await bump(state, 'transfers');
 	},
 });
 
-/** The free-form path with both keepers, indexed to the tip against branch A. */
+/** The three counters, read back through the processor's own handle. */
+async function namesIn(view: EntityStateView): Promise<NamesState> {
+	const read = async (name: string) => Number((await view.getCurrent<{value: number}>('names', {name}))?.value ?? 0);
+	return {
+		underOldName: await read('underOldName'),
+		underNewName: await read('underNewName'),
+		transfers: await read('transfers'),
+	};
+}
+
+/** A store and a stream keeper under one name, indexed to the tip against branch A. */
 async function indexedWithKeptStream(tag = freshName(), chain = fakeChain()) {
-	const indexer = createIndexerState<TestABI, NamesState>(fromJSProcessor(namesProcessor('1.0.0'))(), {
-		keepState: keepStateOnIndexedDB(tag) as never,
-		keepStream: keepStreamOnIndexedDB(tag) as never,
-	});
+	const store = await createBrowserStateStore(namesProcessor('1.0.0').entities, {databaseName: tag});
+	const indexer = createIndexerState<TestABI, EntityStateView>(
+		new EntityEventProcessor<TestABI>(store, namesProcessor('1.0.0')),
+		{keepStream: keepStreamOnIndexedDB(tag) as never},
+	);
 	await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
 	await indexToTip(indexer as never);
-	return {indexer, chain, tag};
+	return {indexer, chain, tag, store};
 }
 
 describe('a renamed NON-INDEXED parameter', () => {
 	it('keeps the stream and discards the state, which is the pair that could not be said before', async () => {
 		const {indexer, chain} = await indexedWithKeptStream();
-		expect(indexer.state.$state).toEqual({underOldName: 5, underNewName: 0, transfers: 5});
+		expect(await namesIn(indexer.state.$state)).toEqual({underOldName: 5, underNewName: 0, transfers: 5});
 		const fetchesBefore = chain.ranges.length;
 
 		const outcome = await indexer.updateIndexer({source: SOURCE_RENAMED_PARAMETER as never});
@@ -174,7 +193,7 @@ describe('a renamed NON-INDEXED parameter', () => {
 
 		await indexer.updateIndexer({source: SOURCE_RENAMED_PARAMETER as never});
 
-		expect(indexer.state.$state).toEqual({underOldName: 0, underNewName: 5, transfers: 5});
+		expect(await namesIn(indexer.state.$state)).toEqual({underOldName: 0, underNewName: 5, transfers: 5});
 
 		indexer.dispose();
 	});
@@ -190,20 +209,20 @@ describe('a context persisted by the SHIPPED code, read by this one', () => {
 	 * re-index every existing deployment once -- charging exactly the cost
 	 * per-event hashing exists to remove, at exactly the moment nobody is looking.
 	 */
-	async function agePersistedContextsToTheShippedShape(tag: string) {
+	async function agePersistedContextsToTheShippedShape(tag: string, store: StateStore) {
 		const wholeSource = [{startBlock: 0, hash: simple_hash(SOURCE)}];
 
-		// The STATE keeper still writes one blob under a flat key, with the cursor
-		// inside it.
-		const stateKey = `${tag}_${SOURCE.chainId}`;
-		const state = await get<{lastSync: LastSync<TestABI>}>(stateKey);
-		expect(state).toBeDefined();
+		// The STATE side keeps its cursor behind the storage seam, as an opaque string
+		// under one key (ADR-0027), so the ageing goes through the cursor port.
+		const stored = await store.readCursor(SYNC_CURSOR_KEY);
+		expect(stored).toBeDefined();
+		const lastSync = deserializeLastSync<TestABI>(stored as string);
 		// what the new code wrote is the per-event list, so this is a real ageing
-		expect(state!.lastSync.context.source.length).toBeGreaterThan(1);
-		await set(stateKey, {
-			...state,
-			lastSync: {...state!.lastSync, context: {...state!.lastSync.context, source: wholeSource}},
-		});
+		expect(lastSync.context.source.length).toBeGreaterThan(1);
+		await store.writeCursor(
+			SYNC_CURSOR_KEY,
+			serializeLastSync({...lastSync, context: {...lastSync.context, source: wholeSource as never}}),
+		);
 
 		// The STREAM keeper's cursor now lives ONCE, in the cursor record inside the
 		// stream's subtree, at the hierarchical address. Same ageing, deliberately
@@ -217,17 +236,18 @@ describe('a context persisted by the SHIPPED code, read by this one', () => {
 	}
 
 	it('resumes rather than re-indexing, on a source that did not move', async () => {
-		const {indexer, chain, tag} = await indexedWithKeptStream();
-		expect(indexer.state.$state.transfers).toBe(5);
+		const {indexer, chain, tag, store} = await indexedWithKeptStream();
+		expect((await namesIn(indexer.state.$state)).transfers).toBe(5);
 		indexer.dispose();
-		await agePersistedContextsToTheShippedShape(tag);
+		await agePersistedContextsToTheShippedShape(tag, store);
 
 		// a new tab, the same stores, the upgraded library
 		const rangesBefore = chain.ranges.length;
-		const reloaded = createIndexerState<TestABI, NamesState>(fromJSProcessor(namesProcessor('1.0.0'))(), {
-			keepState: keepStateOnIndexedDB(tag) as never,
-			keepStream: keepStreamOnIndexedDB(tag) as never,
-		});
+		const reopened = await createBrowserStateStore(namesProcessor('1.0.0').entities, {databaseName: tag});
+		const reloaded = createIndexerState<TestABI, EntityStateView>(
+			new EntityEventProcessor<TestABI>(reopened, namesProcessor('1.0.0')),
+			{keepStream: keepStreamOnIndexedDB(tag) as never},
+		);
 		await reloaded.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
 		await indexToTip(reloaded as never);
 
@@ -236,7 +256,7 @@ describe('a context persisted by the SHIPPED code, read by this one', () => {
 		for (const range of chain.ranges.slice(rangesBefore)) {
 			expect(range.from).toBeGreaterThan(START_BLOCK);
 		}
-		expect(reloaded.state.$state.transfers).toBe(5);
+		expect((await namesIn(reloaded.state.$state)).transfers).toBe(5);
 
 		reloaded.dispose();
 	});
@@ -259,7 +279,7 @@ describe('an event REMOVED from the ABI', () => {
 			expect(range.from).toBeGreaterThan(START_BLOCK);
 		}
 		// and the rebuild lands on the same numbers, from the cache alone
-		expect(indexer.state.$state.transfers).toBe(5);
+		expect((await namesIn(indexer.state.$state)).transfers).toBe(5);
 
 		indexer.dispose();
 	});

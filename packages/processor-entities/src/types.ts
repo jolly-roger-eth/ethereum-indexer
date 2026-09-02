@@ -26,14 +26,15 @@ export type InputNames<T extends AbiEvent> = Extract<T['inputs'][number], {name:
  *
  * The single-version case is unchanged: distributing over a non-union is the
  * mapped type itself. Pinned both ways in `test/handler-args.test.ts`, under
- * `pnpm typecheck`. The js-processor package holds its own copy of this type
- * and the two must stay in step.
+ * `pnpm typecheck`. There used to be a second copy of this type in the free-form
+ * processor package that had to be kept in step; that package is gone (ADR-0037)
+ * and this is now the only one.
  */
 export type InputValues<T extends AbiEvent> = T extends AbiEvent
 	? {[Property in InputNames<T>]: AbiParameterToPrimitiveType<Extract<T['inputs'][number], {name: Property}>>}
 	: never;
 
-/** `on<EventName>` handlers, typed off the ABI exactly as the JS-object path types them. */
+/** `on<EventName>` handlers, typed off the ABI. */
 export type EventHandlers<ABI extends Abi, ProcessorConfig = undefined> = {
 	[Property in ExtractAbiEventNames<ABI> as `on${Property}`]?: (
 		state: MutationContext,
@@ -45,9 +46,9 @@ export type EventHandlers<ABI extends Abi, ProcessorConfig = undefined> = {
 /**
  * What an author writes: the entity schema, and a handler per event.
  *
- * The shape deliberately mirrors `JSProcessor` from the js-processor package, so
- * that moving a processor from an in-memory object to versioned rows is a change
- * of write calls and nothing else. `construct()` has no counterpart here: the
+ * The shape deliberately kept the retired free-form `JSProcessor`'s, so that
+ * moving a processor from an in-memory object to versioned rows was a change of
+ * write calls and nothing else. `construct()` has no counterpart here: the
  * initial state of a versioned store is an empty set of entities, which
  * `migrate` creates from `entities`.
  *

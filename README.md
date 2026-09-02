@@ -24,15 +24,15 @@ NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000
   pnpm --filter event-processor-nfts index -n https://rpc.mevblocker.io
 ```
 
-`etherfold index --store sqlite --db <libsql url>` runs an entity processor into versioned rows and exits at the tip; `--store file` keeps the free-form state blob the CLI has always written. Which of the two a module is comes from the MODULE, never from a flag.
+`etherfold index --store sqlite --db <libsql url>` runs the processor into versioned rows and exits at the tip. There is ONE way to author a processor (ADR-0037), so the module hands over the processor itself and the operator names only where the state goes.
 
 ## Main features:
 
 - written in typescript, run both in a browser context and node
 - modular : you can use the part you want
 - designed to run in-browser and relies only on [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193)
-- when run on a server, you can hook your own database module to store the indexer process's result
-- A json object can be used as DB (useful for in-browser indexing).
+- one processor, several storage backends behind one seam: SQLite on a server, versioned rows in IndexedDB in a tab, or a light patch store
+- as-of reads and an explicit retention window, so a historical question gets an answer or a refusal and never a tip read
 - Supports Reorg
 - Supports caching
 
@@ -60,175 +60,78 @@ It is also worth noting that for an indexer to work, it needs to index all event
 
 ## Usage
 
-install `@etherfold/browser` and `@etherfold/js-processor`
+install `@etherfold/browser` and `@etherfold/processor-entities`
 
 ```
-npm i @etherfold/browser @etherfold/js-processor
+npm i @etherfold/browser @etherfold/processor-entities
 ```
 
-If you use react, here is a mostly self-contained example from [App.tsx](https://github.com/wighawag/etherfold/blob/main/examples/basic/src/App.tsx)
+A processor is **entity declarations plus one handler per event**, and it names no backend: the same object indexes into IndexedDB in a tab and into SQLite on a server. Here is one, for a contract that emits `MessageChanged(address user, string message)`:
 
-```tsx
-import './App.css';
-import {fromJSProcessor, JSProcessor} from '@etherfold/js-processor';
-import {createIndexerState, keepStateOnIndexedDB} from '@etherfold/browser';
-import {connect} from './utils/web3';
-import react from 'react';
+```ts
+import type {EntityProcessor} from '@etherfold/processor-entities';
 
-// we need the contract info
-// the abi will be used by the processor to have its type generated, allowing you to get type-safety
-// the adress will be given to the indexer, so it index only this contract
-// the startBlock field allow to tell the indexer to start indexing from that point only
-// here it is the block at which the contract was deployed
-const contract = {
-	abi: [
-		{
-			anonymous: false,
-			inputs: [
-				{
-					indexed: true,
-					name: 'user',
-					type: 'address',
-				},
-				{
-					indexed: false,
-					name: 'message',
-					type: 'string',
-				},
-			],
-			name: 'MessageChanged',
-			type: 'event',
-		},
-	],
-	address: '0x21d366ee3BbF67AB057c517380D37E54fFd9dfC0',
-	startBlock: 3040661,
-} as const;
-
-// we define the type of the state computed by the processor
-// we can also declare it inline in the generic type of JSProcessor
-type State = {greetings: {account: `0x${string}`; message: string}[]};
-
-// the processor is given the type of the ABI as Generic type to get generated
-// it also specify the type which represent the current state
-const processor: JSProcessor<typeof contract.abi, State> = {
-	// the version is REQUIRED, and ideally you would generate it so that it changes for each change
-	// when a version changes, the indexer will detect that and clear the state
-	// if it has the event stream cached, it will repopulate the state automatically
-	// if you edit a handler and forget to bump it, the indexer says so at load time (an error-level
-	// drift report, plus the `onProcessorDrift` callback); set `strictProcessorDrift: true` in the
-	// indexer config to refuse to start instead of merely reporting
-	version: '1.0.1',
-	// this function set the starting state
-	// this allow the app to always have access to a state, no undefined needed
-	construct() {
-		return {greetings: []};
+const abi = [
+	{
+		anonymous: false,
+		inputs: [
+			{indexed: true, name: 'user', type: 'address'},
+			{indexed: false, name: 'message', type: 'string'},
+		],
+		name: 'MessageChanged',
+		type: 'event',
 	},
-	// each event has an associated on<EventName> function which is given both the current state and the typed event
-	// each event's argument can be accessed via the `args` field
-	// it then modify the state as it wishes
-	// behind the scene, the JSProcessor will handle reorg by reverting and applying new events automatically
-	onMessageChanged(state, event) {
-		const greetingFound = state.greetings.find((v) => v.account === event.args.user);
-		if (greetingFound) {
-			greetingFound.message = event.args.message;
-		} else {
-			state.greetings.push({
-				message: event.args.message,
-				account: event.args.user,
-			});
-		}
+] as const;
+
+export const greetings: EntityProcessor<typeof abi> = {
+	// REQUIRED, and ideally generated so it changes whenever a handler does. The indexer
+	// discards state computed by a previous version by comparing it; if you edit a handler
+	// and forget to bump it, the indexer says so at load time (an error-level drift report,
+	// plus the `onProcessorDrift` callback). Set `strictProcessorDrift: true` in the indexer
+	// config to refuse to start instead of merely reporting.
+	version: '1.0.1',
+
+	// `{name, id, fields}` per entity is the whole schema an author writes: the store owns
+	// the layout, the version columns, the as-of read and the reorg revert.
+	entities: [{name: 'greeting', id: ['user'], fields: {message: 'text'}}],
+
+	// one handler per event, over a MutationContext with read-your-writes inside the block
+	async onMessageChanged(state, event) {
+		state.set('greeting', {user: event.args.user.toLowerCase()}, {message: event.args.message});
 	},
 };
-
-// we setup the indexer via a call to `createIndexerState`
-// this setup a set of observable (subscribe pattern)
-// including one for the current state (computed by the processor above)
-// and one for the syncing
-// we then call `.withHooks(react)` to transform these observable in react hooks ready to be used.
-const {init, useState, useSyncing, startAutoIndexing} = createIndexerState(fromJSProcessor(processor)(), {
-	keepState: keepStateOnIndexedDB('basic') as any,
-}).withHooks(react);
-
-// we now need to get a handle on a ethereum provider
-// for this app we are simply using window.ethereum
-const ethereum = (window as any).ethereum;
-
-// but to not trigger a metamask popup right away we wrap that in a function to be called via a click of a button
-function start() {
-	if (ethereum) {
-		// here we first connect it to the chain of our choice and then initialise the indexer
-		// see ./utils/web3
-		connect(ethereum, {
-			chain: {
-				chainId: '11155111',
-				chainName: 'Sepolia',
-				rpcUrls: ['https://rpc.sepolia.org'],
-				nativeCurrency: {name: 'Sepolia Ether', symbol: 'SEP', decimals: 18},
-				blockExplorerUrls: ['https://sepolia.etherscan.io'],
-			},
-		}).then(({ethereum}) => {
-			// we already setup the processor
-			// now we need to initialise the indexer with
-			// - an EIP-1193 provider (window.ethereum here)
-			// - source config which includes the chainId and the list of contracts (abi,address. startBlock)
-			init({
-				provider: ethereum,
-				source: {chainId: '11155111', contracts: [contract]},
-			}).then(() => {
-				// this automatically index on a timer
-				// alternatively you can call `indexMore` or `indexMoreAndCatchupIfNeeded`, both available from the return value of `createIndexerState`
-				// startAutoIndexing is easier but manually calling `indexMore` or `indexMoreAndCatchupIfNeeded` is better
-				// this is because you can call them for every `newHeads` eth_subscribe message
-				startAutoIndexing();
-			});
-		});
-	}
-}
-
-function App() {
-	// we use the hooks to get the latest state and make sure react update the values as they changes
-	const $state = useState();
-	const $syncing = useSyncing();
-
-	if (!ethereum) {
-		return (
-			<div className="App">
-				<h1>Indexing a basic example</h1>
-				<p>To test this app, you need to have a ethereum wallet installed</p>
-			</div>
-		);
-	}
-	// we have various variable to check the status of the indexer
-	// here we can act on whether the indexer is still waiting to be provided an EIP-1193 provider
-	if ($syncing.waitingForProvider) {
-		return (
-			<div className="App">
-				<h1>Indexing a basic example</h1>
-				<button onClick={start} style={{backgroundColor: '#45ffbb', color: 'black'}}>
-					Start
-				</button>
-			</div>
-		);
-	}
-
-	// here we add a progress bar indicating the progress of the indexer
-	return (
-		<div className="App">
-			<h1>Indexing a basic example</h1>
-			<p>{$syncing.lastSync?.syncPercentage || 0}</p>
-			{$syncing.lastSync ? (
-				<progress value={($syncing.lastSync.syncPercentage || 0) / 100} style={{width: '100%'}} />
-			) : (
-				<p>Please wait...</p>
-			)}
-			<div>
-				{$state.greetings.map((greeting) => (
-					<p key={greeting.account}>{greeting.message}</p>
-				))}
-			</div>
-		</div>
-	);
-}
-
-export default App;
 ```
+
+Indexing it in a browser tab is two more lines. The first names WHERE the state lives, which is the only deployment decision here; the second wires the hook:
+
+```ts
+import {createBrowserStateStore, createIndexerState} from '@etherfold/browser';
+import {fromEntityProcessor} from '@etherfold/processor-entities';
+
+// versioned rows in IndexedDB: the browser default, decided on measurement (ADR-0024)
+const store = await createBrowserStateStore(greetings.entities, {databaseName: 'greetings'});
+const indexer = createIndexerState(fromEntityProcessor(greetings)(store));
+
+await indexer.init({
+	provider: (window as any).ethereum,
+	source: {chainId: '11155111', contracts: [{abi, address: '0x21d3…', startBlock: 3040661}]},
+});
+
+// index on a timer; `indexMore` / `indexMoreAndCatchupIfNeeded` are the manual forms, and
+// calling one on every `newHeads` subscription message is better than a timer
+await indexer.startAutoIndexing();
+
+// `indexer.state` publishes a READ HANDLE, because the state is rows in a store rather than
+// an object: ask it questions instead of being handed all of it
+indexer.state.subscribe(async (view) => {
+	const mine = await view.getCurrent<{message: string}>('greeting', {user: account});
+	render(mine?.message);
+});
+
+// and `indexer.syncing` publishes the cursor and the progress
+indexer.syncing.subscribe(($syncing) => showProgress($syncing.lastSync?.syncPercentage ?? 0));
+```
+
+`.withHooks(react)` turns those observables into React hooks (`useState`, `useSyncing`, `useStatus`).
+
+A runnable version of all of this, against a real chain, is [`examples/event-processor-nfts`](https://github.com/wighawag/etherfold/blob/main/examples/event-processor-nfts/README.md); [`examples/browser-reference`](https://github.com/wighawag/etherfold/blob/main/examples/browser-reference) is the minimal wiring with both hot-reload axes.

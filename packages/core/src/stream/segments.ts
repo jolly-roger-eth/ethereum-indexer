@@ -13,9 +13,9 @@ const namedLogger = logs('@etherfold/core');
  * the extent went with it. The three block numbers and the `context` live ONCE,
  * in the cursor record beside the segments.
  *
- * Deliberately NOT holding `unconfirmedBlocks`: the window has two homes that
- * are READ (`KeepState.save`'s `lastSync`, and the entity path's serialized sync
- * cursor) and a stream keeper's copy is read by nobody -- `promiseToFeed` takes
+ * Deliberately NOT holding `unconfirmedBlocks`: the window is READ from the
+ * entity path's serialized sync cursor, and a stream keeper's copy is read by
+ * nobody -- `promiseToFeed` takes
  * only the three block numbers and `generateStreamToAppend` rebuilds the window
  * from the replayed events. `captureStream`/`replayStream` are the shipped third
  * implementation of this seam that already stores none.

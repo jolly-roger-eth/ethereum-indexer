@@ -28,7 +28,12 @@ export type WorkloadFixture = {
 	readonly deployment: string;
 	/** The captured stream. `.gz` is gunzipped by `loadStreamFixture` on extension. */
 	readonly streamPath: string;
-	/** The state the ORIGINAL `JSProcessor` computed from that stream. */
+	/**
+	 * The state the ORIGINAL `JSProcessor` computed from that stream.
+	 *
+	 * A FROZEN expectation: the driver that could recompute it went with the
+	 * free-form authoring path (ADR-0037). See `../fixtures/README.md`.
+	 */
 	readonly goldenStatePath: string;
 	/** Roughly how big it is, so a reader knows which loop it belongs in. */
 	readonly events: number;

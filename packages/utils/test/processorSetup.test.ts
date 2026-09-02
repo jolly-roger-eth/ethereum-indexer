@@ -26,9 +26,10 @@ function fakeProvider(opts: {chainIdHex?: `0x${string}`; throwOnChainId?: boolea
 	return {request} as any;
 }
 
-// A minimal processor object: must carry the methods callers care about (loose).
+// A minimal processor object. Loose on purpose: this module hands back whatever the
+// factory made, unread, because only the HOST knows which runtime is built around it.
 function fakeProcessor(tag = 'p') {
-	return {tag, keepState: vi.fn(), getVersionHash: () => 'h'} as any;
+	return {tag, version: '1.0.0', entities: []} as any;
 }
 
 const SAMPLE_CONTRACTS: ContractData<[]>[] = [{address: '0xabc', abi: [], startBlock: 1}];

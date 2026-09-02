@@ -1,0 +1,73 @@
+import {expect} from 'vitest';
+import {EntityEventProcessor, type EntityProcessor, type EntityStateView} from '@etherfold/processor-entities';
+import type {StateStore} from '@etherfold/state-store';
+import {createBrowserStateStore, createIndexerState} from '../../src/index.js';
+import type {TestABI} from '../../browser/workload.js';
+
+/**
+ * The vehicle the STREAM tests drive: a processor that records what it applied.
+ *
+ * These suites are about the stream cache and the stream keeper, not about the
+ * processor, so what they need from one is the smallest thing that makes a
+ * replay observable -- WHICH events reached a handler, in chain order, and HOW
+ * MANY TIMES each did.
+ *
+ * `times` is the load-bearing field. The question every case here asks is
+ * whether a replayed block is applied ONCE, and a store that simply overwrote a
+ * row would hide a double application behind an idempotent-looking write.
+ *
+ * The id starts with a constant `bucket` because the seam's only set read is a
+ * PREFIX of the declared id (ADR-0021): the bucket is what makes "every event
+ * this processor applied" a prefix, and `at` (block number then log index, both
+ * fixed-width, so the lexicographic order is the chain's) is what makes the
+ * listing come back in the order the events arrived.
+ */
+export function applyingProcessor(control: {failFromBlock?: number} = {}): EntityProcessor<TestABI> {
+	return {
+		version: '1.0.0',
+		entities: [{name: 'applied', id: ['bucket', 'at'], fields: {key: 'text', times: 'integer'}}],
+		async onTransfer(state, event) {
+			if (control.failFromBlock !== undefined && event.blockNumber >= control.failFromBlock) {
+				throw new Error('handler blew up');
+			}
+			const at = `${String(event.blockNumber).padStart(12, '0')}:${String(event.logIndex).padStart(6, '0')}`;
+			const prior = await state.get<{times: number}>('applied', {bucket: 'all', at});
+			state.set(
+				'applied',
+				{bucket: 'all', at},
+				{key: `${event.blockHash}:${event.logIndex}`, times: (prior?.times ?? 0) + 1},
+			);
+		},
+	};
+}
+
+/** What the store says was applied, in chain order, with the count beside it. */
+export async function appliedIn(view: EntityStateView): Promise<{key: string; times: number}[]> {
+	const listing = await view.listCurrent<{key: string; times: number}>('applied', {bucket: 'all'}, 500);
+	expect(listing.truncated).toBe(false);
+	return listing.rows.map((row) => ({key: row.key, times: Number(row.times)}));
+}
+
+/** Just the keys, which is what a from-scratch run is compared against. */
+export const keysOf = (rows: {key: string}[]) => rows.map((row) => row.key);
+
+/**
+ * A durable browser store under its own database name.
+ *
+ * The name is the IDENTITY of the state: reopening the same one is what a RELOAD
+ * is here, and a fresh one is what DISCARDING the state is.
+ */
+export function browserStore(name: string, definition: EntityProcessor<TestABI>): Promise<StateStore> {
+	return createBrowserStateStore(definition.entities, {databaseName: name});
+}
+
+/** The hook over one store, with a stream keeper where a case wants one. */
+export function indexerOver(
+	definition: EntityProcessor<TestABI>,
+	store: StateStore,
+	keepers: {keepStream?: unknown} = {},
+) {
+	return createIndexerState<TestABI, EntityStateView>(new EntityEventProcessor<TestABI>(store, definition), {
+		...(keepers.keepStream ? {keepStream: keepers.keepStream as never} : {}),
+	});
+}

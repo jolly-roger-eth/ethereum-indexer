@@ -35,7 +35,6 @@
 		"@libsql/client": "^0.17.3",
 		"@types/node": "^25.9.1",
 		"as-soon": "^0.1.5",
-		"@etherfold/js-processor": "workspace:*",
 		"@etherfold/state-store": "workspace:*",
 		"remote-sql-libsql": "^0.0.7",
 		"tsx": "^4.21.0",

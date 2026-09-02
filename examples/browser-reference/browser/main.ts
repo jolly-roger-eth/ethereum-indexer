@@ -100,10 +100,7 @@ async function start() {
 	// =====================================================================
 	// 3. THE HOOK, AND THE TWO SUBSCRIPTIONS
 	// =====================================================================
-	const indexer = createIndexerState({
-		kind: 'entities',
-		processor: fromEntityProcessor(tokenProcessor)(store),
-	});
+	const indexer = createIndexerState(fromEntityProcessor(tokenProcessor)(store));
 
 	await indexer.init({
 		provider,
@@ -206,10 +203,7 @@ async function start() {
 		import.meta.hot.accept('../src/processor.js', async (module) => {
 			if (!module) return;
 			const next = module.tokenProcessor as typeof tokenProcessor;
-			const outcome = await indexer.updateProcessor({
-				kind: 'entities',
-				processor: fromEntityProcessor(next)(store),
-			});
+			const outcome = await indexer.updateProcessor(fromEntityProcessor(next)(store));
 			el('reload').textContent = outcome.stateDiscarded
 				? 'processor swapped: state discarded, rebuilding'
 				: 'processor NOT swapped: same version hash, so the edit is not running. Bump `version`.';

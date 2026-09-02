@@ -61,14 +61,6 @@ export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	clear: () => Promise<void>;
 };
 
-export type EventProcessorWithInitialState<ABI extends Abi, ProcessResultType, ProcessorConfig> = EventProcessor<
-	ABI,
-	ProcessResultType
-> & {
-	createInitialState(): ProcessResultType;
-	configure(config: ProcessorConfig): void;
-};
-
 export type IncludedEIP1193Log = EIP1193Log & {
 	blockNumber: EIP1193DATA;
 	logIndex: EIP1193DATA;
@@ -416,43 +408,4 @@ export type LogParseConfig = {
 		[eventName: string]: (`0x${string}` | `0x${string}`[])[][];
 		// Note we do not provide type arg here (could have done it via abitype) because multiple event could share the same order
 	};
-};
-
-/**
- * What a `KeepState` keeper is told about the processor whose state it is
- * storing.
- *
- * `version` is REQUIRED, because every processor now has one: it is validated at
- * construction (`assertProcessorVersion`), so an optional field here would only
- * describe a state that can no longer exist, and every keeper that reads it
- * would keep carrying a defensive branch for it.
- */
-export type ProcessorContext<ABI extends Abi, ProcessorConfig> = ProcessorConfig extends undefined
-	? {
-			readonly source: IndexingSource<ABI>;
-			version: string;
-		}
-	: {
-			readonly source: IndexingSource<ABI>;
-			readonly config: ProcessorConfig;
-			version: string;
-		};
-
-export type AllData<ABI extends Abi, ProcessResultType, Extra> = {
-	state: ProcessResultType;
-	lastSync: LastSync<ABI>;
-} & Extra;
-
-export type ExistingStateFetcher<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
-	context: ProcessorContext<ABI, ProcessorConfig>,
-) => Promise<AllData<ABI, ProcessResultType, Extra>>;
-export type StateSaver<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = (
-	context: ProcessorContext<ABI, ProcessorConfig>,
-	all: AllData<ABI, ProcessResultType, Extra>,
-) => Promise<void>;
-
-export type KeepState<ABI extends Abi, ProcessResultType, Extra, ProcessorConfig> = {
-	fetch: ExistingStateFetcher<ABI, ProcessResultType, Extra, ProcessorConfig>;
-	save: StateSaver<ABI, ProcessResultType, Extra, ProcessorConfig>;
-	clear: (context: ProcessorContext<ABI, ProcessorConfig>) => Promise<void>;
 };

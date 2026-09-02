@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
-import type {Abi, EventProcessorWithInitialState, IndexingSource} from '@etherfold/core';
+import type {Abi, IndexingSource, LogEvent} from '@etherfold/core';
 import {EthereumIndexer} from '@etherfold/core';
-import {createIndexerState} from '../src/IndexerState.js';
+import {createIndexerState, type EntityEventProcessorLike} from '../src/IndexerState.js';
 
 // chainId '1' as the 0x-hex the provider returns
 const CHAIN_ID_HEX = '0x1';
@@ -27,13 +27,13 @@ function makeProvider(chainIdHex: string = CHAIN_ID_HEX) {
 
 type State = {count: number};
 
-function makeProcessor(versionHash = 'v1'): EventProcessorWithInitialState<Abi, State, undefined> {
+function makeProcessor(versionHash = 'v1'): EntityEventProcessorLike<Abi, State, undefined> {
 	return {
 		getVersionHash: () => versionHash,
 		// required on `EventProcessor`: a fake that omits it is a fake that would
 		// lose drift detection without anybody noticing
 		getCodeFingerprint: () => undefined,
-		createInitialState: () => ({count: 0}),
+		state: {count: 0},
 		configure: () => {},
 		load: async () => undefined,
 		process: async () => ({count: 0}),

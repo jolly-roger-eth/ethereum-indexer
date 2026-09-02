@@ -18,37 +18,26 @@ program.name('etherfold').version(pkg.version).description('Index EVM logs into 
  */
 const index = program
 	.command('index', {isDefault: true})
-	.description('run a processor over a source and write the resulting state to a file or a libSQL database')
-	.usage(
-		`-p <processor's path> --store file --folder <folder> | --store sqlite --db <libsql url> ` +
-			`[-d <deployment folder> -n http://localhost:8545]`,
-	)
+	.description('run a processor over a source and write the resulting state to a libSQL database')
+	.usage(`-p <processor's path> --store sqlite --db <libsql url> [-d <deployment folder> -n http://localhost:8545]`)
 	.requiredOption(
 		'-p, --processor <path>',
 		`path to the event processor module (need to export a field named "createProcessor")`,
 	)
 	/**
-	 * REQUIRED, and never defaulted: `file` keeps a free-form state blob with no
-	 * history, `sqlite` keeps versioned entity rows that answer as-of reads and
-	 * survive a reorg. A default would hide that difference at the moment a
-	 * deployment picks. See `resolveIndexOptions`, which owns every refusal.
+	 * REQUIRED, and never defaulted. It named two stores until the free-form state
+	 * blob went with the processor path that wrote it (ADR-0037); it is kept as the
+	 * axis a second backend arrives on. See `resolveIndexOptions`, which owns every
+	 * refusal.
 	 */
 	.requiredOption(
-		'--store <file|sqlite>',
-		"where the indexed state goes: 'file' writes the free-form state blob to --folder (what this command " +
-			"always did), 'sqlite' writes versioned entity rows to the libSQL database at --db",
+		'--store <sqlite>',
+		'where the indexed state goes: versioned entity rows in the libSQL database at --db',
 	)
-	/**
-	 * No longer a `requiredOption`: it feeds exactly one call
-	 * (`createFileKeepState`) and means nothing on the entity path. It is required
-	 * WITH `--store file` and refused with `--store sqlite`, which is checked where
-	 * the store is known rather than by the parser.
-	 */
-	.option('-f, --folder <value>', 'folder to read and write to (required with --store file)')
-	.option('--db <url>', 'libSQL url, e.g. file:./etherfold.db or :memory: (required with --store sqlite)')
+	.option('--db <url>', 'libSQL url, e.g. file:./etherfold.db or :memory: (required)')
 	.option(
 		'--retention <blocks|revert-only|unbounded>',
-		'how far back superseded versions are kept, in BLOCK numbers (--store sqlite only). Nothing prunes ' +
+		'how far back superseded versions are kept, in BLOCK numbers. Nothing prunes ' +
 			'automatically: pruning is a call a host schedules (ADR-0022)',
 	)
 	.option(
