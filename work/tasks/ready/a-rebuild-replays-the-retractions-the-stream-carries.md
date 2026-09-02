@@ -1,0 +1,60 @@
+---
+promotedFrom: observation:a-rebuild-off-a-cached-stream-drops-its-retractions
+---
+
+## What to build
+
+Make a REPLAY of a stored event stream reproduce the same sequence of applies and reverts the LIVE run produced, so that rebuilding a discarded state off the cached stream lands on the same state as the run that wrote that stream. Today it does not: a stored stream that contains a reorg is replayed with its retractions thrown away.
+
+The mechanism is already diagnosed, and the fix should start from it rather than re-deriving it. `EthereumIndexer.promiseToFeed` (`packages/core/src/indexer.ts`) hands whatever it is fed to `generateStreamToAppend`, which is a FETCH-shaped function: it derives retractions ONLY from the cursor's `unconfirmedBlocks`, and `groupLogsPerBlock` (`packages/core/src/internal/engine/utils.ts`) deliberately SKIPS `removed` events out of its input ("we deal with them manually... we do not even expect them to be possible here"), which is right for raw logs arriving from a stateless `eth_getLogs` and wrong for a stream being replayed. A rebuild starts from `freshLastSync`, whose window is EMPTY, so a stored stream carrying a reorg (`0xa104` events, then those same events flagged `removed`, then `0xb104`) replays as: both branches emitted as live blocks, no `revertTo` at all, both applied at height 104.
+
+The out-direction of this seam was already fixed once: `groupStreamPerBlock` exists precisely because a `removed` marker is the only instruction a processor ever gets to revert, and `promiseToFeed` keeps every retraction in ONE batch. The IN direction of a replay is the remaining hole. A replayed stream is not a fetch: it already carries its own verdicts, and the engine must honour them instead of recomputing them from a window it does not have.
+
+The fix must also leave the cursor's unconfirmed window in the state the live path would have left it in, so the FIRST tip cycle after a rebuild does not re-read the finality window and apply the replacement block a SECOND time. That second symptom was recorded separately as `work/notes/observations/a-replayed-reorg-reapplies-the-replacement-block.md` (the free-form-path sighting: the replacement block applied twice, silently wrong state rather than a hard failure). It is the same defect and this one task covers both; that note is a duplicate of this work.
+
+Severity worth stating plainly, because it decides how loudly this fails in the field: on the entity path it is a HARD failure (the store refuses the second block at that height, `block 104 is already recorded`, `IndexedDBStateStore.applyBlock`), but on any path that tolerates the double-apply it is SILENTLY WRONG STATE, derived in part from a dead branch, with nothing asserting the rebuilt state against the live one.
+
+Scope is the ENGINE (`packages/core`). Note that the same `feed()` entry serves the kept-stream replay on load AND the server's import route, so this is not browser-specific even though the regression proof lives in the browser suite. ADR-0008 ("processor upgrades rebuild blue-green from the stored stream") is the reason a replay's fidelity is load-bearing rather than cosmetic.
+
+## What this is NOT
+
+- **NOT the stream keeper's bug, and must not be "fixed" in the keeper.** The observation reproduced it against a hand-rolled whole-blob `ExistingStream` that stores the full `lastSync` (the SHIPPED shape), so it pre-dates the segmented keeper that landed in PR #35. Making a keeper store the unconfirmed window again would undo a deliberate decision (ADR-0035, and `packages/core/src/stream/segments.ts`): the window has two homes that ARE read, and the stream's copy is read by nobody.
+- **Do not delete the characterization test.** `packages/browser/test/streamSegments.test.ts`, the case "is REFUSED on a rebuild, because the replay drops the stored retractions", pins the current wrong behaviour and asserts the store's refusal. It MUST be INVERTED as part of this fix. It is the regression proof and the reason this is provable rather than argued.
+- **Do not regress the delivery side.** `groupStreamPerBlock` and the "every retraction goes in ONE batch, whatever `feedBatchSize` says" rule in `promiseToFeed` are existing, reasoned behaviour; the fix adds the missing in-direction, it does not rework the out-direction.
+
+## Acceptance criteria
+
+- [ ] A rebuild off a stored stream that CONTAINS a reorg succeeds and produces the SAME state as the live run that wrote that stream (asserted as an equality against the live state, not merely as the absence of a throw).
+- [ ] The replacement block at the reorged height is applied EXACTLY ONCE across the whole rebuild, including the first tip cycle that follows the replay (covers the folded-in `a-replayed-reorg-reapplies-the-replacement-block` symptom).
+- [ ] The retractions carried by the stream produce the same reverts on the replay path that the live path produced, in the same order, and the cursor's unconfirmed window after the replay matches what the live run held at the same point.
+- [ ] The characterization test in `packages/browser/test/streamSegments.test.ts` ("is REFUSED on a rebuild...") is INVERTED to assert the correct behaviour, keeping its explanatory comment updated rather than dropped, and no longer expects `block 104 is already recorded`.
+- [ ] Engine-level coverage lives in `packages/core` too (the replay entry exercised directly with a stream carrying `removed` markers against a fresh cursor), so the guarantee is not only observable through the browser stack.
+- [ ] A replay of a stream with NO reorg, and live `indexMore()` behaviour, are unchanged: the existing core, browser and server suites stay green, including the server import route that shares `feed()`.
+- [ ] `groupLogsPerBlock`'s fetch-side contract is left intact or its change is explicit and documented at the seam (whichever the chosen fix implies), so a future reader cannot mistake the fetch rule for the replay rule.
+- [ ] Tests write nothing outside their own temp/in-memory fixtures (the browser suite's fake IndexedDB and per-test tags); no real shared/global location is touched.
+
+## Blocked by
+
+- None — can start immediately.
+
+## Prompt
+
+> Fix a correctness bug in the etherfold engine: a REBUILD off a cached event stream drops the retractions that stream carries, so a reorged history is replayed as if both branches were live.
+>
+> FIRST, check this task against current reality (it is a launch snapshot and may have DRIFTED): does it still match the code, the tasks in `work/tasks/done/`, and the relevant ADRs (0004 on reorg cause, 0008 on rebuilding from the stored stream, 0034 on invalidation, 0035 on the stream cursor contract)? If a dependency landed differently than this task assumes, do not build on the stale premise — route the task to needs-attention with the discrepancy as the reason (WORK-CONTRACT.md, "Drift is a needs-attention signal").
+>
+> The behaviour required is settled and needs no new design: a REPLAY must reproduce the same sequence of applies and reverts that the LIVE path produced. Nothing about the desired semantics is open. What is missing is the mechanism.
+>
+> Vocabulary and mechanism. The engine holds a sync CURSOR (`lastSync`) whose `unconfirmedBlocks` is the finality WINDOW. `generateStreamToAppend` turns a FETCH (raw logs from a stateless `eth_getLogs`) plus that window into the event STREAM the processor consumes; it detects a reorg by comparing the window against the incoming blocks by NUMBER, and re-emits the superseded events flagged `removed`. `groupLogsPerBlock` (`packages/core/src/internal/engine/utils.ts`) deliberately SKIPS `removed` events out of its input, because in a fetch such a marker has no business existing. Its counterpart `groupStreamPerBlock` keeps them, because on the way OUT to the processor a `removed` marker is the retraction itself. `EthereumIndexer.promiseToFeed` (`packages/core/src/indexer.ts`) is used by BOTH the live fetch path and `feed()`, and `feed()` is what replays a stored stream on load and what the server's import route calls.
+>
+> The defect: `promiseToFeed` routes a REPLAY through the fetch-shaped `generateStreamToAppend`, which derives retractions only from `this.lastSync.unconfirmedBlocks`. A rebuild starts from `freshLastSync`, whose window is EMPTY, so a stored stream containing a reorg (`0xa104` events, the same events flagged `removed`, then `0xb104`) is replayed with its retractions discarded: both branches are emitted as live blocks, no `revertTo` happens, and both are applied at height 104. On the entity path the store refuses the second block at that height (`block 104 is already recorded`); on a path that tolerates the double-apply the result is silently wrong state derived partly from a dead branch.
+>
+> There is a second, same-root symptom to close in this task: after such a replay the following tip cycle re-reads the finality window and applies the replacement block AGAIN rather than recognising it as already in the window. So the fix must leave the cursor (window included) where the live run would have left it, not just emit the right stream.
+>
+> Where to work: `packages/core` (the engine). The seam to change is the feed/replay entry where a stream that already carries its own verdicts meets a function whose contract assumes it does not. Decide explicitly whether a replay gets its own path or whether `generateStreamToAppend` learns to accept a stream input, and record the choice; do not silently loosen `groupLogsPerBlock`'s fetch-side rule without saying so at the seam.
+>
+> Hard constraints. (1) This is NOT the stream keeper's bug and must NOT be fixed there: it reproduces against a hand-rolled whole-blob `ExistingStream` storing the full `lastSync` (the shipped shape), so it pre-dates the segmented keeper from PR #35. Making a keeper store the unconfirmed window again would undo a deliberate decision (ADR-0035 and `packages/core/src/stream/segments.ts`): the window has two homes that ARE read, and the stream's copy is read by nobody. (2) The characterization test in `packages/browser/test/streamSegments.test.ts` — "is REFUSED on a rebuild, because the replay drops the stored retractions" — pins the CURRENT wrong behaviour and MUST be inverted, never deleted; it is the regression proof. (3) Do not regress the delivery side already in place: `groupStreamPerBlock`, and the rule that every retraction goes in ONE batch regardless of `feedBatchSize`.
+>
+> Done means: a rebuild off a stream containing a reorg reaches the SAME state as the live run (asserted as an equality, not merely no-throw), the replacement block is applied exactly once including across the first following tip cycle, the inverted browser test is green, an engine-level test in `packages/core` exercises the replay entry directly with a stream carrying `removed` markers against a fresh cursor, and the core/browser/server suites (including the shared `feed()` import route) stay green.
+>
+> RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT — in particular the shape you chose for the replay seam, and anything you decided about how a replay reconstructs the unconfirmed window. Do no git, do not edit this task body, and do not write a done record. If a choice meets the ADR gate (hard to reverse + surprising without context + a real trade-off, see `work/protocol/ADR-FORMAT.md`), ALSO write it as an ADR in `docs/adr/` and name it in the block.
