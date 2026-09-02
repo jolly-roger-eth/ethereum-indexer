@@ -486,3 +486,7 @@ git fetch origin && git switch -c work/the-stream-appends-in-segments-on-indexed
 # on completion, in the work branch's PR/merge:
 git mv work/tasks/ready/the-stream-appends-in-segments-on-indexeddb.md work/tasks/done/the-stream-appends-in-segments-on-indexeddb.md
 ```
+
+## Requeue 2026-09-02
+
+Environment was torn down mid-build (session teardown cleared /tmp and killed the agent). The runner's abort handler saved ~1600 lines as WIP commit 9298e29; the conductor pushed that branch to the arbiter so this re-claim CONTINUES from its tip. Work completed so far: core/src/stream/segments.ts helper, OnIndexedDB keeper rewrite, core+browser segment tests, changeset. NOT yet run: the acceptance gate. Continue from the branch tip and finish; do not restart.
