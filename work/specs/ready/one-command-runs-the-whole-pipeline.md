@@ -2,9 +2,46 @@
 title: 'One command runs the whole pipeline, and the split is a deployment choice rather than a milestone'
 slug: one-command-runs-the-whole-pipeline
 taskedAfter: [one-processor-everywhere]
+needsAnswers: true
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
+
+> **NOT TASKED — DRIFTED, 2026-09-02.** Tasking was attempted and STOPPED at `TASKING-PROTOCOL` §2's
+> drift check: one of the two problems this spec is motivated by has since been SOLVED, so tasking it
+> as written would emit tasks on a false premise. The open questions are below; the Solution's command
+> set is probably still right, but its SCOPE is now unknown. Answer the questions, correct the Problem
+> Statement, clear `needsAnswers`, and it is taskable again.
+
+## Open questions
+
+1. **How much of this spec is already delivered?** The Problem Statement's first bullet — "`etherfold
+   index` folds, but is one-shot and REFUSES an entity processor outright (`packages/cli/src/index.ts`
+   throws `this processor do not support "keepState" config`)" — is now **FALSE**. The done task
+   `index-to-a-store-from-the-cli` quotes that exact throw and removes it, delivering "the same
+   processor object, unchanged, indexing on a server into SQLite". Verified: no `keepState` refusal
+   remains in `packages/cli/src`, and `packages/cli/src/keepState.ts` is gone entirely (deleted with
+   the `KeepState` family by `retire-the-js-object-processor-path`, ADR-0037). So the `index` row of
+   the five-command table substantially EXISTS. Which rows are genuinely missing now — `run`, `build`,
+   `fetch`, and the `/status` cursor field — and which are already there?
+
+2. **Does the command RENAME still stand, and who owns it?** This spec re-means `index` (no chain
+   following) and introduces `build` as the one-shot that exits at the tip. Today's CLI is `index`
+   (default, one-shot) plus `serve`. Two landed tasks already wrote around this rename as a future
+   event (`retire-the-js-object-processor-path` warned "if the rename has landed, the refusal you are
+   deleting lives on `build`"), so the rename is still pending and still owned by this spec — confirm
+   that is intended, because it is a user-visible breaking change to the only shipped command.
+
+3. **What happened to `--store` / `--folder`?** `retire-the-js-object-processor-path` recorded that
+   `--store` survives with exactly one value and stays REQUIRED, and that `--folder` went with the
+   free-form path. This spec's command table assigns a database to four of five commands but predates
+   that decision. Does the flag surface described here still match?
+
+4. **Is the `/status` cursor field still the only new surface?** The spec says so, and says the cursor
+   must arrive as an injected reporter beside `getDB`/`getEnv`/`getIngestion` rather than teaching
+   `@etherfold/server` to read a cursor table. `d1-limits-reach-the-stores-batch-bounds` has since
+   landed and wired host configuration into the store — confirm that did not already create (or
+   foreclose) the seam this spec planned to use.
 
 ## Problem Statement
 
