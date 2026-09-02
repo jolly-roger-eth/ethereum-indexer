@@ -1,0 +1,593 @@
+import 'fake-indexeddb/auto';
+import {describe, expect, it, vi} from 'vitest';
+import {createStore, get, keys as allKeys, set, type UseStore} from 'idb-keyval';
+import type {LastSync} from '@etherfold/core';
+import {fromJSProcessor, type JSProcessor} from '@etherfold/js-processor';
+import {
+	createIndexerState,
+	keepStateOnIndexedDB,
+	keepStreamOnIndexedDB,
+	KEYVAL_DATABASE,
+	KEYVAL_OBJECT_STORE,
+	streamAddress,
+} from '../src/index.js';
+import {
+	BRANCH_A,
+	BRANCH_A_EXTENDED,
+	BRANCH_A_TIP,
+	BRANCH_B,
+	BRANCH_B_TIP,
+	fakeChain,
+	FINALITY,
+	indexToTip,
+	SOURCE,
+	START_BLOCK,
+	type TestABI,
+} from '../browser/workload.js';
+
+/**
+ * THE STREAM KEEPER, on `fake-indexeddb`.
+ *
+ * The rules are asserted against the core helper (`@etherfold/core`'s
+ * `streamSegments.test.ts`); what is asserted HERE is everything that is about
+ * this substrate and cannot be seen from there: the array address, the key
+ * ranges, the one `readwrite` transaction the commit is, the store it shares with
+ * every other keeper, and the legacy blob.
+ *
+ * Cost is asserted as WORK at the INSTRUMENTED OBJECT STORE and never as
+ * wall-clock: `fake-indexeddb` is itself quadratic
+ * (`work/notes/observations/fake-indexeddb-write-cost-grows-quadratically.md`)
+ * and ADR-0032 rules a clock out on a loaded machine anyway.
+ */
+
+let counter = 0;
+const freshName = () => `segments-${counter++}-${Math.random().toString(36).slice(2, 8)}`;
+
+type Recorded = {
+	puts: {key: IDBValidKey; value: unknown; tx: IDBTransaction; mode: IDBTransactionMode}[];
+	gets: {key: IDBValidKey; tx: IDBTransaction}[];
+	scans: {method: string; count: number}[];
+	deletes: IDBValidKey[];
+};
+
+/**
+ * A `UseStore` over the SAME database and object store the keeper uses, wrapping
+ * the object store so every request it makes is counted.
+ *
+ * Mocking `idb-keyval`'s `set` or `setMany` would measure nothing now that the
+ * commit is a raw transaction: a criterion naming either would pass vacuously.
+ */
+function instrumented(): {store: UseStore; recorded: Recorded} {
+	const base = createStore(KEYVAL_DATABASE, KEYVAL_OBJECT_STORE);
+	const recorded: Recorded = {puts: [], gets: [], scans: [], deletes: []};
+	const store: UseStore = (txMode, callback) =>
+		base(txMode, (objectStore) =>
+			callback(
+				new Proxy(objectStore, {
+					get(target, property) {
+						const value = (target as unknown as Record<string | symbol, unknown>)[property];
+						if (typeof value !== 'function') return value;
+						return (...args: unknown[]) => {
+							const request = (value as (...a: unknown[]) => unknown).apply(target, args);
+							if (property === 'put') {
+								recorded.puts.push({
+									key: args[1] as IDBValidKey,
+									value: args[0],
+									tx: target.transaction,
+									mode: target.transaction.mode,
+								});
+							} else if (property === 'get') {
+								recorded.gets.push({key: args[0] as IDBValidKey, tx: target.transaction});
+							} else if (property === 'delete') {
+								recorded.deletes.push(args[0] as IDBValidKey);
+							} else if (property === 'getAll' || property === 'getAllKeys' || property === 'openCursor') {
+								const scan = {method: property as string, count: 0};
+								recorded.scans.push(scan);
+								(request as IDBRequest).addEventListener('success', () => {
+									const result = (request as IDBRequest).result;
+									scan.count = Array.isArray(result) ? result.length : result ? 1 : 0;
+								});
+							}
+							return request;
+						};
+					},
+				}),
+			),
+		);
+	return {store, recorded};
+}
+
+/** The `named-logs` channel this package logs on, silenced and recorded. */
+async function captureLogs() {
+	const {logs} = await import('named-logs');
+	const namedLogger = logs('@etherfold/browser');
+	const messages: string[] = [];
+	const record = (...args: unknown[]) => {
+		messages.push(args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+	};
+	const spies = [
+		vi.spyOn(namedLogger, 'error').mockImplementation(record),
+		vi.spyOn(namedLogger, 'info').mockImplementation(record),
+	];
+	return {messages, restore: () => spies.forEach((spy) => spy.mockRestore())};
+}
+
+function event(blockNumber: number, logIndex = 0) {
+	return {
+		blockNumber,
+		logIndex,
+		removed: false,
+		blockHash: `0x${blockNumber.toString(16)}`,
+		transactionHash: `0x${blockNumber.toString(16)}-${logIndex}`,
+	} as never;
+}
+
+function cursorAt(lastFromBlock: number, lastToBlock: number): LastSync<TestABI> {
+	return {
+		context: {source: [{startBlock: 0, hash: 'src'}], config: 'cfg', processor: 'proc'},
+		latestBlock: lastToBlock,
+		lastFromBlock,
+		lastToBlock,
+		unconfirmedBlocks: [{number: lastToBlock, hash: '0xtip', events: []}],
+	} as unknown as LastSync<TestABI>;
+}
+
+const OTHER_CHAIN = {...SOURCE, chainId: '10'};
+
+describe('the address', () => {
+	it('is an ARRAY key with the digest level present, and `chainId` is not a level of its own', async () => {
+		const tag = freshName();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
+
+		const written = (await allKeys()).filter((key) => Array.isArray(key) && key[1] === tag) as IDBValidKey[][];
+		expect(written).toHaveLength(2);
+		for (const key of written) {
+			expect(Array.isArray(key)).toBe(true);
+			// FOUR levels: the literal, the indexer name, the digest, the ordinal or
+			// the cursor. `chainId` is not one of them -- it is inside the digest,
+			// which is what keeps two chains apart until the real one lands.
+			expect(key).toHaveLength(4);
+			expect(key[0]).toBe('stream');
+			expect(key[1]).toBe(tag);
+			expect(key[2]).toBe(`chain-${SOURCE.chainId}`);
+			expect(key.slice(0, 3)).not.toContain(SOURCE.chainId);
+		}
+		expect(written.map((key) => key[3]).sort()).toEqual([0, 'cursor']);
+		expect(streamAddress(tag, SOURCE.chainId).cursor).toEqual(['stream', tag, `chain-${SOURCE.chainId}`, 'cursor']);
+	});
+
+	it('holds the cursor ONCE, in the cursor record inside the subtree, with no competing copy', async () => {
+		const tag = freshName();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
+		const address = streamAddress(tag, SOURCE.chainId);
+
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(101)], lastSync: cursorAt(101, 104)});
+
+		// a segment is `{events}` and nothing else: no extent, no `lastSync`, no window
+		for (const ordinal of [0, 1]) {
+			const segment = await get<Record<string, unknown>>(address.segment(ordinal));
+			expect(Object.keys(segment!)).toEqual(['events']);
+		}
+		const record = await get<Record<string, unknown>>(address.cursor);
+		expect(Object.keys(record!).sort()).toEqual([
+			'context',
+			'lastFromBlock',
+			'lastToBlock',
+			'latestBlock',
+			'nextOrdinal',
+			'startBlock',
+		]);
+		// and it is INSIDE the subtree, so a scoped delete cannot orphan it
+		expect((address.cursor as IDBValidKey[]).slice(0, 3)).toEqual(address.prefix);
+	});
+
+	it('cannot confuse one indexer name with another that it is a PREFIX of', async () => {
+		const tag = freshName();
+		const shortName = keepStreamOnIndexedDB<TestABI>(tag);
+		const longName = keepStreamOnIndexedDB<TestABI>(`${tag}_10`);
+
+		await shortName.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
+		await longName.saveNewEvents(SOURCE, {eventStream: [event(200), event(201)], lastSync: cursorAt(100, 201)});
+
+		expect((await shortName.fetchFrom(SOURCE, 100))?.eventStream).toHaveLength(1);
+		expect((await longName.fetchFrom(SOURCE, 100))?.eventStream).toHaveLength(2);
+
+		// a flat delimited key would have made `stream_<tag>_1` a prefix of
+		// `stream_<tag>_10_0`; comparing key ELEMENTS cannot
+		await shortName.clear(SOURCE);
+		expect(await shortName.fetchFrom(SOURCE, 100)).toBeUndefined();
+		expect((await longName.fetchFrom(SOURCE, 100))?.eventStream).toHaveLength(2);
+	});
+});
+
+describe('two CHAINS under one indexer name do not see each other', () => {
+	it('writes, reads and clears one while the other stays complete and replayable', async () => {
+		const tag = freshName();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
+
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100), event(101)], lastSync: cursorAt(100, 101)});
+		await keeper.saveNewEvents(OTHER_CHAIN, {eventStream: [event(500)], lastSync: cursorAt(500, 500)});
+
+		expect((await keeper.fetchFrom(SOURCE, 100))?.eventStream.map((e) => e.blockNumber)).toEqual([100, 101]);
+		expect((await keeper.fetchFrom(OTHER_CHAIN, 500))?.eventStream.map((e) => e.blockNumber)).toEqual([500]);
+
+		await keeper.clear(SOURCE);
+
+		expect(await keeper.fetchFrom(SOURCE, 100)).toBeUndefined();
+		const survivor = await keeper.fetchFrom(OTHER_CHAIN, 500);
+		expect(survivor?.eventStream.map((e) => e.blockNumber)).toEqual([500]);
+		expect(survivor?.lastSync.lastToBlock).toBe(500);
+	});
+});
+
+describe('segments are read by KEY RANGE, not by a whole-store scan', () => {
+	it('reads only the asked-for stream`s records, however many streams share the store', async () => {
+		const mine = freshName();
+		const theirs = freshName();
+		const {store, recorded} = instrumented();
+		const keeper = keepStreamOnIndexedDB<TestABI>(mine, {store});
+		const neighbour = keepStreamOnIndexedDB<TestABI>(theirs, {store});
+
+		for (let i = 0; i < 5; i++) {
+			await keeper.saveNewEvents(SOURCE, {eventStream: [event(100 + i)], lastSync: cursorAt(100 + i, 100 + i)});
+			await neighbour.saveNewEvents(SOURCE, {eventStream: [event(100 + i)], lastSync: cursorAt(100 + i, 100 + i)});
+		}
+		recorded.scans.length = 0;
+
+		const fetched = await keeper.fetchFrom(SOURCE, 100);
+		expect(fetched?.eventStream).toHaveLength(5);
+
+		// five segments, not ten, and not "every key in the store": `keys()` would
+		// make `fetchFrom` O(store) once several streams exist
+		expect(recorded.scans.length).toBeGreaterThan(0);
+		for (const scan of recorded.scans) {
+			expect(scan.count).toBe(5);
+		}
+	});
+});
+
+describe('a save writes exactly its BATCH plus the cursor record', () => {
+	it('makes two puts, at its own segment and the cursor, and never rewrites a segment', async () => {
+		const tag = freshName();
+		const {store, recorded} = instrumented();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag, {store});
+		const address = streamAddress(tag, SOURCE.chainId);
+
+		for (let i = 0; i < 100; i++) {
+			await keeper.saveNewEvents(SOURCE, {
+				eventStream: [event(100 + i, 0), event(100 + i, 1)],
+				lastSync: cursorAt(100 + i, 100 + i),
+			});
+		}
+
+		// exactly two puts per save, whatever the history behind them
+		expect(recorded.puts).toHaveLength(200);
+		const segmentPuts = recorded.puts.filter((put) => typeof (put.key as IDBValidKey[])[3] === 'number');
+		expect(segmentPuts).toHaveLength(100);
+
+		// the 100th save wrote the 100th BATCH, not the history: two events, and the
+		// same two the caller handed over
+		const last = segmentPuts[segmentPuts.length - 1];
+		expect(last.key).toEqual(address.segment(99));
+		expect((last.value as {events: unknown[]}).events).toHaveLength(2);
+		// no threshold either: every segment is its own batch and no other size, and
+		// the bytes written do not grow with the history behind them
+		expect(new Set(segmentPuts.map((put) => (put.value as {events: unknown[]}).events.length))).toEqual(new Set([2]));
+		const sizes = segmentPuts.map((put) => JSON.stringify(put.value).length);
+		expect(Math.max(...sizes)).toBe(Math.min(...sizes));
+
+		// and no segment key is ever written a second time
+		const segmentKeys = segmentPuts.map((put) => JSON.stringify(put.key));
+		expect(new Set(segmentKeys).size).toBe(segmentKeys.length);
+	});
+
+	it('reads the cursor and writes both records in ONE `readwrite` transaction', async () => {
+		const tag = freshName();
+		const {store, recorded} = instrumented();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag, {store});
+
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
+		recorded.gets.length = 0;
+		recorded.puts.length = 0;
+		recorded.scans.length = 0;
+
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(101)], lastSync: cursorAt(101, 101)});
+
+		expect(recorded.gets).toHaveLength(1);
+		expect(recorded.puts).toHaveLength(2);
+		expect(recorded.puts[0].mode).toBe('readwrite');
+		// the read and both writes on ONE transaction. A `get` followed by `setMany`
+		// is two, and two tabs would then both read next-ordinal `n` and both write
+		// segment `n`, losing a batch with the ordinals still contiguous.
+		expect(recorded.puts[0].tx).toBe(recorded.gets[0].tx);
+		expect(recorded.puts[1].tx).toBe(recorded.gets[0].tx);
+		// and it decided where to write from the CURSOR, with no scan of the keyspace
+		expect(recorded.scans).toHaveLength(0);
+	});
+
+	it('an EMPTY save writes ONLY the cursor record', async () => {
+		const tag = freshName();
+		const {store, recorded} = instrumented();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag, {store});
+		const address = streamAddress(tag, SOURCE.chainId);
+
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
+		recorded.puts.length = 0;
+
+		await keeper.saveNewEvents(SOURCE, {eventStream: [], lastSync: cursorAt(101, 400)});
+
+		expect(recorded.puts).toHaveLength(1);
+		expect(recorded.puts[0].key).toEqual(address.cursor);
+	});
+});
+
+describe('two keepers over one store cannot lose a batch', () => {
+	it('interleaves saves without writing an ordinal twice or dropping one', async () => {
+		const tag = freshName();
+		const a = instrumented();
+		const b = instrumented();
+		const keeperA = keepStreamOnIndexedDB<TestABI>(tag, {store: a.store});
+		const keeperB = keepStreamOnIndexedDB<TestABI>(tag, {store: b.store});
+
+		// Both tabs re-scan from the same block, which is what a pair of tabs
+		// following the same chain actually does, so neither save is a forward jump
+		// whichever order they land in.
+		const rounds = 20;
+		for (let i = 0; i < rounds; i++) {
+			await Promise.all([
+				keeperA.saveNewEvents(SOURCE, {eventStream: [event(100, i * 2)], lastSync: cursorAt(100, 100 + i)}),
+				keeperB.saveNewEvents(SOURCE, {eventStream: [event(100, i * 2 + 1)], lastSync: cursorAt(100, 100 + i)}),
+			]);
+		}
+
+		const segmentPuts = [...a.recorded.puts, ...b.recorded.puts].filter(
+			(put) => typeof (put.key as IDBValidKey[])[3] === 'number',
+		);
+		const ordinals = segmentPuts.map((put) => (put.key as IDBValidKey[])[3] as number);
+		expect(ordinals).toHaveLength(rounds * 2);
+		expect(new Set(ordinals).size).toBe(ordinals.length);
+
+		const stored = await keeperA.fetchFrom(SOURCE, 100);
+		const logIndexes = (stored?.eventStream ?? []).map((e) => e.logIndex).sort((x, y) => Number(x) - Number(y));
+		expect(logIndexes).toEqual(Array.from({length: rounds * 2}, (_, i) => i));
+	});
+});
+
+describe('clear removes the subtree and nothing else', () => {
+	it('leaves an unrelated key in the same store alone, and presence reads FALSE afterwards', async () => {
+		const tag = freshName();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
+		const neighbourKey = `some-other-keeper-${tag}`;
+
+		await set(neighbourKey, {mine: true});
+		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
+
+		await keeper.clear(SOURCE);
+
+		// `idb-keyval`'s `clear()` would have taken this with it, along with every
+		// other stream and every row `keepStateOnIndexedDB` wrote
+		expect(await get(neighbourKey)).toEqual({mine: true});
+		expect(await keeper.fetchFrom(SOURCE, 100)).toBeUndefined();
+		expect((await allKeys()).filter((key) => Array.isArray(key) && key[1] === tag)).toEqual([]);
+	});
+});
+
+describe('the legacy flat-key blob', () => {
+	it('is DELETED rather than adopted, from `fetchFrom`, and the deletion is logged', async () => {
+		const tag = freshName();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
+		const address = streamAddress(tag, SOURCE.chainId);
+		const logged = await captureLogs();
+
+		// exactly what the shipped keeper wrote: one flat key, the whole stream
+		await set(address.legacy, {lastSync: cursorAt(100, 104), eventStream: [event(100), event(104)]});
+
+		// detected in `fetchFrom` and not only in `clear`: `indexer.ts`'s state-kept
+		// branch guards its `clear` behind `if (existingStreamData)`, so a blob found
+		// only by `clear` would survive indefinitely
+		expect(await keeper.fetchFrom(SOURCE, 100)).toBeUndefined();
+		expect(await get(address.legacy)).toBeUndefined();
+		expect(logged.messages.some((m) => m.includes('DELETED rather than'))).toBe(true);
+		logged.restore();
+	});
+
+	it('is deleted by `clear` too', async () => {
+		const tag = freshName();
+		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
+		const address = streamAddress(tag, SOURCE.chainId);
+
+		await set(address.legacy, {lastSync: cursorAt(100, 104), eventStream: []});
+		await keeper.clear(SOURCE);
+
+		expect(await get(address.legacy)).toBeUndefined();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// The START BLOCK, end to end.
+// ---------------------------------------------------------------------------
+
+type Applied = {applied: string[]};
+
+const applyingProcessor: JSProcessor<TestABI, Applied> = {
+	version: '1.0.0',
+	construct: () => ({applied: []}),
+	onTransfer(json, event) {
+		json.applied.push(`${event.blockHash}:${event.logIndex}`);
+	},
+};
+
+function indexerOver(keepers: {keepState?: unknown; keepStream?: unknown}) {
+	return createIndexerState<TestABI, Applied>(fromJSProcessor(applyingProcessor)(), {
+		...(keepers.keepState ? {keepState: keepers.keepState as never} : {}),
+		...(keepers.keepStream ? {keepStream: keepers.keepStream as never} : {}),
+	});
+}
+
+const CONFIG = {stream: {finality: FINALITY}};
+const DIVERGED_TIP = 120;
+
+describe('a stream that does not reach back to the requested fromBlock', () => {
+	it('is cleared on a REBUILD and re-fetched, while a state-kept reload keeps it', async () => {
+		const tag = freshName();
+		const chain = fakeChain();
+		const stream = keepStreamOnIndexedDB<TestABI>(tag);
+		const address = streamAddress(tag, SOURCE.chainId);
+
+		// A tab whose stream was the shipped blob: the state is good, the blob is
+		// deleted on load, and nothing re-fetches -- so the NEXT save opens a subtree
+		// whose first segment begins mid-history. This is the state a self-clear
+		// creates, and it is why the cursor record carries a start block at all.
+		const first = indexerOver({keepState: keepStateOnIndexedDB(tag)});
+		await first.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(first as never);
+		first.dispose();
+		await set(address.legacy, {lastSync: cursorAt(START_BLOCK, BRANCH_A_TIP), eventStream: []});
+
+		chain.serve(BRANCH_A_EXTENDED, DIVERGED_TIP);
+		const second = indexerOver({keepState: keepStateOnIndexedDB(tag), keepStream: stream});
+		await second.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(second as never);
+		second.dispose();
+
+		const partial = await get<{startBlock: number}>(address.cursor);
+		expect(partial).toBeDefined();
+		expect(partial!.startBlock).toBeGreaterThan(START_BLOCK);
+
+		// THE NEGATIVE, and it matters as much: while the state is kept, the request
+		// is for the RESUME point, which this stream does serve. A keeper comparing
+		// its start block against the SOURCE's minimum instead would clear here, the
+		// next save would recreate it partial, and it would re-index on every reload
+		// forever.
+		for (let reload = 0; reload < 3; reload++) {
+			const kept = indexerOver({keepState: keepStateOnIndexedDB(tag), keepStream: stream});
+			await kept.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+			await indexToTip(kept as never);
+			kept.dispose();
+			expect(await get(address.cursor)).toBeDefined();
+		}
+		expect((await get<{startBlock: number}>(address.cursor))!.startBlock).toBe(partial!.startBlock);
+
+		// now DISCARD the state: the rebuild asks from the source's first block, and
+		// this stream cannot serve it. Replaying it would rebuild state that is
+		// silently missing every block below its start.
+		const rangesBefore = chain.ranges.length;
+		const rebuilt = indexerOver({keepStream: stream});
+		await rebuilt.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(rebuilt as never);
+
+		expect(chain.ranges.slice(rangesBefore).some((range) => range.from === START_BLOCK)).toBe(true);
+
+		const scratchChain = fakeChain(BRANCH_A_EXTENDED, DIVERGED_TIP);
+		const scratch = indexerOver({});
+		await scratch.init({provider: scratchChain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(scratch as never);
+		expect(rebuilt.state.$state.applied).toEqual(scratch.state.$state.applied);
+		expect(rebuilt.state.$state.applied).toHaveLength(BRANCH_A_EXTENDED.length);
+
+		rebuilt.dispose();
+		scratch.dispose();
+	});
+});
+
+/**
+ * The SAME keeper, with an unconfirmed WINDOW re-attached on the way out.
+ *
+ * The shipped keeper stored the whole `lastSync`, window included, and this is
+ * the control for dropping it: if a rebuild off a stream that carries the window
+ * lands where a rebuild off one that does not lands, the window was REDUNDANT
+ * here rather than merely unread. (It is: `promiseToFeed` takes the three block
+ * numbers and `generateStreamToAppend` rebuilds the window from the events.)
+ */
+function withWindowReattached(keeper: ReturnType<typeof keepStreamOnIndexedDB<TestABI>>) {
+	return {
+		...keeper,
+		async fetchFrom(source: never, fromBlock: number) {
+			const fetched = await keeper.fetchFrom(source, fromBlock);
+			if (!fetched) return fetched;
+			const floor = fetched.lastSync.latestBlock - FINALITY;
+			const blocks: {number: number; hash: string; events: unknown[]}[] = [];
+			for (const e of fetched.eventStream as unknown as {blockNumber: number; blockHash: string; removed?: boolean}[]) {
+				if (e.removed || e.blockNumber <= floor) continue;
+				let block = blocks.find((b) => b.hash === e.blockHash);
+				if (!block) blocks.push((block = {number: e.blockNumber, hash: e.blockHash, events: []}));
+				block.events.push(e);
+			}
+			return {...fetched, lastSync: {...fetched.lastSync, unconfirmedBlocks: blocks as never}};
+		},
+	};
+}
+
+describe('a reorg, replayed', () => {
+	/** Index branch A to its tip, then the reorged branch B, keeping the stream. */
+	async function liveRunThroughAReorg(tag: string) {
+		const chain = fakeChain();
+		const stream = keepStreamOnIndexedDB<TestABI>(tag);
+		const live = indexerOver({keepStream: stream});
+		await live.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(live as never);
+		chain.serve(BRANCH_B, BRANCH_B_TIP);
+		await indexToTip(live as never);
+		const applied = [...live.state.$state.applied];
+		live.dispose();
+		return {chain, stream, applied};
+	}
+
+	it('returns the retractions in APPEND order', async () => {
+		const {stream} = await liveRunThroughAReorg(freshName());
+
+		const stored = await stream.fetchFrom(SOURCE, START_BLOCK);
+		const order = (stored?.eventStream ?? []).map((e) => `${e.blockHash}:${e.logIndex}${e.removed ? ':removed' : ''}`);
+		// the superseded 104 comes back at its ORIGINAL block, flagged `removed`, AFTER
+		// the events it supersedes and BEFORE the replacement branch -- which is why
+		// segments are keyed by ordinal and the read is a full ordered scan: a later
+		// segment holds LOWER block numbers and no block ordering could produce this.
+		expect(order.filter((entry) => entry.includes('0xa104'))).toEqual([
+			'0xa104:0',
+			'0xa104:1',
+			'0xa104:0:removed',
+			'0xa104:1:removed',
+		]);
+		expect(order.indexOf('0xa104:0:removed')).toBeLessThan(order.indexOf('0xb104:0'));
+		expect(stored?.lastSync.unconfirmedBlocks).toEqual([]);
+	});
+
+	it('rebuilds the same state whether or not the cursor carries a window', async () => {
+		const withoutWindow = await liveRunThroughAReorg(freshName());
+		const withWindow = await liveRunThroughAReorg(freshName());
+
+		const plain = indexerOver({keepStream: withoutWindow.stream});
+		await plain.init({provider: withoutWindow.chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(plain as never);
+
+		const windowed = indexerOver({keepStream: withWindowReattached(withWindow.stream)});
+		await windowed.init({provider: withWindow.chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(windowed as never);
+
+		expect(plain.state.$state.applied).toEqual(windowed.state.$state.applied);
+		plain.dispose();
+		windowed.dispose();
+	});
+});
+
+describe('`fetchFrom` answers what it answered before', () => {
+	it('returns the same events in the same order as one whole-blob read did', async () => {
+		const tag = freshName();
+		const chain = fakeChain();
+		const stream = keepStreamOnIndexedDB<TestABI>(tag);
+
+		const indexer = indexerOver({keepStream: stream});
+		await indexer.init({provider: chain.provider, source: SOURCE, config: CONFIG});
+		await indexToTip(indexer as never);
+		indexer.dispose();
+
+		const whole = await stream.fetchFrom(SOURCE, START_BLOCK);
+		expect(whole?.eventStream.map((e) => `${e.blockHash}:${e.logIndex}`)).toEqual(
+			BRANCH_A.map((log) => `${log.blockHash}:${parseInt(log.logIndex.slice(2), 16)}`),
+		);
+		// the window is not stored and not reconstructed
+		expect(whole?.lastSync.unconfirmedBlocks).toEqual([]);
+	});
+});

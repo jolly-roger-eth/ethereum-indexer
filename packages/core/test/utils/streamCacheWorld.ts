@@ -92,12 +92,15 @@ export function fakeChain(logs: LogEvent<Abi>[] = [], tip = 105) {
 }
 
 /**
- * A stream keeper with the SHIPPED keeper's semantics, in memory.
+ * A stream keeper with the seam's OBSERVABLE semantics, in memory.
  *
- * `keepStreamOnIndexedDB` is one blob: a save concatenates onto what is stored
- * and rewrites the cursor, a fetch filters by block, and a clear drops
- * everything. That is what the engine is asserted against here; the browser
- * suite runs the same shapes through the real keeper on `fake-indexeddb`.
+ * A save appends to what is stored and moves the cursor, a fetch filters by
+ * block, and a clear drops everything -- which is what an `ExistingStream` looks
+ * like from the engine's side whether it stores one blob (as the shipped keeper
+ * did) or a run of ordinal SEGMENTS (as `keepStreamOnIndexedDB` now does). That
+ * is what the engine is asserted against here; the browser suite runs the same
+ * shapes through the real keeper on `fake-indexeddb`, and the segmentation rules
+ * themselves are pinned in `streamSegments.test.ts`.
  */
 export function memoryStream(initial?: {lastSync: LastSync<Abi>; eventStream: LogEvent<Abi>[]}) {
 	let stored = initial ? (JSON.parse(JSON.stringify(initial)) as typeof initial) : undefined;
