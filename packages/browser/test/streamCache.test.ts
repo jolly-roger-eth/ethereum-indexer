@@ -68,11 +68,14 @@ function failableStream(name: string) {
 			failWith = undefined;
 		},
 		async storedEvents(): Promise<string[]> {
-			const stored = await real.fetchFrom({chainId: SOURCE.chainId} as never, 0);
+			// From the source's own first block, not 0: `fetchFrom` REFUSES (and clears)
+			// a stream that does not reach back to what was asked for, so an inspection
+			// asking for a block below the start would destroy what it came to read.
+			const stored = await real.fetchFrom({chainId: SOURCE.chainId} as never, START_BLOCK);
 			return (stored?.eventStream ?? []).map((event: any) => `${event.blockHash}:${event.logIndex}`);
 		},
 		async storedCursor(): Promise<LastSync<TestABI> | undefined> {
-			const stored = await real.fetchFrom({chainId: SOURCE.chainId} as never, 0);
+			const stored = await real.fetchFrom({chainId: SOURCE.chainId} as never, START_BLOCK);
 			return stored?.lastSync as LastSync<TestABI> | undefined;
 		},
 	};

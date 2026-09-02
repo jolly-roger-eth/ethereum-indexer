@@ -8,6 +8,7 @@ import {
 	createIndexerState,
 	keepStateOnIndexedDB,
 	keepStreamOnIndexedDB,
+	streamAddress,
 } from '../src/index.js';
 import {
 	EXPECTED_A,
@@ -191,19 +192,28 @@ describe('a context persisted by the SHIPPED code, read by this one', () => {
 	 */
 	async function agePersistedContextsToTheShippedShape(tag: string) {
 		const wholeSource = [{startBlock: 0, hash: simple_hash(SOURCE)}];
-		for (const storageID of [`${tag}_${SOURCE.chainId}`, `stream_${tag}_${SOURCE.chainId}`]) {
-			const stored = await get<{lastSync: LastSync<TestABI>}>(storageID);
-			expect(stored).toBeDefined();
-			// what the new code wrote is the per-event list, so this is a real ageing
-			expect((stored as {lastSync: LastSync<TestABI>}).lastSync.context.source.length).toBeGreaterThan(1);
-			await set(storageID, {
-				...stored,
-				lastSync: {
-					...(stored as {lastSync: LastSync<TestABI>}).lastSync,
-					context: {...(stored as {lastSync: LastSync<TestABI>}).lastSync.context, source: wholeSource},
-				},
-			});
-		}
+
+		// The STATE keeper still writes one blob under a flat key, with the cursor
+		// inside it.
+		const stateKey = `${tag}_${SOURCE.chainId}`;
+		const state = await get<{lastSync: LastSync<TestABI>}>(stateKey);
+		expect(state).toBeDefined();
+		// what the new code wrote is the per-event list, so this is a real ageing
+		expect(state!.lastSync.context.source.length).toBeGreaterThan(1);
+		await set(stateKey, {
+			...state,
+			lastSync: {...state!.lastSync, context: {...state!.lastSync.context, source: wholeSource}},
+		});
+
+		// The STREAM keeper's cursor now lives ONCE, in the cursor record inside the
+		// stream's subtree, at the hierarchical address. Same ageing, deliberately
+		// re-aimed: the trap this test exists for is a persisted `ContextIdentifier`
+		// misread by its successor, and moving where it is stored does not retire it.
+		const cursorKey = streamAddress(tag, SOURCE.chainId).cursor;
+		const cursor = await get<{context: LastSync<TestABI>['context']}>(cursorKey);
+		expect(cursor).toBeDefined();
+		expect(cursor!.context.source.length).toBeGreaterThan(1);
+		await set(cursorKey, {...cursor, context: {...cursor!.context, source: wholeSource}});
 	}
 
 	it('resumes rather than re-indexing, on a source that did not move', async () => {

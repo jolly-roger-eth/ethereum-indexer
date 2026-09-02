@@ -20,6 +20,7 @@ export {resolveStreamConfig} from './internal/engine/utils.js';
 export * from './snapshot.js';
 export * from './stream/fixture.js';
 export * from './stream/capture.js';
+export * from './stream/segments.js';
 
 export type {
 	Abi,
