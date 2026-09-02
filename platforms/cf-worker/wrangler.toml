@@ -6,7 +6,21 @@ compatibility_flags = ["nodejs_compat"]
 [observability]
 enabled = true
 
+# Which plan this deployment runs on, which is what the state store's per-request
+# bounds are derived from (src/d1.ts). `free` and `paid` differ by 20x on queries
+# per Worker invocation, so moving between them is a CONFIGURATION change here --
+# or `wrangler deploy --var D1_PLAN:paid`, or a secret -- and never a code change.
+# It is stated rather than left out because an omitted value means `free`, and a
+# Paid deployment would then silently pay the Free tier's price forever.
+[vars]
+D1_PLAN = "free"
+
+# NOTE: a named environment does NOT inherit the top-level `[vars]`, so the value
+# is repeated per environment rather than assumed.
 [env.production]
 d1_databases = [
   { binding = "DB", database_name = "etherfold-db", database_id = "" }
 ]
+
+[env.production.vars]
+D1_PLAN = "free"

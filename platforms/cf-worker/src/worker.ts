@@ -1,5 +1,5 @@
-import {RemoteD1} from 'remote-sql-d1';
 import {createServer} from '@etherfold/server';
+import {createD1DB} from './d1.js';
 import type {CloudflareEnv} from './env.js';
 
 /**
@@ -13,9 +13,15 @@ import type {CloudflareEnv} from './env.js';
  * Node adapter does that, because there is one process owning one file. Here
  * there are many instances against one D1, so migration is an operator action
  * (`POST /admin/setup`, or wrangler), not something several isolates race to do.
+ *
+ * It also hosts no processor, so it passes no `getIngestion` and the ingestion
+ * routes answer `501`. A deployment that DOES host one bundles its processor and
+ * builds its store with `createD1Store` (`d1.ts`), which is where this host
+ * states D1's per-request limits: the store is given the bounds THIS plan
+ * allows, instead of a shared package carrying one vendor's numbers.
  */
 export const app = createServer<CloudflareEnv>({
-	getDB: (c) => new RemoteD1(c.env.DB as never),
+	getDB: (c) => createD1DB(c.env),
 	getEnv: (c) => c.env,
 });
 
