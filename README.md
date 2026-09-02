@@ -36,6 +36,24 @@ NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000
 - Supports Reorg
 - Supports caching
 
+## The packages
+
+One engine, one way to author a processor, and then a choice of where the state lives and who runs the loop. Read down the column that describes your deployment; each package's own README says when to reach for it instead of its neighbours.
+
+| | |
+| --- | --- |
+| **the engine** | [`@etherfold/core`](packages/core) -- fetch logs, derive reorgs, drive a processor. Stores nothing |
+| **authoring a processor** | [`@etherfold/processor-entities`](packages/processor-entities) -- entity declarations plus `on<EventName>` handlers, naming no backend |
+| **where the state lives** | [`@etherfold/state-store`](packages/state-store) is the seam; the backends are [`-sqlite`](packages/state-store-sqlite) (a server), [`-indexeddb`](packages/state-store-indexeddb) (the browser default) and [`-patch`](packages/state-store-patch) (light, memory-only). A new one earns its place by passing [`-conformance`](packages/state-store-conformance) |
+| **running it in a tab** | [`@etherfold/browser`](packages/browser) -- observable stores, auto-indexing, in-place reconfigure |
+| **running it from a terminal** | [`etherfold`](packages/cli) -- `index` folds to the tip and exits; `serve` puts the server in front of a database |
+| **running it as a service** | [`@etherfold/server`](packages/server) is the host-free HTTP app; [`platforms/nodejs`](platforms/nodejs) and [`platforms/cf-worker`](platforms/cf-worker) are the hosts |
+| **splitting fetching from folding** | [`@etherfold/fetcher-host`](packages/fetcher-host) decides when a fetch cycle runs; [`platforms/nodejs-fetcher`](platforms/nodejs-fetcher) is the process that does it |
+| **richer reads on a SQL backend** | [`@etherfold/processor-sqlite`](packages/processor-sqlite) -- the same processor, plus caller-supplied SQL and block addressing |
+| **loading a processor by path** | [`@etherfold/utils`](packages/utils) -- what a host uses to turn `-p ./processor.js` into a processor and its source |
+
+`archive/` is retired code kept only as reading material: outside the workspace globs, and not built, tested, versioned or published.
+
 ## Why ?
 
 The main reason for building `etherfold` is to have the indexing be performed in a fully decentralised manner: in the client.
