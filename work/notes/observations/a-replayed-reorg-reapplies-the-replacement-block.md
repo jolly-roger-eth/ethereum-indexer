@@ -1,3 +1,7 @@
+---
+needsAnswers: true
+---
+
 # A replayed reorged stream applies the replacement block TWICE
 
 2026-09-02, noticed while building `the-stream-appends-in-segments-on-indexeddb`.
