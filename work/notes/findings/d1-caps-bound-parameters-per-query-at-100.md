@@ -1,7 +1,7 @@
 ---
 title: 'D1 caps bound parameters per query at 100, so the store''s default prune batch is 5x over'
 slug: d1-caps-bound-parameters-per-query-at-100
-source: 'Cloudflare D1 platform limits, https://developers.cloudflare.com/d1/platform/limits/, retrieved 2026-09-01 (page states "Last updated Apr 21, 2026"). Cross-checked against packages/state-store-sqlite/src/statements.ts and src/batching.ts at 29e17c6.'
+source: 'Cloudflare D1 platform limits, https://developers.cloudflare.com/d1/platform/limits/, retrieved 2026-09-01 and re-fetched 2026-09-02 with every number below UNCHANGED (page still states "Last updated Apr 21, 2026"). Cross-checked against packages/state-store-sqlite/src/statements.ts and src/batching.ts at 29e17c6.'
 ---
 
 Cloudflare D1's documented per-query limits, as of the retrieval above. These are the numbers the
@@ -76,6 +76,16 @@ What remains undelivered is the other half: a HOST adapter stating its own backe
 passing `{bounds}`, which is `work/tasks/backlog/d1-limits-reach-the-stores-batch-bounds.md`. A host
 is the one place allowed to name its backend, so a Paid-tier deployment raises
 `maxStatementsPerBatch` there rather than everyone paying the Free tier's price forever.
+
+**DONE 2026-09-02, by that task: `platforms/cf-worker/src/d1.ts`.** The table above is transcribed
+there as `D1_LIMITS`, keyed by PLAN, and `d1BatchBounds(plan)` turns it into the store's
+`BatchBounds`; which plan a deployment is on is the `D1_PLAN` var in `wrangler.toml`, so moving
+between Free and Paid is a configuration change. Two couplings that only hold while this note and
+that file agree, and which the adapter's tests assert rather than trust: `d1BatchBounds('free')`
+equals `DEFAULT_BATCH_BOUNDS` exactly (the shipped default is DERIVED from the Free column, so a
+moved limit means a moved default), and no statement a prune emits carries more bound parameters
+than the cap. The per-INVOCATION budget is a third number the adapter takes from here,
+`d1PruneBudget(plan)`, because no batch bound can keep an invocation inside a query cap.
 
 ## Why it is a finding rather than an observation
 

@@ -947,6 +947,9 @@ importers:
       '@etherfold/server':
         specifier: workspace:*
         version: link:../../packages/server
+      '@etherfold/state-store-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/state-store-sqlite
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
