@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import {describe, expect, it, vi} from 'vitest';
 import {createStore, get, keys as allKeys, set, type UseStore} from 'idb-keyval';
-import type {LastSync} from '@etherfold/core';
+import {resolveStreamConfig, streamDigestOf, type IndexingSource, type LastSync} from '@etherfold/core';
 import {keepStreamOnIndexedDB, KEYVAL_DATABASE, KEYVAL_OBJECT_STORE, streamAddress} from '../src/index.js';
 import {appliedIn, applyingProcessor, browserStore, indexerOver, keysOf} from './utils/applied.js';
 import {
@@ -128,6 +128,21 @@ function cursorAt(lastFromBlock: number, lastToBlock: number): LastSync<TestABI>
 
 const OTHER_CHAIN = {...SOURCE, chainId: '10'};
 
+/**
+ * The address of a stream, at the stream config the keeper under test is running.
+ *
+ * The DIGEST level is a function of the filter AND the config (`streamDigestOf`),
+ * so an inspection has to name the same config the keeper was handed or it would
+ * be reading a different stream's subtree. A keeper nobody has told runs at the
+ * resolved DEFAULT, which is what an indexer given no `stream` config runs at
+ * too; the end-to-end cases below pass `CONFIG.stream` instead.
+ */
+const addressOf = (
+	name: string,
+	streamConfig: Parameters<typeof resolveStreamConfig>[0] = undefined,
+	source: IndexingSource<TestABI> = SOURCE,
+) => streamAddress(name, source, resolveStreamConfig(streamConfig));
+
 describe('the address', () => {
 	it('is an ARRAY key with the digest level present, and `chainId` is not a level of its own', async () => {
 		const tag = freshName();
@@ -144,17 +159,22 @@ describe('the address', () => {
 			expect(key).toHaveLength(4);
 			expect(key[0]).toBe('stream');
 			expect(key[1]).toBe(tag);
-			expect(key[2]).toBe(`chain-${SOURCE.chainId}`);
+			expect(key[2]).toBe(streamDigestOf(SOURCE, resolveStreamConfig(undefined)));
 			expect(key.slice(0, 3)).not.toContain(SOURCE.chainId);
 		}
 		expect(written.map((key) => key[3]).sort()).toEqual([0, 'cursor']);
-		expect(streamAddress(tag, SOURCE.chainId).cursor).toEqual(['stream', tag, `chain-${SOURCE.chainId}`, 'cursor']);
+		expect(addressOf(tag).cursor).toEqual([
+			'stream',
+			tag,
+			streamDigestOf(SOURCE, resolveStreamConfig(undefined)),
+			'cursor',
+		]);
 	});
 
 	it('holds the cursor ONCE, in the cursor record inside the subtree, with no competing copy', async () => {
 		const tag = freshName();
 		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
-		const address = streamAddress(tag, SOURCE.chainId);
+		const address = addressOf(tag);
 
 		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
 		await keeper.saveNewEvents(SOURCE, {eventStream: [event(101)], lastSync: cursorAt(101, 104)});
@@ -247,7 +267,7 @@ describe('a save writes exactly its BATCH plus the cursor record', () => {
 		const tag = freshName();
 		const {store, recorded} = instrumented();
 		const keeper = keepStreamOnIndexedDB<TestABI>(tag, {store});
-		const address = streamAddress(tag, SOURCE.chainId);
+		const address = addressOf(tag);
 
 		for (let i = 0; i < 100; i++) {
 			await keeper.saveNewEvents(SOURCE, {
@@ -305,7 +325,7 @@ describe('a save writes exactly its BATCH plus the cursor record', () => {
 		const tag = freshName();
 		const {store, recorded} = instrumented();
 		const keeper = keepStreamOnIndexedDB<TestABI>(tag, {store});
-		const address = streamAddress(tag, SOURCE.chainId);
+		const address = addressOf(tag);
 
 		await keeper.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursorAt(100, 100)});
 		recorded.puts.length = 0;
@@ -372,7 +392,7 @@ describe('the legacy flat-key blob', () => {
 	it('is DELETED rather than adopted, from `fetchFrom`, and the deletion is logged', async () => {
 		const tag = freshName();
 		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
-		const address = streamAddress(tag, SOURCE.chainId);
+		const address = addressOf(tag);
 		const logged = await captureLogs();
 
 		// exactly what the shipped keeper wrote: one flat key, the whole stream
@@ -390,7 +410,7 @@ describe('the legacy flat-key blob', () => {
 	it('is deleted by `clear` too', async () => {
 		const tag = freshName();
 		const keeper = keepStreamOnIndexedDB<TestABI>(tag);
-		const address = streamAddress(tag, SOURCE.chainId);
+		const address = addressOf(tag);
 
 		await set(address.legacy, {lastSync: cursorAt(100, 104), eventStream: []});
 		await keeper.clear(SOURCE);
@@ -411,7 +431,8 @@ describe('a stream that does not reach back to the requested fromBlock', () => {
 		const tag = freshName();
 		const chain = fakeChain();
 		const stream = keepStreamOnIndexedDB<TestABI>(tag);
-		const address = streamAddress(tag, SOURCE.chainId);
+		// driven by an INDEXER below, which hands the keeper the config it resolved
+		const address = addressOf(tag, CONFIG.stream);
 		const definition = applyingProcessor();
 		const store = await browserStore(tag, definition);
 

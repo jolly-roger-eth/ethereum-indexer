@@ -55,11 +55,14 @@ function failableStream(name: string) {
 			// From the source's own first block, not 0: `fetchFrom` REFUSES (and clears)
 			// a stream that does not reach back to what was asked for, so an inspection
 			// asking for a block below the start would destroy what it came to read.
-			const stored = await real.fetchFrom({chainId: SOURCE.chainId} as never, START_BLOCK);
+			// And with the WHOLE source, not a stand-in carrying its `chainId`: the
+			// stream is ADDRESSED by a digest of its filter, so a stand-in reads an
+			// empty subtree rather than the stream under inspection.
+			const stored = await real.fetchFrom(SOURCE, START_BLOCK);
 			return (stored?.eventStream ?? []).map((event: any) => `${event.blockHash}:${event.logIndex}`);
 		},
 		async storedCursor(): Promise<LastSync<TestABI> | undefined> {
-			const stored = await real.fetchFrom({chainId: SOURCE.chainId} as never, START_BLOCK);
+			const stored = await real.fetchFrom(SOURCE, START_BLOCK);
 			return stored?.lastSync as LastSync<TestABI> | undefined;
 		},
 	};

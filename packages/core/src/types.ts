@@ -396,6 +396,22 @@ export type ExistingStream<ABI extends Abi> = {
 	fetchFrom: StreamFetcher<ABI>;
 	saveNewEvents: StreamSaver<ABI>;
 	clear: StreamClearer<ABI>;
+	/**
+	 * The other half of the stream's IDENTITY, handed over by the indexer.
+	 *
+	 * A stream is identified by its FETCH FILTER plus its stream CONFIG
+	 * (`streamDigestOf`), and only the first of those travels with every call:
+	 * the `source` is an argument, the config is not. A keeper that ADDRESSES a
+	 * stream by that identity therefore has to be told, and the indexer is the
+	 * one place that holds the RESOLVED config -- so it hands it over in
+	 * `reinit`, before any other call and again on every reconfigure, rather than
+	 * an application repeating it at the keeper's construction site where it
+	 * could silently disagree with the config the indexer is actually running.
+	 *
+	 * OPTIONAL because a keeper that addresses NOTHING has no use for it: a
+	 * replayed fixture serves one captured stream whatever it is asked for.
+	 */
+	setStreamConfig?: (streamConfig: UsedStreamConfig) => void;
 };
 
 export type LogParseConfig = {
