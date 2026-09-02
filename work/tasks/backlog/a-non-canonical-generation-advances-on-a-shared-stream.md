@@ -27,8 +27,9 @@ appends. Anything else breaks three things at once:
 
 1. The spec's own test says a processor-only change re-fetches NOTHING, "zero, not fewer" — a
    head-following poller makes it fewer.
-2. The one-writer rule breaks by construction, because the indexer calls `saveNewEvents`
-   UNCONDITIONALLY, so an ordinary indexer pointed at that stream APPENDS to it.
+2. The one-writer rule breaks, because an ordinary indexer pointed at that stream APPENDS to it: the
+   save is driven by the indexing loop rather than by the caller's intent, so "a second generation
+   that merely reads" is not expressible by configuration — it needs the read-only view below.
 3. Most seriously, the successor's state would become a function of ITS OWN FETCH rather than of the
    stream, so a later re-fold of the stored stream yields a DIFFERENT state. That stops a generation
    being "a stream plus a fold over it", and breaks story 4's promise that moving the pointer back
@@ -40,10 +41,14 @@ indexer with a different stream address.
 
 ### The genuinely new mechanism: a READ-ONLY STREAM VIEW
 
-A pure reader is NOT expressible by simply not writing, because `saveNewEvents` is unconditional. The
-follower needs a **read-only stream view whose `saveNewEvents` is a no-op**. Such a view existed in an
-earlier design option and was deleted as "existing only to serve option B"; it is needed again. Build
-it here.
+A pure reader is not expressible by simply declining to write, because READ and WRITE share ONE
+`ExistingStream` seam: a generation handed the stream to fold is handed the thing that also appends.
+The follower needs a **read-only stream view whose `saveNewEvents` is a no-op**.
+
+**A precedent already exists — GENERALISE it, do not write a second one.** `replayStream` (core's
+stream fixture module) is exactly this shape: it never writes and its `saveNewEvents` is documented as
+a no-op. Start from it rather than inventing a parallel view, and say in your Decisions block whether
+you generalised it or deliberately kept them separate.
 
 ## Acceptance criteria
 
@@ -103,8 +108,9 @@ it here.
 >   breaks the one-writer rule because `saveNewEvents` is unconditional, and — worst — makes the
 >   successor's state a function of its own fetch, so a later re-fold gives a DIFFERENT state and the
 >   exact-revert promise dies.
-> - Trying to express "read-only" by just not calling save. The call is unconditional; build the
->   read-only view whose `saveNewEvents` is a no-op.
+> - Trying to express "read-only" by just not calling save. Read and write share one `ExistingStream`
+>   seam; use a read-only view whose `saveNewEvents` is a no-op, generalising the existing
+>   `replayStream` precedent rather than adding a second one.
 >
 > **Scope fence.** Do NOT build the promotion POLICY or its trigger (that is
 > `the-promotion-policy-moves-the-canonical-pointer`). Do NOT build pause/resume. Do NOT implement

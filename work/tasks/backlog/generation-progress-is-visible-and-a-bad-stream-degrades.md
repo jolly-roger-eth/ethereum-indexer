@@ -46,7 +46,10 @@ permanently unloadable. Degrade the same way.
       become permanently unloadable.
 - [ ] The degradation path matches the existing keeper precedent (clear/return-nothing, never throw
       into a call site with no `try`/`catch`).
-- [ ] **Round-trip through BOTH keepers**, since they are independent implementations of one contract.
+- [ ] Round-trip through every stream keeper that actually exists. At the time of writing that is ONE
+      (the browser's IndexedDB keeper over core's segmented-stream helper) — filesystem stream storage
+      is deliberately not supported and its package is deleted. If a second keeper has landed by the
+      time you build this, cover both; do not invent one to satisfy this line.
 - [ ] Ship a changeset for every published package whose surface changes.
 - [ ] `pnpm build && pnpm typecheck && pnpm test` green.
 

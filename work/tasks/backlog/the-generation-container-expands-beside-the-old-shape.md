@@ -2,9 +2,26 @@
 title: 'EXPAND: the generation container lands beside the old indexer shape, both accepted'
 slug: the-generation-container-expands-beside-the-old-shape
 spec: a-reconfigure-is-not-an-outage
+needsAnswers: true
 blockedBy: [the-invalidation-verdict-becomes-a-published-answer]
 covers: []
 ---
+
+## Open questions
+
+1. **What are the two concrete class names, and which one does the retained alias point at?** The
+   direction is settled by `CONTEXT.md`: `EthereumIndexer` is "one source plus one processor plus one
+   state, which is a GENERATION rather than the container, so that class is renamed when the container
+   lands". So the existing class becomes the GENERATION and a NEW class becomes the container. What is
+   NOT settled is the two identifiers. This blocks the build because the name propagates through three
+   batches and 46 call sites, and two builders on two batches could choose differently.
+
+   Concretely, answer both halves: (a) what is the existing class renamed TO (e.g. `Generation`,
+   `IndexerGeneration`)? (b) what is the CONTAINER called (e.g. `EthereumIndexer` reused for it, since
+   `CONTEXT.md` says "an indexer holds several generations", or a distinct new name)? Reusing
+   `EthereumIndexer` for the container is the reading `CONTEXT.md` most supports, but it silently
+   RE-MEANS an exported identifier that 46 sites already construct with generation-shaped arguments,
+   so it must be a deliberate choice rather than a default.
 
 ## What to build
 
@@ -12,10 +29,23 @@ The **EXPAND** batch of a wide refactor (`TASKING-PROTOCOL` §3a). Add the new c
 shape so nothing breaks yet, and accept BOTH call shapes. Nothing is removed, and the gate stays green
 because every existing caller still resolves.
 
-Two non-indirected surfaces change across this landable — an exported CLASS NAME and the
-`createIndexerState` signature — at 37 call sites plus five example apps. That is exactly the shape
-§3a exists to catch: a linear hard swap of a non-indirected identifier read at that many sites cannot
-leave `pnpm -r build` green in isolation. Hence three batches; this is the first.
+Two non-indirected surfaces change across this landable, and they are DISJOINT — do not merge their
+counts, because the migrate batch has to own both lists separately:
+
+- **The exported CLASS NAME**, defined in **`@etherfold/core`** (`src/indexer.ts`), used at ~46 sites
+  across `packages/core` (~22), `packages/browser` (~13), `packages/processor-sqlite` (~9) and
+  `packages/server` (~2). It is NOT a browser-package symbol, and an earlier draft of this task said
+  so wrongly.
+- **The `createIndexerState` signature**, which is browser-side: its invocations live in the browser
+  package's tests and workload plus the remaining example apps and the docs.
+
+That is exactly the shape §3a exists to catch: a linear hard swap of a non-indirected identifier read
+at that many sites, in four packages, cannot leave `pnpm -r build` green in isolation. Hence three
+batches; this is the first.
+
+> **Counts are a launch snapshot — DERIVE them.** They post-date
+> `retire-the-js-object-processor-path`, which deleted several example apps and the `processorKinds`
+> tests, so a number here that no longer matches is expected rather than drift.
 
 ### What the container is
 
@@ -26,8 +56,13 @@ exists. `CONTEXT.md` already promises that rename and nothing else delivers it.
 
 ### This batch, precisely
 
-- **Add the new class name as the REAL export, with the old name ALIASED to it.** The alias is what
-  keeps the 37 call sites compiling.
+- **Add the container as a NEW export, and rename the existing class to its generation name, keeping
+  the OLD identifier as an alias to the GENERATION.** The alias must point at the GENERATION, not at
+  the container — that is the whole correction. `EthereumIndexer` today is constructed as
+  `new EthereumIndexer(provider, processor, source, config)` at ~46 sites; aliasing that identifier to
+  a CONTAINER would mean "construct a multi-generation container from one already-constructed
+  processor", which this very task declares impossible. The alias exists so those 46 sites keep
+  compiling unchanged while they still mean a generation.
 - **Accept BOTH the old and the new factory shape.** The new shape passes the PROCESSOR FACTORY rather
   than its result, and takes per-generation state factories, because a container that holds N
   generations cannot be handed one already-constructed processor and one already-constructed store.
@@ -51,8 +86,13 @@ discard. Those are the migrate and contract batches.
 
 ## Acceptance criteria
 
-- [ ] The new container class is the REAL export and the old `EthereumIndexer` name is an ALIAS to it.
-      Every existing call site still compiles untouched.
+- [ ] The container is a NEW export; the existing class is renamed to its generation name; and the old
+      `EthereumIndexer` identifier remains as an ALIAS **to the GENERATION**, so every existing
+      construction site still compiles untouched and still means what it meant.
+- [ ] **The expand covers the WHOLE non-indirected surface, in every package that reads it** — the
+      class is defined in `@etherfold/core`, not the browser package, and is used across `core`,
+      `browser`, `processor-sqlite` and `server`. Assert `pnpm -r build` is green with NO call site in
+      ANY of those packages touched.
 - [ ] The factory accepts BOTH the old shape and the new one (processor FACTORY plus per-generation
       state factories). Assert both paths work.
 - [ ] The entities-path handle is INDIRECT: a handle held across a pointer move keeps answering, from
@@ -90,10 +130,12 @@ discard. Those are the migrate and contract batches.
 > that holds several of them, one of which is canonical. `EthereumIndexer` as it exists today IS a
 > generation, not a container, which is why the rename is part of this landable.
 >
-> **Where to look.** `createIndexerState` and `SyncingState` in the browser package; the
-> `EthereumIndexer` class; the entities-path state handle and the store it binds to; the subscribable
-> stores (`state`, `syncing`, `status`) and the indexer's state callback, which already define the
-> notification boundary you are reusing as the read unit of work.
+> **Where to look.** The `EthereumIndexer` class is in **`@etherfold/core`** (`src/indexer.ts`) — NOT
+> the browser package — and is re-exported and constructed from `browser`, `processor-sqlite` and
+> `server` too. `createIndexerState` and `SyncingState` are in the browser package. Also: the
+> entities-path state handle and the store it binds to; and the subscribable stores (`state`,
+> `syncing`, `status`) plus the indexer's state callback, which already define the notification
+> boundary you are reusing as the read unit of work.
 >
 > **Easy to get wrong:**
 >

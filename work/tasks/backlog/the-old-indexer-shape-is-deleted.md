@@ -3,14 +3,15 @@ title: 'CONTRACT: the old indexer name and factory shape are deleted'
 slug: the-old-indexer-shape-is-deleted
 spec: a-reconfigure-is-not-an-outage
 blockedBy: [every-caller-moves-onto-the-generation-container]
-covers: [2, 6]
+covers: [2, 6, 7]
 ---
 
 ## What to build
 
 The **CONTRACT** batch (`TASKING-PROTOCOL` §3a). No caller remains on the old form, so delete it:
 
-- the `EthereumIndexer` ALIAS,
+- the `EthereumIndexer` ALIAS (which lives in **`@etherfold/core`**, `src/indexer.ts` — NOT the browser
+  package — and is re-exported/read from `browser`, `processor-sqlite` and `server`),
 - the old `createIndexerState` factory shape,
 - and the `stateDiscarded` DISCARD that
   `the-invalidation-verdict-becomes-a-published-answer` deliberately left in place so that landable
@@ -31,8 +32,9 @@ landable completes and its two stories become true.
 ### The one thing that must not slip
 
 Deleting the discard is a BEHAVIOUR change, and it is the point: a no-op reconfigure becomes
-OBSERVABLY free, which is what story 7 was promised in the verdict task and could not demonstrate
-until now. Assert it here rather than assuming the earlier task covered it — it explicitly did not.
+OBSERVABLY free. **Story 7 is therefore carried HERE, not on the verdict task**, which builds the
+verdict but explicitly defers the observable half. Assert it here rather than assuming the earlier
+task covered it — it explicitly did not.
 
 ## Acceptance criteria
 
@@ -41,12 +43,20 @@ until now. Assert it here rather than assuming the earlier task covered it — i
       state-factory shape is the only shape. One name, one call shape.
 - [ ] The `stateDiscarded` discard is removed and the published verdict is what the verbs act on.
 - [ ] **A processor-only change re-fetches NOTHING**, asserted on the ranges the node was asked for —
-      **zero, not fewer** (story 2). This is the spec's headline assertion.
+      **zero, not fewer** (story 2). **Assert it in the SINGLE-GENERATION sense available here**: the
+      filter did not move, so the stream is reused whole and a re-fold costs no fetch. The
+      MULTI-generation case (a second generation folding the stored stream while the canonical one
+      still answers) needs the shared-stream follower, which is
+      `a-non-canonical-generation-advances-on-a-shared-stream` and lands AFTER this. Do not reach
+      forward into that scope; assert what this batch can honestly deliver and leave the rest to it.
 - [ ] **A handle held across a pointer move keeps answering**, from the newly canonical generation
       (story 6).
 - [ ] **A no-op reconfigure is now OBSERVABLY free**, asserted on ranges fetched AND state discarded.
       An event appended above the cursor remains the regression guard.
-- [ ] No workspace reference to the old name or old shape remains, in source, tests, examples or docs.
+- [ ] No workspace reference to the old name or old shape remains, in source, tests, examples or docs,
+      across ALL FOUR packages that used the class (`core`, `browser`, `processor-sqlite`, `server`) —
+      not the browser package alone. If a straggler exists, the migrate batch was incomplete: surface
+      that rather than migrating it here.
 - [ ] Ship a changeset for every published package whose surface changes (this is the breaking half).
 - [ ] `pnpm build && pnpm typecheck && pnpm test` green.
 
@@ -73,8 +83,10 @@ until now. Assert it here rather than assuming the earlier task covered it — i
 > reconfigure OBSERVABLY free. The verdict task deliberately left the verbs discarding so it could go
 > green alone, so nothing has asserted the observable half yet. Assert it here.
 >
-> **Where to look.** The container and the alias in the browser package; `createIndexerState`'s two
-> accepted shapes; the `stateDiscarded` sites across core and browser; the entities-path handle.
+> **Where to look.** The container and the alias are in **`@etherfold/core`** (`src/indexer.ts`), read
+> from `core`, `browser`, `processor-sqlite` and `server`. `createIndexerState`'s two accepted shapes
+> are browser-side. Also the `stateDiscarded` sites across core and browser, and the entities-path
+> handle.
 >
 > **Easy to get wrong:**
 >

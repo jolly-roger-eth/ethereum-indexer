@@ -3,7 +3,7 @@ title: 'The invalidation verdict becomes a published, actionable answer'
 slug: the-invalidation-verdict-becomes-a-published-answer
 spec: a-reconfigure-is-not-an-outage
 blockedBy: [generations-are-registered-and-one-pointer-is-canonical]
-covers: [7]
+covers: []
 ---
 
 ## What to build
@@ -27,8 +27,10 @@ is published, per `CONTEXT.md`). It is so **each landable lands GREEN on its own
 `TASKING-PROTOCOL` §3a's expand-then-contract and applies whatever the release status.
 
 A consequence worth stating so it is not read as a hole: a no-op reconfigure is not OBSERVABLY free
-until the container removes the discard. Story 7's guarantee is delivered here in the verdict; its
-observability arrives with the container.
+until the container removes the discard. **That is why this task carries `covers: []` and story 7 is
+labelled on `the-old-indexer-shape-is-deleted`** — a task should not be the named deliverer of a story
+whose observable half it explicitly defers. This task builds the verdict the story rests on; the
+contract batch is where the story becomes true.
 
 ### The `stateDiscarded` sweep
 
