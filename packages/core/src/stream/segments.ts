@@ -16,9 +16,10 @@ const namedLogger = logs('@etherfold/core');
  * Deliberately NOT holding `unconfirmedBlocks`: the window is READ from the
  * entity path's serialized sync cursor, and a stream keeper's copy is read by
  * nobody -- `promiseToFeed` takes
- * only the three block numbers and `generateStreamToAppend` rebuilds the window
- * from the replayed events. `captureStream`/`replayStream` are the shipped third
- * implementation of this seam that already stores none.
+ * only the three block numbers and `generateStreamFromReplay` rebuilds the window
+ * by WALKING the replayed events (ADR-0042; it was `generateStreamToAppend` until
+ * a replay stopped being routed through the fetch path). `captureStream`/`replayStream`
+ * are the shipped third implementation of this seam that already stores none.
  */
 export type StreamSegment<ABI extends Abi> = {events: LogEvent<ABI>[]};
 
@@ -246,7 +247,7 @@ export function createSegmentedStream<ABI extends Abi>(port: StreamSegmentPort<A
 					latestBlock: cursor.latestBlock,
 					lastFromBlock: cursor.lastFromBlock,
 					lastToBlock: cursor.lastToBlock,
-					// Read by nobody and stored nowhere: `generateStreamToAppend` rebuilds
+					// Read by nobody and stored nowhere: `generateStreamFromReplay` rebuilds
 					// the window from the events it is handed back.
 					unconfirmedBlocks: [],
 				},
