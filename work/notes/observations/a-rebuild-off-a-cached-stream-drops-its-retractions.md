@@ -1,3 +1,7 @@
+---
+needsAnswers: true
+---
+
 # A rebuild off a cached stream DROPS the retractions the stream carries
 
 2026-09-02, noticed while porting `packages/browser/test/streamSegments.test.ts` off the free-form processor path in `retire-the-js-object-processor-path`.
