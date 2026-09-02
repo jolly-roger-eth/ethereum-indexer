@@ -455,9 +455,18 @@ unrelated keys in the same store survive a `clear`.
 here would collide. Do NOT make the stream raw-only (that is `the-stream-stores-only-what-the-node-said`).
 Do NOT compute a real stream digest or write a canonical pointer (those are
 `a-reconfigure-is-not-an-outage`'s); use a placeholder for the digest level. Do NOT add per-segment
-block-range metadata. Do NOT add a filesystem keeper — and equally, do NOT DELETE `packages/fs`: it still exists at HEAD and
-its removal is owned by `drop-filesystem-storage-and-rehome-the-fixture-loader`, which is unblocked
-and may run in parallel. Touching it here would collide.
+block-range metadata. Do NOT add a filesystem keeper.
+
+> **DRIFT CORRECTION (conductor, 2026-09-02) — this is NOT a needs-attention signal.** This task's
+> fence used to read "do NOT DELETE `packages/fs`: it still exists at HEAD". It no longer does:
+> `drop-filesystem-storage-and-rehome-the-fixture-loader` has since LANDED and deleted both
+> `packages/fs` and `packages/fs-cache`. There is nothing left to collide with and nothing to avoid
+> deleting — the fence is simply moot, so do NOT stop on it. Two consequences for the text above,
+> both cosmetic: the `packages/fs/src/utils/fs.ts` clear-the-folder precedent cited for the legacy
+> blob is now a HISTORICAL citation (read it in `git log` if you want it; the argument it supports is
+> unchanged and still governs), and `@etherfold/fs` is no longer a package you could import even by
+> accident. Everything else in this task — the address, the cursor contract, the three keeper
+> operations, every acceptance criterion — is unaffected.
 
 RECORD non-obvious in-scope decisions in a `## Decisions` block at the end of your FINAL REPORT (the
 placeholder digest constant; the two store names and how you obtained a `UseStore` over the default
