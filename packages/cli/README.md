@@ -1,6 +1,6 @@
 # etherfold
 
-The command line. `etherfold run` follows a chain, folds a processor into a libSQL database and answers HTTP over it, in one process; `etherfold build` is the same thing as a one-shot that exits at the tip; `etherfold serve` answers queries over a database written elsewhere.
+The command line. `etherfold run` follows a chain, folds a processor into a libSQL database and answers HTTP over it, in one process; `etherfold build` is the same thing as a one-shot that exits at the tip; `etherfold fetch` is the chain-facing half of a split deployment, pushing raw logs to a server elsewhere; `etherfold serve` answers queries over a database written elsewhere.
 
 ```sh
 npm i -g etherfold        # or: npx etherfold …
@@ -15,6 +15,7 @@ Every run names its intent: there is no default command, so a bare `etherfold` p
 | --- | --- |
 | to run an indexer: follow a chain, fold into a database and answer HTTP | here, `run` |
 | to index a contract into a database, from a terminal or a CI job | here, `build` |
+| to run the chain-facing half near your node, pushing to an indexer elsewhere | here, `fetch` |
 | to index inside a browser tab, with no server | [`@etherfold/browser`](../browser) |
 | to write the processor being run | [`@etherfold/processor-entities`](../processor-entities) |
 | to embed the same pipeline in your own Node program | [`@etherfold/core`](../core) + [`@etherfold/fetcher-host`](../fetcher-host) |
@@ -81,6 +82,33 @@ A flag combination that names no store is REFUSED rather than ignored: an accept
 
 The processor module hands back the AUTHORING object (declarations plus handlers) and never picks a store; that is what makes the SAME module file the one a browser tab runs. A module still returning the retired `{kind, processor}` tag is refused by name (ADR-0037).
 
+## `etherfold fetch` -- the chain-facing half, and the ONLY way to run a fetcher
+
+```sh
+etherfold fetch \
+  -n https://rpc.example \
+  -d ./deployments \
+  --ingest-endpoint https://indexer.example
+```
+
+**It follows the chain and pushes contiguous ranges of raw logs at an indexer-server elsewhere**, which is what makes splitting a deployment a deployment decision rather than a rewrite: run this on a host near your node and the folding half anywhere. It folds nothing, answers no queries, and keeps running until it is stopped.
+
+It is a front door onto [`@etherfold/platform-nodejs-fetcher`](../../platforms/nodejs-fetcher) and not a second implementation, and it is now the ONLY one: that package used to ship an `etherfold-fetch` binary configured from the environment alone, and that binary is retired with its `bin` entry. What survives there is the library the command drives.
+
+| flag | |
+| --- | --- |
+| `-n, --node-url <url>` | the JSON-RPC endpoint (or `ETH_NODE_URI`) |
+| `-d, --deployments <folder>` | what to index, as a deployments folder, or `INDEXING_SOURCE` as JSON. REQUIRED here in one form or the other: there is no processor module to read contracts out of |
+| `--ingest-endpoint <url>` | the indexer-server to push to (or `INGEST_ENDPOINT`). `/ingest` hangs off it |
+| `--ingest-token <token>` | the wire's shared secret (or `INGEST_TOKEN`, which is preferable: a secret on a command line is visible to every process on the host) |
+| `--rps <n>` | cap the requests per second made to the node (or `REQUESTS_PER_SECOND`) |
+
+Everything else a fetcher deployment tunes -- `SUSPECT_RESULT_COUNT` (**read that package's README about this one**), the fetch bounds, the backoff, the stream identity -- stays in the environment the fetcher host already publishes, rather than growing a second name here.
+
+**It owns no state, and the flags that would imply otherwise are REFUSED rather than ignored.** No `--store` and no `--db`, because a fetcher holds no cursor and no database (ADR-0003); no `-p`, because the chain-facing half holds no processor and whatever folds these logs lives behind `--ingest-endpoint`. There is likewise no state file, no lock file and no `--from-block`: where the next batch starts is the RECEIVER's answer, and a `409` telling this process it asked from the wrong place is the ordinary correction path. So killing it costs nothing and running two of them needs no coordination.
+
+**How it stops.** `SIGINT` / `SIGTERM` finish the cycle in flight and exit `0`. A refusal no waiting fixes -- a bad token, a `{source, config}` the server does not serve, a provider on the wrong chain, a suspected truncation -- exits non-zero, because a fetcher that stays up while achieving nothing is indistinguishable from a working one until somebody reads the state it is not producing. Everything else (an unreachable server, a `5xx`, a dropped socket) is retried on an escalating, capped backoff and never exits.
+
 ## `etherfold serve` -- the READ tier
 
 ```sh
@@ -125,11 +153,11 @@ Six inputs have a variable and six do not, and the line is deliberate: **the env
 
 The CLI used to read a second name for the node URL (`ETHEREUM_NODE`). It is RETIRED: there is one name for it, and it is `ETH_NODE_URI`, which is what the fetcher deployable already refuses by.
 
-## The command names are going to grow
+## One name is still to come
 
-`run`, `build` and `serve` are what ships today, and they are three of the five names the set will have. The other two are the two halves of a SPLIT deployment (`fetch` is the stateless chain-facing half that pushes to a remote; `index` is the folding half that receives those pushes and owns the database) and are decided in `work/specs/tasked/one-command-runs-the-whole-pipeline.md` and NOT built. `CONTEXT.md` is the authority for what each name means. Nothing resolves to them yet: `etherfold index` is an unknown command until the receiver lands.
+`run`, `build`, `fetch` and `serve` are what ships today, and they are four of the five names the set will have. The missing one is `index`, the FOLDING half of a split deployment: it receives the pushes `fetch` sends and owns the database. It is decided in `work/specs/tasked/one-command-runs-the-whole-pipeline.md` and NOT built, so `etherfold index` is an unknown command until the receiver lands; `CONTEXT.md` is the authority for what each name means.
 
-Their CONFIGURATION, though, already resolves: all five rows live in one table (`src/config.ts`), including the two asymmetries that make the set work. `fetch` takes a source but no processor, and refuses `--store` and `--db` outright, because the chain-facing half holds no state (ADR-0003). `index` resolves its source with NO chain call at all, so it takes it from `-d` or `INDEXING_SOURCE` and refuses a processor module that could only be resolved by asking a node for its chain id. So adding one of the three is a command registration and an assembly, never a second way to read a flag.
+Its CONFIGURATION, though, already resolves: all five rows live in one table (`src/config.ts`), including the two asymmetries that make the set work. `fetch` takes a source but no processor, and refuses `--store` and `--db` outright, because the chain-facing half holds no state (ADR-0003). `index` resolves its source with NO chain call at all, so it takes it from `-d` or `INDEXING_SOURCE` and refuses a processor module that could only be resolved by asking a node for its chain id. So adding it is a command registration and an assembly, never a second way to read a flag.
 
 ## Tests
 

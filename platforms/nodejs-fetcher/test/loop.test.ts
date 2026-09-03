@@ -285,7 +285,10 @@ describe('stopOnSignals', () => {
 
 describe('the adapter is scheduling and configuration, and nothing else', () => {
 	const here = fileURLToPath(new URL('.', import.meta.url));
-	const sources = ['../src/index.ts', '../src/bin.ts'].map((path) => ({
+	// ONE file, because the process entry point is gone: `etherfold-fetch` was
+	// retired with its `bin` entry, and this package is a LIBRARY the CLI's
+	// `etherfold fetch` drives -- the shape `platforms/nodejs` already had.
+	const sources = ['../src/index.ts'].map((path) => ({
 		path,
 		// comments stripped, so that prose ABOUT the boundary (which this package is
 		// full of) cannot fail a scan of what the code does
@@ -295,7 +298,7 @@ describe('the adapter is scheduling and configuration, and nothing else', () => 
 	}));
 
 	it('reads the files it claims to check', () => {
-		expect(sources.length).toBe(2);
+		expect(sources.length).toBe(1);
 		expect(sources.every((source) => source.text.includes('import'))).toBe(true);
 		expect(sources[0].text.length).toBeGreaterThan(500);
 	});

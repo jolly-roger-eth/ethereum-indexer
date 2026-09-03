@@ -35,6 +35,7 @@ import type {BuildConfig, ConfigFor, Options, RunConfig, SourceOrigin, StoreTarg
 export * from './config.js';
 export * from './types.js';
 export {readCursorReport, type StoreCursorReport} from './cursorReport.js';
+export {fetch, fetchMain, prepareFetching, type FetchDependencies} from './fetch.js';
 export {run, runMain, type RunDependencies, type RunningIndexer} from './run.js';
 export {serve, type ServeDependencies, type StartedServer} from './serve.js';
 

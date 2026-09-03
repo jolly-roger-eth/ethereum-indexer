@@ -6,10 +6,10 @@ import type {RetentionSetting} from '@etherfold/processor-entities';
  * component split behind it (`CONTEXT.md`, "The COMMAND SET names deployment
  * intents, not components").
  *
- * All five are named here, and two of them are REGISTERED (`src/program.ts`).
- * The other three arrive in their own tasks and consume this resolution rather
- * than extending it: their rows already exist in `OWNERSHIP` and their resolved
- * shapes already exist below, so what a later task adds is a command
+ * All five are named here, and four of them are REGISTERED (`src/program.ts`).
+ * The last one, `index`, arrives in its own task and consumes this resolution
+ * rather than extending it: its row already exists in `OWNERSHIP` and its
+ * resolved shape already exists below, so what that task adds is a command
  * registration and an assembly, never a second way to read a flag.
  */
 export type CommandName = 'run' | 'build' | 'fetch' | 'index' | 'serve';

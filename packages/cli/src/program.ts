@@ -2,6 +2,7 @@ import {Command, Option} from 'commander';
 import type {EnvRecord} from '@etherfold/fetcher-host';
 import pkg from '../package.json' with {type: 'json'};
 import {INPUTS, OWNERSHIP, type ConfigInput} from './config.js';
+import {fetchMain} from './fetch.js';
 import {main} from './index.js';
 import {runMain} from './run.js';
 import {serve} from './serve.js';
@@ -22,6 +23,8 @@ export type ProgramDependencies = {
 	build?: (options: Options) => void;
 	/** Runs the follower. Defaults to `runMain`, which keeps going until a signal and resolves the exit code. */
 	run?: (options: Options) => void | Promise<void>;
+	/** Runs the chain-facing half. Defaults to `fetchMain`, which also hooks the log sink to the console. */
+	fetch?: (options: Options) => void | Promise<void>;
 	/** Starts the read tier. Defaults to `serve`, which resolves its database and starts the Node adapter. */
 	serve?: (options: Options) => Promise<void>;
 };
@@ -60,15 +63,17 @@ function registerInputs(command: Command, name: CommandName): void {
  * The command surface: five names are coming, and each of them means one thing.
  *
  * `CONTEXT.md` ("The COMMAND SET names deployment intents, not components")
- * is the authority for the set. Three of the five ship: **`run`** follows the
+ * is the authority for the set. Four of the five ship: **`run`** follows the
  * chain, folds AND answers queries without terminating -- the milestone, and the
  * default thing to reach for; **`build`** is the same assembly stopping at the
- * tip; and **`serve`** answers queries over a database written elsewhere. The
- * other two (`fetch`, `index`) are the two halves of a SPLIT deployment and do
- * not exist yet, and the words are held free for them rather than borrowed --
- * but their configuration already resolves (`OWNERSHIP` in `src/config.ts`), so
- * adding one is a registration and an assembly rather than a second way to read
- * a flag.
+ * tip; **`serve`** answers queries over a database written elsewhere; and
+ * **`fetch`** is the chain-facing half of a SPLIT deployment, which folds
+ * nothing, holds no state and pushes to a receiver elsewhere -- the ONLY way to
+ * run a fetcher, now that the standalone binary is retired. The one that does
+ * not exist yet is `index`, the other half of that pair, and the word is held
+ * free for it rather than borrowed -- but its configuration already resolves
+ * (`OWNERSHIP` in `src/config.ts`), so adding it is a registration and an
+ * assembly rather than a second way to read a flag.
  *
  * ## Why there is no DEFAULT command any more
  *
@@ -121,6 +126,35 @@ export function createProgram(deps: ProgramDependencies = {}): Command {
 	registerInputs(build, 'build');
 	build.action((options: Options) => {
 		runBuild(options);
+	});
+
+	const runFetch =
+		deps.fetch ??
+		(async (options: Options) => {
+			// Hooks the named-logs facade to the console. Done HERE, in the process entry
+			// point, and never in the library: a fetcher's cycle logs are the only
+			// observability a split deployment has, and the binary that used to hook it
+			// (`etherfold-fetch`) is retired, so the CLI is that process now. An
+			// application embedding `startFetcher` still chooses its own sink, and a
+			// test substituting this handler installs none.
+			await import('named-logs-console');
+			// `fetchMain` resolves the exit code through the adapter's own
+			// `runFetcherProcess`: non-zero when it stopped on a refusal, because a
+			// fetcher that stays up while achieving nothing is indistinguishable from a
+			// working one until somebody reads the state it is not producing.
+			await fetchMain(options, {env});
+		});
+
+	const fetchCommand = program
+		.command('fetch')
+		.description(
+			'follow the chain and push contiguous ranges of raw logs to an indexer-server elsewhere: ' +
+				'the chain-facing half, which folds nothing and holds no state',
+		)
+		.usage('-n http://localhost:8545 -d <deployment folder> --ingest-endpoint http://indexer:2000');
+	registerInputs(fetchCommand, 'fetch');
+	fetchCommand.action(async (options: Options) => {
+		await runFetch(options);
 	});
 
 	const serveCommand = program

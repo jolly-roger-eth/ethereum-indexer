@@ -6,12 +6,16 @@ It is one half of a split deployment (ADR-0003). The other half is the **indexer
 
 This is the host that *drives* the chain, and it wants a runtime that can hold a process. A serverless runtime is a good home for the indexer-server, whose work is short and per-request, and a poor one for this: a cron fires on a schedule rather than continuously, and an invocation is capped well below what a first sync takes. So the usual split is a Node fetcher pointed at an indexer-server anywhere, including one on Workers.
 
+**This package is a LIBRARY, and it ships no binary.** There is exactly one way to run a fetcher and it is [`etherfold fetch`](../../packages/cli), which puts a flag surface in front of the configuration below and drives this:
+
 ```sh
-pnpm add @etherfold/platform-nodejs-fetcher
-etherfold-fetch
+npm i -g etherfold
+etherfold fetch -n https://rpc.example -d ./deployments --ingest-endpoint https://indexer.example
 ```
 
-or, embedded:
+(The standalone `etherfold-fetch` binary this package used to ship is RETIRED, along with its `bin` entry. It was a second front door onto the same loop, configured only from the environment. The CLI is the process now, which is the shape [`@etherfold/platform-nodejs`](../nodejs) already had: a library with no binary, called by the command.)
+
+Embedded in your own program:
 
 ```ts
 import {startFetcher} from '@etherfold/platform-nodejs-fetcher';
@@ -57,7 +61,7 @@ There is no state file, no lock file and no `--from-block`, and their absence is
 
 ## Configuration
 
-Every variable below is read from the environment (a `.env` file works, via `ldenv`). Anything can also be passed to `startFetcher` directly, which wins.
+Every variable below is read from the environment. Anything can also be passed to `startFetcher` directly, which wins -- and that is how `etherfold fetch` supplies the four an operator configures with flags (`-n`, `-d`, `--ingest-endpoint`, `--ingest-token`), each of which still falls back to the variable behind it. A `.env` file works when the CLI loads one (it uses `ldenv`).
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
@@ -91,11 +95,13 @@ Do **not** try to reach the same effect by raising `MAX_EVENTS_PER_FETCH`. That 
 
 ## What it logs, and what it never logs
 
-Cycles are reported through [`named-logs`](https://github.com/wighawag/named-logs); the `etherfold-fetch` binary hooks it to the console (`NAMED_LOGS`, `NAMED_LOGS_LEVEL`). A run of `yielded` cycles is raised to a warning, because one is ordinary (that is what two fetchers do to each other) and a run of them is not.
+Cycles are reported through [`named-logs`](https://github.com/wighawag/named-logs), and this package hooks up no sink: `etherfold fetch` hooks the facade to the console (`NAMED_LOGS`, `NAMED_LOGS_LEVEL`), because choosing where logs go is a process entry point's job and an application embedding `startFetcher` chooses its own. A run of `yielded` cycles is raised to a warning, because one is ordinary (that is what two fetchers do to each other) and a run of them is not.
 
 No credential is ever written. `INGEST_TOKEN` appears in no log line and in no error message: a wrong one comes back as a `401` whose message names the variable. `ETH_NODE_URI` and `INGEST_ENDPOINT` are logged host-only, since `.../v2/<api-key>` is the standard shape at every hosted provider.
 
 ## Exit codes
+
+`runFetcherProcess()` resolves the code the process should exit with, and `etherfold fetch` exits on it:
 
 - `0`: asked to stop (`SIGINT`, `SIGTERM`).
 - `1`: stopped because no retry would help: a bad token, a `{source, config}` the server does not serve, a provider on the wrong chain, a suspected truncation. The process exits rather than staying up and achieving nothing.
