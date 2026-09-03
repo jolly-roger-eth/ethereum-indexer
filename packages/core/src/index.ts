@@ -40,6 +40,15 @@ export type {InvalidationReason, InvalidationVerdict, SourceInvalidation} from '
  * then silently fork the config hash.
  */
 export {resolveStreamConfig} from './internal/engine/utils.js';
+/**
+ * Exported for the same reason `resolveStreamConfig` is, one step further along:
+ * a caller that builds a `ContextIdentifier` or a `WireContext` of its own has
+ * to reach the SAME digest the engine stored, and the way to get that wrong is
+ * to hash the config a user PASSED instead of the config that RUNS. That is the
+ * bug this function exists to make unreachable, and leaving it internal would
+ * leave every caller outside this package re-deriving it.
+ */
+export {streamConfigHashOf} from './internal/engine/utils.js';
 export * from './generation/registry.js';
 export * from './generation/memory.js';
 /**
