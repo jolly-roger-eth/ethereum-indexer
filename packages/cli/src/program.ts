@@ -1,27 +1,57 @@
-import {Command} from 'commander';
+import {Command, Option} from 'commander';
+import type {EnvRecord} from '@etherfold/fetcher-host';
 import pkg from '../package.json' with {type: 'json'};
+import {INPUTS, OWNERSHIP, type ConfigInput} from './config.js';
 import {main} from './index.js';
-import type {Options} from './types.js';
-
-/** The flags `etherfold serve` takes, exactly as commander hands them over. */
-export type ServeOptions = {port: string; db?: string; host?: string; autoSetup: boolean};
+import {serve} from './serve.js';
+import type {CommandName, Options} from './types.js';
 
 /**
  * What `cli.ts` supplies and a test substitutes.
  *
- * The handlers are injected for the same reason `main`'s are
- * (`src/index.ts`): the interesting part of this layer is WHICH WORDS resolve
- * and which flags they carry, and asserting that should not require loading a
- * processor module or binding a port.
+ * The handlers are injected for the same reason `main`'s are (`src/index.ts`):
+ * the interesting part of this layer is WHICH WORDS resolve and which flags they
+ * carry, and asserting that should not require loading a processor module or
+ * binding a port.
  */
 export type ProgramDependencies = {
 	/** The environment flags fall back to. Defaults to `process.env`. */
-	env?: Record<string, string | undefined>;
+	env?: EnvRecord;
 	/** Runs the one-shot. Defaults to `main`, which resolves the process exit code. */
 	build?: (options: Options) => void;
-	/** Starts the read tier. Defaults to the Node adapter's `startServer`. */
-	serve?: (options: ServeOptions) => Promise<void>;
+	/** Starts the read tier. Defaults to `serve`, which resolves its database and starts the Node adapter. */
+	serve?: (options: Options) => Promise<void>;
 };
+
+/**
+ * Register every flag ONE command owns, and every flag it does not.
+ *
+ * Both halves come out of `OWNERSHIP` (`src/config.ts`), which is the single
+ * table this command set's configuration is written in. What it owns is
+ * registered visibly, with the description that table carries. What it does NOT
+ * own is registered HIDDEN, so that a flag copied across from another command
+ * parses, reaches the resolver, and is refused with the reason this command does
+ * not own it -- instead of meeting commander's `unknown option`, which names
+ * neither a reason nor the command that does own it. That is the whole payoff of
+ * "moving between commands is a deployment change, never a rewrite": a copied
+ * command line gets told what to change.
+ *
+ * Nothing is registered as `requiredOption` and nothing carries a commander
+ * DEFAULT. Both would put a piece of the contract where no test can call it, and
+ * a commander default is worse than that: a flag that is always present can never
+ * fall back to the variable behind it, so `--port`'s old default silently made
+ * `PORT` unreachable.
+ */
+function registerInputs(command: Command, name: CommandName): void {
+	const row = OWNERSHIP[name];
+	for (const input of Object.keys(INPUTS) as ConfigInput[]) {
+		const spec = INPUTS[input];
+		const described = spec.variable ? `${spec.describe} (or ${spec.variable})` : spec.describe;
+		const option = new Option(spec.flag, described);
+		if (row[input] === 'refused') option.hideHelp();
+		command.addOption(option);
+	}
+}
 
 /**
  * The command surface: five names are coming, and each of them means one thing.
@@ -30,7 +60,10 @@ export type ProgramDependencies = {
  * is the authority for the set. Two of the five ship: **`build`** follows the
  * chain, folds and EXITS at the tip, and **`serve`** answers queries over a
  * database written elsewhere. The other three (`run`, `fetch`, `index`) do not
- * exist yet, and the words are held free for them rather than borrowed.
+ * exist yet, and the words are held free for them rather than borrowed -- but
+ * their configuration already resolves (`OWNERSHIP` in `src/config.ts`), so
+ * adding one is a registration and an assembly rather than a second way to read
+ * a flag.
  *
  * ## Why there is no DEFAULT command any more
  *
@@ -44,16 +77,16 @@ export type ProgramDependencies = {
  * to remove. So a bare `etherfold` prints help and every run names its intent.
  */
 export function createProgram(deps: ProgramDependencies = {}): Command {
-	const env = deps.env ?? process.env;
+	const env = deps.env ?? (process.env as EnvRecord);
 	const runBuild =
 		deps.build ??
 		((options: Options) => {
 			// `main` resolves the exit code: 0 on success, 1 on failure (so CI does not treat a failed
 			// build as success). It calls `process.exit`, which also avoids the process lingering on
 			// provider timers.
-			main(options);
+			main(options, {env});
 		});
-	const runServe = deps.serve ?? defaultServe;
+	const runServe = deps.serve ?? ((options: Options) => serve(options, {env}));
 
 	const program = new Command();
 
@@ -62,72 +95,20 @@ export function createProgram(deps: ProgramDependencies = {}): Command {
 	const build = program
 		.command('build')
 		.description('follow the chain, fold a processor into a libSQL database, and exit at the tip')
-		.usage(`-p <processor's path> --store sqlite --db <libsql url> [-d <deployment folder> -n http://localhost:8545]`)
-		.requiredOption(
-			'-p, --processor <path>',
-			`path to the event processor module (need to export a field named "createProcessor")`,
-		)
-		/**
-		 * REQUIRED, and never defaulted. It named two stores until the free-form state
-		 * blob went with the processor path that wrote it (ADR-0037); it is kept as the
-		 * axis a second backend arrives on. See `resolveIndexOptions`, which owns every
-		 * refusal.
-		 */
-		.requiredOption(
-			'--store <sqlite>',
-			'where the indexed state goes: versioned entity rows in the libSQL database at --db',
-		)
-		.option('--db <url>', 'libSQL url, e.g. file:./etherfold.db or :memory: (required)')
-		.option(
-			'--retention <blocks|revert-only|unbounded>',
-			'how far back superseded versions are kept, in BLOCK numbers. Nothing prunes ' +
-				'automatically: pruning is a call a host schedules (ADR-0022)',
-		)
-		.option(
-			'-d, --deployments <value>',
-			"path the folder containing contract deployments, use hardhat-deploy/rocketh format, optional if processor's module provide it",
-		)
-		.option('--rps <value>', 'request per seconds');
-
-	if (env.ETHEREUM_NODE) {
-		build.option(
-			'-n, --node-url <value>',
-			`ethereum's node url (fallback on ETHEREUM_NODE env variable)`,
-			env.ETHEREUM_NODE,
-		);
-	} else {
-		build.requiredOption('-n, --node-url <value>', `ethereum's node url (fallback on ETHEREUM_NODE env variable)`);
-	}
-
+		.usage(`-p <processor's path> --store sqlite --db <libsql url> [-d <deployment folder> -n http://localhost:8545]`);
+	registerInputs(build, 'build');
 	build.action((options: Options) => {
 		runBuild(options);
 	});
 
-	program
+	const serveCommand = program
 		.command('serve')
 		.description('answer queries over a libSQL database written elsewhere: the read tier, which folds nothing')
-		.option('--port <port>', 'port to listen on', '2000')
-		.option('--db <url>', 'libSQL url, e.g. file:./etherfold.db or :memory:')
-		.option('--host <hostname>', 'hostname to bind')
-		.option('--no-auto-setup', 'do not apply the fixed-table schema at startup')
-		.action(async (options: ServeOptions) => {
-			await runServe(options);
-		});
+		.usage('--db <libsql url> [--port 2000]');
+	registerInputs(serveCommand, 'serve');
+	serveCommand.action(async (options: Options) => {
+		await runServe(options);
+	});
 
 	return program;
-}
-
-async function defaultServe(options: ServeOptions): Promise<void> {
-	// Imported lazily so that `etherfold build` never pays for the server's
-	// dependency tree (hono, libSQL, the node HTTP adapter). The one-shot
-	// indexing path is the common one and it should stay cheap to start.
-	const {startServer} = await import('@etherfold/platform-nodejs');
-	const running = await startServer({
-		port: Number(options.port),
-		db: options.db,
-		hostname: options.host,
-		autoSetup: options.autoSetup,
-	});
-	console.log(`etherfold server listening on ${running.url}`);
-	console.log(`  status: ${running.url}/status`);
 }

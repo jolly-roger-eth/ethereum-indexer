@@ -60,7 +60,7 @@ function depsFor(chain: ReturnType<typeof fakeChain>, db: RemoteSQL, extra: Inde
 describe('the one-shot', () => {
 	it('stops at the tip instead of following the chain', async () => {
 		const chain = fakeChain().serve(SPREAD, TIP);
-		const prepared = await prepareIndexing(SQLITE, depsFor(chain, oneDatabase()));
+		const prepared = await prepareIndexing('build', SQLITE, depsFor(chain, oneDatabase()));
 		const summary = await prepared.index();
 
 		expect(summary.stoppedBecause).toBe('stopped');
@@ -75,7 +75,7 @@ describe('the one-shot', () => {
 		const logged: string[] = [];
 		await main(SQLITE, {
 			build: async (options) => {
-				const prepared = await prepareIndexing(options, depsFor(chain, oneDatabase()));
+				const prepared = await prepareIndexing('build', options, depsFor(chain, oneDatabase()));
 				return prepared.index();
 			},
 			exit: (code) => exits.push(code),
@@ -101,6 +101,7 @@ describe('the one-shot', () => {
 		await main(SQLITE, {
 			build: async (options) => {
 				const prepared = await prepareIndexing(
+					'build',
 					options,
 					depsFor(chain, oneDatabase(), {env: {...SMALL_RANGES, SUSPECT_RESULT_COUNT: '2'}}),
 				);
@@ -125,6 +126,7 @@ describe('stop and resume', () => {
 		// exactly as a signal handler would stop it
 		const killer = new AbortController();
 		const first = await prepareIndexing(
+			'build',
 			SQLITE,
 			depsFor(interrupted, db, {
 				signal: killer.signal,
@@ -141,7 +143,7 @@ describe('stop and resume', () => {
 
 		// a NEW run, with a new fetcher that has never been told anything
 		const resumed = fakeChain().serve(SPREAD, TIP);
-		const second = await prepareIndexing(SQLITE, depsFor(resumed, db));
+		const second = await prepareIndexing('build', SQLITE, depsFor(resumed, db));
 		await second.index();
 
 		// it asked the store where it was: the first range of the second run starts
@@ -150,7 +152,7 @@ describe('stop and resume', () => {
 
 		// ...and it lands where a run that was never interrupted lands
 		const uninterrupted = oneDatabase();
-		const straight = await prepareIndexing(SQLITE, depsFor(fakeChain().serve(SPREAD, TIP), uninterrupted));
+		const straight = await prepareIndexing('build', SQLITE, depsFor(fakeChain().serve(SPREAD, TIP), uninterrupted));
 		await straight.index();
 
 		expect(await transfersIn(db)).toBe(SPREAD.length);

@@ -37,9 +37,9 @@ Named for what it PRODUCES: a database. What it does: load the processor module,
 | `--store <sqlite>` | REQUIRED and never defaulted. It names where the state goes, and it is the axis a second backend would arrive on |
 | `--db <url>` | libSQL url: `file:./etherfold.db`, `:memory:`, or `libsql://<host>`. Required with `--store sqlite`, so no run writes a database nobody named |
 | `--retention <blocks\|revert-only\|unbounded>` | how far back superseded versions are kept, in BLOCK numbers and no other unit (ADR-0019). Default `unbounded` |
-| `-d, --deployments <folder>` | contract deployments in hardhat-deploy / rocketh format. Optional when the module supplies `contractsData` or `contractsDataPerChain` |
-| `-n, --node-url <url>` | the JSON-RPC endpoint (falls back to `ETHEREUM_NODE`) |
-| `--rps <n>` | cap the requests per second made to the node |
+| `-d, --deployments <folder>` | contract deployments in hardhat-deploy / rocketh format, or `INDEXING_SOURCE` as JSON. Optional when the module supplies `contractsDataPerChain` |
+| `-n, --node-url <url>` | the JSON-RPC endpoint (or `ETH_NODE_URI`) |
+| `--rps <n>` | cap the requests per second made to the node (or `REQUESTS_PER_SECOND`) |
 
 A flag combination that names no store is REFUSED rather than ignored: an accepted-and-ignored flag is a deployment believing a retention window is enforced, or a database is being written, when neither is true. Nothing prunes automatically, because pruning costs time proportional to what it drops and is a call a host schedules (ADR-0022).
 
@@ -57,11 +57,43 @@ It starts [`@etherfold/server`](../server) on Node through [`@etherfold/platform
 
 The one thing it does write is the fixed-table SCHEMA, applied at startup if it is not already there, because the Node host is the single-operator case; `--no-auto-setup` turns that off and leaves migration to the operator.
 
+| flag | |
+| --- | --- |
+| `--db <url>` | REQUIRED. The libSQL database to answer over (or `DB`). It is not defaulted, so a read tier never comes up on an empty database nobody named |
+| `--port <port>` | port to listen on (or `PORT`). Defaults to `2000` |
+| `--host <hostname>` | hostname to bind. Binds every interface when absent |
+| `--no-auto-setup` | do not apply the fixed-table schema at startup |
+
 The server's dependency tree is imported lazily, so `etherfold build` never pays for it.
+
+## Configuration: flags first, environment behind them
+
+Every command resolves every input THE SAME WAY, which is what makes moving between them a deployment change rather than a rewrite. The rules:
+
+- **A flag beats the environment**, the environment is used when the flag is absent, and neither present is a REFUSAL. Only the port falls back to a default (`2000`); nothing else does, because getting a database or a node URL wrong silently is how a deployment ends up believing something untrue.
+- **One name per input**, and the variables are the ones a deployable already publishes: the fetcher host's (`INDEXING_SOURCE`, `ETH_NODE_URI`, `INGEST_ENDPOINT`, `INGEST_TOKEN`, `REQUESTS_PER_SECOND`) plus the Node server host's (`DB`, `PORT`).
+- **A refusal names the flag AND the variable** that would have satisfied it, and it happens before the chain is dialled or a database is opened.
+- **Nothing is accepted and ignored.** A flag a command does not own is refused with the reason it does not own it (`etherfold serve -p ./processor.js` says that a read tier holds no processor and points at `index` / `run` / `build`), rather than being taken and quietly having no effect. An ambient VARIABLE a command does not own is simply not read, so one host can run several commands side by side.
+
+Six inputs have a variable and six do not, and the line is deliberate: **the environment carries what varies between deployments of one image** -- the chain, the source, the database, the wire, the port -- while a flag carries what the image IS: which processor module, which store, which retention window, which interface.
+
+| variable | flag | |
+| --- | --- | --- |
+| `INDEXING_SOURCE` | `-d, --deployments` | what to index, as JSON (`{chainId, contracts}`) where the flag is a deployments folder |
+| `ETH_NODE_URI` | `-n, --node-url` | the chain's JSON-RPC endpoint |
+| `DB` | `--db` | the libSQL database |
+| `PORT` | `--port` | the port an HTTP surface binds |
+| `INGEST_ENDPOINT` | `--ingest-endpoint` | the indexer-server a `fetch` pushes to |
+| `INGEST_TOKEN` | `--ingest-token` | the ingest wire's shared secret, the same name on both sides. Prefer the variable: a secret on a command line is visible to every process on the host |
+| `REQUESTS_PER_SECOND` | `--rps` | the rate limit applied to the node |
+
+The CLI used to read a second name for the node URL (`ETHEREUM_NODE`). It is RETIRED: there is one name for it, and it is `ETH_NODE_URI`, which is what the fetcher deployable already refuses by.
 
 ## The command names are going to grow
 
 `build` and `serve` are what ships today, and they are two of the five names the set will have. The other three (`run` follows the chain, folds and answers queries without terminating; `fetch` is the stateless chain-facing half that pushes to a remote; `index` is the folding half that receives those pushes and owns the database) are decided in `work/specs/tasked/one-command-runs-the-whole-pipeline.md` and NOT built. `CONTEXT.md` is the authority for what each name means. Nothing resolves to them yet: `etherfold index` is an unknown command until the receiver lands.
+
+Their CONFIGURATION, though, already resolves: all five rows live in one table (`src/config.ts`), including the two asymmetries that make the set work. `fetch` takes a source but no processor, and refuses `--store` and `--db` outright, because the chain-facing half holds no state (ADR-0003). `index` resolves its source with NO chain call at all, so it takes it from `-d` or `INDEXING_SOURCE` and refuses a processor module that could only be resolved by asking a node for its chain id. So adding one of the three is a command registration and an assembly, never a second way to read a flag.
 
 ## Tests
 
