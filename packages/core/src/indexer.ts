@@ -33,6 +33,7 @@ import {
 	resolveStreamConfig,
 	sourceInvalidationOf,
 	stateMatches,
+	streamConfigHashOf,
 	streamMatches,
 	type SourceInvalidation,
 	wait,
@@ -40,7 +41,6 @@ import {
 import {sourceHashesOf} from './internal/engine/eventRanges.js';
 import {CancelOperations, createAction} from './internal/utils/promises.js';
 import {InvalidBatchError, isOutOfSpace} from './errors.js';
-import {simple_hash} from './utils/index.js';
 
 const namedLogger = logs('@etherfold/core');
 
@@ -385,7 +385,10 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		const streamConfig: UsedStreamConfig = resolveStreamConfig(config.stream);
 		this.config = {feedBatchSize: 300, ...config, stream: streamConfig};
 
-		this.streamConfigHash = simple_hash(this.config.stream || 'undefined');
+		// Resolved and hashed in ONE step, the same step `updateIndexer` reaches for:
+		// the two used to be separate expressions and drifted apart, which turned an
+		// ordinary reconfigure into a full re-index. See `streamConfigHashOf`.
+		this.streamConfigHash = streamConfigHashOf(this.config.stream);
 		this.finality = this.config.stream.finality;
 
 		// The half of the stream's IDENTITY that does not travel with each call. A
@@ -709,7 +712,13 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		streamConfig?: ProvidedStreamConfig;
 	}): Promise<ReconfigureOutcome> {
 		this.disableProcessing();
-		const newConfigHash = update.streamConfig ? simple_hash(update.streamConfig) : this.streamConfigHash;
+		// The config this reconfigure will RUN under, hashed exactly as `reinit` will
+		// hash it below -- through the one resolve-then-hash step, so an unset
+		// `finality` cannot make the stored hash and the incoming one disagree for
+		// ever. Left as `this.streamConfigHash` when no config was passed, because
+		// "unchanged" is not "the default": this generation may be running a config
+		// that is not the resolver's.
+		const newConfigHash = update.streamConfig ? streamConfigHashOf(update.streamConfig) : this.streamConfigHash;
 
 		const newSourceHashes = update.source ? sourceHashesOf(update.source) : this.sourceHashes;
 		const newProvider = update.provider || this.provider;

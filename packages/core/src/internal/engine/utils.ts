@@ -686,6 +686,36 @@ export function resolveStreamConfig(stream: ProvidedStreamConfig | undefined): U
 }
 
 /**
+ * The digest of a stream config, and THE ONLY PLACE A STREAM CONFIG IS HASHED.
+ *
+ * It RESOLVES before it hashes, so an unset `finality` and the default written
+ * out are one config -- exactly as they are already one stream to
+ * `streamDigestOf`, which resolves for the same reason. `resolveStreamConfig` is
+ * idempotent, so a caller that already holds a `UsedStreamConfig` (the wire
+ * identity, a `StreamBuilder`) reaches the same bytes through here as it did
+ * hashing directly, and no stored digest moves.
+ *
+ * ## Why it is a function and not two well-behaved call sites
+ *
+ * It was two call sites, and they DIVERGED. `reinit` hashed the config it had
+ * resolved; `updateIndexer` hashed the config as the caller PASSED it. Since the
+ * stored hash always carried `finality` and a caller usually leaves it unset --
+ * which is what the resolver exists for -- the two could never match, so
+ * `sourceInvalidationOf` reported `reason: 'stream-config'` on a reconfigure
+ * that moved nothing, and that verdict invalidates the STREAM half from block 0:
+ * the cache is cleared and the whole history is re-fetched from the node.
+ *
+ * A comment cannot hold that shut, and the resolve is the easy half to forget
+ * precisely because forgetting it still compiles and still produces a digest.
+ * So the step is ONE function every caller goes through, and
+ * `test/updateIndexer.test.ts` asserts that no second site in the package hashes
+ * a config at all.
+ */
+export function streamConfigHashOf(stream: ProvidedStreamConfig | UsedStreamConfig | undefined): string {
+	return simple_hash(resolveStreamConfig(stream));
+}
+
+/**
  * The `{source, config}` identity a sender asserts and a receiver checks.
  *
  * Derived here rather than at each end, for the same reason `getFromBlock` is:
@@ -700,7 +730,7 @@ export function wireContextOf<ABI extends Abi>(
 ): WireContext {
 	return {
 		source: [{startBlock: 0, hash: simple_hash(source)}],
-		config: simple_hash(streamConfig),
+		config: streamConfigHashOf(streamConfig),
 	};
 }
 

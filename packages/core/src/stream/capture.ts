@@ -2,8 +2,8 @@ import type {Abi} from 'abitype';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {LogEventFetcher} from '../internal/decoding/LogEventFetcher.js';
 import {sourceHashesOf} from '../internal/engine/eventRanges.js';
+import {streamConfigHashOf} from '../internal/engine/utils.js';
 import type {FetchConfig, IndexingSource, LogEvent, LogParseConfig, ProvidedStreamConfig} from '../types.js';
-import {simple_hash} from '../utils/hash.js';
 import {STREAM_FIXTURE_FORMAT, type StreamFixture} from './fixture.js';
 
 export type CaptureStreamOptions = {
@@ -17,7 +17,11 @@ export type CaptureStreamOptions = {
 	toBlock: number;
 	fetch?: FetchConfig;
 	parse?: LogParseConfig;
-	/** Hashed into the fixture's cursor, so a replay can tell a config change from a data change. */
+	/**
+	 * RESOLVED and then hashed into the fixture's cursor, so a replay can tell a
+	 * config change from a data change -- and so a capture that left `finality`
+	 * unset still replays into an indexer that filled the default in.
+	 */
 	streamConfig?: ProvidedStreamConfig;
 	/** Merged into the fixture's provenance: contracts repo + commit, node, whatever a reader needs. */
 	provenance?: Record<string, unknown>;
@@ -90,7 +94,6 @@ export async function captureStream<ABI extends Abi>(
 		next = toBlockUsed + 1;
 	}
 
-	const streamConfig = options.streamConfig ?? {};
 	return {
 		format: STREAM_FIXTURE_FORMAT,
 		provenance: {
@@ -107,7 +110,11 @@ export async function captureStream<ABI extends Abi>(
 				// that declares event block ranges is still recognised when it is replayed
 				// through `replayStream`.
 				source: sourceHashesOf(source),
-				config: simple_hash(streamConfig),
+				// Through the one resolve-then-hash step, like every other site: a fixture
+				// captured with `finality` left unset must replay into an indexer that
+				// resolved the same default, or the load path reads the stream as belonging
+				// to another config and clears it.
+				config: streamConfigHashOf(options.streamConfig),
 				// A stream is processor-independent: the same logs feed any processor,
 				// and which one will read this fixture is not knowable at capture time.
 				// It is left empty rather than filled with a plausible-looking digest,
