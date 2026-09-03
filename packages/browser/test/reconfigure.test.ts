@@ -204,8 +204,10 @@ describe('axis two: a new implementation behind the same address', () => {
 		const rangesBefore = chain.ranges.length;
 
 		const outcome = await indexer.updateIndexer({source: SOURCE_REDEPLOYED_SAME_ABI});
-		// nothing to report, because nothing about the source moved
+		// nothing to report, because nothing about the source moved -- and the verdict
+		// SAYS so now, on both halves, rather than only the one bit
 		expect(outcome.stateDiscarded).toBe(false);
+		expect(outcome.sourceInvalidation).toEqual({state: {valid: true}, stream: {valid: true}});
 		await indexToTip(indexer);
 
 		const askedAfter = chain.ranges.slice(rangesBefore);

@@ -142,6 +142,20 @@ A local chain restarted with each deploy never meets this. A chain that keeps it
 
 ### Both axes report what they did
 
-`updateProcessor`, `updateIndexer` and `reset` return `{stateDiscarded: boolean}`. Branch on it rather than re-deriving the rule — the rule includes `force`, the entity declarations and the source hashes, and a caller who gets that derivation wrong fails silently.
+`updateProcessor`, `updateIndexer` and `reset` return a `ReconfigureOutcome`. Branch on it rather than re-deriving the rule — the rule includes `force`, the entity declarations and the source hashes, and a caller who gets that derivation wrong fails silently.
 
-Use it to tell the user their data is being rebuilt. You do **not** need it to clear your own copy of the state: the hook re-seeds its `state` store at the moment of a discard, so subscribers never see state the core has thrown away.
+`stateDiscarded: boolean` is the whole of it for most apps. Use it to tell the user their data is being rebuilt. You do **not** need it to clear your own copy of the state: the hook re-seeds its `state` store at the moment of a discard, so subscribers never see state the core has thrown away.
+
+`sourceInvalidation` is the verdict that one bit was collapsed from, and it is there for the caller who wants to do something other than discard:
+
+```ts
+const outcome = await indexer.updateIndexer({source});
+outcome.sourceInvalidation; // SourceInvalidation | undefined
+// {state: {valid: false, invalidFromBlock: 780, reason: 'entry-added'}, stream: {valid: true}}
+```
+
+Two halves, because the fetch and the fold do not depend on the same thing. `stream` is about the raw logs, fetched under a topic-and-address filter, so it survives anything that did not GROW that filter; `state` is about the fold over decoded events, so it dies whenever the decoding shape moved. A renamed non-indexed parameter is the case that proves they are two questions: `topic0` hashes types and not names, so every cached log is still right and every cached `args` is filed under a key the handler no longer reads. Each half names the block it stopped being valid from.
+
+It is `undefined` on `updateProcessor` and `reset`, which ask no source question: a processor swap moves neither the filter nor the decode, and `reset` is a discard by fiat that also clears the cached stream.
+
+What it is **not** is a digest comparison. `streamDigestOf` MOVES when an event is appended above the cursor, and that append is free — the verdict is what decides whether a reconfigure invalidates anything, and the digest only decides which stream a result belongs to.

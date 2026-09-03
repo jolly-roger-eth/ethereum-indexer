@@ -254,8 +254,16 @@ async function start() {
 		const outcome = await indexer.updateIndexer({
 			source: {chainId: String(CHAIN.id), contracts: [next]},
 		});
+		// `stateDiscarded` is one bit: WHETHER the fold went. `sourceInvalidation` is
+		// the verdict it was collapsed from -- which half died (the raw log STREAM, the
+		// STATE folded out of it, or both) and from which BLOCK. Read it rather than
+		// hashing the source yourself: a second derivation is a second answer, and it
+		// can disagree with the one the indexer acted on.
+		const verdict = outcome.sourceInvalidation;
+		const from =
+			verdict && !verdict.state.valid ? ` from block ${verdict.state.invalidFromBlock} (${verdict.state.reason})` : '';
 		el('reload').textContent = outcome.stateDiscarded
-			? 'new ABI at the same address: state discarded, re-indexing from the start block'
+			? `new ABI at the same address: state discarded${from}, re-indexing from the start block`
 			: 'the source hashes the same, so nothing was discarded. If the MEANING changed, call reset().';
 	}
 

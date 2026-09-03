@@ -171,7 +171,10 @@ describe('EthereumIndexer reconfigure outcomes', () => {
 			chainId: '1',
 			contracts: [{abi: [] as unknown as Abi, address: '0x0000000000000000000000000000000000000001', startBlock: 0}],
 		};
-		expect(await indexer.updateIndexer({source: same})).toEqual({stateDiscarded: false});
+		expect(await indexer.updateIndexer({source: same})).toEqual({
+			stateDiscarded: false,
+			sourceInvalidation: {state: {valid: true}, stream: {valid: true}},
+		});
 
 		// a second contract: a different source, so the stored state cannot stand
 		const changed: IndexingSource<Abi> = {
@@ -181,7 +184,7 @@ describe('EthereumIndexer reconfigure outcomes', () => {
 				{abi: [] as unknown as Abi, address: '0x0000000000000000000000000000000000000002', startBlock: 0},
 			],
 		};
-		expect(await indexer.updateIndexer({source: changed})).toEqual({stateDiscarded: true});
+		expect(await indexer.updateIndexer({source: changed})).toMatchObject({stateDiscarded: true});
 	});
 
 	it('always reports a discard from reset, because reset IS the discard', async () => {
@@ -189,5 +192,65 @@ describe('EthereumIndexer reconfigure outcomes', () => {
 		await indexer.load();
 
 		expect(await indexer.reset()).toEqual({stateDiscarded: true});
+	});
+});
+
+/**
+ * THE VERDICT IS PUBLISHED, instead of being computed and dropped.
+ *
+ * `updateIndexer` has always asked `sourceInvalidationOf` whether the stored
+ * data still describes the source now being run, and has always gone on to throw
+ * the answer away: the two halves and the block each of them names reached a log
+ * line and nothing else. `stateDiscarded` is the collapse of that answer into one
+ * bit, and one bit cannot say WHICH half died or FROM WHICH BLOCK -- which is
+ * exactly what a caller building a new generation beside the live one has to
+ * know, and it lives browser-side, across the package boundary.
+ *
+ * So the verdict rides out on the outcome, in the shape `sourceInvalidationOf`
+ * returns. What it is NOT is a second way to decide: `stateDiscarded` still says
+ * what the verbs DID, and today they still discard exactly as they did before.
+ */
+describe('the invalidation verdict a reconfigure publishes', () => {
+	it('reports both halves valid when the source did not move', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		// a DIFFERENT object carrying the same contents, which is what a redeploy
+		// behind a proxy hands over when the ABI did not move
+		const same: IndexingSource<Abi> = {
+			chainId: '1',
+			contracts: [{abi: [] as unknown as Abi, address: '0x0000000000000000000000000000000000000001', startBlock: 0}],
+		};
+		const outcome = await indexer.updateIndexer({source: same});
+
+		expect(outcome.sourceInvalidation).toEqual({state: {valid: true}, stream: {valid: true}});
+	});
+
+	it('names the BLOCK and the REASON, which is what one bit could not say', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		// a stream CONFIG change is the both-halves case: it is hashed into the wire
+		// identity and describes how logs were fetched as much as what they meant
+		const outcome = await indexer.updateIndexer({streamConfig: {finality: 42}});
+
+		expect(outcome.sourceInvalidation).toEqual({
+			state: {valid: false, invalidFromBlock: 0, reason: 'stream-config'},
+			stream: {valid: false, invalidFromBlock: 0, reason: 'stream-config'},
+		});
+		// and the verb still did what it always did with that verdict
+		expect(outcome.stateDiscarded).toBe(true);
+	});
+
+	it('carries no source verdict from the two verbs that ask no source question', async () => {
+		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		await indexer.load();
+
+		// A processor swap moves neither the fetch filter nor the decoding shape, and
+		// `reset` is a discard by fiat that also CLEARS the stream. Reporting "both
+		// halves valid" for either would be answering a question nobody asked, and for
+		// `reset` it would read as "the stream stands" about a stream it just deleted.
+		expect((await indexer.updateProcessor(makeProcessor('v2'))).sourceInvalidation).toBeUndefined();
+		expect((await indexer.reset()).sourceInvalidation).toBeUndefined();
 	});
 });
