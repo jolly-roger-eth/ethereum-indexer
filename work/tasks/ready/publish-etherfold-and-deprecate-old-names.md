@@ -2,7 +2,7 @@
 title: Publish the etherfold packages and deprecate the old names
 slug: publish-etherfold-and-deprecate-old-names
 humanOnly: true
-blockedBy: [rename-to-etherfold, a-snapshot-a-client-cannot-read-is-refused-not-installed]
+blockedBy: [rename-to-etherfold, a-snapshot-a-client-cannot-read-is-refused-not-installed, the-one-shot-is-build-and-serve-is-only-the-read-tier]
 covers: []
 ---
 
@@ -111,6 +111,11 @@ effect of this one.
 ## Blocked by
 
 - `rename-to-etherfold` (done: the tree is renamed but unpublished).
+- `the-one-shot-is-build-and-serve-is-only-the-read-tier`. The CLI command rename (`index` becomes
+  `build`, no implicit default command) from `one-command-runs-the-whole-pipeline`. Same asymmetry as
+  the edge below, and added on its precedent: renaming the only shipped command is FREE today and a
+  breaking change to a shipped CLI the moment this task publishes. The spec's answer 2 records the
+  decision; this edge is what enforces it.
 - `a-snapshot-a-client-cannot-read-is-refused-not-installed`. This edge is the enforcement of an
   ordering that was previously decided in PROSE and by nothing else: that task states it is "better
   done BEFORE `publish-etherfold-and-deprecate-old-names`, which is what turns this from an

@@ -4,7 +4,6 @@ slug: the-node-server-starts-on-a-handle-it-was-given
 spec: one-command-runs-the-whole-pipeline
 blockedBy: [status-reports-the-cursor-through-an-injected-reporter]
 covers: []
-needsAnswers: true
 ---
 
 ## What to build
@@ -69,6 +68,8 @@ git fetch origin && git switch -c work/the-node-server-starts-on-a-handle-it-was
 git mv work/tasks/ready/the-node-server-starts-on-a-handle-it-was-given.md work/tasks/done/the-node-server-starts-on-a-handle-it-was-given.md
 ```
 
-## Open questions
+## Resolved during tasking (no question outstanding)
+
+The tasker's review loop found the finding below and FIXED it in this body before emitting; the `needsAnswers` stamp it left was the loop's non-convergence safety net, not an open question, and was cleared on 2026-09-03 after verifying the fix against `packages/server/src/api/ingest.ts`. Kept here because the trap it describes (a `501` that only an AUTHENTICATED caller can see) is one a builder would otherwise rediscover.
 
 - Three tasks require a test asserting that a processor-less server answers 501 on the ingestion routes, but that is not what the code does for an unauthenticated caller: getIngestAPI registers the token guard on the PATH (both /ingest and /ingest/*) BEFORE the getIngestion lookup, and authorized() fails CLOSED when INGEST_TOKEN is unset. So a serve/run/no-ingestion server answers 401, and 501 is reachable only by an AUTHENTICATED call. A test written to the literal criterion fails, and the tempting repair (move the capability check ahead of the guard) would let an unauthenticated caller probe whether a server hosts a processor, undoing the path-level guard the route comment says exists for exactly that reason. Fixed in the edits: each criterion now says configure the token, present a matching bearer header, assert 501 (the shape packages/server/test/ingest.test.ts:349 already uses), and states that the guard is not reordered. (packages/server/src/api/ingest.ts:106-118 (guard) vs 141/151 + notConfigured() at 199-204; affects run-follows (ingestion routes answer 501 on a run process), the-node-server (with none supplied they answer 501 exactly as they do today) and the-one-shot (a server started the way serve starts one answers 501))
