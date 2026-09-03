@@ -94,6 +94,7 @@ function fakeChain() {
 describe('etherfold build --store sqlite, over src/entities.ts', () => {
 	it('indexes the browser demo’s processor into a database, unchanged', async () => {
 		const prepared = await prepareIndexing(
+			'build',
 			{
 				processor: './dist/cli.js',
 				nodeUrl: 'http://localhost:0',

@@ -1,6 +1,6 @@
 import type {Command} from 'commander';
 import {describe, expect, it} from 'vitest';
-import {createProgram, type ProgramDependencies, type ServeOptions} from '../src/program.js';
+import {createProgram, type ProgramDependencies} from '../src/program.js';
 import type {Options} from '../src/types.js';
 
 // ---------------------------------------------------------------------------------------------------
@@ -14,9 +14,13 @@ import type {Options} from '../src/types.js';
 // receiver, and no command is commander's default -- a bare invocation prints
 // help rather than silently meaning one of the five.
 //
+// What this file does NOT assert is requiredness. That lives in the resolver
+// (`configuration.test.ts`), never in the parser, so nothing here is a
+// `requiredOption` and nothing carries a commander default: a flag that is
+// always present can never fall back to the variable behind it.
+//
 // The handlers are injected, so this file asserts the WORDS and the FLAGS
-// without loading a processor module or binding a port. What each command then
-// does with those flags is asserted by `indexOptions`, `oneShot` and `refusals`.
+// without loading a processor module or binding a port.
 // ---------------------------------------------------------------------------------------------------
 
 /** Errors and help go to these arrays instead of the process, all the way down the command tree. */
@@ -28,7 +32,7 @@ function silence(command: Command, output: string[]): void {
 
 function programUnderTest(deps: ProgramDependencies = {}) {
 	const built: Options[] = [];
-	const served: ServeOptions[] = [];
+	const served: Options[] = [];
 	const output: string[] = [];
 	const program = createProgram({
 		env: {},
@@ -79,22 +83,20 @@ describe('`build` is the one-shot', () => {
 			db: 'file:./etherfold.db',
 			retention: '50000',
 			deployments: './deployments',
+			// commander hands every flag over as a string, and the type says so now: the
+			// resolver is what turns it into a rate
+			rps: '5',
 		});
-		// commander hands every flag over as a string; that `--rps` is TYPED as a
-		// number is a lie older than this rename and not this task's to correct
-		expect(String(cli.built[0]!.rps)).toBe('5');
 	});
 
-	it('keeps -n required, and keeps ETHEREUM_NODE as its fallback', async () => {
-		const bare = programUnderTest({env: {}});
-		await expect(bare.run(['build', '-p', './processor.js', '--store', 'sqlite', '--db', ':memory:'])).rejects.toThrow(
-			/--node-url/,
-		);
-		expect(bare.built).toEqual([]);
+	it('does not make -n a parser requirement, so the resolver can name ETH_NODE_URI behind it', async () => {
+		const cli = programUnderTest();
 
-		const fromEnv = programUnderTest({env: {ETHEREUM_NODE: 'http://node.from.env'}});
-		await fromEnv.run(['build', '-p', './processor.js', '--store', 'sqlite', '--db', ':memory:']);
-		expect(fromEnv.built[0]!.nodeUrl).toBe('http://node.from.env');
+		// the parser accepts it; what refuses is `resolveCommandConfig`, which is what
+		// lets the refusal name the variable as well as the flag
+		await cli.run(['build', '-p', './processor.js', '--store', 'sqlite', '--db', ':memory:']);
+		expect(cli.built).toHaveLength(1);
+		expect(cli.built[0]!.nodeUrl).toBeUndefined();
 	});
 });
 
@@ -140,20 +142,71 @@ describe('no command is implicit', () => {
 });
 
 describe('`serve` is still `serve`', () => {
-	it('resolves, defaults its port, and applies the schema unless told not to', async () => {
+	it('resolves, and hands its handler the flags the read tier owns', async () => {
 		const cli = programUnderTest();
 
 		await cli.run(['serve', '--db', 'file:./etherfold.db']);
-		expect(cli.served[0]).toMatchObject({port: '2000', db: 'file:./etherfold.db', autoSetup: true});
+		expect(cli.served[0]).toMatchObject({db: 'file:./etherfold.db', autoSetup: true});
+		// NOT defaulted by the parser: a commander default is always present, so it
+		// would make PORT unreachable. 2000 is the resolver's, and only when neither
+		// the flag nor the variable said anything
+		expect(cli.served[0]!.port).toBeUndefined();
 
 		await cli.run(['serve', '--db', 'file:./etherfold.db', '--port', '3000', '--no-auto-setup']);
 		expect(cli.served[1]).toMatchObject({port: '3000', autoSetup: false});
 	});
+});
 
-	it('takes no processor, because it hosts none', async () => {
+// ---------------------------------------------------------------------------------------------------
+// A COMMAND LINE COPIED ACROSS GETS TOLD WHAT TO CHANGE
+// ---------------------------------------------------------------------------------------------------
+// A flag a command does not own PARSES, so it reaches the resolver and is refused
+// with the reason -- rather than meeting commander's `unknown option`, which
+// names neither a reason nor the command that does own it. That is the whole
+// point of "moving between commands is a deployment change, never a rewrite":
+// the flags that do not move say where they went.
+// ---------------------------------------------------------------------------------------------------
+
+describe('flags a command does not own reach the resolver, and are refused there', () => {
+	it('parses -p on `serve` rather than calling it an unknown option', async () => {
 		const cli = programUnderTest();
 
-		await expect(cli.run(['serve', '-p', './processor.js'])).rejects.toThrow(/unknown option/i);
-		expect(cli.served).toEqual([]);
+		await cli.run(['serve', '--db', ':memory:', '-p', './processor.js']);
+		expect(cli.served[0]).toMatchObject({processor: './processor.js'});
+	});
+
+	it('keeps them out of --help, so the surface a user reads is what the command owns', async () => {
+		const cli = programUnderTest();
+
+		await expect(cli.run(['serve', '--help'])).rejects.toMatchObject({code: 'commander.helpDisplayed'});
+		const help = cli.output.join('');
+		expect(help).toMatch(/--db/);
+		expect(help).toMatch(/--port/);
+		expect(help).not.toMatch(/--processor/);
+		expect(help).not.toMatch(/--ingest-token/);
+	});
+
+	it('shows every flag `build` owns, and no flag it does not', async () => {
+		const cli = programUnderTest();
+
+		await expect(cli.run(['build', '--help'])).rejects.toMatchObject({code: 'commander.helpDisplayed'});
+		const help = cli.output.join('');
+		for (const owned of ['--processor', '--deployments', '--node-url', '--rps', '--store', '--db', '--retention']) {
+			expect(help).toMatch(owned);
+		}
+		for (const notOwned of ['--port', '--host', '--ingest-endpoint', '--ingest-token']) {
+			expect(help).not.toMatch(notOwned);
+		}
+	});
+
+	it('names the variable behind a flag in the help text, so both are in one place', async () => {
+		const cli = programUnderTest();
+
+		await expect(cli.run(['build', '--help'])).rejects.toMatchObject({code: 'commander.helpDisplayed'});
+		const help = cli.output.join('');
+		expect(help).toMatch(/ETH_NODE_URI/);
+		expect(help).toMatch(/\bDB\b/);
+		expect(help).toMatch(/INDEXING_SOURCE/);
+		expect(help).not.toMatch(/ETHEREUM_NODE/);
 	});
 });

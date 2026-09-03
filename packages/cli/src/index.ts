@@ -12,18 +12,29 @@ import {
 	resolveFetcherHostConfig,
 	runFetcherLoop,
 	type CycleReport,
+	type EnvRecord,
 	type FetcherHost,
 	type RunSummary,
 	type Sleep,
 } from '@etherfold/fetcher-host';
 import type {EntityProcessor, StateStore} from '@etherfold/processor-entities';
-import {instantiateProcessor, loadContracts, loadProcessorModule, resolveSource} from '@etherfold/utils';
+import {
+	instantiateProcessor,
+	loadContracts,
+	loadProcessorModule,
+	resolveSource,
+	type ProcessorModule,
+} from '@etherfold/utils';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
-import {resolveIndexOptions} from './options.js';
-import type {Options, StoreTarget} from './types.js';
+import {resolveCommandConfig} from './config.js';
+import type {BuildConfig, Options, RunConfig, SourceOrigin, StoreTarget} from './types.js';
+
+export * from './config.js';
+export * from './types.js';
+export {serve, type ServeDependencies, type StartedServer} from './serve.js';
 
 const logger = logs('etherfold');
 
@@ -54,8 +65,18 @@ export type IndexingDependencies = {
 	/** Every cycle report, in order, after this command has acted on it. */
 	onReport?: (report: CycleReport) => void;
 	/** The environment flags fall back to. Defaults to `process.env`. */
-	env?: Record<string, string | undefined>;
+	env?: EnvRecord;
 };
+
+/**
+ * The commands this assembly serves: the ones that FOLLOW a chain and FOLD it.
+ *
+ * `index` folds too and is deliberately not here: it receives its batches over
+ * the wire and makes no chain call, so it builds no provider and no
+ * `LogFetcher`. It resolves through the same `resolveCommandConfig` and assembles
+ * differently, which is the distinction the command table already draws.
+ */
+export type ChainFollowingCommand = 'run' | 'build';
 
 /** Everything the assembled pipeline is made of, so a caller can drive it and look at it. */
 export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown> = {
@@ -100,12 +121,21 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
  * first issuing `eth_chainId`.
  */
 export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
+	command: ChainFollowingCommand,
 	options: Options,
 	deps: IndexingDependencies = {},
 ): Promise<PreparedIndexing<ABI, ProcessResultType>> {
-	const resolved = resolveIndexOptions(options);
+	const env = deps.env ?? (process.env as EnvRecord);
+	// FIRST, and pure: a missing node URL, a missing database, a store nothing
+	// implements or a source this command cannot reach is refused here, before a
+	// module is imported, a database is opened or the chain is dialled.
+	const resolved: RunConfig<ABI> | BuildConfig<ABI> = resolveCommandConfig<ChainFollowingCommand, ABI>(
+		command,
+		options,
+		env,
+	);
 
-	logger.info({nodeUrl: resolved.nodeUrl, store: resolved.target.store});
+	logger.info({nodeUrl: resolved.nodeUrl, store: resolved.destination.store, source: resolved.source.from});
 
 	// The CLI owns its provider construction (rate-limited JSON-RPC). The processor/source resolution
 	// logic is shared with the server via the helpers in @etherfold/utils.
@@ -125,15 +155,16 @@ export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 	});
 
 	const streamConfig = resolveStreamConfig(STREAM_CONFIG);
-	const {processor, store} = await buildProcessor<ABI, ProcessResultType>(declared, resolved.target, {
+	const {processor, store} = await buildProcessor<ABI, ProcessResultType>(declared, resolved.destination, {
 		finalityDepth: streamConfig.finality,
 		...(deps.createDB ? {createDB: deps.createDB} : {}),
 	});
 
-	let source: IndexingSource<ABI> | undefined = resolved.deployments ? loadContracts(resolved.deployments) : undefined;
-	if (!source) {
-		source = await resolveSource<ABI, ProcessResultType>(processorModule, provider as never);
-	}
+	const source: IndexingSource<ABI> | undefined = await openSource<ABI, ProcessResultType>(
+		resolved.source,
+		processorModule,
+		provider,
+	);
 	if (!source || !source.contracts) {
 		throw new Error(
 			`contracts data not found in the processor module, it needs to be provided either as exported field named "contractsData" or as field "contractsDataPerChain" indexed by chainID`,
@@ -146,7 +177,7 @@ export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 	const streamBuilder = new StreamBuilder<ABI, ProcessResultType>(processor, source, {stream: STREAM_CONFIG});
 
 	const host = createFetcherHost<ABI>(
-		resolveFetcherHostConfig<ABI>(deps.env ?? process.env, {
+		resolveFetcherHostConfig<ABI>(env, {
 			source,
 			nodeUrl: resolved.nodeUrl,
 			stream: STREAM_CONFIG,
@@ -168,6 +199,32 @@ export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 		store,
 		index: () => indexToTip(host, deps),
 	};
+}
+
+/**
+ * Turn a resolved source ORIGIN into the source itself.
+ *
+ * The origin was decided from the flags and the environment alone; this is where
+ * the side effect it names actually happens, and the three arms are deliberately
+ * not equivalent. Both explicit arms are CHAIN-FREE, which is what lets `index`
+ * -- the receiving half, which makes no chain call at all -- resolve a source as
+ * a first-class case rather than as a special case bolted on. The module arm is
+ * the only one that may cost an `eth_chainId` call, and it is the only one a
+ * chain-free caller is refused (`requireExplicitSource`).
+ */
+async function openSource<ABI extends Abi, ProcessResultType>(
+	origin: SourceOrigin<ABI>,
+	processorModule: ProcessorModule<ABI, ProcessResultType>,
+	provider: EIP1193ProviderWithoutEvents,
+): Promise<IndexingSource<ABI> | undefined> {
+	switch (origin.from) {
+		case 'deployments':
+			return loadContracts<ABI>(origin.folder);
+		case 'INDEXING_SOURCE':
+			return origin.source;
+		case 'processor-module':
+			return resolveSource<ABI, ProcessResultType>(processorModule, provider as never);
+	}
 }
 
 /**
@@ -268,7 +325,7 @@ async function buildProcessor<ABI extends Abi, ProcessResultType>(
  */
 export async function build(options: Options, deps: IndexingDependencies = {}): Promise<RunSummary> {
 	logger.info(JSON.stringify(options, null, 2));
-	const prepared = await prepareIndexing<Abi, unknown>(options, deps);
+	const prepared = await prepareIndexing<Abi, unknown>('build', options, deps);
 	return prepared.index();
 }
 
@@ -282,9 +339,12 @@ export async function main(
 		exit?: (code: number) => void;
 		log?: (...args: any[]) => void;
 		error?: (...args: any[]) => void;
+		/** The environment flags fall back to. Threaded from `createProgram`, so a test's env reaches the resolver. */
+		env?: EnvRecord;
 	},
 ): Promise<void> {
-	const buildFn = deps?.build ?? ((opts: Options) => build(opts));
+	const env = deps?.env;
+	const buildFn = deps?.build ?? ((opts: Options) => build(opts, env ? {env} : {}));
 	const exit = deps?.exit ?? ((code: number) => process.exit(code));
 	const log = deps?.log ?? console.log;
 	const error = deps?.error ?? console.error;

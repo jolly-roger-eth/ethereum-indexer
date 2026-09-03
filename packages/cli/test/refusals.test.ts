@@ -22,7 +22,7 @@ describe('the module shape', () => {
 	it('refuses the retired KIND TAG rather than unwrapping it, naming the module', async () => {
 		const chain = noChain();
 		await expect(
-			prepareIndexing(BASE as Options, {
+			prepareIndexing('build', BASE as Options, {
 				importModule: async () => taggedModule,
 				provider: chain.provider,
 			}),
@@ -33,7 +33,7 @@ describe('the module shape', () => {
 	it('refuses a module with no createProcessor at all, before any RPC', async () => {
 		const chain = noChain();
 		await expect(
-			prepareIndexing(BASE as Options, {
+			prepareIndexing('build', BASE as Options, {
 				importModule: async () => ({}),
 				provider: chain.provider,
 			}),

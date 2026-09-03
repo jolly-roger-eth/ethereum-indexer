@@ -59,6 +59,7 @@ const A_TIP = START_BLOCK + 100;
 
 async function indexOnce(options: Partial<Options>, chain: ReturnType<typeof fakeChain>, db: RemoteSQL) {
 	const prepared = await prepareIndexing(
+		'build',
 		{...SQLITE, ...options},
 		{
 			importModule: async () => entityModule,
@@ -150,6 +151,7 @@ describe('--store sqlite', () => {
 	it('takes a retention window and REPORTS it, and prunes nothing inside the index loop', async () => {
 		const chain = fakeChain().serve(A_100, A_TIP);
 		const prepared = await prepareIndexing(
+			'build',
 			{...SQLITE, retention: '500'},
 			{
 				importModule: async () => entityModule,
@@ -174,6 +176,7 @@ describe('--store sqlite', () => {
 		// same config both halves of the wire hash, so nothing here restates it
 		await expect(
 			prepareIndexing(
+				'build',
 				{...SQLITE, retention: '3'},
 				{
 					importModule: async () => entityModule,
