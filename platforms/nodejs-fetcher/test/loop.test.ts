@@ -2,7 +2,7 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {afterEach, describe, expect, it} from 'vitest';
 import type {CycleReport} from '@etherfold/fetcher-host';
-import {startFetcher, runFetcherProcess, type RunningFetcher} from '../src/index.js';
+import {startFetcher, runFetcherProcess, stopOnSignals, type RunningFetcher} from '../src/index.js';
 import {
 	ALICE,
 	fakeChain,
@@ -248,6 +248,36 @@ describe('killing the process mid-run', () => {
 		// the cycle in flight ran to completion: the batch it had fetched was pushed
 		expect(await receiver.transfers()).toBe(2);
 		expect(process.listenerCount('SIGTERM')).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// THE SIGNAL HALF, ON ITS OWN
+// ---------------------------------------------------------------------------
+// "A process, its signals and an exit code" is this adapter's whole
+// contribution, and the middle third is reusable on its own because
+// `startFetcher` is not the only shape that needs it: `etherfold run` builds its
+// own host (it also runs the receiving half in-process) and drives
+// `runFetcherLoop` itself, so it takes this rather than writing a second answer
+// to "which signals, and what happens to the cycle in flight".
+// ---------------------------------------------------------------------------
+
+describe('stopOnSignals', () => {
+	it('aborts on the signals a container sends, and hands back the undo', () => {
+		const controller = new AbortController();
+		const before = {term: process.listenerCount('SIGTERM'), int: process.listenerCount('SIGINT')};
+
+		const release = stopOnSignals(controller);
+		expect(process.listenerCount('SIGTERM')).toBe(before.term + 1);
+		expect(process.listenerCount('SIGINT')).toBe(before.int + 1);
+
+		process.emit('SIGTERM', 'SIGTERM');
+		expect(controller.signal.aborted).toBe(true);
+
+		// a caller that stops for another reason must not leave a listener behind
+		release();
+		expect(process.listenerCount('SIGTERM')).toBe(before.term);
+		expect(process.listenerCount('SIGINT')).toBe(before.int);
 	});
 });
 

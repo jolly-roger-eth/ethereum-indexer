@@ -119,6 +119,17 @@ sqlite3 nfts.db 'select * from nft limit 5'      # who owns which token, with it
 
 Stop it with `Ctrl-C` half way and run it again: it continues from the cursor in the database rather than re-indexing, for the same reason the tab resumes on reload. `test/cli.test.ts` runs this whole path against a fake node, so "the browser's processor runs under the CLI" is checked rather than claimed.
 
+**To keep it current instead of stopping at the tip, swap one word.** `etherfold run` is the same command with the same flags, plus an HTTP surface: it follows the chain rather than exiting, and `GET /status` reports a cursor that advances while it works.
+
+```sh
+NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000 \
+  pnpm --filter event-processor-nfts exec etherfold run \
+  -p ./dist/cli.js --store sqlite --db file:./nfts.db --port 2000 \
+  -n https://rpc.mevblocker.io
+```
+
+The processor file is still not one line different, which is the point: which deployment shape you run is a flag, and `test/cli.test.ts` asserts the same three facts under `run` that it asserts under `build`.
+
 **One collection, not every address.** The browser app indexes *one account's* tokens across every collection, which it does with a topic filter it passes to the indexer; a command line has no way to express that, so the CLI entry indexes one contract instead. Point `NFT_CONTRACT` anywhere; `NFT_START_BLOCK` is a recent block rather than the collection's deployment, because the first sync is what you wait for.
 
 ## What is in `src/`

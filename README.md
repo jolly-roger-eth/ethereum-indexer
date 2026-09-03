@@ -26,6 +26,8 @@ NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000
 
 `etherfold build --store sqlite --db <libsql url>` runs the processor into versioned rows and exits at the tip. There is ONE way to author a processor (ADR-0037), so the module hands over the processor itself and the operator names only where the state goes.
 
+To keep that database CURRENT and answer over it, swap one word: `etherfold run` is the same assembly that follows the chain instead of stopping at the tip, and serves `/status` (health, reorg counters, and a cursor that advances) on the port you name. One process, no split to think about.
+
 ## Main features:
 
 - written in typescript, run both in a browser context and node
@@ -46,7 +48,7 @@ One engine, one way to author a processor, and then a choice of where the state 
 | **authoring a processor** | [`@etherfold/processor-entities`](packages/processor-entities) -- entity declarations plus `on<EventName>` handlers, naming no backend |
 | **where the state lives** | [`@etherfold/state-store`](packages/state-store) is the seam; the backends are [`-sqlite`](packages/state-store-sqlite) (a server), [`-indexeddb`](packages/state-store-indexeddb) (the browser default) and [`-patch`](packages/state-store-patch) (light, memory-only). A new one earns its place by passing [`-conformance`](packages/state-store-conformance) |
 | **running it in a tab** | [`@etherfold/browser`](packages/browser) -- observable stores, auto-indexing, in-place reconfigure |
-| **running it from a terminal** | [`etherfold`](packages/cli) -- `build` folds to the tip and exits; `serve` answers queries over a database written elsewhere |
+| **running it from a terminal** | [`etherfold`](packages/cli) -- `run` follows, folds and answers HTTP in one process; `build` folds to the tip and exits; `serve` answers queries over a database written elsewhere |
 | **running it as a service** | [`@etherfold/server`](packages/server) is the host-free HTTP app; [`platforms/nodejs`](platforms/nodejs) and [`platforms/cf-worker`](platforms/cf-worker) are the hosts |
 | **splitting fetching from folding** | [`@etherfold/fetcher-host`](packages/fetcher-host) decides when a fetch cycle runs; [`platforms/nodejs-fetcher`](platforms/nodejs-fetcher) is the process that does it |
 | **richer reads on a SQL backend** | [`@etherfold/processor-sqlite`](packages/processor-sqlite) -- the same processor, plus caller-supplied SQL and block addressing |

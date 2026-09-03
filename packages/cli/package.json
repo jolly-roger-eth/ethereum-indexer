@@ -1,7 +1,7 @@
 {
 	"name": "etherfold",
 	"version": "0.7.0",
-	"description": "The etherfold command line: `build` runs a processor over a chain and writes the derived state into a libSQL database (one shot, exits at the tip); `serve` answers queries over a database written elsewhere.",
+	"description": "The etherfold command line: `run` follows a chain, folds a processor into a libSQL database and answers HTTP in one process; `build` is the same one shot, exiting at the tip; `serve` answers queries over a database written elsewhere.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -28,6 +28,7 @@
 		"@etherfold/core": "workspace:*",
 		"@etherfold/fetcher-host": "workspace:*",
 		"@etherfold/platform-nodejs": "workspace:*",
+		"@etherfold/platform-nodejs-fetcher": "workspace:*",
 		"@etherfold/processor-entities": "workspace:*",
 		"@etherfold/state-store-sqlite": "workspace:*",
 		"@etherfold/utils": "workspace:*",

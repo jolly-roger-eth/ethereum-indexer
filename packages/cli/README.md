@@ -1,6 +1,6 @@
 # etherfold
 
-The command line. `etherfold build` runs a processor over a chain and writes the derived state into a libSQL database; `etherfold serve` answers queries over a database written elsewhere.
+The command line. `etherfold run` follows a chain, folds a processor into a libSQL database and answers HTTP over it, in one process; `etherfold build` is the same thing as a one-shot that exits at the tip; `etherfold serve` answers queries over a database written elsewhere.
 
 ```sh
 npm i -g etherfold        # or: npx etherfold …
@@ -13,10 +13,44 @@ Every run names its intent: there is no default command, so a bare `etherfold` p
 
 | you want | use |
 | --- | --- |
-| to index a contract into a database, from a terminal or a CI job | here |
+| to run an indexer: follow a chain, fold into a database and answer HTTP | here, `run` |
+| to index a contract into a database, from a terminal or a CI job | here, `build` |
 | to index inside a browser tab, with no server | [`@etherfold/browser`](../browser) |
 | to write the processor being run | [`@etherfold/processor-entities`](../processor-entities) |
 | to embed the same pipeline in your own Node program | [`@etherfold/core`](../core) + [`@etherfold/fetcher-host`](../fetcher-host) |
+
+## `etherfold run` -- the whole pipeline, in one process
+
+```sh
+etherfold run \
+  -p ./dist/processor.js \
+  --store sqlite --db file:./etherfold.db \
+  -n https://rpc.example --port 2000
+```
+
+**This is the default thing to reach for.** One process, one terminal invocation: it follows the chain, folds your processor into the libSQL database you named, and answers HTTP on the port you resolved -- with no knowledge required of how the components divide. When it reaches the tip it does not stop; it backs off to a poll interval and keeps following.
+
+It is ASSEMBLY and not a fourth engine. A log-fetcher pushes into a stream-builder through an in-process direct ingestion (the two halves of the wire with the transport removed), the stream-builder folds your processor into the store, and the server starts on the SAME database handle the store writes through. `run` IS `fetch` plus `index` plus `serve` in one process; splitting them later is a deployment change and not a rewrite.
+
+| flag | |
+| --- | --- |
+| everything `build` takes | same flags, same variables, same refusals: see the table below |
+| `--port <port>` | port to listen on (or `PORT`). Defaults to `2000`; `0` asks the OS for any free port |
+| `--host <hostname>` | hostname to bind. Binds every interface when absent |
+| `--no-auto-setup` | do not apply the fixed-table schema at startup |
+
+**How it stops.** On `SIGINT` or `SIGTERM` it finishes the cycle in flight and exits `0`; nothing needs to be saved, because the store holds the rows AND the sync cursor in one transaction (ADR-0027), which is also why an interrupted run resumes from the store rather than from the start block. A refusal no waiting fixes -- a foreign `{source, config}`, the wrong chain, a suspected truncation -- ends it with a non-zero code, so a supervisor can tell a stop from a wedge. A retryable failure (an unreachable node) is retried indefinitely on an escalating, capped backoff rather than after N attempts: a transient outage should not leave a stopped indexer behind. Reaching the tip is not one of the ways it ends; that is `build`.
+
+**`/status` reports a cursor that advances**, which is how a running deployment is observable before a query layer exists:
+
+```json
+{"healthy": true, "cursor": {"reported": true,
+  "value": {"lastFromBlock": 21000001, "lastToBlock": 21004300, "latestBlock": 21004300, "unconfirmedBlocks": 3}}}
+```
+
+Four numbers, deliberately, and never the cursor itself: the stored cursor is a serialized sync structure carrying a window of decoded events, and `/status` reports whatever a host hands it verbatim (ADR-0047). `lastToBlock` is what moves; `latestBlock - lastToBlock` is how far behind it is.
+
+**A `run` process hosts no remote writer.** It fetches for itself, so no ingestion capability is injected into its server: an authenticated call to `/ingest` answers `501 ingestion-not-configured`, and an unauthenticated one answers `401`, exactly as on the read tier. A remote sender pushing into a process that is already fetching would be a second writer nobody asked for; the command that receives pushes is `index`. That is why `--ingest-endpoint` and `--ingest-token` are refused here: the two halves meet in this process through a direct in-process ingestion, so there is no wire to configure.
 
 ## `etherfold build` -- one shot, to the tip, then exit
 
@@ -28,6 +62,8 @@ etherfold build \
 ```
 
 Named for what it PRODUCES: a database. What it does: load the processor module, open the store, resolve the source, then fetch and fold until it reaches the chain tip it observed, and exit. Exit code 0 on success, 1 on failure, so a CI job can depend on it.
+
+**It is `run` without the serving, stopping at the tip**, and that is true of the code rather than of this sentence: both commands assemble through one function and differ by whether the loop aborts on the first report that reached the tip.
 
 **It is a ONE-SHOT and nothing else.** It does not follow the chain, does not stay up, and cannot be reconfigured while it runs: to keep a database current, run it again (a cron, a loop, a job). It resumes rather than restarting, because the sync cursor is in the store, written in the same transaction as the block it describes (ADR-0027). Live reconfiguration is the browser package's ability, not this one's.
 
@@ -91,7 +127,7 @@ The CLI used to read a second name for the node URL (`ETHEREUM_NODE`). It is RET
 
 ## The command names are going to grow
 
-`build` and `serve` are what ships today, and they are two of the five names the set will have. The other three (`run` follows the chain, folds and answers queries without terminating; `fetch` is the stateless chain-facing half that pushes to a remote; `index` is the folding half that receives those pushes and owns the database) are decided in `work/specs/tasked/one-command-runs-the-whole-pipeline.md` and NOT built. `CONTEXT.md` is the authority for what each name means. Nothing resolves to them yet: `etherfold index` is an unknown command until the receiver lands.
+`run`, `build` and `serve` are what ships today, and they are three of the five names the set will have. The other two are the two halves of a SPLIT deployment (`fetch` is the stateless chain-facing half that pushes to a remote; `index` is the folding half that receives those pushes and owns the database) and are decided in `work/specs/tasked/one-command-runs-the-whole-pipeline.md` and NOT built. `CONTEXT.md` is the authority for what each name means. Nothing resolves to them yet: `etherfold index` is an unknown command until the receiver lands.
 
 Their CONFIGURATION, though, already resolves: all five rows live in one table (`src/config.ts`), including the two asymmetries that make the set work. `fetch` takes a source but no processor, and refuses `--store` and `--db` outright, because the chain-facing half holds no state (ADR-0003). `index` resolves its source with NO chain call at all, so it takes it from `-d` or `INDEXING_SOURCE` and refuses a processor module that could only be resolved by asking a node for its chain id. So adding one of the three is a command registration and an assembly, never a second way to read a flag.
 

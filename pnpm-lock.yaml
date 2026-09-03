@@ -182,6 +182,9 @@ importers:
       '@etherfold/platform-nodejs':
         specifier: workspace:*
         version: link:../../platforms/nodejs
+      '@etherfold/platform-nodejs-fetcher':
+        specifier: workspace:*
+        version: link:../../platforms/nodejs-fetcher
       '@etherfold/processor-entities':
         specifier: workspace:*
         version: link:../processor-entities

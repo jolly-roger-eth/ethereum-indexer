@@ -55,6 +55,42 @@ export type StartFetcherOptions<ABI extends Abi> = FetcherHostConfigOverrides<AB
 	dependencies?: FetcherHostDependencies;
 };
 
+/**
+ * Abort `controller` on the signals a container sends, and hand back the undo.
+ *
+ * The adapter's contribution to a fetching process is "a process, its signals
+ * and an exit code", so this is that middle third on its own, exported because
+ * `startFetcher` is NOT the only shape that needs it: a COMBINED process
+ * (`etherfold run`) builds its own host, wires it to a stream-builder through
+ * `createDirectIngestion` and drives the same `runFetcherLoop`, and it must stop
+ * on SIGINT and SIGTERM the same way. A second copy of this in the CLI would be
+ * a second answer to "which signals, and what happens to the cycle in flight".
+ *
+ * The cycle in flight is allowed to finish and nothing needs to be saved, on
+ * either shape: progress lives in the receiver's cursor (ADR-0004), which for a
+ * combined process is the store's, written in the same transaction as the block
+ * it describes (ADR-0027).
+ *
+ * The returned function REMOVES the handlers, so a caller that stops for another
+ * reason does not leave a listener on the process (and does not keep aborting a
+ * controller nobody reads).
+ */
+export function stopOnSignals(controller: AbortController, options: {signals?: NodeJS.Signals[]} = {}): () => void {
+	const signals = options.signals ?? (['SIGINT', 'SIGTERM'] as NodeJS.Signals[]);
+	const onSignal = (signal: NodeJS.Signals) => {
+		logger.info(`${signal}: finishing the cycle in flight, then stopping. Nothing needs to be saved.`);
+		controller.abort();
+	};
+	for (const signal of signals) {
+		process.on(signal, onSignal);
+	}
+	return () => {
+		for (const signal of signals) {
+			process.off(signal, onSignal);
+		}
+	};
+}
+
 export type RunningFetcher<ABI extends Abi> = {
 	host: FetcherHost<ABI>;
 	/** Resolves when the loop has stopped, with what the run did. */
@@ -76,23 +112,10 @@ export function startFetcher<ABI extends Abi>(options: StartFetcherOptions<ABI> 
 	const host = createFetcherHost<ABI>(config, dependencies ?? {});
 
 	const controller = new AbortController();
-	const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
-	const onSignal = (signal: NodeJS.Signals) => {
-		logger.info(`${signal}: finishing the cycle in flight, then stopping. Nothing needs to be saved.`);
-		controller.abort();
-	};
-	if (handleSignals !== false) {
-		for (const signal of signals) {
-			process.on(signal, onSignal);
-		}
-	}
+	const releaseSignals = handleSignals === false ? () => {} : stopOnSignals(controller);
 
 	const stopped = runFetcherLoop(host, {signal: controller.signal, onReport}).then((summary) => {
-		if (handleSignals !== false) {
-			for (const signal of signals) {
-				process.off(signal, onSignal);
-			}
-		}
+		releaseSignals();
 		if (summary.stoppedBecause === 'fatal') {
 			logger.error(
 				`the fetch loop stopped after a refusal no retry can fix, having run ${summary.cycles} cycle(s). ` +

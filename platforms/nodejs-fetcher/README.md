@@ -36,7 +36,16 @@ const running = startFetcher({
 
 `INGEST_ENDPOINT` and `INGEST_TOKEN` are then neither needed nor read: there is no network to point at and nobody to authenticate to. Everything else is identical, because it is the same fetcher, the same stream-builder and the same contract, with the transport removed. The receiver still owns the cursor, still derives every reorg and still refuses a batch that does not start where it says.
 
-(Building the stream-builder and its processor is the indexer-server's business, not this package's.)
+(Building the stream-builder and its processor is the indexer-server's business, not this package's. `etherfold run` is that combined process built for you, and it drives its own loop -- so it takes `stopOnSignals` from here rather than `startFetcher`, which is what keeps "which signals stop a fetching process, and what happens to the cycle in flight" one answer:)
+
+```ts
+import {stopOnSignals} from '@etherfold/platform-nodejs-fetcher';
+
+const controller = new AbortController();
+const release = stopOnSignals(controller); // SIGINT and SIGTERM abort it
+await runFetcherLoop(myHost, {signal: controller.signal});
+release();
+```
 
 ## It keeps nothing, on purpose
 
