@@ -8,7 +8,8 @@ import type {Options} from '../src/types.js';
 // ---------------------------------------------------------------------------------------------------
 // The five names of `one-command-runs-the-whole-pipeline` are chosen so a reader
 // can tell what a process will DO, which only holds if every word means one
-// thing. So the two that ship are asserted at the surface a user types at:
+// thing. So the three that ship are asserted at the surface a user types at:
+// `run` follows the chain, folds AND answers queries without terminating,
 // `build` is the one-shot (`CONTEXT.md`: follows the chain, folds, EXITS at the
 // tip), `index` resolves to nothing at all because that word belongs to the wire
 // receiver, and no command is commander's default -- a bare invocation prints
@@ -33,6 +34,7 @@ function silence(command: Command, output: string[]): void {
 function programUnderTest(deps: ProgramDependencies = {}) {
 	const built: Options[] = [];
 	const served: Options[] = [];
+	const followed: Options[] = [];
 	const output: string[] = [];
 	const program = createProgram({
 		env: {},
@@ -42,16 +44,70 @@ function programUnderTest(deps: ProgramDependencies = {}) {
 		serve: async (options) => {
 			served.push(options);
 		},
+		run: async (options) => {
+			followed.push(options);
+		},
 		...deps,
 	});
 	silence(program, output);
 	return {
 		built,
 		served,
+		followed,
 		output,
 		run: (argv: string[]) => program.parseAsync(argv, {from: 'user'}),
 	};
 }
+
+describe('`run` is the follower, and the default thing to reach for', () => {
+	it('resolves, and hands its handler the flags a process that folds AND serves owns', async () => {
+		const cli = programUnderTest();
+
+		await cli.run([
+			'run',
+			'-p',
+			'./processor.js',
+			'--store',
+			'sqlite',
+			'--db',
+			'file:./etherfold.db',
+			'-n',
+			'http://localhost:8545',
+			'--port',
+			'3000',
+			'--host',
+			'127.0.0.1',
+		]);
+
+		expect(cli.followed).toHaveLength(1);
+		expect(cli.followed[0]).toMatchObject({
+			processor: './processor.js',
+			store: 'sqlite',
+			db: 'file:./etherfold.db',
+			nodeUrl: 'http://localhost:8545',
+			port: '3000',
+			host: '127.0.0.1',
+		});
+		// it is its own command and not a flag on another one
+		expect(cli.built).toEqual([]);
+		expect(cli.served).toEqual([]);
+	});
+
+	it('shows the folding flags AND the serving ones, and no wire', async () => {
+		const cli = programUnderTest();
+
+		await expect(cli.run(['run', '--help'])).rejects.toMatchObject({code: 'commander.helpDisplayed'});
+		const help = cli.output.join('');
+		for (const owned of ['--processor', '--store', '--db', '--node-url', '--port', '--host', '--no-auto-setup']) {
+			expect(help).toMatch(owned);
+		}
+		// this process runs both halves in ONE process, so there is no wire to
+		// configure: the flags parse and are refused with that reason
+		for (const notOwned of ['--ingest-endpoint', '--ingest-token']) {
+			expect(help).not.toMatch(notOwned);
+		}
+	});
+});
 
 describe('`build` is the one-shot', () => {
 	it('resolves, and hands its handler every flag the one-shot has always taken', async () => {
@@ -128,7 +184,8 @@ describe('no command is implicit', () => {
 		await expect(cli.run([])).rejects.toMatchObject({code: 'commander.help'});
 		expect(cli.built).toEqual([]);
 		expect(cli.served).toEqual([]);
-		expect(cli.output.join('')).toMatch(/Commands:[\s\S]*build[\s\S]*serve/);
+		expect(cli.followed).toEqual([]);
+		expect(cli.output.join('')).toMatch(/Commands:[\s\S]*run[\s\S]*build[\s\S]*serve/);
 	});
 
 	it('refuses the old default-command form rather than folding under no name', async () => {

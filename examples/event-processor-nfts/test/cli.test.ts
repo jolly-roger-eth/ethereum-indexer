@@ -1,4 +1,4 @@
-import {prepareIndexing} from 'etherfold';
+import {prepareIndexing, run} from 'etherfold';
 import {describe, expect, it} from 'vitest';
 
 // ---------------------------------------------------------------------------------------------------
@@ -6,8 +6,10 @@ import {describe, expect, it} from 'vitest';
 // ---------------------------------------------------------------------------------------------------
 // `src/entities.ts` is what `browser/main.ts` runs against IndexedDB in a tab.
 // This drives THAT FILE, unchanged, through `etherfold build --store sqlite`
-// into versioned rows -- which is the whole claim of "one processor,
-// everywhere", checked rather than asserted.
+// and through `etherfold run` into versioned rows -- which is the whole claim of
+// "one processor, everywhere", checked rather than asserted. Under `run` it is
+// checked against the deployment a developer actually reaches for: one process
+// that follows the chain, folds, and answers HTTP.
 //
 // The chain is a fake node; everything above it is the shipped pipeline
 // (`LogFetcher` -> `createDirectIngestion` -> `StreamBuilder` ->
@@ -129,5 +131,54 @@ describe('etherfold build --store sqlite, over src/entities.ts', () => {
 		// the ERC-20 log with the same topic0: refused by the decoder, counted by
 		// `handleUnparsedEvent`, exactly as in the tab
 		expect(await store.getCurrent('counter', {name: 'undecodable'})).toMatchObject({value: 1});
+	});
+});
+
+describe('etherfold run, over the same src/entities.ts', () => {
+	it('follows the chain, folds the browser demo\u2019s processor and answers HTTP, unchanged', async () => {
+		const running = await run(
+			{
+				processor: './dist/cli.js',
+				nodeUrl: 'http://localhost:0',
+				store: 'sqlite',
+				db: ':memory:',
+				// the OS picks the port, so this suite never collides with whatever is
+				// already listening on the developer machine running it
+				port: '0',
+			},
+			{
+				importModule: async () => import('../src/cli.js'),
+				provider: fakeChain(),
+				sleep: async () => {
+					await new Promise((resolve) => setTimeout(resolve, 1));
+				},
+				// the test runner's process is not this command's to install handlers on
+				handleSignals: false,
+				log: () => {},
+			},
+		);
+
+		try {
+			const tokenID = '7'.padStart(78, '0');
+			const deadline = Date.now() + 10_000;
+			let cursor: {lastToBlock: number} | undefined;
+			for (;;) {
+				const body = (await (await fetch(`${running.url}/status`)).json()) as {
+					cursor?: {reported: boolean; value?: {lastToBlock: number}};
+				};
+				cursor = body.cursor?.reported ? body.cursor.value : undefined;
+				if (cursor?.lastToBlock === TIP) break;
+				if (Date.now() > deadline) throw new Error(`timed out; /status last reported ${JSON.stringify(body.cursor)}`);
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			}
+
+			// the same three assertions the one-shot makes, from the same processor file,
+			// read out of the database this process is still writing to
+			expect(await running.store.getCurrent('nft', {tokenAddress: CONTRACT, tokenID})).toMatchObject({owner: BOB});
+			expect(await running.store.getCurrent('counter', {name: 'transfers'})).toMatchObject({value: 2});
+			expect(await running.store.getCurrent('counter', {name: 'undecodable'})).toMatchObject({value: 1});
+		} finally {
+			await running.stop();
+		}
 	});
 });

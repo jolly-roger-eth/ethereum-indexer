@@ -30,10 +30,12 @@ import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
 import {resolveCommandConfig} from './config.js';
-import type {BuildConfig, Options, RunConfig, SourceOrigin, StoreTarget} from './types.js';
+import type {BuildConfig, ConfigFor, Options, RunConfig, SourceOrigin, StoreTarget} from './types.js';
 
 export * from './config.js';
 export * from './types.js';
+export {readCursorReport, type StoreCursorReport} from './cursorReport.js';
+export {run, runMain, type RunDependencies, type RunningIndexer} from './run.js';
 export {serve, type ServeDependencies, type StartedServer} from './serve.js';
 
 const logger = logs('etherfold');
@@ -79,7 +81,19 @@ export type IndexingDependencies = {
 export type ChainFollowingCommand = 'run' | 'build';
 
 /** Everything the assembled pipeline is made of, so a caller can drive it and look at it. */
-export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown> = {
+export type PreparedIndexing<
+	ABI extends Abi = Abi,
+	ProcessResultType = unknown,
+	C extends ChainFollowingCommand = ChainFollowingCommand,
+> = {
+	/**
+	 * This command's row of the table, resolved once.
+	 *
+	 * Handed back rather than kept private because a command that also SERVES needs
+	 * the address it resolved (`run`), and resolving it a second time in the
+	 * command would be a second call site for one answer.
+	 */
+	config: ConfigFor<C, ABI>;
 	source: IndexingSource<ABI>;
 	processor: EventProcessor<ABI, ProcessResultType>;
 	/** The receiving half. Present so a test can assert WHICH engine folds, rather than trust it. */
@@ -88,7 +102,22 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
 	host: FetcherHost<ABI>;
 	/** The store the processor folds into. */
 	store: StateStore;
-	/** Run cycles until the tip, and return what the run did. Throws on a `fatal` report. */
+	/**
+	 * The ONE libSQL handle this command built, which the store folds into.
+	 *
+	 * Exposed because a command that also serves hands this SAME handle to the
+	 * server (`platforms/nodejs`'s `StartOptions.db` takes one), so the store and
+	 * the read surface see one database rather than two connections with two views
+	 * of it -- against `:memory:` they would not even be the same database.
+	 */
+	db: RemoteSQL;
+	/**
+	 * Drive the assembled pipeline, and return what the run did. Throws on a
+	 * `fatal` report.
+	 *
+	 * WHERE IT STOPS is the one difference between the two commands: `build` stops
+	 * at the tip, `run` follows it (see `driveCycles`).
+	 */
 	index(): Promise<RunSummary>;
 };
 
@@ -120,11 +149,11 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
  * module this command cannot drive, or a store it cannot open, fails without
  * first issuing `eth_chainId`.
  */
-export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
-	command: ChainFollowingCommand,
-	options: Options,
-	deps: IndexingDependencies = {},
-): Promise<PreparedIndexing<ABI, ProcessResultType>> {
+export async function prepareIndexing<
+	ABI extends Abi,
+	ProcessResultType,
+	C extends ChainFollowingCommand = ChainFollowingCommand,
+>(command: C, options: Options, deps: IndexingDependencies = {}): Promise<PreparedIndexing<ABI, ProcessResultType, C>> {
 	const env = deps.env ?? (process.env as EnvRecord);
 	// FIRST, and pure: a missing node URL, a missing database, a store nothing
 	// implements or a source this command cannot reach is refused here, before a
@@ -155,7 +184,7 @@ export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 	});
 
 	const streamConfig = resolveStreamConfig(STREAM_CONFIG);
-	const {processor, store} = await buildProcessor<ABI, ProcessResultType>(declared, resolved.destination, {
+	const {processor, store, db} = await buildProcessor<ABI, ProcessResultType>(declared, resolved.destination, {
 		finalityDepth: streamConfig.finality,
 		...(deps.createDB ? {createDB: deps.createDB} : {}),
 	});
@@ -192,12 +221,16 @@ export async function prepareIndexing<ABI extends Abi, ProcessResultType>(
 	);
 
 	return {
+		// the switch inside `resolveCommandConfig` produced exactly the arm named by
+		// `command`, which the compiler cannot see through a generic parameter
+		config: resolved as ConfigFor<C, ABI>,
 		source,
 		processor,
 		streamBuilder,
 		host,
 		store,
-		index: () => indexToTip(host, deps),
+		db,
+		index: () => driveCycles(command, host, deps),
 	};
 }
 
@@ -228,21 +261,44 @@ async function openSource<ABI extends Abi, ProcessResultType>(
 }
 
 /**
- * Run cycles until this command has nothing left to do, then stop.
+ * Drive cycles until this command has nothing left to do, then stop.
+ *
+ * ## The ONE difference between `build` and `run`, and there is no second one
  *
  * `runFetcherLoop` follows the tip forever and has no stop-at-tip option, which
- * is right for a host that is meant to keep running; a one-shot is that same
- * loop plus an `AbortController` aborted from `onReport`. Two reports mean the
- * work is done: a `progress` that reached the tip it observed (`caughtUp`), and
- * an `idle` (there was nothing above the cursor to fetch). Everything else is
- * the loop's own business -- a `retry` backs off and tries again, a `fatal` ends
- * the loop by itself and is re-thrown here so the process exits non-zero.
+ * is right for a host that is meant to keep running. `run` is exactly that loop.
+ * The one-shot is that same loop plus an `AbortController` aborted from
+ * `onReport`, and `stopAtTip` below is the whole of it: two reports mean a
+ * one-shot's work is done -- a `progress` that reached the tip it observed
+ * (`caughtUp`), and an `idle` (there was nothing above the cursor to fetch).
  *
- * Deliberately NOT a stop on `contended`: a yielded cycle means another sender
- * moved the cursor, and stopping there would report success having landed
- * nothing.
+ * Everything else is the loop's own business on BOTH commands -- a `retry` backs
+ * off and tries again, a `fatal` ends the loop by itself and is re-thrown here so
+ * the process exits non-zero.
+ *
+ * **A retryable failure is never bounded, on either command.** The one-shot
+ * decided that and deliberately left the follower's answer to this command; it
+ * is the same answer, and more obviously right here. `runFetcherLoop` escalates
+ * to a capped delay (a minute by default), a node that comes back is the ordinary
+ * case, and a bound would turn a transient outage into a stopped indexer that
+ * only a supervisor restarts -- which is exactly the loop we would have written
+ * by hand. What is NOT retried forever is a refusal no waiting fixes: that is a
+ * `fatal`, and it stops the process with a non-zero code.
+ *
+ * Deliberately NOT a stop on `contended`, on either command: a yielded cycle
+ * means another sender moved the cursor, and stopping there would report success
+ * having landed nothing.
+ *
+ * Stopping a FOLLOWER is therefore a signal and never a report, which is what
+ * `deps.signal` carries in from the caller (`run` installs the process's signal
+ * handlers on it; a test aborts it by hand).
  */
-async function indexToTip<ABI extends Abi>(host: FetcherHost<ABI>, deps: IndexingDependencies): Promise<RunSummary> {
+async function driveCycles<ABI extends Abi>(
+	command: ChainFollowingCommand,
+	host: FetcherHost<ABI>,
+	deps: IndexingDependencies,
+): Promise<RunSummary> {
+	const stopAtTip = command === 'build';
 	const controller = new AbortController();
 	const stop = () => controller.abort();
 	if (deps.signal?.aborted) {
@@ -260,7 +316,7 @@ async function indexToTip<ABI extends Abi>(host: FetcherHost<ABI>, deps: Indexin
 					console.log(`${report.outcome.toBlock} / ${report.outcome.latestBlock}`);
 				}
 				deps.onReport?.(report);
-				if (report.kind === 'idle' || (report.kind === 'progress' && report.caughtUp)) {
+				if (stopAtTip && (report.kind === 'idle' || (report.kind === 'progress' && report.caughtUp))) {
 					controller.abort();
 				}
 			},
@@ -290,7 +346,7 @@ async function buildProcessor<ABI extends Abi, ProcessResultType>(
 	declared: EntityProcessor<ABI, any>,
 	target: StoreTarget,
 	context: {finalityDepth: number; createDB?: (url: string) => RemoteSQL},
-): Promise<{processor: EventProcessor<ABI, ProcessResultType>; store: StateStore}> {
+): Promise<{processor: EventProcessor<ABI, ProcessResultType>; store: StateStore; db: RemoteSQL}> {
 	const [{EntityEventProcessor}, {VersionedStateStore}, {createNodeDB}] = await Promise.all([
 		import('@etherfold/processor-entities'),
 		import('@etherfold/state-store-sqlite'),
@@ -312,7 +368,7 @@ async function buildProcessor<ABI extends Abi, ProcessResultType>(
 	const processor = new EntityEventProcessor<ABI, any>(store, declared, {
 		finalityDepth: context.finalityDepth,
 	});
-	return {processor: processor as unknown as EventProcessor<ABI, ProcessResultType>, store};
+	return {processor: processor as unknown as EventProcessor<ABI, ProcessResultType>, store, db: handle};
 }
 
 /**
@@ -320,8 +376,9 @@ async function buildProcessor<ABI extends Abi, ProcessResultType>(
  *
  * Named for the command rather than for "running", because under the five-name
  * set `run` is a DIFFERENT deployment intent -- one that follows the chain,
- * answers queries and never terminates (`CONTEXT.md`). This one stops at the
- * tip, so it is `build`.
+ * answers queries and never terminates (`CONTEXT.md`, and `src/run.ts`). This
+ * one stops at the tip, so it is `build`; the assembly under both is the same
+ * `prepareIndexing`, and the difference is `driveCycles`'s `stopAtTip`.
  */
 export async function build(options: Options, deps: IndexingDependencies = {}): Promise<RunSummary> {
 	logger.info(JSON.stringify(options, null, 2));

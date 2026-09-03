@@ -3,6 +3,7 @@ import type {EnvRecord} from '@etherfold/fetcher-host';
 import pkg from '../package.json' with {type: 'json'};
 import {INPUTS, OWNERSHIP, type ConfigInput} from './config.js';
 import {main} from './index.js';
+import {runMain} from './run.js';
 import {serve} from './serve.js';
 import type {CommandName, Options} from './types.js';
 
@@ -19,6 +20,8 @@ export type ProgramDependencies = {
 	env?: EnvRecord;
 	/** Runs the one-shot. Defaults to `main`, which resolves the process exit code. */
 	build?: (options: Options) => void;
+	/** Runs the follower. Defaults to `runMain`, which keeps going until a signal and resolves the exit code. */
+	run?: (options: Options) => void | Promise<void>;
 	/** Starts the read tier. Defaults to `serve`, which resolves its database and starts the Node adapter. */
 	serve?: (options: Options) => Promise<void>;
 };
@@ -57,11 +60,13 @@ function registerInputs(command: Command, name: CommandName): void {
  * The command surface: five names are coming, and each of them means one thing.
  *
  * `CONTEXT.md` ("The COMMAND SET names deployment intents, not components")
- * is the authority for the set. Two of the five ship: **`build`** follows the
- * chain, folds and EXITS at the tip, and **`serve`** answers queries over a
- * database written elsewhere. The other three (`run`, `fetch`, `index`) do not
- * exist yet, and the words are held free for them rather than borrowed -- but
- * their configuration already resolves (`OWNERSHIP` in `src/config.ts`), so
+ * is the authority for the set. Three of the five ship: **`run`** follows the
+ * chain, folds AND answers queries without terminating -- the milestone, and the
+ * default thing to reach for; **`build`** is the same assembly stopping at the
+ * tip; and **`serve`** answers queries over a database written elsewhere. The
+ * other two (`fetch`, `index`) are the two halves of a SPLIT deployment and do
+ * not exist yet, and the words are held free for them rather than borrowed --
+ * but their configuration already resolves (`OWNERSHIP` in `src/config.ts`), so
  * adding one is a registration and an assembly rather than a second way to read
  * a flag.
  *
@@ -87,10 +92,27 @@ export function createProgram(deps: ProgramDependencies = {}): Command {
 			main(options, {env});
 		});
 	const runServe = deps.serve ?? ((options: Options) => serve(options, {env}));
+	const runFollower =
+		deps.run ??
+		((options: Options) => {
+			// `runMain` resolves the exit code the same way `main` does, and for the same
+			// reason: a follower that stopped on a refusal no waiting fixes must not look
+			// like one that was asked to stop.
+			return runMain(options, {env});
+		});
 
 	const program = new Command();
 
 	program.name('etherfold').version(pkg.version).description('Index EVM logs into state, from a terminal');
+
+	const run = program
+		.command('run')
+		.description('follow the chain, fold a processor into a libSQL database, and answer queries over it')
+		.usage(`-p <processor's path> --store sqlite --db <libsql url> [--port 2000 -n http://localhost:8545]`);
+	registerInputs(run, 'run');
+	run.action(async (options: Options) => {
+		await runFollower(options);
+	});
 
 	const build = program
 		.command('build')
