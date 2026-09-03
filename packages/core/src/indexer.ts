@@ -59,6 +59,28 @@ function sameEvent<ABI extends Abi>(a: LogEvent<ABI>, b: LogEvent<ABI>): boolean
 export type LoadingState = 'Loading' | 'FetchingEventStream' | 'ProcessingEventStream' | 'Loaded';
 
 /**
+ * WHERE A GENERATION IS BETWEEN RUNNING AND A GENUINE IDLE.
+ *
+ * *Pausing* caps and drains; *draining* is the period of continued light
+ * polling until every block the generation holds is FINAL. So there are three
+ * positions and no more, and none of them is a state MACHINE: `pauseState` is
+ * DERIVED, on every read, from the cap and the existing `getFromBlock`.
+ *
+ * - `running` -- not paused. No cap.
+ * - `draining` -- paused, and the cap is still inside the reorg window, so each
+ *   round re-scans a SHRINKING `[latestBlock - finality, cap]` and corrects
+ *   anything the chain moved under it.
+ * - `drained` -- paused, and the cap has fallen below `latestBlock - finality`.
+ *   Every block it holds is final, so `getFromBlock` asks for a block above the
+ *   capped `toBlock` and the existing "no new block" branch fetches nothing.
+ *
+ * A consumer watches this to know that a pause is not INSTANT: it takes up to
+ * `finality` blocks of continued light polling to complete, and `drained` is the
+ * moment it has.
+ */
+export type PauseState = 'running' | 'draining' | 'drained';
+
+/**
  * What one attempt to write the cached stream DID, which is what decides whether
  * the batch may be processed.
  *
@@ -297,6 +319,27 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 	/** So the decline is said once rather than once per cycle. */
 	protected streamDeclineReported: boolean = false;
 
+	/**
+	 * Whether this generation has been asked to PAUSE. The cap itself is
+	 * `pausedToBlock`, pinned by the first paused cycle.
+	 */
+	protected pauseRequested: boolean = false;
+
+	/**
+	 * `maxToBlock`: the block a paused generation will not fetch above, and the
+	 * WHOLE of what a pause is.
+	 *
+	 * PINNED BY THE FIRST PAUSED CYCLE rather than by `pause()` itself, which is
+	 * the one subtlety here. `pause()` is synchronous and a fetch may be in flight
+	 * when it is called; a cap pinned from the cursor at that moment would then sit
+	 * BELOW the cursor the racing batch leaves behind, and `getFromBlock` would
+	 * immediately ask for a block above it -- so the generation would go idle
+	 * holding an unconfirmed window it never re-scanned, which is exactly the
+	 * hazard draining exists to remove. Pinned inside the serialized index action
+	 * instead, it is by construction the cursor the paused generation actually has.
+	 */
+	protected pausedToBlock: number | undefined;
+
 	protected streamWriteFailureLimit: number = DEFAULT_STREAM_WRITE_FAILURE_LIMIT;
 	protected streamWriteRetryDelay: number = DEFAULT_STREAM_WRITE_RETRY_DELAY;
 
@@ -403,6 +446,97 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 	 */
 	get finalityDepth(): number {
 		return this.finality;
+	}
+
+	/**
+	 * The block this generation will not fetch above, or `undefined` when it is
+	 * running. See `pausedToBlock`; `undefined` while paused means the cap has not
+	 * been pinned yet, because no cycle has run since `pause()`.
+	 */
+	get maxToBlock(): number | undefined {
+		return this.pauseRequested ? this.pausedToBlock : undefined;
+	}
+
+	/**
+	 * DERIVED, never stored: the cap plus the existing `getFromBlock` already say
+	 * where a pause has got to, and a second copy of that answer could disagree
+	 * with the one the fetch loop acts on.
+	 */
+	get pauseState(): PauseState {
+		if (!this.pauseRequested) {
+			return 'running';
+		}
+		if (this.pausedToBlock === undefined || !this.lastSync) {
+			// asked for, not yet pinned: no cycle has run, so nothing has drained
+			return 'draining';
+		}
+		// The one condition, and it is the SAME expression the fetch loop takes its
+		// "no new block" branch on: once `getFromBlock` asks for a block above the
+		// capped `toBlock`, this generation fetches nothing ever again and everything
+		// it holds is below `latestBlock - finality` and therefore final.
+		return getFromBlock(this.lastSync, this.defaultFromBlock, this.finality) > this.pausedToBlock
+			? 'drained'
+			: 'draining';
+	}
+
+	/**
+	 * PAUSE: stop indexing WITHOUT being deleted, and without ever answering with
+	 * state a reorg has invalidated underneath.
+	 *
+	 * It caps `toBlock` at this generation's cursor and NOTHING ELSE. It truncates
+	 * nothing, reverts nothing and never touches `revertTo`, so what this
+	 * generation answers at the moment it pauses is what it goes on answering --
+	 * which is what keeps a paused generation revertible-TO: moving the canonical
+	 * pointer back to it restores its answers EXACTLY.
+	 *
+	 * ## Why it needs no new mechanism
+	 *
+	 * With `toBlock` capped at `x` and `lastToBlock = x`, the existing
+	 * `getFromBlock` does the whole thing. While `latestBlock - finality <= x` it
+	 * returns `latestBlock - finality`, so every round re-scans `[that, x]` -- a
+	 * SHRINKING window that still corrects a reorg striking at or below the cap.
+	 * Once `latestBlock - finality > x` it returns `x + 1`, which is above the
+	 * capped `toBlock`, so the indexer takes its existing `fromBlock > toBlock`
+	 * branch and fetches nothing. A paused generation self-terminates into a no-op
+	 * poll; there is no timer, no branch and no state machine here to get wrong.
+	 *
+	 * `lastSync.latestBlock` deliberately keeps tracking the REAL head. Capping
+	 * that too would make `getFromBlock` return `latestBlock - finality` forever
+	 * and the drain would NEVER idle.
+	 *
+	 * ## What it is NOT
+	 *
+	 * It is NOT INSTANT: draining takes up to `finality` blocks of continued light
+	 * polling, and a driver that stops calling `indexMore()` the moment it pauses
+	 * leaves the generation holding an unconfirmed window forever. Watch
+	 * `pauseState` for the moment it is `drained`.
+	 *
+	 * It is NOT `disableProcessing()`, which stops the engine where it stands --
+	 * that IS the hazard: a generation carrying an unconfirmed window it can no
+	 * longer correct never finds out that one of those blocks was reorged away, and
+	 * its state permanently contains events from blocks that no longer exist.
+	 *
+	 * It is NOT persisted. A reload comes back running, and re-pausing costs one
+	 * drain; making it durable is a registry record, which is the registry's to add
+	 * when something needs it. It DOES survive a reconfigure in the session that
+	 * asked for it -- `reinit` does not clear the cap -- because "do not go above
+	 * x" is a decision about this generation and not about the source it was made
+	 * under; `resume()` is the only thing that lifts it.
+	 *
+	 * It caps the verb that FETCHES (`indexMore`). A generation advanced with
+	 * `followMore` goes exactly as far as the STREAM it folds and holds no
+	 * `toBlock` of its own, so a cap would be a no-op that lied about being a
+	 * pause: `Indexer.pause` refuses a follower for that reason
+	 * (`CannotPauseFollowerError`).
+	 */
+	pause(): void {
+		this.pauseRequested = true;
+	}
+
+	/** RESUME: remove the cap, and nothing else. The next round asks the head again. */
+	resume(): void {
+		this.pauseRequested = false;
+		this.pausedToBlock = undefined;
 	}
 
 	get expectedFromBlock(): number {
@@ -1325,6 +1459,28 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		const latestBlock = await unlessCancelled(getBlockNumber(this.provider));
 
 		let toBlock = latestBlock;
+
+		// ----------------------------------------------------------------------------------------
+		// THE PAUSE CAP, and it goes HERE: on `toBlock`, BEFORE the guard below
+		// ----------------------------------------------------------------------------------------
+		// This is the whole of pause. Capped before the guard, the drain falls out of
+		// the existing arithmetic: while the cap is inside the reorg window the guard
+		// passes and this re-scans `[latestBlock - finality, cap]`, and once the cap
+		// falls out of it `getFromBlock` asks for `cap + 1`, the guard fires, and this
+		// fetches nothing. Capped AFTER the guard instead, a head above the cap would
+		// take the guard's other branch and the drain would never idle.
+		//
+		// `latestBlock` above is deliberately NOT capped: it is the REAL head, and it is
+		// what the cursor keeps recording, so `getFromBlock` can eventually reach past
+		// the cap. Cap that too and it returns `latestBlock - finality` forever.
+		if (this.pauseRequested) {
+			// pinned HERE, inside the serialized index action, so the cap is the cursor
+			// this generation actually has rather than one a racing batch has moved past
+			this.pausedToBlock ??= lastSync.lastToBlock;
+			if (toBlock > this.pausedToBlock) {
+				toBlock = this.pausedToBlock;
+			}
+		}
 
 		if (fromBlock > toBlock) {
 			namedLogger.info(`no new block`);
