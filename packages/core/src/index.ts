@@ -52,6 +52,15 @@ export * from './generation/memory.js';
 export * from './container.js';
 export * from './stream/identity.js';
 export * from './stream/fixture.js';
+/**
+ * THE READ-ONLY STREAM VIEW, which is what makes the one-writer rule structural.
+ *
+ * Read and write share ONE `ExistingStream`, so a generation handed the stream
+ * to fold is handed the thing that also appends. `readOnlyStream` is how a
+ * generation that merely READS a stream somebody else indexes is expressed at
+ * all -- see `container.ts`'s `add`, which hands one to every follower.
+ */
+export * from './stream/readOnly.js';
 export * from './stream/capture.js';
 export * from './stream/segments.js';
 

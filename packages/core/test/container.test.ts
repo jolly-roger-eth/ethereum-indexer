@@ -137,7 +137,7 @@ describe('the generation container', () => {
 		expect(await registry.canonical()).toMatchObject({stream, processor: 'version-of-A'});
 	});
 
-	it('holds several generations, and only the canonical one answers or indexes', async () => {
+	it('holds several generations, and only the canonical one ANSWERS', async () => {
 		const a = makeFold('A');
 		const b = makeFold('B');
 		const {indexer} = await openContainer([a, b]);
@@ -148,10 +148,14 @@ describe('the generation container', () => {
 		expect(indexer.state.read()).toBe('A');
 
 		await indexer.load();
-		// the non-canonical generation does not advance: nothing here follows a
-		// shared stream yet, and pretending otherwise is the next landable's job
+		// EVERY generation loads, because every generation advances: a fold that
+		// never loaded has no state and no cursor to advance from. Which one ANSWERS
+		// is still the canonical pointer's decision and nothing else's.
 		expect(a.calls.load).toBe(1);
-		expect(b.calls.load).toBe(0);
+		expect(b.calls.load).toBe(1);
+		expect(indexer.state.read()).toBe('A');
+		// ...and the second one is a FOLLOWER, because it shares the first's stream
+		expect(indexer.generations.map((held) => held.follows)).toEqual([false, true]);
 	});
 
 	it('gives each generation its OWN state, built once', async () => {

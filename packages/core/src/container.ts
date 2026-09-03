@@ -10,6 +10,7 @@ import {
 	type GenerationRegistry,
 } from './generation/registry.js';
 import {streamDigestOf} from './stream/identity.js';
+import {readOnlyStream} from './stream/readOnly.js';
 import {resolveStreamConfig} from './internal/engine/utils.js';
 import type {
 	EventProcessor,
@@ -35,7 +36,7 @@ const namedLogger = logs('@etherfold/core');
  *
  * ## What it adds, and what it deliberately does not
  *
- * It adds three things and no fourth:
+ * It adds four things:
  *
  * 1. **Generations are BUILT from factories, not handed over already built.** A
  *    container that holds N generations cannot be given one already-constructed
@@ -49,18 +50,23 @@ const namedLogger = logs('@etherfold/core');
  * 3. **A pointer move is APPLIED AT A NOTIFICATION.** See `promote` for why that
  *    single rule is the whole read unit of work, and why no scope API, no
  *    transaction handle and no timer is needed to get it.
+ * 4. **EVERY generation it holds ADVANCES, and HOW each one advances is
+ *    DETERMINED rather than configured.** A generation that shares its stream
+ *    with one already held is a FOLLOWER: it fetches nothing, writes nothing,
+ *    re-folds the stored stream from the start and then follows it. A generation
+ *    on its own stream is an ordinary indexer at a different address. There is no
+ *    knob, and `add` is where the rule lives.
  *
- * It also PUBLISHES a discard (`publishDiscard`), which is not a fourth thing but
+ * It also PUBLISHES a discard (`publishDiscard`), which is not a fifth thing but
  * the second one applied to the case `onStateUpdated` never covered: a fold that
  * was thrown away is neither adopted nor produced, so without this a subscriber
  * holding the state it lost is told by nothing.
  *
  * It does NOT decide WHEN the pointer moves (the promotion policy is
- * `the-promotion-policy-moves-the-canonical-pointer`), it does not advance a
- * non-canonical generation (that needs the shared-stream follower,
- * `a-non-canonical-generation-advances-on-a-shared-stream`), and it does not yet
- * turn a reconfigure into a new generation: `updateIndexer` and `updateProcessor`
- * still do to the canonical generation exactly what they did before.
+ * `the-promotion-policy-moves-the-canonical-pointer`), it does not pause a
+ * generation (`a-generation-pauses-by-cap-and-drain`), and it does not yet turn a
+ * reconfigure into a new generation: `updateIndexer` and `updateProcessor` still
+ * do to the canonical generation exactly what they did before.
  * ------------------------------------------------------------------------- */
 
 /** What both of a generation's factories are told about the generation being built. */
@@ -128,6 +134,24 @@ export type GenerationSpec<ABI extends Abi, ProcessResultType = void, State = un
 	 * with nothing at all until it publishes one.
 	 */
 	stateOf?: (processor: EventProcessor<ABI, ProcessResultType>) => ProcessResultType;
+	/**
+	 * The FETCH FILTER this generation folds, when it is not the container's own.
+	 *
+	 * A stream IS its fetch filter, so this is the only way to say "a different
+	 * stream" -- and saying it is what makes the container's advance rule
+	 * DETERMINED rather than configured: a generation naming no source of its own
+	 * shares the container's stream and therefore FOLLOWS it, while one naming a
+	 * different filter must fetch, because the logs it needs were never requested
+	 * under the old one. There is deliberately no flag anywhere that says which.
+	 *
+	 * The stream CONFIG is deliberately NOT settable per generation, and that is a
+	 * limit rather than an oversight: `setStreamConfig` is a single mutable value
+	 * on the ONE keeper a container holds ("one keeper serves one indexer"), so two
+	 * generations under different configs would clobber each other's address. A
+	 * config change is still a new stream; reaching it needs a keeper per
+	 * generation, which is nobody's landable yet.
+	 */
+	source?: IndexingSource<ABI>;
 };
 
 /**
@@ -149,6 +173,8 @@ type HeldEntry<ABI extends Abi, ProcessResultType> = {
 	generation: IndexerGeneration<ABI, ProcessResultType>;
 	processor: EventProcessor<ABI, ProcessResultType>;
 	spec: AnyGenerationSpec<ABI, ProcessResultType>;
+	/** Whether this generation FOLLOWS a stream another generation writes. See `add`. */
+	follows: boolean;
 	published?: ProcessResultType;
 	/** Distinguishes "published nothing yet" from "published `undefined`", which a `void` fold does. */
 	hasPublished: boolean;
@@ -173,6 +199,16 @@ export type HeldGeneration<ABI extends Abi, ProcessResultType = void> = {
 	readonly generation: IndexerGeneration<ABI, ProcessResultType>;
 	/** The processor this generation folds with. */
 	readonly processor: EventProcessor<ABI, ProcessResultType>;
+	/**
+	 * Whether this generation FOLLOWS a stream another held generation writes,
+	 * rather than fetching its own.
+	 *
+	 * REPORTED and never set: it is a consequence of sharing a stream, and a caller
+	 * that could choose it would be choosing to break the one-writer rule. Exposed
+	 * so a driver or a test can see what was determined instead of inferring it
+	 * from a fetch count.
+	 */
+	readonly follows: boolean;
 };
 
 /**
@@ -382,9 +418,32 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	 * Build a generation and register it BESIDE the ones already held.
 	 *
 	 * It does not become canonical (unless nothing is, which is the registry's
-	 * rule for the first one) and it does not index: a non-canonical generation
-	 * that ADVANCES needs the shared-stream follower, and this container will not
-	 * pretend to have one.
+	 * rule for the first one), and it DOES advance -- but how it advances is
+	 * decided here and is not a choice anybody gets to make.
+	 *
+	 * ## The rule: a SHARED stream makes a FOLLOWER, and nothing else does
+	 *
+	 * A generation whose stream digest matches one already held is handed a
+	 * READ-ONLY VIEW of the keeper (`readOnlyStream`) and advances with
+	 * `followMore`: it fetches NOTHING, writes NOTHING, re-folds the stored stream
+	 * from the start and then follows it as the indexing generation appends. A
+	 * generation on a stream nobody here holds keeps the keeper itself and advances
+	 * with `indexMore`, which is an ordinary indexer at a different address.
+	 *
+	 * There is no flag, because a flag would be wrong in both positions. "Follow a
+	 * stream nobody writes" never advances; "fetch a stream somebody else writes"
+	 * is a second writer, and it also makes this generation's state a function of
+	 * its own fetch rather than of the stream, which is what would break the exact
+	 * revert (`IndexerGeneration.followMore`). ADR-0044 records the rule and the
+	 * options weighed against it.
+	 *
+	 * ## Which generation WRITES a stream: the first one held on it
+	 *
+	 * Registration order and not the canonical pointer, so the writer is stable:
+	 * moving the pointer is one small record write and must not silently hand the
+	 * append duty to a different engine mid-flight. The normal case makes the two
+	 * the same thing anyway, since the first generation registered is the one the
+	 * registry makes canonical.
 	 *
 	 * The registry is written BEFORE the engine exists, which is the order its own
 	 * documentation asks for: a stream subtree no registered generation claims is
@@ -392,7 +451,10 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	 * registration.
 	 */
 	async add(spec: AnyGenerationSpec<ABI, ProcessResultType>): Promise<HeldGeneration<ABI, ProcessResultType>> {
-		const context: GenerationContext = {stream: this.streamDigest};
+		const source = spec.source ?? this.source;
+		const context: GenerationContext = {
+			stream: spec.source ? this.digestOf(spec.source, this.config) : this.streamDigest,
+		};
 		const state = await spec.createState(context);
 		const processor = await spec.createProcessor(state, context);
 		const record = await this.registry.create({stream: context.stream, processor: processor.getVersionHash()});
@@ -406,15 +468,24 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 				`the generation {stream: ${record.stream}, processor: ${record.processor}} is already held, so the spec ` +
 					`resolved to it rather than adding a second engine over the same state.`,
 			);
-			return existing;
+			return this.heldOf(existing);
 		}
 
-		const generation = this.createGeneration(this.provider, processor, this.source, this.config);
+		// DETERMINED, and determined HERE: everything downstream reads this rather
+		// than re-deciding it, so there is one place the rule lives.
+		const follows = this.held.some((entry) => entry.record.stream === record.stream);
+		const config: ProvidedIndexerConfig<ABI> =
+			follows && this.config.keepStream
+				? {...this.config, keepStream: readOnlyStream<ABI>(this.config.keepStream)}
+				: this.config;
+
+		const generation = this.createGeneration(this.provider, processor, source, config);
 		const entry: HeldEntry<ABI, ProcessResultType> = {
 			record,
 			generation,
 			processor,
 			spec,
+			follows,
 			hasPublished: false,
 			publications: 0,
 		};
@@ -444,18 +515,17 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			}
 		};
 
-		return {record: entry.record, generation: entry.generation, processor: entry.processor};
+		return this.heldOf(entry);
 	}
 
 	/** Every generation this container holds, in the order it built them. */
 	get generations(): readonly HeldGeneration<ABI, ProcessResultType>[] {
-		return this.held.map((entry) => ({record: entry.record, generation: entry.generation, processor: entry.processor}));
+		return this.held.map((entry) => this.heldOf(entry));
 	}
 
 	/** The generation that answers reads right now. */
 	get canonical(): HeldGeneration<ABI, ProcessResultType> {
-		const entry = this.requireCurrent();
-		return {record: entry.record, generation: entry.generation, processor: entry.processor};
+		return this.heldOf(this.requireCurrent());
 	}
 
 	/**
@@ -537,12 +607,52 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		return this.requireCurrent().generation.expectedFromBlock;
 	}
 
-	load(): Promise<LastSync<ABI>> {
-		return this.requireCurrent().generation.load();
+	/**
+	 * Load EVERY generation, and answer with the canonical one's cursor.
+	 *
+	 * All of them, because a generation that has not loaded has no state and no
+	 * cursor, so it could not advance afterwards -- and for a FOLLOWER the load IS
+	 * the re-fold of the stored stream from the start. In HELD ORDER, which puts a
+	 * stream's writer before anything following it, so a follower's first re-fold
+	 * sees whatever the writer's load recovered. `load` is idempotent per
+	 * generation (`_load.once()`), so naming the canonical one twice costs nothing.
+	 */
+	async load(): Promise<LastSync<ABI>> {
+		const current = this.requireCurrent();
+		for (const entry of this.held) {
+			await entry.generation.load();
+		}
+		return current.generation.load();
 	}
 
-	indexMore(): Promise<LastSync<ABI>> {
-		return this.requireCurrent().generation.indexMore();
+	/**
+	 * Advance EVERY generation one step, each by the verb its stream decides, and
+	 * answer with the canonical one's cursor.
+	 *
+	 * The order is the order they were built, which is what makes a follower's step
+	 * meaningful: a stream's writer is always ahead of it in that list, so by the
+	 * time a follower reads the stream this cycle's batch is already in it. A
+	 * follower that ran first would simply see nothing new and catch up on the next
+	 * tick, so the order is a latency decision rather than a correctness one -- but
+	 * a driver that loops to the tip would otherwise leave every follower one cycle
+	 * short at the end.
+	 *
+	 * The canonical generation is resolved BEFORE the loop, so a promotion applied
+	 * mid-cycle cannot make this return a cursor from a generation that was not the
+	 * one being driven.
+	 */
+	async indexMore(): Promise<LastSync<ABI>> {
+		const current = this.requireCurrent();
+		let answer: LastSync<ABI> | undefined;
+		for (const entry of this.held) {
+			const lastSync = entry.follows ? await entry.generation.followMore() : await entry.generation.indexMore();
+			if (entry === current) {
+				answer = lastSync;
+			}
+		}
+		// The canonical generation is always one this container holds -- that is what
+		// `resolveCanonical` refuses to open without -- so the loop always answered.
+		return answer as LastSync<ABI>;
 	}
 
 	feed(eventStream: LogEvent<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
@@ -553,12 +663,17 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		return this.requireCurrent().generation.replay(eventStream, lastSyncStored);
 	}
 
+	/** Stop EVERY generation, because every generation is what advances. */
 	disableProcessing(): void {
-		this.requireCurrent().generation.disableProcessing();
+		for (const entry of this.held) {
+			entry.generation.disableProcessing();
+		}
 	}
 
 	reenableProcessing(): void {
-		this.requireCurrent().generation.reenableProcessing();
+		for (const entry of this.held) {
+			entry.generation.reenableProcessing();
+		}
 	}
 
 	async reset(): Promise<ReconfigureOutcome> {
@@ -628,6 +743,16 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected digestOf(source: IndexingSource<ABI>, config: ProvidedIndexerConfig<ABI>): string {
 		return streamDigestOf(source, resolveStreamConfig(config.stream));
+	}
+
+	/** What the container hands OUT for a generation it holds. */
+	protected heldOf(entry: HeldEntry<ABI, ProcessResultType>): HeldGeneration<ABI, ProcessResultType> {
+		return {
+			record: entry.record,
+			generation: entry.generation,
+			processor: entry.processor,
+			follows: entry.follows,
+		};
 	}
 
 	/**
