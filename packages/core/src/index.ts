@@ -41,6 +41,15 @@ export type {InvalidationReason, InvalidationVerdict, SourceInvalidation} from '
  */
 export {resolveStreamConfig} from './internal/engine/utils.js';
 export * from './generation/registry.js';
+export * from './generation/memory.js';
+/**
+ * THE GENERATION CONTAINER, beside the single-generation shape it will replace.
+ *
+ * `Indexer` HOLDS generations and points at the one that answers reads;
+ * `IndexerGeneration` (exported from `./indexer.js`, and still exported under its
+ * old name `EthereumIndexer`) is ONE of them. See `container.ts`.
+ */
+export * from './container.js';
 export * from './stream/identity.js';
 export * from './stream/fixture.js';
 export * from './stream/capture.js';
