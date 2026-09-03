@@ -87,6 +87,33 @@ Make the edit land by bumping `version` in the processor, or by passing `{force:
 
 Generating the version (a content hash, a build id, a git sha) is the way to stop relying on memory.
 
+### The same edit, without the blank app
+
+`updateProcessor` reconfigures the generation that is answering reads, so the rebuild it costs is time your app has nothing to render. `addGeneration` is the other shape: it builds a **generation** *beside* the live one, which goes on answering every read while the new fold catches up.
+
+```ts
+await indexer.addGeneration({
+	createState: () => createBrowserStateStore(next.entities),
+	createProcessor: (store) => fromEntityProcessor(next)(store),
+});
+```
+
+A processor change does not move the fetch filter, so the new generation folds the stream that is already there and **fetches not one log**.
+
+When the pointer moves to it is the *promotion policy*, passed to `createIndexerState` and defaulting to `on-catch-up` in every runtime:
+
+| policy | when the new generation starts answering |
+| --- | --- |
+| `on-catch-up` (default) | once it reaches the cursor the canonical one had — the app never shows state going backwards |
+| `immediate` | at once, before it has caught up — what you want while iterating, and an opt-in |
+| `manual` | only when you call `promote(id)` |
+
+There is deliberately **no development-versus-production default**: nothing in a browser build can detect which it is in, so the safe value is the default everywhere and `immediate` is chosen explicitly.
+
+Under `immediate` the new generation is canonical having folded nothing, so reads are *incomplete* for a moment — and `checkTxInclusion` says so, answering `'unknown'` / `'not-synced'` rather than reporting inclusion from the generation that no longer answers. Keep your overlays on anything that is not `'included'` and this costs you nothing.
+
+The old generation is kept, so `promote(indexer.generations[0].record)` moves the pointer **back** with no re-index and no fetch.
+
 ### Axis two — the contract was redeployed
 
 On a local chain these apps deploy behind a **proxy**, so a redeploy does not move the address. What moves is the implementation and therefore the generated ABI — and the ABI is hashed into the indexing source, so handing the new source over is enough:

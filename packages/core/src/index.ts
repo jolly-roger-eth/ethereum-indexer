@@ -43,6 +43,18 @@ export {resolveStreamConfig} from './internal/engine/utils.js';
 export * from './generation/registry.js';
 export * from './generation/memory.js';
 /**
+ * THE PROMOTION POLICY: when the canonical pointer moves on its own.
+ *
+ * Three values, and `on-catch-up` is the default in EVERY runtime -- there is
+ * deliberately no per-runtime and no per-environment selection, because the axis
+ * that would choose one is DEVELOPMENT versus PRODUCTION and nothing in a browser
+ * build can detect it. Exported because a deployment SAYS which one it wants
+ * (`IndexerOptions.promotion`), and because the resolved value is reported back
+ * (`Indexer.promotion`) rather than each runtime keeping its own copy of the
+ * default.
+ */
+export * from './generation/promotion.js';
+/**
  * THE GENERATION CONTAINER, which is how an indexer is built.
  *
  * `Indexer` HOLDS generations and points at the one that answers reads;

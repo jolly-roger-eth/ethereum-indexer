@@ -2,12 +2,17 @@ import type {
 	Abi,
 	EventProcessor,
 	GenerationContext,
+	GenerationId,
+	GenerationRecord,
 	GenerationRegistry,
+	HeldGeneration,
 	Indexer,
 	IndexerGeneration,
 	IndexingSource,
 	LastSync,
 	ExistingStream,
+	PromotionConfig,
+	UsedPromotionConfig,
 	ProvidedStreamConfig,
 	ProvidedIndexerConfig,
 	TxInclusionQuery,
@@ -187,6 +192,19 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		trackNumRequests?: boolean;
 		logRequests?: boolean;
 		keepStream?: ExistingStream<ABI>;
+		/**
+		 * WHEN the canonical pointer moves to a generation added beside the live one.
+		 *
+		 * PASSED THROUGH and never defaulted here. `on-catch-up` is the default in
+		 * every runtime, and this hook deliberately does not select one of its own:
+		 * the axis that would justify a browser-specific value is DEVELOPMENT versus
+		 * PRODUCTION, and nothing in a browser build can detect which it is in, so a
+		 * runtime default would be a guess with `immediate`'s consequences. A
+		 * developer who wants their edit to answer straight away says
+		 * `{promotion: {policy: 'immediate'}}`; a shipped app says nothing and gets
+		 * the safe one.
+		 */
+		promotion?: PromotionConfig;
 		// Optional factory used to construct the underlying IndexerGeneration. Receives the same
 		// arguments (already request-tracked/logged provider, configured processor, source, config)
 		// that would otherwise be passed to `new IndexerGeneration(...)`. Useful for injecting a
@@ -236,6 +254,19 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	let indexingTimeout: ReturnType<typeof setTimeout> | undefined;
 	let autoIndexingInterval: number = 4;
 
+	/**
+	 * How many times the canonical pointer has moved.
+	 *
+	 * Read as a STAMP across an advance, to answer "did the pointer move while that
+	 * call was running?". A cycle the pointer moved in returns the cursor of the
+	 * generation that was canonical when it STARTED (`Indexer.indexMore` resolves
+	 * the canonical generation before its loop), and publishing that afterwards
+	 * would put the RETIRED generation's cursor back into `syncing` -- undoing the
+	 * container's own re-publish, and leaving `checkTxInclusion` answering from a
+	 * window nothing maintains.
+	 */
+	let promotions = 0;
+
 	// Serializes reconfiguration (updateIndexer/updateProcessor) so that overlapping calls
 	// (e.g. a slow deploy's source change racing a processor change, in either order) run one fully
 	// settled then the next, in arrival order, instead of interleaving their reset/reinit/load phases
@@ -250,6 +281,53 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			() => undefined,
 		);
 		return run;
+	}
+
+	/**
+	 * The two factories, as the container takes them: state first, then the fold
+	 * over it.
+	 *
+	 * Shared by `init` and `addGeneration`, so a generation added beside the live
+	 * one is built exactly as the first one was -- including the read HANDLE
+	 * (`stateOf`), which is what lets the container answer from a generation that
+	 * has folded nothing yet, and which is what a just-promoted generation IS.
+	 */
+	function generationSpecFor(
+		createState: BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>['createState'],
+		createProcessor: BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>['createProcessor'],
+		processorConfig?: ProcessorConfig,
+	) {
+		return {
+			createState: (context: GenerationContext) => createState(context),
+			createProcessor: async (state: unknown, context: GenerationContext) => {
+				const built = await createProcessor(state as StateStore, context);
+				if (built.configure && processorConfig) {
+					built.configure(processorConfig);
+				}
+				return built;
+			},
+			stateOf: (built: EventProcessor<ABI, ProcessResultType>) =>
+				(built as EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>).state,
+		};
+	}
+
+	/**
+	 * THE POINTER MOVED, so what this hook derived from the retired generation goes
+	 * with it.
+	 *
+	 * `syncing.lastSync` is not decoration: `checkTxInclusion` answers from it, and
+	 * the retired generation's unconfirmed window would report a transaction as
+	 * INCLUDED that the generation now answering has not reached -- which is the
+	 * double-counted optimistic update the whole verdict exists to prevent. So it is
+	 * dropped here, and the container re-publishes the new canonical generation's
+	 * own cursor immediately after IF it has one. Where it has none (an `immediate`
+	 * promotion, which is canonical before it has caught up), nothing replaces it
+	 * and `checkTxInclusion` answers `unknown` / `not-synced` -- which is the honest
+	 * answer rather than a missing one.
+	 */
+	function onPromoted() {
+		promotions++;
+		clearSyncingStateForReconfigure();
 	}
 
 	async function init(
@@ -318,24 +396,11 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			provider,
 			source,
 			config,
-			generations: [
-				{
-					createState: (context) => spec.createState(context),
-					createProcessor: async (state, context) => {
-						const built = await spec.createProcessor(state as StateStore, context);
-						if (built.configure && processorConfig) {
-							built.configure(processorConfig);
-						}
-						return built;
-					},
-					// The entity path's state is a read HANDLE that exists the moment the
-					// processor does, so the container can answer from a generation that
-					// has folded nothing -- which is what a just-promoted generation is.
-					stateOf: (built) => (built as EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>).state,
-				},
-			],
+			...(options?.promotion ? {promotion: options.promotion} : {}),
+			generations: [generationSpecFor(spec.createState, spec.createProcessor, processorConfig)],
 			createGeneration: options?.createIndexer,
 		});
+		indexer.onPromoted = onPromoted;
 		// Published straight away, and it is the INDIRECT handle: a subscriber that
 		// keeps what it is handed keeps something that follows the canonical pointer.
 		setState(indexer.state);
@@ -424,15 +489,31 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		}
 	}
 
-	async function indexMore(): Promise<LastSync<ABI>> {
-		await setupIndexing();
+	/**
+	 * ONE advance, published unless the pointer moved during it.
+	 *
+	 * The skip is not an optimisation: the value this returns belongs to whichever
+	 * generation was canonical when the cycle started, and after a promotion that is
+	 * the RETIRED one. The container publishes the new canonical generation's own
+	 * cursor at the move (or publishes none, when it has none yet), and that is what
+	 * `syncing` must be left holding.
+	 */
+	async function advanceOnce(): Promise<LastSync<ABI>> {
 		if (!indexer) {
 			throw new Error(`no indexer`);
 		}
+		const stamp = promotions;
 		const lastSync = await indexer.indexMore();
-		setLastSync(lastSync);
-		setCatchup(lastSync);
+		if (promotions === stamp) {
+			setLastSync(lastSync);
+			setCatchup(lastSync);
+		}
 		return lastSync;
+	}
+
+	async function indexMore(): Promise<LastSync<ABI>> {
+		await setupIndexing();
+		return advanceOnce();
 	}
 
 	async function indexMoreAndCatchupIfNeeded(): Promise<LastSync<ABI>> {
@@ -441,9 +522,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			throw new Error(`no indexer`);
 		}
 
-		const lastSync = await indexer.indexMore();
-		setLastSync(lastSync);
-		setCatchup(lastSync);
+		const lastSync = await advanceOnce();
 
 		if (lastSync.lastToBlock !== lastSync.latestBlock) {
 			return indexToLatest();
@@ -475,9 +554,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		}
 
 		try {
-			lastSync = await indexer.indexMore();
-			setLastSync(lastSync);
-			setCatchup(lastSync);
+			lastSync = await advanceOnce();
 		} catch (err) {
 			lastSync = await new Promise((resolve) => {
 				setTimeout(async () => {
@@ -493,9 +570,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 
 		while (lastSync.lastToBlock !== lastSync.latestBlock) {
 			try {
-				lastSync = await indexer.indexMore();
-				setLastSync(lastSync);
-				setCatchup(lastSync);
+				lastSync = await advanceOnce();
 			} catch (err) {
 				await new Promise((resolve) => {
 					setTimeout(resolve, 1000);
@@ -572,6 +647,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			indexer.onLoad = undefined;
 			indexer.onLastSyncUpdated = undefined;
 			indexer.onStateUpdated = undefined;
+			indexer.onPromoted = undefined;
 		}
 
 		// 3. drop the indexer reference and reset browser-layer state so a later init() starts clean.
@@ -652,6 +728,78 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		},
 		checkTxInclusion,
 		init: init as InitFunction<ABI, ProcessorConfig>,
+		/**
+		 * RECONFIGURE WITHOUT AN OUTAGE: build a generation BESIDE the live one.
+		 *
+		 * This is what a reconfigure is under the generation model, and it is why one
+		 * is not an outage: the new generation folds alongside the canonical one,
+		 * which goes on answering every read until the promotion policy moves the
+		 * pointer (stories 1 and 3). A generation on the SAME stream -- a processor
+		 * change, which is the common case -- fetches not one log: it re-folds the
+		 * stream that is already there and then follows it (ADR-0044).
+		 *
+		 * Distinct from `updateProcessor`, which reconfigures the canonical generation
+		 * IN PLACE and therefore still costs the discard-and-rebuild it always did.
+		 *
+		 * When the pointer moves is the POLICY's (`promotion`), not this call's:
+		 * `on-catch-up` (the default everywhere) moves it once the new generation
+		 * reaches the cursor the canonical one had, `immediate` moves it here and now,
+		 * and `manual` waits for `promote`.
+		 */
+		addGeneration(
+			generation: {
+				createState: BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>['createState'];
+				createProcessor: BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>['createProcessor'];
+			},
+			processorConfig?: ProcessorConfig,
+		): Promise<HeldGeneration<ABI, ProcessResultType>> {
+			if (!indexer) {
+				throw new Error(`no indexer setup, call init`);
+			}
+			// Serialized with the reconfiguring verbs: building a generation and swapping
+			// the canonical one's processor are two ways of asking for the same thing, and
+			// interleaving them would run one against the other's half-applied state.
+			return serializeReconfigure(async () => {
+				if (!indexer) {
+					throw new Error(`no indexer setup, call init`);
+				}
+				return indexer.add(generationSpecFor(generation.createState, generation.createProcessor, processorConfig));
+			});
+		},
+		/**
+		 * MOVE THE CANONICAL POINTER by hand: forwards it promotes, backwards it
+		 * REVERTS.
+		 *
+		 * Never gated by the promotion policy, under any of its values: the policy
+		 * decides the move this library makes ON ITS OWN, and `manual` means "only when
+		 * asked" rather than "never". The revert is exact and costs no re-index, because
+		 * the generation it names was never touched.
+		 */
+		promote(id: GenerationId): Promise<GenerationRecord> {
+			if (!indexer) {
+				throw new Error(`no indexer setup, call init`);
+			}
+			return indexer.promote(id);
+		},
+		/** Every generation this indexer holds, in the order it built them. */
+		get generations(): readonly HeldGeneration<ABI, ProcessResultType>[] {
+			return indexer ? indexer.generations : [];
+		},
+		/** The generation that answers reads right now. */
+		get canonical(): HeldGeneration<ABI, ProcessResultType> | undefined {
+			return indexer ? indexer.canonical : undefined;
+		},
+		/**
+		 * The promotion policy in force, resolved.
+		 *
+		 * Reported rather than re-derived, so "which value is this app running under"
+		 * is answered by the container that applies it and not by a second copy of the
+		 * default living here. `undefined` before `init`, because the container that
+		 * holds it does not exist yet.
+		 */
+		get promotion(): UsedPromotionConfig | undefined {
+			return indexer ? indexer.promotion : undefined;
+		},
 		indexToLatest,
 		indexMore,
 		indexMoreAndCatchupIfNeeded,
