@@ -3,7 +3,10 @@ export * from './IndexerState.js';
 export {simple_hash} from '@etherfold/core';
 // where a browser deployment's state lives (the storage seam)
 export * from './storage/state-store/BrowserStateStore.js';
+export * from './storage/keyval.js';
 export * from './storage/stream/OnIndexedDB.js';
+// which generations this indexer holds, and which one answers reads
+export * from './storage/generation/OnIndexedDB.js';
 
 // convenience : export type from @etherfold/core and incidently from abitype
 

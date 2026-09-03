@@ -10,26 +10,11 @@ import {
 	type StreamSegmentPort,
 	type UsedStreamConfig,
 } from '@etherfold/core';
-import {createStore, del, get, promisifyRequest, type UseStore} from 'idb-keyval';
+import {del, get, promisifyRequest, type UseStore} from 'idb-keyval';
 import {logs} from 'named-logs';
+import {keyvalStore} from '../keyval.js';
 
 const namedLogger = logs('@etherfold/browser');
-
-/**
- * `idb-keyval`'s DEFAULT database and object store, re-derived.
- *
- * `defaultGetStore` is module-private, so naming the two strings is the ONLY way
- * to get a `UseStore` -- the escape hatch `createStore` returns, and the only
- * route to a key RANGE -- over the very store the bare `get`/`set` calls reach.
- * That is load-bearing rather than incidental. A keeper that quietly opened a
- * store of its own would never SEE the legacy blob it is required to delete, it
- * would make "an unrelated key in the same store survives `clear`" vacuous, and
- * it would remove the whole ground for banning `idb-keyval`'s `clear()`, which
- * is dangerous exactly BECAUSE the stream shares one store with everything else
- * this package writes.
- */
-export const KEYVAL_DATABASE = 'keyval-store';
-export const KEYVAL_OBJECT_STORE = 'keyval';
 
 /** The leading literal, so the stream keyspace cannot be a prefix of another. */
 const STREAM = 'stream';
@@ -37,7 +22,7 @@ const STREAM = 'stream';
 const CURSOR = 'cursor';
 
 /**
- * One stream's address: a HIERARCHICAL array key, plus the flat key it replaces.
+ * One stream's address, BY DIGEST: a HIERARCHICAL array key.
  *
  * ```
  * ['stream', <indexer-name>, <streamDigest>, <ordinal>]   a segment
@@ -60,13 +45,14 @@ const CURSOR = 'cursor';
  * subtrees written under it are simply unreachable now, and disposing of them
  * belongs to the sweep in the generation registry, which is the only place that
  * can know which digests are registered.
+ *
+ * It is addressed BY THE DIGEST rather than by a `{source, config}` because that
+ * sweep reaches subtrees it cannot resolve a source for: an orphan is a digest
+ * and nothing else. `streamAddress` below is the same subtree for a caller that
+ * has the source in hand.
  */
-export function streamAddress<ABI extends Abi>(
-	name: string,
-	source: IndexingSource<ABI>,
-	streamConfig: UsedStreamConfig,
-) {
-	const prefix: IDBValidKey[] = [STREAM, name, streamDigestOf(source, streamConfig)];
+export function streamSubtree(name: string, digest: string) {
+	const prefix: IDBValidKey[] = [STREAM, name, digest];
 	return {
 		prefix,
 		cursor: [...prefix, CURSOR] as IDBValidKey,
@@ -80,26 +66,40 @@ export function streamAddress<ABI extends Abi>(
 		 * orphaned by a scoped delete. A SEGMENTS-ONLY read has to exclude the string
 		 * bound, or a full ordered scan would come back with the cursor record sitting
 		 * in it as though it were a segment.
+		 *
+		 * The subtree's LOWER bound is the prefix itself (exclusive) rather than
+		 * ordinal `0`, so it spans every key below this digest whatever its last
+		 * element is. That matters to the registry's sweep, which drops subtrees
+		 * written by code that is GONE: what a dead digest rule put down there is not
+		 * this module's to assume.
 		 */
 		segments: IDBKeyRange.bound([...prefix, 0], [...prefix, CURSOR], false, true),
-		subtree: IDBKeyRange.bound([...prefix, 0], [...prefix, []]),
-		/** The SHIPPED keeper's flat key, which is deleted rather than adopted. */
-		legacy: `${STREAM}_${name}_${source.chainId}`,
+		subtree: IDBKeyRange.bound(prefix, [...prefix, []], true, false),
 	};
 }
 
 /**
- * `idb-keyval`'s default store, opened once for this module.
+ * Every key under ONE indexer name, whatever stream it belongs to.
  *
- * Memoised the way `idb-keyval` memoises its own, so a page holding several
- * named indexers does not hold one IndexedDB connection per keeper.
+ * The range the registry's scoped listing of the digest level walks: the level
+ * above the digest is the caller-supplied name, so one indexer can enumerate its
+ * own streams without ever seeing another's.
  */
-let sharedStore: UseStore | undefined;
-function keyvalStore(): UseStore {
-	if (!sharedStore) {
-		sharedStore = createStore(KEYVAL_DATABASE, KEYVAL_OBJECT_STORE);
-	}
-	return sharedStore;
+export function streamsUnder(name: string): IDBKeyRange {
+	return IDBKeyRange.bound([STREAM, name], [STREAM, name, []], true, false);
+}
+
+/** Where the stream a `{source, config}` resolves to lives. See `streamSubtree`. */
+export function streamAddress<ABI extends Abi>(
+	name: string,
+	source: IndexingSource<ABI>,
+	streamConfig: UsedStreamConfig,
+) {
+	return {
+		...streamSubtree(name, streamDigestOf(source, streamConfig)),
+		/** The SHIPPED keeper's flat key, which is deleted rather than adopted. */
+		legacy: `${STREAM}_${name}_${source.chainId}`,
+	};
 }
 
 /**

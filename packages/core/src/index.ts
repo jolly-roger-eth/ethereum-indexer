@@ -17,6 +17,7 @@ export type {ReorgCause, ReorgDetection} from './internal/engine/utils.js';
  * then silently fork the config hash.
  */
 export {resolveStreamConfig} from './internal/engine/utils.js';
+export * from './generation/registry.js';
 export * from './stream/identity.js';
 export * from './stream/fixture.js';
 export * from './stream/capture.js';
