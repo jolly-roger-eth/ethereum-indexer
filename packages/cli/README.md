@@ -1,6 +1,6 @@
 # etherfold
 
-The command line. `etherfold run` follows a chain, folds a processor into a libSQL database and answers HTTP over it, in one process; `etherfold build` is the same thing as a one-shot that exits at the tip; `etherfold fetch` is the chain-facing half of a split deployment, pushing raw logs to a server elsewhere; `etherfold serve` answers queries over a database written elsewhere.
+The command line. `etherfold run` follows a chain, folds a processor into a libSQL database and answers HTTP over it, in one process; `etherfold build` is the same thing as a one-shot that exits at the tip; `etherfold fetch` is the chain-facing half of a split deployment, pushing raw logs to a server elsewhere; `etherfold index` is the half that receives those pushes and owns the database; `etherfold serve` answers queries over a database written elsewhere.
 
 ```sh
 npm i -g etherfold        # or: npx etherfold …
@@ -16,6 +16,8 @@ Every run names its intent: there is no default command, so a bare `etherfold` p
 | to run an indexer: follow a chain, fold into a database and answer HTTP | here, `run` |
 | to index a contract into a database, from a terminal or a CI job | here, `build` |
 | to run the chain-facing half near your node, pushing to an indexer elsewhere | here, `fetch` |
+| to receive those pushes and own the database, on another host | here, `index` |
+| to answer over a database something else writes | here, `serve` |
 | to index inside a browser tab, with no server | [`@etherfold/browser`](../browser) |
 | to write the processor being run | [`@etherfold/processor-entities`](../processor-entities) |
 | to embed the same pipeline in your own Node program | [`@etherfold/core`](../core) + [`@etherfold/fetcher-host`](../fetcher-host) |
@@ -109,13 +111,50 @@ Everything else a fetcher deployment tunes -- `SUSPECT_RESULT_COUNT` (**read tha
 
 **How it stops.** `SIGINT` / `SIGTERM` finish the cycle in flight and exit `0`. A refusal no waiting fixes -- a bad token, a `{source, config}` the server does not serve, a provider on the wrong chain, a suspected truncation -- exits non-zero, because a fetcher that stays up while achieving nothing is indistinguishable from a working one until somebody reads the state it is not producing. Everything else (an unreachable server, a `5xx`, a dropped socket) is retried on an escalating, capped backoff and never exits.
 
+## `etherfold index` -- the RECEIVING half, which owns the database
+
+```sh
+etherfold index \
+  -p ./dist/processor.js \
+  --store sqlite --db file:./etherfold.db \
+  -d ./deployments --port 2000
+```
+
+**It folds what something else pushed at it.** It makes no chain call, receives contiguous ranges of raw logs over HTTP, folds them through your processor into the libSQL database you named, and keeps running. It is the other half of the pair `fetch` sends to, and together they are a split deployment: run `fetch` on a host near your node and this anywhere.
+
+**It exposes the write path and NOT the query API, and that asymmetry is the point.** It has an HTTP surface because it must RECEIVE; answering queries is `serve`'s. So a split deployment is `index` plus `serve` against ONE database -- the writer and a stateless read tier -- and `/status` is available on both, because it reports on the database rather than on the process.
+
+| flag | |
+| --- | --- |
+| `-p, --processor <path>` | the processor module. It must export `createProcessor` |
+| `--store <sqlite>` / `--db <url>` | REQUIRED, exactly as on `build`: this command owns the database |
+| `--retention <blocks\|revert-only\|unbounded>` | as on `build`. Nothing prunes automatically (ADR-0022) |
+| `-d, --deployments <folder>` | what to index, or `INDEXING_SOURCE` as JSON. REQUIRED here in one form or the other -- see below |
+| `--ingest-token <token>` | REQUIRED. The wire's shared secret, the same name on both sides (or `INGEST_TOKEN`, which is preferable: a secret on a command line is visible to every process on the host) |
+| `--port <port>` / `--host <hostname>` | where it LISTENS for pushes (or `PORT`). `/ingest` and `/status` hang off it |
+| `--no-auto-setup` | do not apply the fixed-table schema at startup |
+
+**It makes NO chain call, and that is why the source must be explicit.** `-n` and `--rps` are REFUSED naming what this command is instead: there is no node here. The source cannot be taken from a processor module that keys its contracts per chain either, because reading one costs an `eth_chainId` call -- so it comes from `-d` or `INDEXING_SOURCE`, and a module-only source is refused naming both forms. That is not fussiness: the wire identity is derived from the source and the stream config together, so a source this half discovered on its own could not be the sender's, and every push would be refused with a `400`.
+
+**It authenticates, or it refuses everyone.** The shared secret is required, so a receiver with none configured never binds a port rather than coming up as an open-looking endpoint that answers `401` to a sender with no way to know why. A push with the wrong secret is a `401` naming the variable, and nothing is applied.
+
+**A replayed or resumed push is safe, because the cursor IS the idempotency key.** A batch that does not start where this receiver says the next one must is refused with a `409` carrying that block, and the sender re-sends from there; a sender that fell behind is corrected with no operator involved, and a batch re-sent after a lost acknowledgement cannot be applied twice. There is no dedupe table and no idempotency header, deliberately.
+
+**`/status` reports the cursor here, exactly as on `run`**, because this is the half that owns the store. It also counts the reorgs it derived (`absence` versus `contradiction`, ADR-0004): a rising rate of the absence kind means truncation or misconfiguration rather than chain activity.
+
+**How it stops.** `SIGINT` / `SIGTERM` shut the listener down and exit `0`. It never stops on its own: a receiver has no tip to reach, because what it folds arrives from somewhere else. A configuration it refuses, a module it cannot drive or a database it cannot open exits `1` without binding a port.
+
+One thing it does not have yet: an indexer-NAME route segment. This is one indexer per process; hosting several under one server is a later milestone.
+
 ## `etherfold serve` -- the READ tier
 
 ```sh
 etherfold serve --db file:./etherfold.db --port 2000
 ```
 
-**It only serves.** It holds no processor, makes no chain call, receives no logs and writes no indexed state: it answers queries over a database something ELSE wrote, so a serving tier can scale or move without carrying an indexer with it. Point it at a database `etherfold build` produced, or at one a log-fetcher is pushing into elsewhere.
+**It only serves.** It holds no processor, makes no chain call, receives no logs and writes no indexed state: it answers queries over a database something ELSE wrote, so a serving tier can scale or move without carrying an indexer with it. Point it at a database `etherfold build` produced, or at the one `etherfold index` is folding into.
+
+**It answers `/status` WITHOUT a cursor, and that is correct rather than missing.** The cursor reaches `/status` only through a reporter the host injects, and only a process that OWNS the store can read one; a read tier owns none and is given none, so its `/status` carries no `cursor` field at all rather than an invented one. What it does report is what the server derives from the DATABASE itself -- health, the schema version, the reorg counters -- so those agree with what the writer of that database reports.
 
 It starts [`@etherfold/server`](../server) on Node through [`@etherfold/platform-nodejs`](../../platforms/nodejs): `GET /status` (health, schema version, reorg counters, last error) and `POST /admin/setup`. Because it hosts no ingestion, the write path is a CAPABILITY it does not have rather than a route it lacks: an authenticated call to `/ingest` answers `501 ingestion-not-configured` (an unauthenticated one answers `401`, so the absence of a processor is not something an anonymous caller can probe). `platforms/nodejs/test/serve.test.ts` asserts both.
 
@@ -153,11 +192,13 @@ Six inputs have a variable and six do not, and the line is deliberate: **the env
 
 The CLI used to read a second name for the node URL (`ETHEREUM_NODE`). It is RETIRED: there is one name for it, and it is `ETH_NODE_URI`, which is what the fetcher deployable already refuses by.
 
-## One name is still to come
+## The five names, and the two compositions
 
-`run`, `build`, `fetch` and `serve` are what ships today, and they are four of the five names the set will have. The missing one is `index`, the FOLDING half of a split deployment: it receives the pushes `fetch` sends and owns the database. It is decided in `work/specs/tasked/one-command-runs-the-whole-pipeline.md` and NOT built, so `etherfold index` is an unknown command until the receiver lands; `CONTEXT.md` is the authority for what each name means.
+All five ship, and `CONTEXT.md` is the authority for what each one means. Two compositions hold in the CODE rather than in this sentence: **`run` IS `fetch` plus `index` plus `serve` in one process** (the first pairing is the in-process direct ingestion, the same log-fetcher and the same stream-builder with the transport removed), and **`build` is `run` without the serving**, stopping at the tip.
 
-Its CONFIGURATION, though, already resolves: all five rows live in one table (`src/config.ts`), including the two asymmetries that make the set work. `fetch` takes a source but no processor, and refuses `--store` and `--db` outright, because the chain-facing half holds no state (ADR-0003). `index` resolves its source with NO chain call at all, so it takes it from `-d` or `INDEXING_SOURCE` and refuses a processor module that could only be resolved by asking a node for its chain id. So adding it is a command registration and an assembly, never a second way to read a flag.
+Which is why splitting is a deployment decision you can defer and then reverse. `packages/cli/test/equivalence.test.ts` asserts it at the commands rather than claiming it: the same processor, the same entity declarations and the same fixture chain -- reorg included, with the replacement branch carrying fewer events -- run once through `run` and once through `fetch` plus `index`, land on identical state and an identical cursor; and `index` plus `serve` against one database answer what `run` answers.
+
+All five rows of the configuration live in one table (`src/config.ts`), which is what makes moving between them a deployment change rather than a rewrite. Two asymmetries in it are load-bearing: `fetch` takes a source but no processor, and refuses `--store` and `--db` outright, because the chain-facing half holds no state (ADR-0003); and `index` resolves its source with NO chain call at all, so it takes it from `-d` or `INDEXING_SOURCE` and refuses a processor module that could only be resolved by asking a node for its chain id.
 
 ## Tests
 

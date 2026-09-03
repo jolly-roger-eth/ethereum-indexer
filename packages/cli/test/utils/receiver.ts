@@ -1,11 +1,13 @@
-import {StreamBuilder, type FetchLike, type IndexingSource} from '@etherfold/core';
+import {StreamBuilder, type FetchLike} from '@etherfold/core';
 import {EntityEventProcessor} from '@etherfold/processor-entities';
 import {createServer} from '@etherfold/server';
 import {VersionedStateStore} from '@etherfold/state-store-sqlite';
 import {createClient} from '@libsql/client';
 import type {RemoteSQL} from 'remote-sql';
 import {RemoteLibSQL} from 'remote-sql-libsql';
-import {abi, CONTRACT, nftProcessor, START_BLOCK} from './chain.js';
+import {abi, nftProcessor, SOURCE} from './chain.js';
+
+export {SOURCE};
 
 // ---------------------------------------------------------------------------------------------------
 // THE OTHER HALF OF A SPLIT DEPLOYMENT, SUPPLIED BY THE TEST
@@ -30,12 +32,6 @@ export const ENDPOINT = 'http://indexer.test';
 
 /** Both halves hash `{source, config}` into the wire identity, so both must resolve this same number. */
 export const FINALITY = 3;
-
-/** What both halves index. The fetcher gets it as `INDEXING_SOURCE` or as a deployments folder. */
-export const SOURCE: IndexingSource<typeof abi> = {
-	chainId: '1',
-	contracts: [{abi, address: CONTRACT, startBlock: START_BLOCK}],
-};
 
 export type RunningReceiver = {
 	/** The in-process wire a test hands the command, in place of the runtime's own `fetch`. */

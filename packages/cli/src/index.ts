@@ -5,7 +5,6 @@ import {
 	type Abi,
 	type EventProcessor,
 	type IndexingSource,
-	type ProvidedStreamConfig,
 } from '@etherfold/core';
 import {
 	createFetcherHost,
@@ -18,40 +17,25 @@ import {
 	type Sleep,
 } from '@etherfold/fetcher-host';
 import type {EntityProcessor, StateStore} from '@etherfold/processor-entities';
-import {
-	instantiateProcessor,
-	loadContracts,
-	loadProcessorModule,
-	resolveSource,
-	type ProcessorModule,
-} from '@etherfold/utils';
+import {instantiateProcessor, loadProcessorModule, resolveSource, type ProcessorModule} from '@etherfold/utils';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
 import {resolveCommandConfig} from './config.js';
-import type {BuildConfig, ConfigFor, Options, RunConfig, SourceOrigin, StoreTarget} from './types.js';
+import {buildProcessor, openExplicitSource, STREAM_CONFIG} from './folding.js';
+import type {BuildConfig, ConfigFor, Options, RunConfig, SourceOrigin} from './types.js';
 
 export * from './config.js';
 export * from './types.js';
 export {readCursorReport, type StoreCursorReport} from './cursorReport.js';
+export {buildProcessor, openExplicitSource, STREAM_CONFIG} from './folding.js';
 export {fetch, fetchMain, prepareFetching, type FetchDependencies} from './fetch.js';
+export {index, indexMain, type IndexDependencies, type RunningReceiver} from './indexCommand.js';
 export {run, runMain, type RunDependencies, type RunningIndexer} from './run.js';
 export {serve, type ServeDependencies, type StartedServer} from './serve.js';
 
 const logger = logs('etherfold');
-
-/**
- * The stream configuration this command indexes under.
- *
- * Deliberately empty, and deliberately passed to BOTH halves: the resolved
- * object is hashed into the wire identity, so the sending `LogFetcher` and the
- * receiving `StreamBuilder` must reach the same `finality` from the same input.
- * Its RESOLVED form (`resolveStreamConfig`) is also what the entity store's
- * retention floor is checked against, which is why nothing here writes a
- * finality number of its own.
- */
-const STREAM_CONFIG: ProvidedStreamConfig = {};
 
 /** What a test may substitute for the real world. */
 export type IndexingDependencies = {
@@ -251,14 +235,10 @@ async function openSource<ABI extends Abi, ProcessResultType>(
 	processorModule: ProcessorModule<ABI, ProcessResultType>,
 	provider: EIP1193ProviderWithoutEvents,
 ): Promise<IndexingSource<ABI> | undefined> {
-	switch (origin.from) {
-		case 'deployments':
-			return loadContracts<ABI>(origin.folder);
-		case 'INDEXING_SOURCE':
-			return origin.source;
-		case 'processor-module':
-			return resolveSource<ABI, ProcessResultType>(processorModule, provider as never);
+	if (origin.from === 'processor-module') {
+		return resolveSource<ABI, ProcessResultType>(processorModule, provider as never);
 	}
+	return openExplicitSource<ABI>(origin);
 }
 
 /**
@@ -333,43 +313,6 @@ async function driveCycles<ABI extends Abi>(
 	} finally {
 		deps.signal?.removeEventListener('abort', stop);
 	}
-}
-
-/**
- * Build the `EventProcessor` the stream-builder drives, plus the store it writes
- * to.
- *
- * The imports are dynamic so that a command that never opens a database does not
- * pay for libSQL, matching how `serve` keeps the server's dependency tree off
- * `build`.
- */
-async function buildProcessor<ABI extends Abi, ProcessResultType>(
-	declared: EntityProcessor<ABI, any>,
-	target: StoreTarget,
-	context: {finalityDepth: number; createDB?: (url: string) => RemoteSQL},
-): Promise<{processor: EventProcessor<ABI, ProcessResultType>; store: StateStore; db: RemoteSQL}> {
-	const [{EntityEventProcessor}, {VersionedStateStore}, {createNodeDB}] = await Promise.all([
-		import('@etherfold/processor-entities'),
-		import('@etherfold/state-store-sqlite'),
-		import('@etherfold/platform-nodejs'),
-	]);
-
-	const handle = context.createDB ? context.createDB(target.db) : createNodeDB(target.db);
-	// The finality depth is the stream's own, resolved once above: a retention
-	// window is validated against the depth a reorg can actually reach, and a
-	// number written here instead would be a second opinion about it.
-	const store = new VersionedStateStore(handle, declared.entities, {
-		retention: target.retention,
-		finalityDepth: context.finalityDepth,
-	});
-	// No cursor of our own: the store holds the rows and the cursor in one
-	// transaction, and the stream-builder reads that persisted cursor on every
-	// call. Nothing here prunes: pruning is a call a host schedules (ADR-0022), and
-	// one inside the index loop would stall whichever block crossed the threshold.
-	const processor = new EntityEventProcessor<ABI, any>(store, declared, {
-		finalityDepth: context.finalityDepth,
-	});
-	return {processor: processor as unknown as EventProcessor<ABI, ProcessResultType>, store, db: handle};
 }
 
 /**

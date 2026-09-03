@@ -1,4 +1,6 @@
+import type {IndexingSource} from '@etherfold/core';
 import type {EntityProcessor} from '@etherfold/processor-entities';
+import {declareEntities} from '@etherfold/state-store';
 
 // ---------------------------------------------------------------------------------------------------
 // A CHAIN AND A PROCESSOR MODULE
@@ -147,13 +149,24 @@ export function noChain() {
 // the processors
 // ---------------------------------------------------------------------------------------------------
 
+/**
+ * ONE description of the data, for the storage AND for the reads.
+ *
+ * `declareEntities` is an identity function that keeps the literals an
+ * annotation would widen away, so the SAME array goes to the processor below and
+ * to `createReadSurface` / `createQuerySurface` -- which is what lets a test
+ * compare two deployments through the surface GENERATED from the declarations,
+ * rather than through a second, hand-written description of the same rows.
+ */
+export const nftEntities = declareEntities([
+	{name: 'nft', id: ['tokenID'], fields: {owner: 'text'}},
+	{name: 'counter', id: ['name'], fields: {value: 'integer'}},
+]);
+
 /** "Who owns this token", plus a counter that a reorg must be able to bring DOWN. */
 export const nftProcessor: EntityProcessor<typeof abi> = {
 	version: '1.0.0',
-	entities: [
-		{name: 'nft', id: ['tokenID'], fields: {owner: 'text'}},
-		{name: 'counter', id: ['name'], fields: {value: 'integer'}},
-	],
+	entities: nftEntities,
 	async onTransfer(state, event) {
 		const tokenID = event.args.id.toString().padStart(78, '0');
 		const to = event.args.to.toLowerCase();
@@ -168,6 +181,19 @@ export const nftProcessor: EntityProcessor<typeof abi> = {
 };
 
 const contractsDataPerChain = {'1': [{abi, address: CONTRACT, startBlock: START_BLOCK}]};
+
+/**
+ * What a deployment indexes, as an EXPLICIT source.
+ *
+ * The same object both halves of a split deployment must reach, since the wire
+ * identity is derived from the source and the stream config together: a sender
+ * gets it as `INDEXING_SOURCE` or as a deployments folder, and a chain-free
+ * receiver can get it no other way.
+ */
+export const SOURCE: IndexingSource<typeof abi> = {
+	chainId: '1',
+	contracts: [{abi, address: CONTRACT, startBlock: START_BLOCK}],
+};
 
 /**
  * The module a deployment ships: `createProcessor` returns the AUTHORING object.

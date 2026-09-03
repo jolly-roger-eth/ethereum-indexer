@@ -8,13 +8,13 @@ import type {Options} from '../src/types.js';
 // ---------------------------------------------------------------------------------------------------
 // The five names of `one-command-runs-the-whole-pipeline` are chosen so a reader
 // can tell what a process will DO, which only holds if every word means one
-// thing. So the four that ship are asserted at the surface a user types at:
-// `run` follows the chain, folds AND answers queries without terminating,
-// `build` is the one-shot (`CONTEXT.md`: follows the chain, folds, EXITS at the
-// tip), `fetch` is the chain-facing half that folds nothing, `index` resolves to
-// nothing at all because that word belongs to the wire receiver, and no command
-// is commander's default -- a bare invocation prints help rather than silently
-// meaning one of the five.
+// thing. So all five are asserted at the surface a user types at: `run` follows
+// the chain, folds AND answers queries without terminating, `build` is the
+// one-shot (`CONTEXT.md`: follows the chain, folds, EXITS at the tip), `fetch`
+// is the chain-facing half that folds nothing, `index` is the other half of that
+// pair -- receiving pushes, owning the database, taking no node URL -- and no
+// command is commander's default: a bare invocation prints help rather than
+// silently meaning one of the five.
 //
 // What this file does NOT assert is requiredness. That lives in the resolver
 // (`configuration.test.ts`), never in the parser, so nothing here is a
@@ -37,6 +37,7 @@ function programUnderTest(deps: ProgramDependencies = {}) {
 	const served: Options[] = [];
 	const followed: Options[] = [];
 	const fetched: Options[] = [];
+	const received: Options[] = [];
 	const output: string[] = [];
 	const program = createProgram({
 		env: {},
@@ -55,6 +56,9 @@ function programUnderTest(deps: ProgramDependencies = {}) {
 		fetch: async (options) => {
 			fetched.push(options);
 		},
+		index: async (options) => {
+			received.push(options);
+		},
 		...deps,
 	});
 	silence(program, output);
@@ -63,6 +67,7 @@ function programUnderTest(deps: ProgramDependencies = {}) {
 		served,
 		followed,
 		fetched,
+		received,
 		output,
 		run: (argv: string[]) => program.parseAsync(argv, {from: 'user'}),
 	};
@@ -217,24 +222,56 @@ describe('`fetch` is the chain-facing half, and the only way to run a fetcher', 
 	});
 });
 
-describe('`index` is not the one-shot any more', () => {
-	it('resolves to nothing, so the word is free for the wire receiver', async () => {
+describe('`index` is the receiving half, and no longer the one-shot', () => {
+	it('resolves, and hands its handler the flags a process that RECEIVES and folds owns', async () => {
 		const cli = programUnderTest();
 
-		await expect(
-			cli.run([
-				'index',
-				'-p',
-				'./processor.js',
-				'--store',
-				'sqlite',
-				'--db',
-				':memory:',
-				'-n',
-				'http://localhost:8545',
-			]),
-		).rejects.toThrow(/unknown command/i);
+		await cli.run([
+			'index',
+			'-p',
+			'./processor.js',
+			'--store',
+			'sqlite',
+			'--db',
+			'file:./etherfold.db',
+			'-d',
+			'./deployments',
+			'--port',
+			'3000',
+			'--ingest-token',
+			'a-shared-secret',
+		]);
+
+		expect(cli.received).toHaveLength(1);
+		expect(cli.received[0]).toMatchObject({
+			processor: './processor.js',
+			store: 'sqlite',
+			db: 'file:./etherfold.db',
+			deployments: './deployments',
+			port: '3000',
+			ingestToken: 'a-shared-secret',
+		});
+		// the word means ONE thing, and it is no longer the one-shot: that is `build`
 		expect(cli.built).toEqual([]);
+		expect(cli.followed).toEqual([]);
+		expect(cli.fetched).toEqual([]);
+		expect(cli.served).toEqual([]);
+	});
+
+	it('shows the folding flags, the port and the secret it CHECKS, and no chain', async () => {
+		const cli = programUnderTest();
+
+		await expect(cli.run(['index', '--help'])).rejects.toMatchObject({code: 'commander.helpDisplayed'});
+		const help = cli.output.join('');
+		for (const owned of ['--processor', '--deployments', '--store', '--db', '--port', '--ingest-token']) {
+			expect(help).toMatch(owned);
+		}
+		// it makes NO chain call and it RECEIVES rather than sends, so those flags
+		// parse (a copied command line gets an answer) and are refused by the resolver
+		// rather than advertised here
+		for (const notOwned of ['--node-url', '--rps', '--ingest-endpoint']) {
+			expect(help).not.toMatch(notOwned);
+		}
 	});
 });
 
@@ -247,7 +284,8 @@ describe('no command is implicit', () => {
 		expect(cli.served).toEqual([]);
 		expect(cli.followed).toEqual([]);
 		expect(cli.fetched).toEqual([]);
-		expect(cli.output.join('')).toMatch(/Commands:[\s\S]*run[\s\S]*build[\s\S]*fetch[\s\S]*serve/);
+		expect(cli.received).toEqual([]);
+		expect(cli.output.join('')).toMatch(/Commands:[\s\S]*run[\s\S]*build[\s\S]*fetch[\s\S]*index[\s\S]*serve/);
 	});
 
 	it('refuses the old default-command form rather than folding under no name', async () => {

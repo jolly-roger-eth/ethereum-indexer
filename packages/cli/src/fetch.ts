@@ -1,4 +1,4 @@
-import type {Abi, FetchLike, IndexingSource} from '@etherfold/core';
+import type {Abi, FetchLike} from '@etherfold/core';
 import type {CycleReport, EnvRecord} from '@etherfold/fetcher-host';
 import {
 	runFetcherProcess,
@@ -6,10 +6,10 @@ import {
 	type RunningFetcher,
 	type StartFetcherOptions,
 } from '@etherfold/platform-nodejs-fetcher';
-import {loadContracts} from '@etherfold/utils';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {resolveCommandConfig} from './config.js';
-import type {ExplicitSource, FetchConfig, Options} from './types.js';
+import {openExplicitSource} from './folding.js';
+import type {FetchConfig, Options} from './types.js';
 
 // ---------------------------------------------------------------------------------------------------
 // `etherfold fetch`: THE CHAIN-FACING HALF, AND THE ONLY WAY TO RUN ONE
@@ -85,7 +85,12 @@ export async function prepareFetching<ABI extends Abi = Abi>(
 
 	return {
 		env,
-		source: await openSource<ABI>(config.source),
+		// two arms and no third, which is the type talking: a chain-facing half holds
+		// no processor, so the module route -- the only one that can cost an
+		// `eth_chainId` call -- is not available to it and was already refused by name
+		// (`requireExplicitSource`). `index` lands on the same two arms for its own,
+		// independent reason, which is why opening one is shared (`src/folding.ts`).
+		source: await openExplicitSource<ABI>(config.source),
 		nodeUrl: config.nodeUrl,
 		endpoint: config.wire.endpoint,
 		token: config.wire.token,
@@ -144,22 +149,5 @@ export async function fetchMain<ABI extends Abi = Abi>(
 	} catch (err) {
 		error(err instanceof Error ? err.message : err);
 		exit(1);
-	}
-}
-
-/**
- * Turn the source ORIGIN this command resolved into the source itself.
- *
- * Two arms and no third, which is the type talking: a chain-facing half holds no
- * processor, so the module route -- the only one that can cost an `eth_chainId`
- * call -- is not available to it and was already refused by name
- * (`requireExplicitSource`).
- */
-async function openSource<ABI extends Abi>(origin: ExplicitSource<ABI>): Promise<IndexingSource<ABI>> {
-	switch (origin.from) {
-		case 'deployments':
-			return loadContracts<ABI>(origin.folder);
-		case 'INDEXING_SOURCE':
-			return origin.source;
 	}
 }
