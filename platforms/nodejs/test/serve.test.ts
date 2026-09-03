@@ -1,7 +1,33 @@
 import {describe, it, expect, afterEach} from 'vitest';
-import {startServer, type RunningServer} from '../src/index.js';
+import {readSchemaState, recordReorg} from '@etherfold/server';
+import {createNodeDB, startServer, type RunningServer, type StartOptions} from '../src/index.js';
 
 let running: RunningServer | undefined;
+
+const TOKEN = 'a-shared-secret';
+
+/**
+ * The ingestion this adapter passes through, as the adapter sees it.
+ *
+ * Spelled through `StartOptions` rather than imported from `@etherfold/core`,
+ * because this package depends on no engine and no store and the test must not
+ * be the thing that adds one.
+ */
+type Ingestion = NonNullable<ReturnType<NonNullable<StartOptions['getIngestion']>>>;
+
+/** A stand-in for a stream-builder: it records what reached it and nothing else. */
+function fakeIngestion(expected: number) {
+	const received: {fromBlock: number; toBlock: number}[] = [];
+	const ingestion: Ingestion = {
+		context: {source: [{startBlock: 100, hash: '0xsource'}], config: '{}'},
+		expectedFromBlock: async () => expected,
+		receive: async (batch) => {
+			received.push({fromBlock: batch.fromBlock, toBlock: batch.toBlock});
+			return {applied: 1, retracted: 0, expectedFromBlock: batch.toBlock + 1};
+		},
+	};
+	return {ingestion, received};
+}
 
 afterEach(async () => {
 	await running?.close();
@@ -37,5 +63,117 @@ describe('the node adapter serves the app over real HTTP', () => {
 		running = await startServer({db: ':memory:', port: 0});
 		expect(running.port).toBeGreaterThan(0);
 		expect(running.url).toContain(String(running.port));
+	});
+});
+
+describe('the adapter starts on a database handle its caller built', () => {
+	it('serves on the given handle, and hands back that very handle', async () => {
+		const db = createNodeDB(':memory:');
+		running = await startServer({db, port: 0});
+
+		const res = await fetch(`${running.url}/status`);
+		expect(res.status).toBe(200);
+		expect(((await res.json()) as {schema: {applied: boolean}}).schema.applied).toBe(true);
+		expect(running.db).toBe(db);
+	});
+
+	it('shares it: a write made outside the server is visible to a read the server answers', async () => {
+		const db = createNodeDB(':memory:');
+		running = await startServer({db, port: 0});
+
+		// the assertion below cannot pass by accident, and this is why: a SECOND
+		// connection to `:memory:` is a different database entirely, so it does not
+		// even carry the schema the server just applied through the handle it was given
+		expect((await readSchemaState(createNodeDB(':memory:'))).applied).toBe(false);
+
+		await recordReorg(db, {cause: 'absence', blockNumber: 4242, blockHash: '0xdead'});
+
+		const body = (await (await fetch(`${running.url}/status`)).json()) as {
+			reorgs: {absence: number; contradiction: number; last?: {blockNumber: number}};
+		};
+		expect(body.reorgs.absence).toBe(1);
+		expect(body.reorgs.last?.blockNumber).toBe(4242);
+	});
+
+	it('auto-sets the schema up on the given handle, so both forms start usable', async () => {
+		const db = createNodeDB(':memory:');
+		expect((await readSchemaState(db)).applied).toBe(false);
+
+		running = await startServer({db, port: 0});
+
+		expect((await readSchemaState(db)).applied).toBe(true);
+	});
+
+	it('honours autoSetup: false on the given handle too', async () => {
+		const db = createNodeDB(':memory:');
+		running = await startServer({db, port: 0, autoSetup: false});
+
+		expect((await readSchemaState(db)).applied).toBe(false);
+		expect((await fetch(`${running.url}/status`)).status).toBe(503);
+
+		expect((await fetch(`${running.url}/admin/setup`, {method: 'POST'})).status).toBe(200);
+		expect((await fetch(`${running.url}/status`)).status).toBe(200);
+		expect((await readSchemaState(db)).applied).toBe(true);
+	});
+});
+
+describe('the adapter carries the host-supplied capabilities through to the app', () => {
+	it('reports the cursor a supplied reporter returns, verbatim', async () => {
+		const report = {lastToBlock: 4242, latestBlock: 4250};
+		running = await startServer({db: ':memory:', port: 0, getCursorReport: () => report});
+
+		const body = (await (await fetch(`${running.url}/status`)).json()) as {cursor: unknown};
+		expect(body.cursor).toEqual({reported: true, value: report});
+	});
+
+	it('invents no cursor when no reporter is supplied, as the read tier starts today', async () => {
+		running = await startServer({db: ':memory:', port: 0});
+
+		const body = (await (await fetch(`${running.url}/status`)).json()) as Record<string, unknown>;
+		expect('cursor' in body).toBe(false);
+	});
+
+	it('lets a supplied ingestion receive logs, so a process on Node can host a processor', async () => {
+		const {ingestion, received} = fakeIngestion(105);
+		running = await startServer({
+			db: ':memory:',
+			port: 0,
+			env: {INGEST_TOKEN: TOKEN},
+			getIngestion: () => ingestion,
+		});
+
+		const asked = await fetch(`${running.url}/ingest/expected-from-block`, {
+			method: 'POST',
+			headers: {Authorization: `Bearer ${TOKEN}`},
+		});
+		expect(asked.status).toBe(200);
+		expect(((await asked.json()) as {expectedFromBlock: number}).expectedFromBlock).toBe(105);
+
+		const pushed = await fetch(`${running.url}/ingest`, {
+			method: 'POST',
+			headers: {Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json'},
+			body: JSON.stringify({fromBlock: 105, toBlock: 110, latestBlock: 110, logs: [], context: ingestion.context}),
+		});
+		expect(pushed.status).toBe(200);
+		expect(((await pushed.json()) as {applied: number}).applied).toBe(1);
+		expect(received).toEqual([{fromBlock: 105, toBlock: 110}]);
+	});
+
+	it('answers 501 to an AUTHENTICATED caller when no ingestion is supplied, exactly as today', async () => {
+		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
+
+		const res = await fetch(`${running.url}/ingest/expected-from-block`, {
+			method: 'POST',
+			headers: {Authorization: `Bearer ${TOKEN}`},
+		});
+		expect(res.status).toBe(501);
+		expect(((await res.json()) as {error: string}).error).toBe('ingestion-not-configured');
+	});
+
+	it('answers 401 to an unauthenticated caller, so the absence of a processor is not a probe', async () => {
+		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
+
+		expect((await fetch(`${running.url}/ingest`, {method: 'POST', body: '{}'})).status).toBe(401);
+		expect((await fetch(`${running.url}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
 	});
 });
