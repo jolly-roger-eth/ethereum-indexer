@@ -1,5 +1,6 @@
 import {
 	createSegmentedStream,
+	degradingStream,
 	resolveStreamConfig,
 	streamDigestOf,
 	type Abi,
@@ -277,10 +278,17 @@ export function keepStreamOnIndexedDB<ABI extends Abi>(
 		return true;
 	}
 
-	return {
-		setStreamConfig(next) {
-			streamConfig = next;
-		},
+	/**
+	 * WRAPPED AGAIN, because this keeper makes IndexedDB calls of its OWN.
+	 *
+	 * `createSegmentedStream` already degrades everything that goes through the
+	 * segment port, but the legacy-blob probe in `fetchFrom` (and the `del` in
+	 * `clear`) are this module's own calls, outside it -- and an unopenable database fails there
+	 * FIRST, before a single port operation runs. Wrapping twice costs nothing and
+	 * never doubles a log line: the inner one answers `undefined` rather than
+	 * raising, so this one only ever sees what it did not already handle.
+	 */
+	const guarded = degradingStream<ABI>({
 		async fetchFrom(source, fromBlock) {
 			if (await dropLegacyBlob(source)) {
 				return undefined;
@@ -293,6 +301,13 @@ export function keepStreamOnIndexedDB<ABI extends Abi>(
 		async clear(source) {
 			await del(streamAddress(name, source, streamConfig).legacy, store);
 			await segmented.clear(source);
+		},
+	});
+
+	return {
+		...guarded,
+		setStreamConfig(next) {
+			streamConfig = next;
 		},
 	};
 }

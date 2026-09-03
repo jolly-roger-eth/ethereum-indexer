@@ -263,6 +263,25 @@ export type HeldGeneration<ABI extends Abi, ProcessResultType = void> = {
 	 */
 	readonly follows: boolean;
 	/**
+	 * HOW FAR THIS GENERATION'S FOLD HAS GOT, or nothing before it has loaded.
+	 *
+	 * Reported for EVERY held generation and not for the canonical one alone,
+	 * because "a generation exists beside the live one and it is N blocks behind"
+	 * is a question only this object can answer: the canonical generation's cursor
+	 * is published through `onLastSyncUpdated`, and a non-canonical one publishes
+	 * to nobody (story 5). The container already keeps it -- the promotion trigger
+	 * is a comparison between two of these -- so this exposes what is there rather
+	 * than recording it twice.
+	 *
+	 * Read afresh from the entry on every access, like `pauseState` and for the
+	 * same reason: a cursor moves between two reads, and a snapshot taken when this
+	 * object was built would report a distance that stopped closing.
+	 *
+	 * `undefined` means this generation has not loaded, which is NOT the same claim
+	 * as being level at block 0.
+	 */
+	readonly lastSync: LastSync<ABI> | undefined;
+	/**
 	 * WHERE A PAUSE HAS GOT TO: `running`, `draining`, or `drained`.
 	 *
 	 * Read afresh from the engine on every access, because a drain completes
@@ -1157,8 +1176,11 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			generation: entry.generation,
 			processor: entry.processor,
 			follows: entry.follows,
-			// a GETTER, so a caller holding this object sees the drain complete rather
-			// than the value it had when the object was built
+			// GETTERS, so a caller holding this object sees the drain complete and the
+			// cursor move rather than the values they had when the object was built
+			get lastSync(): LastSync<ABI> | undefined {
+				return entry.lastSync;
+			},
 			get pauseState(): PauseState {
 				return entry.generation.pauseState;
 			},

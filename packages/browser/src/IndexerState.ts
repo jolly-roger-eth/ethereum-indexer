@@ -18,7 +18,12 @@ import type {
 	TxInclusionQuery,
 	TxInclusionVerdict,
 } from '@etherfold/core';
-import {checkTxInclusion as checkTxInclusionAgainst, openIndexer, openMemoryGenerationRegistry} from '@etherfold/core';
+import {
+	checkTxInclusion as checkTxInclusionAgainst,
+	openIndexer,
+	openMemoryGenerationRegistry,
+	sameGeneration,
+} from '@etherfold/core';
 import type {StateStore} from '@etherfold/state-store';
 import {BROWSER_GENERATION_CAPS} from './storage/generation/OnIndexedDB.js';
 import {createRootStore, createStore} from './utils/stores.js';
@@ -37,6 +42,45 @@ export type ExtendedLastSync<ABI extends Abi> = LastSync<ABI> & {
 
 export type ErrorCode = string;
 
+/**
+ * A GENERATION THAT IS NOT ANSWERING READS, and how far its fold has got.
+ *
+ * The FACT and the DISTANCE, and nothing beyond them. Whether a second
+ * generation existing means the answers on screen should be rendered, dimmed or
+ * hidden is not something this library can know: only the developer knows
+ * whether their reconfigure made the old answers WRONG or merely INCOMPLETE, so
+ * a library that decided would be deciding wrong half the time (story 5 of
+ * `a-reconfigure-is-not-an-outage`). It reports; the app decides.
+ */
+export type GenerationProgress = {
+	/** WHICH generation. The same record `promote` takes, so a report is actionable. */
+	readonly record: GenerationRecord;
+	/**
+	 * Whether it FOLLOWS a stream another generation writes rather than fetching
+	 * its own -- which is what the common reconfigure (a processor change) makes,
+	 * and what makes it free.
+	 */
+	readonly follows: boolean;
+	/**
+	 * How far its fold has got, or `undefined` before it has loaded.
+	 *
+	 * Absent rather than `0`, because "it has folded nothing yet" and "it is level
+	 * at block 0" are different claims and an app that dims on progress must be
+	 * able to tell them apart.
+	 */
+	readonly lastToBlock?: number;
+	/**
+	 * How far BEHIND the generation that is answering reads, in blocks: `0` means
+	 * level (or ahead, which `manual` allows).
+	 *
+	 * `undefined` when either cursor is unknown. A percentage is deliberately not
+	 * reported: which span to divide by is a presentation decision (the whole
+	 * chain, the catch-up, the last reconfigure), and this `lastToBlock` together
+	 * with `SyncingState.lastSync` carries the numbers for any of them.
+	 */
+	readonly blocksBehind?: number;
+};
+
 export type SyncingState<ABI extends Abi> = {
 	waitingForProvider: boolean;
 	autoIndexing: boolean;
@@ -47,6 +91,19 @@ export type SyncingState<ABI extends Abi> = {
 	numRequests?: number;
 	lastSync?: ExtendedLastSync<ABI>;
 	error?: {message: string; id: ErrorCode; code?: number};
+	/**
+	 * EVERY generation this indexer holds that is NOT answering reads, with how far
+	 * each has caught up (story 5).
+	 *
+	 * Empty while there is only one generation, which is the ordinary state of an
+	 * app that has not reconfigured. A generation LEAVES this list the moment the
+	 * canonical pointer names it -- it is then the thing being read, not a
+	 * successor to it -- and the generation the pointer moved OFF enters it, because
+	 * it is retained (that is what makes moving the pointer BACK a revert) and
+	 * because "a generation you could revert to exists" is the same fact reported
+	 * the same way.
+	 */
+	nonCanonicalGenerations: readonly GenerationProgress[];
 };
 
 export type StatusState = {
@@ -234,6 +291,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		fetchingLogs: false,
 		processingFetchedLogs: false,
 		numRequests: options?.trackNumRequests ? 0 : undefined,
+		nonCanonicalGenerations: [],
 	});
 
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
@@ -325,9 +383,60 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	 * and `checkTxInclusion` answers `unknown` / `not-synced` -- which is the honest
 	 * answer rather than a missing one.
 	 */
-	function onPromoted() {
+	function onPromoted(promoted: GenerationRecord) {
 		promotions++;
 		clearSyncingStateForReconfigure();
+		// The promoted generation is passed IN rather than read back, because this
+		// fires BEFORE the container applies the move on the read path (that is the
+		// whole point of the callback: a consumer drops what it derived from the
+		// retired generation before it is told to re-read). Asking `indexer.canonical`
+		// here would still answer with the generation being superseded, and the one
+		// just promoted would be reported as a successor to itself.
+		reportGenerationProgress(promoted);
+	}
+
+	/**
+	 * WHICH GENERATIONS ARE NOT ANSWERING READS, and how far each has caught up.
+	 *
+	 * Derived from the container on demand rather than accumulated here: it already
+	 * keeps every generation's cursor (the promotion trigger is a comparison
+	 * between two of them), and a second copy in this hook would be a second thing
+	 * to keep true across promotion, revert and drop.
+	 *
+	 * `canonicalNow` exists for the one caller that knows better than the container
+	 * does -- see `onPromoted`.
+	 */
+	function reportGenerationProgress(canonicalNow?: GenerationRecord) {
+		if (!indexer) {
+			setSyncing({nonCanonicalGenerations: []});
+			return;
+		}
+		const generations = indexer.generations;
+		// `canonical` is a generation and never nothing: `init` opens the container with
+		// a spec, and a container that could not resolve a canonical generation refuses
+		// to open at all rather than holding none.
+		const canonical = canonicalNow ?? indexer.canonical.record;
+		const isCanonical = (record: GenerationRecord) => sameGeneration(record, canonical);
+		const canonicalCursor = generations.find((generation) => isCanonical(generation.record))?.lastSync?.lastToBlock;
+		setSyncing({
+			nonCanonicalGenerations: generations
+				.filter((generation) => !isCanonical(generation.record))
+				.map((generation) => {
+					const lastToBlock = generation.lastSync?.lastToBlock;
+					return {
+						record: generation.record,
+						follows: generation.follows,
+						lastToBlock,
+						// floored at zero: a generation AHEAD of the canonical one (which `manual`
+						// allows) is not behind by a negative number, it is not behind. The two
+						// cursors are both reported for an app that needs the exact relation.
+						blocksBehind:
+							lastToBlock === undefined || canonicalCursor === undefined
+								? undefined
+								: Math.max(0, canonicalCursor - lastToBlock),
+					};
+				}),
+		});
 	}
 
 	async function init(
@@ -405,6 +514,10 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		// keeps what it is handed keeps something that follows the canonical pointer.
 		setState(indexer.state);
 		setSyncing({waitingForProvider: false});
+		// One generation and it is canonical, so this reports nothing -- but it reports
+		// nothing from the CONTAINER, rather than leaving the initial value standing
+		// for a container that may have been opened over a durable registry.
+		reportGenerationProgress();
 	}
 
 	let lastLastToBlock: number;
@@ -482,6 +595,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		try {
 			const lastSync = await indexer.load();
 			setSyncing({loading: false});
+			// A load is an advance for every generation -- for a follower it is the whole
+			// re-fold of the stored stream -- so it is where a successor first has a cursor.
+			reportGenerationProgress();
 			return lastSync;
 		} catch (err) {
 			setSyncing({loading: false, error: {message: 'Failed to load', id: 'FAILED_TO_LOAD'}});
@@ -508,6 +624,10 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			setLastSync(lastSync);
 			setCatchup(lastSync);
 		}
+		// Unconditionally, unlike the cursor above: this is read from the container as
+		// it stands NOW, so a pointer that moved during the cycle is already accounted
+		// for rather than something to skip.
+		reportGenerationProgress();
 		return lastSync;
 	}
 
@@ -661,6 +781,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			processingFetchedLogs: false,
 			lastSync: undefined,
 			error: undefined,
+			nonCanonicalGenerations: [],
 		});
 		setStatus({state: 'Idle'});
 	}
@@ -763,7 +884,16 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 				if (!indexer) {
 					throw new Error(`no indexer setup, call init`);
 				}
-				return indexer.add(generationSpecFor(generation.createState, generation.createProcessor, processorConfig));
+				const held = await indexer.add(
+					generationSpecFor(generation.createState, generation.createProcessor, processorConfig),
+				);
+				// Reported from the moment it EXISTS, before it has folded anything: an app
+				// that hides its answers during a rebuild must be able to do so from the
+				// reconfigure, not from the first cursor the successor happens to publish.
+				// (Under `immediate` the successor is canonical already, so this reports the
+				// generation it superseded instead -- which is the same fact, the other way up.)
+				reportGenerationProgress();
+				return held;
 			});
 		},
 		/**

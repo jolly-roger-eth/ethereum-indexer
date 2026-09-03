@@ -382,6 +382,43 @@ describe('a stream that does not reach back to the requested fromBlock', () => {
 	});
 });
 
+describe('a substrate that is GONE degrades to a re-index, like the damage it can see', () => {
+	/** Every read raises: an object store that will not open, a database that was evicted. */
+	function unreadablePort(): StreamSegmentPort<Abi> {
+		const gone = async () => {
+			throw new Error('the object store could not be opened');
+		};
+		return {
+			readCursor: gone,
+			readSegments: gone,
+			commitSegmentWithCursor: gone,
+			writeCursorOnly: gone,
+			clearSubtree: gone,
+		} as unknown as StreamSegmentPort<Abi>;
+	}
+
+	it('reports absent instead of raising, so `load()` re-indexes rather than failing forever', async () => {
+		const logged = await captureLogs();
+		const stream = createSegmentedStream<Abi>(unreadablePort());
+
+		// the rules live in this helper, so EVERY keeper over the port inherits this
+		// one: a second keeper supplies five substrate operations and nothing else
+		await expect(stream.fetchFrom(SOURCE, 100)).resolves.toBeUndefined();
+		await expect(stream.clear(SOURCE)).resolves.toBeUndefined();
+		logged.restore();
+	});
+
+	it('still REPORTS a failed write, which is what stops the state advancing past it', async () => {
+		const logged = await captureLogs();
+		const stream = createSegmentedStream<Abi>(unreadablePort());
+
+		await expect(stream.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursor(100, 100)})).rejects.toThrow(
+			/could not be opened/,
+		);
+		logged.restore();
+	});
+});
+
 describe('clear', () => {
 	it('removes the subtree, so presence reads FALSE afterwards', async () => {
 		const {port, rows} = memoryPort();

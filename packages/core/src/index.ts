@@ -75,6 +75,19 @@ export * from './stream/fixture.js';
 export * from './stream/readOnly.js';
 export * from './stream/capture.js';
 export * from './stream/segments.js';
+/**
+ * DEGRADE, NEVER BREAK: the read side of a stream keeper reports ABSENT instead
+ * of raising.
+ *
+ * The load path calls `fetchFrom` and `clear` with no `try`/`catch` above them,
+ * so a keeper that raises there makes the indexer permanently unloadable -- for a
+ * LOCAL CACHE whose correct recovery is to re-index. Exported because it is the
+ * rule a KEEPER follows: `createSegmentedStream` applies it to everything built
+ * over the segment port, and a keeper that makes substrate calls of its own
+ * outside that helper applies it to those too. `saveNewEvents` deliberately
+ * raises through; see the JSDoc for why swallowing it would make a HOLE.
+ */
+export * from './stream/degrading.js';
 
 export type {
 	Abi,
