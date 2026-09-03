@@ -10,8 +10,8 @@ import {ALICE, BOB, entityModule, fakeChain, nftProcessor, START_BLOCK, transfer
 // THE ONE-SHOT: IT STOPS AT THE TIP, IT EXITS ON ITS CODE, AND IT RESUMES
 // ---------------------------------------------------------------------------------------------------
 // `runFetcherLoop` follows the tip forever, so the one-shot is that loop plus an
-// `AbortController` aborted from `onReport` -- the same driver `build` will use.
-// What a CI job depends on is the exit code, so the two ends of it are asserted
+// `AbortController` aborted from `onReport`, which is the driver behind
+// `etherfold build`. What a CI job depends on is the exit code, so the two ends of it are asserted
 // here rather than described: 0 at the tip, non-zero on a refusal no waiting
 // fixes.
 //
@@ -74,7 +74,7 @@ describe('the one-shot', () => {
 		const exits: number[] = [];
 		const logged: string[] = [];
 		await main(SQLITE, {
-			run: async (options) => {
+			build: async (options) => {
 				const prepared = await prepareIndexing(options, depsFor(chain, oneDatabase()));
 				return prepared.index();
 			},
@@ -99,7 +99,7 @@ describe('the one-shot', () => {
 		const exits: number[] = [];
 		const errors: unknown[] = [];
 		await main(SQLITE, {
-			run: async (options) => {
+			build: async (options) => {
 				const prepared = await prepareIndexing(
 					options,
 					depsFor(chain, oneDatabase(), {env: {...SMALL_RANGES, SUSPECT_RESULT_COUNT: '2'}}),

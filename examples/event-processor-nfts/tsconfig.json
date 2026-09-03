@@ -15,7 +15,7 @@
 		"forceConsistentCasingInFileNames": true,
 		"allowImportingTsExtensions": false,
 		// this example is no longer browser-only: `src/cli.ts` reads two environment
-		// variables so the documented `etherfold index` command can be pointed anywhere
+		// variables so the documented `etherfold build` command can be pointed anywhere
 		"types": ["node"],
 		"rootDir": "./src",
 		"outDir": "./dist"

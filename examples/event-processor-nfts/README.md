@@ -92,13 +92,15 @@ This is the modelling rule the spec states as *"key children by something natura
 
 ## The same processor, on a server
 
-The claim this example exists to make is that `src/entities.ts` names no backend. Here is that claim as a command: the file the tab runs, run by `etherfold index` into SQLite, with **not one line of it changed**.
+The claim this example exists to make is that `src/entities.ts` names no backend. Here is that claim as a command: the file the tab runs, folded by `etherfold build` into SQLite, with **not one line of it changed**.
 
 ```sh
 pnpm --filter event-processor-nfts build
 NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000 \
-  pnpm --filter event-processor-nfts index -n https://rpc.mevblocker.io
+  pnpm --filter event-processor-nfts build:db -n https://rpc.mevblocker.io
 ```
+
+(`build` is `tsc`, which is what `build:db` needs first; `build:db` is the `etherfold build` that produces `nfts.db`.)
 
 `src/cli.ts` is the whole difference, and it adds no indexing logic: it imports `NFTProcessor` as-is and says what to index per chain. A browser page needs neither, because `browser/main.ts` passes both at the call site.
 
@@ -124,7 +126,7 @@ Stop it with `Ctrl-C` half way and run it again: it continues from the cursor in
 | file | |
 | --- | --- |
 | `entities.ts` | the processor: an `EntityProcessor` (`@etherfold/processor-entities`), declared entities written through a `MutationContext`, kept in whichever `StateStore` the deployment chose |
-| `cli.ts` | the entry `etherfold index` loads. Not a second processor: it imports `entities.ts` unchanged and adds only what to index per chain |
+| `cli.ts` | the entry `etherfold build` loads. Not a second processor: it imports `entities.ts` unchanged and adds only what to index per chain |
 | `eip721.ts` | the ABI |
 
 `entities.ts` is what the browser app runs, and it is the same object a server runs against SQLite: nothing in it names a backend.

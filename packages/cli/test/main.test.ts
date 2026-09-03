@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {main, run} from '../src/index.js';
+import {build, main} from '../src/index.js';
 import type {Options} from '../src/types.js';
 
 const OPTIONS: Options = {
@@ -12,17 +12,17 @@ const OPTIONS: Options = {
 };
 
 // ---------------------------------------------------------------------------
-// Characterization (current behaviour of run() — should PASS as-is)
+// Characterization (current behaviour of build() — should PASS as-is)
 // ---------------------------------------------------------------------------
 
-describe('run() — characterization (current behaviour)', () => {
+describe('build() — characterization (current behaviour)', () => {
 	it('rejects when the processor module cannot be imported', async () => {
-		await expect(run(OPTIONS)).rejects.toBeTruthy();
+		await expect(build(OPTIONS)).rejects.toBeTruthy();
 	});
 
 	it('rejects before anything else when no store was chosen', async () => {
 		const {store, ...noStore} = OPTIONS;
-		await expect(run(noStore)).rejects.toThrow(/--store/);
+		await expect(build(noStore)).rejects.toThrow(/--store/);
 	});
 });
 
@@ -30,7 +30,7 @@ describe('run() — characterization (current behaviour)', () => {
 // MEDIUM-1: the CLI must resolve a process exit code — 0 on success, 1 on
 // failure — and must NOT print "DONE" on failure. Previously cli.ts did
 // `run().then(() => console.log('DONE'))` with no .catch / no process.exit, so
-// a failed index looked like success (and could leave the process lingering).
+// a failed build looked like success (and could leave the process lingering).
 // `main()` encapsulates that contract with injectable collaborators.
 // ---------------------------------------------------------------------------
 
@@ -39,7 +39,7 @@ describe('main() — exit-code contract (MEDIUM-1)', () => {
 		const exits: number[] = [];
 		const logs: any[] = [];
 		await main(OPTIONS, {
-			run: async () => undefined, // simulate a successful run
+			build: async () => undefined, // simulate a successful run
 			exit: (code) => exits.push(code),
 			log: (...a) => logs.push(a.join(' ')),
 			error: () => {},
@@ -54,7 +54,7 @@ describe('main() — exit-code contract (MEDIUM-1)', () => {
 		const errors: any[] = [];
 		const boom = new Error('indexing failed');
 		await main(OPTIONS, {
-			run: async () => {
+			build: async () => {
 				throw boom;
 			},
 			exit: (code) => exits.push(code),
@@ -66,7 +66,7 @@ describe('main() — exit-code contract (MEDIUM-1)', () => {
 		expect(errors.flat()).toContain(boom);
 	});
 
-	it('exits 1 when the real run() rejects (e.g. missing processor module)', async () => {
+	it('exits 1 when the real build() rejects (e.g. missing processor module)', async () => {
 		const exits: number[] = [];
 		await main(OPTIONS, {
 			exit: (code) => exits.push(code),

@@ -3,7 +3,7 @@ import type {EntityProcessor} from '@etherfold/processor-entities';
 // ---------------------------------------------------------------------------------------------------
 // A CHAIN AND A PROCESSOR MODULE
 // ---------------------------------------------------------------------------------------------------
-// Everything the CLI tests need to drive `etherfold index` without a node: raw
+// Everything the CLI tests need to drive `etherfold build` without a node: raw
 // ERC-721 `Transfer` logs served by a fake provider, and the module shape the
 // command loads.
 // ---------------------------------------------------------------------------------------------------

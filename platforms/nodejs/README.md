@@ -8,7 +8,7 @@ That is the whole adapter. No route, no chain logic and no storage decision live
 
 | you want | use |
 | --- | --- |
-| a server on Node, from a terminal | [`etherfold serve`](../../packages/cli), which calls this |
+| a read tier on Node, from a terminal | [`etherfold serve`](../../packages/cli), which calls this |
 | a server on Node, inside your own program | here |
 | a server on Cloudflare Workers | [`platforms/cf-worker`](../cf-worker) |
 | a host for a runtime neither of those covers | [`@etherfold/server`](../../packages/server) directly |

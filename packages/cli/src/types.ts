@@ -1,7 +1,7 @@
 import type {RetentionSetting} from '@etherfold/processor-entities';
 
 /**
- * The flags `etherfold index` takes, exactly as commander hands them over.
+ * The flags `etherfold build` takes, exactly as commander hands them over.
  *
  * Everything a deployment CHOOSES is a string here, including `--store`, and it
  * is validated by `resolveIndexOptions` rather than by the parser: the refusals

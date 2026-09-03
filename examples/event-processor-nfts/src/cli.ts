@@ -14,7 +14,7 @@ import {NFTProcessor} from './entities.js';
  * ```sh
  * pnpm --filter event-processor-nfts build
  * NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000 \
- *   pnpm --filter event-processor-nfts index -n https://rpc.mevblocker.io
+ *   pnpm --filter event-processor-nfts build:db -n https://rpc.mevblocker.io
  * ```
  *
  * See the README for what that prints and what lands in the database.
