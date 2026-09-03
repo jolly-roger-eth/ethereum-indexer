@@ -2,21 +2,37 @@ import {serve} from '@hono/node-server';
 import {createClient} from '@libsql/client';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import type {RemoteSQL} from 'remote-sql';
-import {createServer, applySchema, readSchemaState, type Env} from '@etherfold/server';
+import {createServer, applySchema, readSchemaState, type Env, type ServerOptions} from '@etherfold/server';
 import {logs} from 'named-logs';
 
 const logger = logs('@etherfold/platform-nodejs');
 
 export type NodeEnv = Env & {
-	/** libSQL URL. A path like `file:./data/etherfold.db`, or `:memory:`. */
+	/** libSQL URL. A path like `file:./data/etherfold.db`, or `:memory:`. Ignored when a handle is passed. */
 	DB: string;
 	/** Port to listen on, when not passed explicitly. */
 	PORT?: string;
 };
 
 export type StartOptions = {
-	/** libSQL URL. Defaults to `DB` in the environment, else `file:./etherfold.db`. */
-	db?: string;
+	/**
+	 * The database, as a libSQL URL or as a handle the caller already built.
+	 *
+	 * ONE option with two forms, because a host has one database and the question
+	 * is only who OPENED it. A URL is the standalone case: this adapter builds the
+	 * handle with `createNodeDB` and defaults to `DB` in the environment, else
+	 * `file:./etherfold.db`. A `RemoteSQL` is the shared case: a process that
+	 * already folds a processor into a store hands the SAME handle here, so the
+	 * store and the server see one database rather than two connections with two
+	 * views of it (against `:memory:` they would not even be the same database) and
+	 * two schema-setup races.
+	 *
+	 * A handle this adapter was GIVEN is not its to close: `close()` shuts the HTTP
+	 * listener down and leaves the database alone, so stopping the server never
+	 * takes a store's connection with it. Whoever built the handle closes it, which
+	 * for the URL form is whoever holds the returned `db`.
+	 */
+	db?: string | RemoteSQL;
 	port?: number;
 	hostname?: string;
 	/**
@@ -30,12 +46,43 @@ export type StartOptions = {
 	 */
 	autoSetup?: boolean;
 	env?: Partial<NodeEnv>;
+	/**
+	 * The stream-builder this process hosts, if it hosts one, handed to the app
+	 * unchanged.
+	 *
+	 * Passthrough, in the server's own shape (resolved per REQUEST, since that is
+	 * what the Workers model forces on the app and one server that runs unmodified
+	 * on both hosts is worth a closure call on Node). This adapter builds no
+	 * processor and knows nothing about one: what it decides is what the app's
+	 * database, environment, ingestion and reporter ARE.
+	 *
+	 * Absent by default, and that absence is what the read tier is: the ingestion
+	 * routes then answer `501` to an authenticated caller, exactly as a server
+	 * started with a URL and nothing else does today.
+	 */
+	getIngestion?: ServerOptions<NodeEnv>['getIngestion'];
+	/**
+	 * Where this process's pipeline has got to, if this process can say, handed to
+	 * the app unchanged.
+	 *
+	 * Passthrough, same as the ingestion and for the same reason: only the process
+	 * that OWNS the store can read a cursor, and this adapter owns no store. What a
+	 * reporter owes the server (a SMALL, JSON-serialisable summary, never the
+	 * store's raw serialized cursor) is stated on `ServerOptions.getCursorReport`,
+	 * which is the seam that has to carry it; nothing is added or checked here.
+	 *
+	 * Absent by default, and then `/status` carries no `cursor` field rather than
+	 * an invented one.
+	 */
+	getCursorReport?: ServerOptions<NodeEnv>['getCursorReport'];
 };
 
 export type RunningServer = {
 	port: number;
 	url: string;
+	/** The handle the app reads through: the one that was given, or the one built from the URL. */
 	db: RemoteSQL;
+	/** Stops listening. It does NOT close `db`, which the server may not own. */
 	close: () => Promise<void>;
 };
 
@@ -47,28 +94,44 @@ export function createNodeDB(url: string): RemoteSQL {
 /**
  * Start the indexer-server on Node.
  *
- * This is the whole adapter: it decides what `getDB` and `getEnv` return and
- * hands them to the platform-agnostic app. No route, no chain logic and no
- * storage decision lives here.
+ * This is the whole adapter: it decides what `getDB`, `getEnv`, `getIngestion`
+ * and `getCursorReport` return and hands them to the platform-agnostic app. No
+ * route, no chain logic and no storage decision lives here, and the two
+ * capabilities are carried through untouched because only a HOST can build them
+ * and only this file can reach the app on Node.
  */
 export async function startServer(options: StartOptions = {}): Promise<RunningServer> {
 	const processEnv = process.env as Partial<NodeEnv>;
 	const env = {...processEnv, ...options.env} as NodeEnv;
-	const dbURL = options.db ?? env.DB ?? 'file:./etherfold.db';
 	const port = options.port ?? (env.PORT ? Number(env.PORT) : 2000);
 	const hostname = options.hostname;
 
-	const db = createNodeDB(dbURL);
+	// a string (or nothing) is a URL to open; anything else is a handle the caller
+	// already opened, still owns, and shares with whatever else reads it
+	const given = options.db;
+	let db: RemoteSQL;
+	let dbURL: string | undefined;
+	if (given !== undefined && typeof given !== 'string') {
+		db = given;
+	} else {
+		dbURL = given ?? env.DB ?? 'file:./etherfold.db';
+		db = createNodeDB(dbURL);
+	}
 
 	if (options.autoSetup !== false) {
 		const state = await readSchemaState(db);
 		if (!state.applied) {
-			logger.info(`applying fixed-table schema to ${dbURL}`);
+			logger.info(`applying fixed-table schema to ${dbURL ?? 'the database handle this server was given'}`);
 			await applySchema(db);
 		}
 	}
 
-	const app = createServer<NodeEnv>({getDB: () => db, getEnv: () => env});
+	const app = createServer<NodeEnv>({
+		getDB: () => db,
+		getEnv: () => env,
+		getIngestion: options.getIngestion,
+		getCursorReport: options.getCursorReport,
+	});
 
 	const server = serve({fetch: app.fetch, port, hostname});
 

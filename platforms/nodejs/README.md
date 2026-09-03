@@ -27,17 +27,33 @@ await running.close();
 
 | option | default |
 | --- | --- |
-| `db` | the `DB` variable, else `file:./etherfold.db` |
+| `db` | a libSQL URL **or** a `RemoteSQL` handle you already built; defaults to the `DB` variable, else `file:./etherfold.db` |
 | `port` | the `PORT` variable, else `2000`. Pass `0` for any free port; `running.port` reports the one it got |
 | `hostname` | Node's default |
 | `autoSetup` | `true`: apply the fixed-table schema at startup if it is not already there |
 | `env` | overrides merged over `process.env` |
+| `getIngestion` | none: the ingestion routes answer `501` |
+| `getCursorReport` | none: `/status` carries no `cursor` field |
 
-`INGEST_TOKEN` is read from the environment by the server itself, and ingestion is refused outright without it.
+`INGEST_TOKEN` is read from the environment by the server itself, and ingestion is refused outright without it. The token guard sits on the `/ingest` path ahead of the capability, so an unauthenticated caller gets `401` whether or not this deployment hosts a processor; `501` is what an authenticated one gets from a server hosting none.
+
+## One database, two users
+
+Pass a handle rather than a URL when this process also folds into that database:
+
+```ts
+import {createNodeDB, startServer} from '@etherfold/platform-nodejs';
+
+const db = createNodeDB('file:./etherfold.db');
+// ... build a store and a processor on `db`, then:
+const running = await startServer({db, port: 2000, getIngestion: () => ingestion, getCursorReport: () => report});
+```
+
+The server then reads what the store just wrote, because it is the same connection: two handles onto one URL are two views of it, and against `:memory:` they are not even the same database. A handle you supplied is yours to close -- `running.close()` stops listening and leaves the database alone, so shutting the server down never takes a store's connection with it.
 
 **`autoSetup` defaults ON here and is deliberately absent on the Worker host.** Node is the single-operator case: one process, owning one database file, where making a user POST to an admin route before the server is usable is ceremony with no safety payoff. On Workers there are many instances against one D1, so migration stays an operator action rather than something several isolates race to do.
 
-This host passes no `getIngestion`, so the deployment it starts SERVES a database rather than folding into one: `/status` and `/admin/setup` answer, and ingestion answers `501`. A deployment that receives pushes from a log-fetcher builds its own app with `createServer` and supplies one.
+**The two capabilities are carried through untouched, and this host builds neither.** `getIngestion` (the stream-builder that receives pushed batches) and `getCursorReport` (how far the pipeline has got, reported verbatim on `/status`) can only be built by the process that owns a processor and a store, so they arrive here in the server's own shape and are handed on unchanged. Supply neither and the deployment SERVES a database rather than folding into one, which is what `etherfold serve` is. What a reporter owes the server -- a small, JSON-serialisable summary, never the store's raw serialized cursor -- is stated on `ServerOptions.getCursorReport` in [`@etherfold/server`](../../packages/server).
 
 ## Related
 
