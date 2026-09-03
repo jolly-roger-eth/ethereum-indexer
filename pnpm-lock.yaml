@@ -216,6 +216,9 @@ importers:
         specifier: ^0.0.7
         version: 0.0.7
     devDependencies:
+      '@etherfold/server':
+        specifier: workspace:*
+        version: link:../server
       '@etherfold/state-store':
         specifier: workspace:*
         version: link:../state-store
@@ -744,15 +747,9 @@ importers:
       '@etherfold/fetcher-host':
         specifier: workspace:*
         version: link:../../packages/fetcher-host
-      ldenv:
-        specifier: ^0.5.0
-        version: 0.5.0
       named-logs:
         specifier: ^0.4.1
         version: 0.4.1
-      named-logs-console:
-        specifier: ^0.5.1
-        version: 0.5.1
     devDependencies:
       '@etherfold/processor-sqlite':
         specifier: workspace:*
