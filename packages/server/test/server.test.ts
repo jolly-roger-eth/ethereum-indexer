@@ -2,13 +2,13 @@ import {describe, it, expect, beforeEach} from 'vitest';
 import {createClient} from '@libsql/client';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import type {RemoteSQL} from 'remote-sql';
-import {createServer, SCHEMA_VERSION} from '../src/index.js';
+import {createServer, SCHEMA_VERSION, type CursorReporter} from '../src/index.js';
 import {clearLastError} from '../src/api/status.js';
 
 type TestEnv = {DEV?: string};
 
-function serverOn(db: RemoteSQL) {
-	return createServer<TestEnv>({getDB: () => db, getEnv: () => ({DEV: 'true'})});
+function serverOn(db: RemoteSQL, getCursorReport?: CursorReporter<TestEnv>) {
+	return createServer<TestEnv>({getDB: () => db, getEnv: () => ({DEV: 'true'}), getCursorReport});
 }
 
 function freshDB(): RemoteSQL {
@@ -93,6 +93,114 @@ describe('the server runs with no platform adapter', () => {
 
 		current = b;
 		expect((await (await app.request('/status')).json()).schema.applied).toBe(false);
+	});
+});
+
+describe('/status reports the cursor a host injects, and nothing when none is', () => {
+	beforeEach(() => clearLastError());
+
+	async function migratedServer(getCursorReport?: CursorReporter<TestEnv>) {
+		const app = serverOn(freshDB(), getCursorReport);
+		await app.request('/admin/setup', {method: 'POST'});
+		return app;
+	}
+
+	it('reports what the reporter returned, verbatim and inside an object', async () => {
+		const report = {lastToBlock: 4242, latestBlock: 4250, unconfirmedBlocks: 3};
+		const app = await migratedServer(() => report);
+
+		const res = await app.request('/status');
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.cursor).toEqual({reported: true, value: report});
+		expect(body.healthy).toBe(true);
+	});
+
+	it('passes a nested report through untouched, because the server does not parse it', async () => {
+		// deliberately a shape this package knows nothing about: only the processor
+		// knows what a cursor means (ADR-0027), so the server may not normalise it
+		const report = {
+			generations: [{id: 'a', lastToBlock: 10, context: {source: {chainId: '1'}}}],
+			nested: {deep: [1, 'two', true, null]},
+		};
+		const app = await migratedServer(() => report);
+
+		const body = await (await app.request('/status')).json();
+		expect(body.cursor.value).toEqual(report);
+	});
+
+	it('awaits a reporter that reads asynchronously, which is what reading a store is', async () => {
+		const app = await migratedServer(async () => ({lastToBlock: 7}));
+
+		const body = await (await app.request('/status')).json();
+		expect(body.cursor).toEqual({reported: true, value: {lastToBlock: 7}});
+	});
+
+	it('invents no cursor field on a host that injected no reporter', async () => {
+		const app = await migratedServer();
+
+		const res = await app.request('/status');
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect('cursor' in body).toBe(false);
+		// and every other status assertion is unchanged by the option existing
+		expect(body).toMatchObject({healthy: true, database: {reachable: true}, schema: {applied: true}});
+	});
+
+	it('degrades to absent-with-a-reason when the reporter throws, without failing the route', async () => {
+		const app = await migratedServer(() => {
+			throw new Error('the cursor table is locked');
+		});
+
+		const res = await app.request('/status');
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.healthy).toBe(true); // a broken reporter is not a broken server
+		expect(body.cursor.reported).toBe(false);
+		expect(body.cursor.reason).toContain('the cursor table is locked');
+	});
+
+	it('degrades the same way when the reporter rejects', async () => {
+		const app = await migratedServer(async () => {
+			throw new Error('database unreachable from the reporter');
+		});
+
+		const body = await (await app.request('/status')).json();
+		expect(body.cursor.reported).toBe(false);
+		expect(body.cursor.reason).toContain('database unreachable from the reporter');
+	});
+
+	it('degrades when the reporter says it has nothing to report', async () => {
+		const app = await migratedServer(() => undefined);
+
+		const res = await app.request('/status');
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.cursor.reported).toBe(false);
+		expect(typeof body.cursor.reason).toBe('string');
+	});
+
+	it('degrades on a report that cannot be serialised, rather than taking the page down', async () => {
+		// a bigint does not compile against the option's type, and a host can still
+		// build one at runtime; `/status` is the page an operator watches while
+		// something is wrong, so it must survive that
+		const app = await migratedServer(() => ({lastToBlock: 10n}) as never);
+
+		const res = await app.request('/status');
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.healthy).toBe(true);
+		expect(body.cursor.reported).toBe(false);
+	});
+
+	it('does not flip healthy or the status code on an unhealthy server either', async () => {
+		const app = serverOn(freshDB(), () => ({lastToBlock: 1}));
+
+		const res = await app.request('/status');
+		expect(res.status).toBe(503); // unmigrated, exactly as before
+		const body = await res.json();
+		expect(body.healthy).toBe(false);
+		expect(body.cursor).toEqual({reported: true, value: {lastToBlock: 1}});
 	});
 });
 

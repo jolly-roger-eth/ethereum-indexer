@@ -5,6 +5,7 @@ import type {Env} from '../env.js';
 import {setup} from '../setup.js';
 import {applySchema, readSchemaState, SCHEMA_VERSION} from '../schema.js';
 import {readReorgCounters, type ReorgCounters} from '../reorgs.js';
+import {reportCursor, type StatusCursor} from '../cursor.js';
 
 const logger = logs('@etherfold/server');
 
@@ -67,11 +68,25 @@ export function getStatusAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			const reorgs: ReorgCounters | undefined =
 				reachable && schema.applied ? await readReorgCounters(db).catch(() => undefined) : undefined;
 
+			// The field that makes a running deployment OBSERVABLE, and the only one
+			// this route does not compute: how far the pipeline has got is a question
+			// only the process that OWNS the store can answer, and what the answer MEANS
+			// is the processor's (ADR-0027). So it arrives as an injected reporter and is
+			// reported VERBATIM inside an envelope (ADR-0047).
+			//
+			// Asked even when the database is unreachable: a reporter is the HOST's, not
+			// this route's `db`, and it degrades on its own. Absent entirely -- not
+			// `null`, not an empty object -- on a host that injected none, because
+			// inventing a field would be inventing a claim.
+			const reporter = options.getCursorReport;
+			const cursor: StatusCursor | undefined = reporter ? await reportCursor(() => reporter(c as never)) : undefined;
+
 			return c.json(
 				{
 					healthy,
 					database: {reachable, error: reachabilityError},
 					reorgs,
+					cursor,
 					schema: schema.applied
 						? {applied: true, version: schema.version, expected: schema.expected, matches: schema.matches}
 						: {applied: false, expected: SCHEMA_VERSION, reason: schema.reason},

@@ -20,16 +20,22 @@ export const app = createServer<MyEnv>({
 	getEnv: (c) => c.env,
 	// OPTIONAL: the stream-builder this deployment folds with, if it hosts one
 	getIngestion: (c) => myStreamBuilder(c),
+	// OPTIONAL: where this deployment's pipeline has got to, if it owns a store
+	getCursorReport: async (c) => ({lastToBlock: await myStore.howFar()}),
 });
 ```
 
 `getIngestion` is optional because an indexer-server is useful before it ingests anything: `/status` and `/admin/setup` answer on a server with no processor at all. When it is absent the ingestion routes answer `501`, which says "this server does not do that" rather than pretending the route is missing.
 
+`getCursorReport` is optional for the same kind of reason: only the process that OWNS the store can read a cursor, and this package has no store dependency. A host with none (the Cloudflare Worker host is one) injects no reporter and `/status` carries no `cursor` field, rather than an invented one.
+
+**What a reporter owes the server: a SMALL, JSON-serialisable summary, and never the store's raw serialized cursor.** That value is a serialized `LastSync` carrying an unconfirmed window of DECODED EVENTS, so handing it over whole would put an unbounded blob on the one page an operator refreshes while something is wrong. The constraint lives on the seam because `/status` reports what the reporter returns VERBATIM: the server does not parse it (the cursor is opaque behind the storage seam, ADR-0027, and only the processor knows what one means), so it cannot bound it afterwards either.
+
 ## The routes
 
 | route | |
 | --- | --- |
-| `GET /status` | health, database reachability, the fixed-schema version against the one this build expects, the reorg counters and the last error this PROCESS saw. `503` when the database is unreachable or the schema is not the expected version |
+| `GET /status` | health, database reachability, the fixed-schema version against the one this build expects, the reorg counters, the injected cursor report and the last error this PROCESS saw. `503` when the database is unreachable or the schema is not the expected version |
 | `POST /admin/setup` | apply the fixed-table schema |
 | `POST /ingest` | a `WireBatch` from a log-fetcher (ADR-0004) |
 | `POST /ingest/expected-from-block` | where the next batch must start |
@@ -43,6 +49,15 @@ export const app = createServer<MyEnv>({
 **`/ingest/expected-from-block` is a POST for a question**, deliberately. Answering it can WRITE, because reading the cursor reconciles one belonging to a different source, config or processor version. A `GET` that writes is a trap whatever its justification, so the method matches what it does.
 
 `/status` reports reverts concluded from ABSENCE separately from those concluded from a hash CONTRADICTION, because absence is an inference and a rising rate of it means truncation or misconfiguration rather than chain activity. It does not make the server unhealthy: it is a signal to investigate, not a fault.
+
+**`/status` is the WHOLE query surface for now, deliberately, and the `cursor` field is the whole observability story.** A richer query layer (GraphQL over entity declarations) is decided in principle and is explicitly NOT in this milestone, so a running deployment is watched here or nowhere. The field is an OBJECT and never a bare value (ADR-0047):
+
+```json
+{"cursor": {"reported": true, "value": {"lastToBlock": 4242}}}
+{"cursor": {"reported": false, "reason": "the cursor table is locked"}}
+```
+
+The envelope is the server's and the `value` is the host's, untouched. It is an object so that the GENERATION dimension can grow INSIDE it later (an indexer already holds several generations and reports progress per generation; the server does not hold them yet, so it reports one cursor and a later host adds a key beside `value`), and so that a broken reporter is distinguishable from a host that simply has no store: **a reporter that throws, rejects, reports nothing or returns something unserialisable degrades to `reported: false` with a reason** and never fails the request or changes `healthy`, exactly as the reorg counters degrade.
 
 ## Typed client
 
