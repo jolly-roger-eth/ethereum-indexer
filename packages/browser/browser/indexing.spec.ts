@@ -129,6 +129,9 @@ test('a redeploy at the same address re-indexes, and never shows the old contrac
 
 		// the ABI moved, so the source hash moved, so the state went
 		expect(run.results.stateDiscarded).toBe(true);
+		// and the verdict that decided it crossed out of the page intact, saying which
+		// half died rather than only that something did
+		expect((run.results.sourceInvalidation as {state: {valid: boolean}}).state.valid).toBe(false);
 		expect(run.results.reindexedFrom).toBe(run.results.startBlock);
 		expect(run.results.after).toEqual(EXPECTED_A);
 

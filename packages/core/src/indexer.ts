@@ -34,6 +34,7 @@ import {
 	sourceInvalidationOf,
 	stateMatches,
 	streamMatches,
+	type SourceInvalidation,
 	wait,
 } from './internal/engine/utils.js';
 import {sourceHashesOf} from './internal/engine/eventRanges.js';
@@ -116,6 +117,32 @@ export type ReconfigureOutcome = {
 	 * `createIndexerState`'s `state` store for what that looks like.
 	 */
 	stateDiscarded: boolean;
+	/**
+	 * WHAT THE SOURCE COMPARISON DECIDED, for the caller that needs more than one
+	 * bit -- and `undefined` when this reconfigure asked no source question.
+	 *
+	 * `stateDiscarded` is that verdict collapsed into "is the fold gone", which is
+	 * all the caller who only re-seeds a store needs. It cannot say which HALF
+	 * died or FROM WHICH BLOCK, and those are what a caller building a new
+	 * generation beside the live one decides on: an invalid STREAM half means the
+	 * fetch filter moved and the logs have to come from the node again, while a
+	 * stream that stands with an invalid STATE half is a new fold over logs
+	 * already on disk. `invalidFromBlock` is the point the new one starts from.
+	 *
+	 * Present on `updateIndexer`, which is the verb that moves the source or the
+	 * stream config and therefore the only one that ASKS. Absent on
+	 * `updateProcessor`, which moves neither, and on `reset`, which is a discard by
+	 * fiat that also CLEARS the stream -- reporting "both halves valid" there would
+	 * be true of the source and read as "the stream stands" about a stream that has
+	 * just been deleted.
+	 *
+	 * REPORTED rather than re-derived, exactly like `stateDiscarded`: a caller
+	 * hashing its own source to ask the same question gets a second answer that can
+	 * disagree with the one the core acted on. And it is the VERDICT, never digest
+	 * inequality -- `streamDigestOf` moves when an entry is appended ABOVE the
+	 * cursor, which ADR-0034 makes free.
+	 */
+	sourceInvalidation?: SourceInvalidation;
 };
 
 // PROPOSAL FOR STATE ANCHORS
@@ -506,8 +533,9 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		// A stream that is no longer covered is dealt with where it is read, in
 		// `promiseToLoad`, so a state discard whose stream SURVIVED rebuilds from the
 		// cache instead of going back to the node. Today the only action is still a
-		// full discard, and the block each half names is carried no further than the
-		// log line below. That is deliberate: see `InvalidationVerdict`.
+		// full discard -- but the verdict is no longer thrown away with it: it rides
+		// out on `ReconfigureOutcome.sourceInvalidation`, where a caller that wants the
+		// other half or the block can read them. See `InvalidationVerdict`.
 		const resetNeeded = !invalidation.state.valid;
 
 		// TODO remove, this is the responsibility of the developer to ensure it pass correct data when indexer context changes
@@ -566,7 +594,7 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 			}
 			this.reenableProcessing();
 		}
-		return {stateDiscarded: resetNeeded};
+		return {stateDiscarded: resetNeeded, sourceInvalidation: invalidation};
 	}
 
 	async updateProcessor(

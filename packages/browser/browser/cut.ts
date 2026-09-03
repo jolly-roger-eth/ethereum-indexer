@@ -228,6 +228,12 @@ async function hotContractCase(params: Params, timings: Timing[]): Promise<Recor
 	return {
 		before,
 		stateDiscarded: outcome.stateDiscarded,
+		// The VERDICT the core reached, carried out of the page as it was reported.
+		// `stateDiscarded` says the fold went; this says WHICH halves and FROM WHICH
+		// block, which is what a caller that wants to do something other than discard
+		// has to read -- so it is worth proving it survives a real engine and the
+		// harness boundary, not only a node test.
+		sourceInvalidation: outcome.sourceInvalidation,
 		after,
 		reindexedFrom,
 		startBlock: START_BLOCK,

@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import {describe, expect, it} from 'vitest';
+import {resolveStreamConfig, streamDigestOf, type SourceInvalidation} from '@etherfold/core';
 import {createBrowserStateStore} from '../src/index.js';
 import {
 	APPENDED_ABOVE_BLOCK,
@@ -79,6 +80,47 @@ describe('an entry appended ABOVE the cursor', () => {
 		indexer.dispose();
 	});
 
+	/**
+	 * THE REGRESSION GUARD, and the reason the verdict is published as a verdict.
+	 *
+	 * A stream is IDENTIFIED by the digest of its filter, and appending an entry
+	 * adds a `streamHash` to that filter set -- so the digest MOVES here, on the one
+	 * reconfigure ADR-0034 made free. Anything that read digest inequality as "this
+	 * reconfigure invalidates something" would re-fetch the whole history for an
+	 * upgrade that costs nothing today.
+	 *
+	 * The two answer different questions and both are needed: the VERDICT decides
+	 * WHETHER anything is invalid, the DIGEST decides WHICH stream a result belongs
+	 * to. Asserted across the package boundary, on the published type, because that
+	 * is where the caller who could get this wrong lives.
+	 */
+	it('is decided by the VERDICT and not by the stream digest, which moves while the append stays free', async () => {
+		const {indexer, chain} = await indexedWithRanges();
+		const rangesBefore = chain.ranges.length;
+
+		const streamConfig = resolveStreamConfig({finality: FINALITY});
+		expect(streamDigestOf(SOURCE_RANGED_APPENDED_ABOVE as never, streamConfig)).not.toBe(
+			streamDigestOf(SOURCE_RANGED, streamConfig),
+		);
+
+		const outcome = await indexer.updateIndexer({source: SOURCE_RANGED_APPENDED_ABOVE as never});
+		await indexToTip(indexer);
+
+		// the digest moved and the verdict did not: nothing is invalid, on either half
+		const verdict: SourceInvalidation | undefined = outcome.sourceInvalidation;
+		expect(verdict).toEqual({state: {valid: true}, stream: {valid: true}});
+
+		// and the pair that proves it COST nothing: nothing discarded, nothing
+		// re-fetched below the cursor
+		expect(outcome.stateDiscarded).toBe(false);
+		for (const range of chain.ranges.slice(rangesBefore)) {
+			expect(range.from).toBeGreaterThan(START_BLOCK);
+		}
+		expect(await readState(indexer.state.$state)).toEqual(EXPECTED_A);
+
+		indexer.dispose();
+	});
+
 	it('survives a RELOAD once the cursor has moved past it, because the kept state adopted the new ranges', async () => {
 		// The state SURVIVED a source it was not computed under, so its persisted
 		// context has to say so. Left carrying the old list, the very same append is
@@ -146,6 +188,13 @@ describe('an entry appended AT or BELOW the cursor', () => {
 		await indexToTip(indexer);
 
 		expect(outcome.stateDiscarded).toBe(true);
+		// and the published verdict says WHICH half and FROM WHERE, which is the half
+		// `stateDiscarded` cannot carry: the filter grew at a block already indexed, so
+		// the stream dies with the state rather than being replayed
+		expect(outcome.sourceInvalidation).toEqual({
+			state: {valid: false, invalidFromBlock: APPENDED_BELOW_BLOCK, reason: 'entry-added'},
+			stream: {valid: false, invalidFromBlock: APPENDED_BELOW_BLOCK, reason: 'entry-added'},
+		});
 		expect(chain.ranges.slice(rangesBefore)[0].from).toBe(START_BLOCK);
 		expect(APPENDED_BELOW_BLOCK).toBeLessThan(chain.ranges[chain.ranges.length - 1].to);
 		// and the rebuild lands on the same rows, which is exactly why the ranges

@@ -9,6 +9,29 @@ export type {RetryPolicy} from './internal/utils/retry.js';
 export * from './utils/index.js';
 export type {ReorgCause, ReorgDetection} from './internal/engine/utils.js';
 /**
+ * The INVALIDATION VERDICT, published because a caller outside this package has
+ * to act on it.
+ *
+ * `sourceInvalidationOf` answers, for a reconfigure, whether the stored data
+ * still describes the source being run now -- separately for the raw log STREAM
+ * and for the STATE folded out of it -- and names the block each half stopped
+ * being valid FROM. That answer used to reach a log line and nothing else, so
+ * every consumer got the one bit `ReconfigureOutcome.stateDiscarded` collapses
+ * it into, and one bit cannot say which half died or from where.
+ *
+ * The TYPES are exported and the FUNCTION deliberately is not. The verdict is
+ * REPORTED, on `ReconfigureOutcome`, for the same reason the discard is: a
+ * caller re-deriving the rule from its own hashes gets a second, divergent
+ * answer, and it fails in exactly the silent direction the report exists to
+ * close.
+ *
+ * Do not confuse this with `streamDigestOf`. The verdict decides WHETHER
+ * anything is invalid; the stream digest decides WHICH stream a result belongs
+ * to. An entry appended above the cursor MOVES the digest and is still free, per
+ * ADR-0034, so digest inequality is not a verdict and never stands in for one.
+ */
+export type {InvalidationReason, InvalidationVerdict, SourceInvalidation} from './internal/engine/utils.js';
+/**
  * Exported because a HOST has to size things against the finality this stream
  * actually runs with, and there is exactly one implementation of that default
  * (see the function). A host that re-stated `finality` to configure, say, a
