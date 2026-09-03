@@ -2,7 +2,7 @@ import type {Abi} from 'abitype';
 import type {EIP1193ProviderWithoutEvents} from 'eip-1193';
 import {logs} from 'named-logs';
 
-import {IndexerGeneration, type LoadingState, type ReconfigureOutcome} from './indexer.js';
+import {IndexerGeneration, type LoadingState, type PauseState, type ReconfigureOutcome} from './indexer.js';
 import {
 	sameGeneration,
 	type GenerationId,
@@ -62,9 +62,15 @@ const namedLogger = logs('@etherfold/core');
  * was thrown away is neither adopted nor produced, so without this a subscriber
  * holding the state it lost is told by nothing.
  *
+ * 5. **A generation PAUSES by capping and draining**, and the container is where
+ *    one is named: `pause` / `resume` take the generation, because pausing is a
+ *    fact about one generation and not about the indexer. It adds no mechanism of
+ *    its own -- the cap lives on the engine and the drain is the existing
+ *    `getFromBlock` -- and `HeldGeneration.pauseState` is what a consumer watches
+ *    for the DRAINING period to end.
+ *
  * It does NOT decide WHEN the pointer moves (the promotion policy is
- * `the-promotion-policy-moves-the-canonical-pointer`), it does not pause a
- * generation (`a-generation-pauses-by-cap-and-drain`), and it does not yet turn a
+ * `the-promotion-policy-moves-the-canonical-pointer`), and it does not yet turn a
  * reconfigure into a new generation: `updateIndexer` and `updateProcessor` still
  * do to the canonical generation exactly what they did before.
  * ------------------------------------------------------------------------- */
@@ -209,6 +215,16 @@ export type HeldGeneration<ABI extends Abi, ProcessResultType = void> = {
 	 * from a fetch count.
 	 */
 	readonly follows: boolean;
+	/**
+	 * WHERE A PAUSE HAS GOT TO: `running`, `draining`, or `drained`.
+	 *
+	 * Read afresh from the engine on every access, because a drain completes
+	 * between two reads and a snapshot taken when this object was built would say
+	 * `draining` forever. It is what a consumer watches to know that a pause -- which
+	 * is NOT instant, since it takes up to `finality` blocks of continued light
+	 * polling -- has actually completed.
+	 */
+	readonly pauseState: PauseState;
 };
 
 /**
@@ -243,6 +259,36 @@ export class CanonicalGenerationNotHeldError extends Error {
 				`Supply the spec that builds the canonical generation, or move the canonical pointer to one of the held ` +
 				`generations before opening -- this is never fixed by promoting one of them here, because which ` +
 				`generation answers reads is not a decision an open may take on its own.`,
+		);
+	}
+}
+
+/**
+ * PAUSING A FOLLOWER, which is not a thing a cap can express.
+ *
+ * A pause CAPS the block a generation fetches up to, and a **follower** fetches
+ * nothing at all: it advances exactly as far as the STREAM it folds and holds no
+ * `toBlock` of its own. So the cap would sit there governing a verb that never
+ * runs, and `pauseState` would report a drain that is not happening -- a pause
+ * that lies, which is worse than a refusal, because the whole point of draining
+ * is knowing that nothing a reorg can invalidate is still being answered.
+ *
+ * What stops a follower is stopping its STREAM, which is the writer's business
+ * (ADR-0044: a follower's whole claim is that its state is a function of the
+ * stream, so the writer's pause is felt by everything following it), or deleting
+ * it. Pausing a follower ON ITS OWN TERMS needs the follow path to keep replaying
+ * its window while it drains, and that is the follower's landable rather than a
+ * cap.
+ */
+export class CannotPauseFollowerError extends Error {
+	readonly name = 'CannotPauseFollowerError';
+
+	constructor(readonly id: GenerationId) {
+		super(
+			`the generation {stream: ${id.stream}, processor: ${id.processor}} FOLLOWS a stream another generation ` +
+				`writes, so it fetches nothing and there is no \`toBlock\` of its own to cap. Pausing it would report a ` +
+				`drain that never runs. A follower advances exactly as far as its stream: stop the stream's WRITER, or ` +
+				`delete this generation.`,
 		);
 	}
 }
@@ -578,13 +624,39 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	 * was canonical when it was made, and neither read is stale.
 	 */
 	async promote(id: GenerationId): Promise<GenerationRecord> {
-		const entry = this.held.find((held) => sameGeneration(held.record, id));
-		if (!entry) {
-			throw new UnheldGenerationError({stream: id.stream, processor: id.processor});
-		}
+		const entry = this.require(id);
 		const record = await this.registry.moveCanonicalTo(id);
 		this.applyAtNotification(entry);
 		return record;
+	}
+
+	/**
+	 * PAUSE ONE GENERATION: it stops indexing without being deleted, by CAPPING
+	 * and DRAINING.
+	 *
+	 * The mechanism is entirely the engine's (`IndexerGeneration.pause`), and there
+	 * is deliberately none of it here: this names WHICH generation and refuses the
+	 * two ids that have no answer. A paused generation goes on being driven by
+	 * `indexMore` -- that is what the drain IS -- and goes on answering reads if it
+	 * is the canonical one; what it stops doing is moving forward.
+	 *
+	 * IN MEMORY, and not recorded in the registry: the registry holds what a
+	 * generation IS, and a pause is what one is DOING. So a reload comes back
+	 * running, which costs one drain to re-pause and never costs correctness.
+	 *
+	 * SYNCHRONOUS, unlike `promote`, precisely because nothing durable is written.
+	 */
+	pause(id: GenerationId): void {
+		const entry = this.require(id);
+		if (entry.follows) {
+			throw new CannotPauseFollowerError({stream: id.stream, processor: id.processor});
+		}
+		entry.generation.pause();
+	}
+
+	/** RESUME one generation: remove the cap. The next round asks the head again. */
+	resume(id: GenerationId): void {
+		this.require(id).generation.resume();
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -752,7 +824,21 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			generation: entry.generation,
 			processor: entry.processor,
 			follows: entry.follows,
+			// a GETTER, so a caller holding this object sees the drain complete rather
+			// than the value it had when the object was built
+			get pauseState(): PauseState {
+				return entry.generation.pauseState;
+			},
 		};
+	}
+
+	/** The held generation this id names, or the refusal that says nothing here can answer for it. */
+	protected require(id: GenerationId): HeldEntry<ABI, ProcessResultType> {
+		const entry = this.held.find((held) => sameGeneration(held.record, id));
+		if (!entry) {
+			throw new UnheldGenerationError({stream: id.stream, processor: id.processor});
+		}
+		return entry;
 	}
 
 	/**
