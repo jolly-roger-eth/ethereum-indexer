@@ -237,9 +237,13 @@ describe('the identity the keeper addresses by is the INDEXER\u2019s', () => {
 		const chain = fakeChain();
 		const store = await createBrowserStateStore(processor.entities, {databaseName: freshName()});
 		const streamConfig = {finality: FINALITY, alwaysFetchTimestamps: true};
-		const indexer = createIndexerState<TestABI, EntityStateView>(entityProcessorOver(store, processor), {
-			keepStream: keepStreamOnIndexedDB<TestABI>(tag) as never,
-		});
+		const indexer = createIndexerState<TestABI, EntityStateView>(
+			{
+				createState: () => store,
+				createProcessor: (state) => entityProcessorOver(state, processor),
+			},
+			{keepStream: keepStreamOnIndexedDB<TestABI>(tag) as never},
+		);
 
 		await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: streamConfig}});
 		await indexToTip(indexer);
@@ -264,9 +268,13 @@ describe('the identity the keeper addresses by is the INDEXER\u2019s', () => {
 		const tag = freshName();
 		const chain = fakeChain();
 		const store = await createBrowserStateStore(processor.entities, {databaseName: freshName()});
-		const indexer = createIndexerState<TestABI, EntityStateView>(entityProcessorOver(store, processor), {
-			keepStream: keepStreamOnIndexedDB<TestABI>(tag) as never,
-		});
+		const indexer = createIndexerState<TestABI, EntityStateView>(
+			{
+				createState: () => store,
+				createProcessor: (state) => entityProcessorOver(state, processor),
+			},
+			{keepStream: keepStreamOnIndexedDB<TestABI>(tag) as never},
+		);
 
 		await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
 		await indexToTip(indexer);

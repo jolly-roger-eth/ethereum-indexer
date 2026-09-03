@@ -119,7 +119,7 @@ export type TxInclusionVerdict = {
  * @param queries the transactions to ask about, which is the app's own pending
  * set and therefore small
  * @param finality the finality depth the indexer is configured with
- * (`EthereumIndexer.finalityDepth`), which is what bounds the window
+ * (`IndexerGeneration.finalityDepth`), which is what bounds the window
  * @returns one verdict per query, keyed by the `txHash` string as given
  */
 export function checkTxInclusion<ABI extends Abi>(

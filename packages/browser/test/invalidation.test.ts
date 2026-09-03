@@ -152,7 +152,10 @@ async function namesIn(view: EntityStateView): Promise<NamesState> {
 async function indexedWithKeptStream(tag = freshName(), chain = fakeChain()) {
 	const store = await createBrowserStateStore(namesProcessor('1.0.0').entities, {databaseName: tag});
 	const indexer = createIndexerState<TestABI, EntityStateView>(
-		new EntityEventProcessor<TestABI>(store, namesProcessor('1.0.0')),
+		{
+			createState: () => store,
+			createProcessor: (state) => new EntityEventProcessor<TestABI>(state, namesProcessor('1.0.0')),
+		},
 		{keepStream: keepStreamOnIndexedDB(tag) as never},
 	);
 	await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
@@ -248,7 +251,10 @@ describe('a context persisted by the SHIPPED code, read by this one', () => {
 		const rangesBefore = chain.ranges.length;
 		const reopened = await createBrowserStateStore(namesProcessor('1.0.0').entities, {databaseName: tag});
 		const reloaded = createIndexerState<TestABI, EntityStateView>(
-			new EntityEventProcessor<TestABI>(reopened, namesProcessor('1.0.0')),
+			{
+				createState: () => reopened,
+				createProcessor: (state) => new EntityEventProcessor<TestABI>(state, namesProcessor('1.0.0')),
+			},
 			{keepStream: keepStreamOnIndexedDB(tag) as never},
 		);
 		await reloaded.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});

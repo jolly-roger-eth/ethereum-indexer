@@ -4,33 +4,44 @@ import type {Abi} from '@etherfold/core';
 import {EntityEventProcessor, type EntityStateView} from '@etherfold/processor-entities';
 import {MemoryStateStore, type StateStore} from '@etherfold/state-store';
 import {createBrowserStateStore, createIndexerState} from '../src/index.js';
-import {processor as entityProcessor, type TestABI} from '../browser/workload.js';
+import {processor as entityProcessor, fakeChain, FINALITY, SOURCE, type TestABI} from '../browser/workload.js';
 
 /**
- * ONE KIND, ONE CALL SHAPE: the hook takes the processor itself.
+ * WHAT THE HOOK ACCEPTS AND WHAT IT REFUSES. Every call below is a SUBJECT, not
+ * a caller.
  *
  * It used to take a union -- a `{kind, processor}` tag, or a free-form
  * `EventProcessorWithInitialState` bare, which meant `'js-object'`. That second
  * authoring path is deleted (ADR-0037), so the tag discriminates nothing and the
- * argument is the processor.
+ * argument is either the processor or the FACTORIES that build a generation.
  *
  * **`pnpm typecheck` is what runs half of this file.** Each `@ts-expect-error`
  * FAILS the typecheck if the line it guards starts compiling, which is the only
  * way to assert that something is NOT accepted.
+ *
+ * **Where the retired one-generation shape still appears**, it appears as a
+ * REFUSAL fixture below and nowhere else. `every-caller-moves-onto-the-generation-container`
+ * moved every caller onto the factories; the assertion that the old shape is
+ * still ACCEPTED lives in `generationContainer.test.ts`, in one place, and
+ * `the-old-indexer-shape-is-deleted` removes it with the shape.
  */
 
 type State = {count: number};
 
 describe('the shape createIndexerState takes', () => {
-	it('takes a processor, and seeds its store from the processor READ HANDLE', () => {
-		const store = new MemoryStateStore(entityProcessor.entities);
-		const indexer = createIndexerState<TestABI, EntityStateView>(
-			new EntityEventProcessor<TestABI>(store, entityProcessor),
-		);
+	it('takes the two FACTORIES a generation is built from, and seeds its store from the processor READ HANDLE', async () => {
+		const indexer = createIndexerState<TestABI, EntityStateView>({
+			createState: () => new MemoryStateStore(entityProcessor.entities),
+			createProcessor: (store) => new EntityEventProcessor<TestABI>(store, entityProcessor),
+		});
+		// the generation is BUILT at init -- state first, then the fold over it --
+		// which is why the handle is asked for afterwards and not before
+		await indexer.init({provider: fakeChain().provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
 
 		// there is no initial state to CREATE: the state lives in the store and is
 		// read back through a handle that exists the moment the processor does
 		expect(typeof indexer.state.$state.getCurrent).toBe('function');
+		indexer.dispose();
 	});
 
 	it('does not compile the shapes the retired path used', () => {

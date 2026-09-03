@@ -1,7 +1,7 @@
 import {createClient} from '@libsql/client';
 import {
 	createHttpIngestion,
-	EthereumIndexer,
+	IndexerGeneration,
 	IngestionRefusedError,
 	LogFetcher,
 	StreamBuilder,
@@ -418,7 +418,7 @@ describe('the split deployment lands where a single process lands', () => {
 		const singleChain = fakeChain();
 		const singleDb: RemoteSQL = new RemoteLibSQL(createClient({url: ':memory:'}));
 		const single = new VersionedStateEventProcessor<TestABI>(singleDb, entityProcessor);
-		const indexer = new EthereumIndexer<TestABI, unknown>(singleChain.provider, single, SOURCE, {
+		const indexer = new IndexerGeneration<TestABI, unknown>(singleChain.provider, single, SOURCE, {
 			stream: {finality: FINALITY},
 		});
 		await indexer.load();

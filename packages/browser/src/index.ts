@@ -16,7 +16,11 @@ export type {
 	AllContractData,
 	ContractData,
 	IndexingSource,
-	EthereumIndexer,
+	// ONE generation: one stream, one processor, one state. Re-exported under the
+	// name the class actually has -- `EthereumIndexer` is the alias the contract
+	// batch removes, and a re-export left on it would have to be renamed then
+	// anyway, from a package that never meant the old word.
+	IndexerGeneration,
 	EventBlock,
 	EventProcessor,
 	StreamFetcher,

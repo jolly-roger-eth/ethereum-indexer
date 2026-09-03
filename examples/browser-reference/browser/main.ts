@@ -93,14 +93,28 @@ async function start() {
 	// IndexedDB is the browser default (ADR-0024): versioned rows, and the sync
 	// cursor written in the same transaction as the block it describes, so a tab
 	// that is closed mid-index reopens consistent.
-	const store = await createBrowserStateStore(tokenProcessor.entities, {
-		databaseName: `reference-${CHAIN.id}-${CONTRACT}`,
-	});
+	//
+	// It is a FACTORY and not a value, because an indexer holds any number of
+	// GENERATIONS -- a stream plus a fold over it -- one of which is canonical and
+	// answers every read, and each folds into its own state. The hook calls this
+	// once per generation.
+	const createState = () =>
+		createBrowserStateStore(tokenProcessor.entities, {
+			databaseName: `reference-${CHAIN.id}-${CONTRACT}`,
+		});
+
+	// The store the CANONICAL generation was built over, kept because the
+	// live-reload below rebuilds a processor over the SAME store: a hot reload
+	// replaces the author's object, not the tab's IndexedDB connection.
+	let store!: Awaited<ReturnType<typeof createState>>;
 
 	// =====================================================================
 	// 3. THE HOOK, AND THE TWO SUBSCRIPTIONS
 	// =====================================================================
-	const indexer = createIndexerState(fromEntityProcessor(tokenProcessor)(store));
+	const indexer = createIndexerState({
+		createState: async () => (store = await createState()),
+		createProcessor: (state) => fromEntityProcessor(tokenProcessor)(state),
+	});
 
 	await indexer.init({
 		provider,

@@ -394,9 +394,13 @@ describe('the state a subscriber is holding, after a discard', () => {
 		const tag = `stream-${counter++}`;
 		const chain = fakeChain();
 		const store = await createBrowserStateStore(processor.entities, {databaseName: freshName()});
-		const indexer = createIndexerState<TestABI, EntityStateView>(entityProcessorOver(store, processor), {
-			keepStream: keepStreamOnIndexedDB(tag) as never,
-		});
+		const indexer = createIndexerState<TestABI, EntityStateView>(
+			{
+				createState: () => store,
+				createProcessor: (state) => entityProcessorOver(state, processor),
+			},
+			{keepStream: keepStreamOnIndexedDB(tag) as never},
+		);
 		await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
 		await indexToTip(indexer);
 		expect((await readState(indexer.state.$state)).transfers).toBe(5);

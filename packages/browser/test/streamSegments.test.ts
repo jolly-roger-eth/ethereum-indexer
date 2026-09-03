@@ -602,7 +602,7 @@ describe('a reorg, replayed', () => {
 	 * store doing exactly its job, and on any path that TOLERATED the double-apply
 	 * the result was silently wrong state derived partly from a dead branch.
 	 *
-	 * The replay now goes through `EthereumIndexer.replay`, which honours the
+	 * The replay now goes through `IndexerGeneration.replay`, which honours the
 	 * verdicts the stream carries instead of recomputing them from a window a
 	 * rebuild does not have. Asserted as an EQUALITY against the live state rather
 	 * than as the absence of a throw, because a no-throw says nothing about which

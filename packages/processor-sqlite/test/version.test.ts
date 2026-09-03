@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {EthereumIndexer, simple_hash, type ProcessorDriftReport} from '@etherfold/core';
+import {IndexerGeneration, simple_hash, type ProcessorDriftReport} from '@etherfold/core';
 import {VersionedStateEventProcessor, type SQLProcessor} from '../src/index.js';
 import {deserializeLastSync, serializeLastSync} from '../src/sync.js';
 import {createTestDB, rows} from './utils/db.js';
@@ -205,14 +205,14 @@ function makeProvider() {
 
 async function loadWith(p: VersionedStateEventProcessor<TestABI>, config: {strictProcessorDrift?: boolean} = {}) {
 	const reports: ProcessorDriftReport[] = [];
-	const indexer = new EthereumIndexer<TestABI, any>(makeProvider(), p, SOURCE, {stream: {finality}, ...config});
+	const indexer = new IndexerGeneration<TestABI, any>(makeProvider(), p, SOURCE, {stream: {finality}, ...config});
 	indexer.onProcessorDrift = (report) => reports.push(report);
 	return {indexer, reports, load: () => indexer.load()};
 }
 
 /** Index one block with `p` through a real indexer, leaving a real cursor in `db`. */
 async function indexOneBlock(p: VersionedStateEventProcessor<TestABI>) {
-	const indexer = new EthereumIndexer<TestABI, any>(makeProvider(), p, SOURCE, {stream: {finality}});
+	const indexer = new IndexerGeneration<TestABI, any>(makeProvider(), p, SOURCE, {stream: {finality}});
 	await indexer.load();
 	await indexer.feed([transfer(100, '0xAAA', {from: '0x0', to: '0xalice', id: 1n})], lastSync({lastToBlock: 100}));
 }

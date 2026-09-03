@@ -1,7 +1,7 @@
 import {createClient} from '@libsql/client';
 import {
 	captureStream,
-	EthereumIndexer,
+	IndexerGeneration,
 	LogFetcher,
 	UnexpectedFromBlockError,
 	WireContextMismatchError,
@@ -39,7 +39,7 @@ import {abi, processor, timestampOf, type TestABI} from './utils/fixtures.js';
 //
 //   single-process  one process does all three. The LOG-FETCHER, the
 //                   STREAM-BUILDER and the processor are the one
-//                   `EthereumIndexer` driving `indexMore()` against a chain.
+//                   `IndexerGeneration` driving `indexMore()` against a chain.
 //                   This is what `etherfold serve` is, and it is the INTENDED
 //                   CLI shape, not a violation.
 //
@@ -328,7 +328,7 @@ const WIRE_CONTEXT: WireBatch['context'] = {
  * routes, a real database) is driven end to end by the fetcher in
  * `packages/server/test/fetcherRoundTrip.test.ts`.
  */
-function ingestionInto(indexer: EthereumIndexer<TestABI, any>, wire: WireBatch[]): IngestionTarget {
+function ingestionInto(indexer: IndexerGeneration<TestABI, any>, wire: WireBatch[]): IngestionTarget {
 	return {
 		async expectedFromBlock() {
 			// the RECEIVER's number, which is the whole of ADR-0004
@@ -385,11 +385,11 @@ function cross(batch: WireBatch): WireBatch {
 /**
  * The indexer-server's ingestion, minus the HTTP.
  *
- * `EthereumIndexer.feed` IS the stream-builder: it takes raw fetched events and
+ * `IndexerGeneration.feed` IS the stream-builder: it takes raw fetched events and
  * a range, derives the retractions itself, and drives the processor. The context
  * is validated first, which is the rule ADR-0004 states for the receiving side.
  */
-async function receive(indexer: EthereumIndexer<TestABI, any>, batch: WireBatch): Promise<void> {
+async function receive(indexer: IndexerGeneration<TestABI, any>, batch: WireBatch): Promise<void> {
 	if (simple_hash(batch.context) !== simple_hash(WIRE_CONTEXT)) {
 		// the core's own refusal type, so a SENDER classifies it the way it would
 		// classify the real receiver's `400`: fatal, and never retried
@@ -513,7 +513,7 @@ const shapes: Shape[] = [
 		async start(backend) {
 			const chain = fakeChain();
 			const {processor: eventProcessor, read} = backend.make();
-			const indexer = new EthereumIndexer<TestABI, any>(chain.provider, eventProcessor, SOURCE, {
+			const indexer = new IndexerGeneration<TestABI, any>(chain.provider, eventProcessor, SOURCE, {
 				stream: STREAM_CONFIG,
 			});
 			return {
@@ -543,7 +543,7 @@ const shapes: Shape[] = [
 			// called, because it starts with an `eth_chainId` round-trip and this half
 			// has no node to ask; the fetcher asserts `{source, config}` instead.
 			await eventProcessor.load(SOURCE, STREAM_CONFIG);
-			const indexer = new EthereumIndexer<TestABI, any>(server.provider, eventProcessor, SOURCE, {
+			const indexer = new IndexerGeneration<TestABI, any>(server.provider, eventProcessor, SOURCE, {
 				stream: STREAM_CONFIG,
 			});
 			const wire: WireBatch[] = [];
@@ -692,7 +692,7 @@ describe('the split seam is still open', () => {
 		const server = noChain();
 		const backend = backends[0].make();
 		await backend.processor.load(SOURCE, STREAM_CONFIG);
-		const indexer = new EthereumIndexer<TestABI, any>(server.provider, backend.processor, SOURCE, {
+		const indexer = new IndexerGeneration<TestABI, any>(server.provider, backend.processor, SOURCE, {
 			stream: STREAM_CONFIG,
 		});
 

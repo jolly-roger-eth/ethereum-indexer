@@ -68,7 +68,7 @@ export type LogIngestion = {
  * It takes contiguous ranges of raw logs from a stateless log-fetcher, derives
  * every retraction itself, drives an `EventProcessor`, and is authoritative
  * about where the next range must start. It makes NO chain calls, which is the
- * whole reason it is a separate object from `EthereumIndexer`: that class opens
+ * whole reason it is a separate object from `IndexerGeneration`: that class opens
  * `load()` with `eth_chainId`, so the half of a split deployment that hosts the
  * processor cannot use it (recorded in
  * `work/notes/observations/indexer-load-needs-a-chain-so-the-server-half-cannot-call-it.md`).
@@ -97,7 +97,7 @@ export type LogIngestion = {
  * ## What it deliberately does not do
  *
  * It does not batch a large stream into several `process()` calls the way
- * `EthereumIndexer.feed` does. A batch is one HTTP request and the sender chose
+ * `IndexerGeneration.feed` does. A batch is one HTTP request and the sender chose
  * its size; splitting it here would add a second place where a partially-applied
  * range is possible, and the processor already applies block by block
  * atomically. It also does not store the emission stream: that arrives with
@@ -119,7 +119,7 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 		private readonly source: IndexingSource<ABI>,
 		config: Pick<ProvidedIndexerConfig<ABI>, 'stream'> = {},
 	) {
-		// The defaults MUST match `EthereumIndexer`'s and the sending `LogFetcher`'s,
+		// The defaults MUST match `IndexerGeneration`'s and the sending `LogFetcher`'s,
 		// because the hash of the resolved config is half the wire identity: a
 		// receiver that defaulted `finality` differently would refuse every batch a
 		// fetcher sent, naming a config hash neither side can see. Hence the one
@@ -196,7 +196,7 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 	 * "Otherwise" is doing real work: a cursor whose context does not match is not
 	 * ignored, it is CLEARED, because the state it points at was computed by a
 	 * different processor or for a different source and would otherwise be indexed
-	 * on top of. This mirrors `EthereumIndexer.promiseToLoad`'s discard branch,
+	 * on top of. This mirrors `IndexerGeneration.promiseToLoad`'s discard branch,
 	 * minus the chain calls that branch is wrapped in.
 	 */
 	private async currentLastSync(): Promise<LastSync<ABI>> {

@@ -1,7 +1,7 @@
 import type {Abi} from 'abitype';
 import {describe, expect, it} from 'vitest';
 import {LogEventFetcher, parseLogBlockTimestamp} from '../src/internal/decoding/LogEventFetcher.js';
-import {EthereumIndexer} from '../src/indexer.js';
+import {IndexerGeneration} from '../src/indexer.js';
 import type {IndexingSource, LastSync} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ function makeIndexer(provider: any, events: any[] | (() => any[]), alwaysFetchTi
 		reset: async () => {},
 		clear: async () => {},
 	};
-	const indexer = new EthereumIndexer<Abi>(provider, processor, SOURCE, {
+	const indexer = new IndexerGeneration<Abi>(provider, processor, SOURCE, {
 		stream: {finality: 12, alwaysFetchTimestamps},
 	});
 	(indexer as any).logEventFetcher = {

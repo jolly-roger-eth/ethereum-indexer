@@ -46,7 +46,7 @@ export type BlockOfEvents<ABI extends Abi> = {hash: string; number: number; even
  * produce one, so its presence means the input is not a fetch; a stored
  * EMISSION stream, where the marker IS the retraction, is grouped by
  * `groupStreamPerBlock` and walked by `generateStreamFromReplay`, and
- * `EthereumIndexer.feed` refuses one rather than quietly handing it here.
+ * `IndexerGeneration.feed` refuses one rather than quietly handing it here.
  */
 export function groupLogsPerBlock<ABI extends Abi>(logEvents: LogEvent<ABI>[]): BlockOfEvents<ABI>[] {
 	const groups: {[hash: string]: BlockOfEvents<ABI>} = {};
@@ -426,7 +426,7 @@ export function getFromBlock<ABI extends Abi>(
  * `startBlock` among its contracts, or 0 when any of them declares none.
  *
  * Extracted so the two things that need it -- the single-process
- * `EthereumIndexer` and the receive-only `StreamBuilder` -- read the same
+ * `IndexerGeneration` and the receive-only `StreamBuilder` -- read the same
  * answer. It is the floor `getFromBlock` returns before anything has been
  * indexed, so two implementations of it would put the two deployment shapes on
  * two different first batches.
@@ -676,7 +676,7 @@ export function streamMatches(
  * The stream config as it is actually USED, defaults filled in.
  *
  * One implementation, because the resolved object is HASHED into the wire
- * identity: `EthereumIndexer`, the receiving `StreamBuilder` and the sending
+ * identity: `IndexerGeneration`, the receiving `StreamBuilder` and the sending
  * `LogFetcher` must all reach the same `finality` from the same input, or two
  * halves of one deployment would compute different `config` hashes and every
  * batch would be refused with a digest neither side can read.

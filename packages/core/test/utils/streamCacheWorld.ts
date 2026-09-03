@@ -1,5 +1,5 @@
 import type {Abi} from 'abitype';
-import {EthereumIndexer} from '../../src/indexer.js';
+import {IndexerGeneration} from '../../src/indexer.js';
 import type {ExistingStream, IndexingSource, LastSync, LogEvent} from '../../src/types.js';
 
 /**
@@ -242,7 +242,7 @@ export function makeIndexer(
 	keepStream?: ExistingStream<Abi>,
 	streamWriteRetry: StreamWriteRetry = {delaySeconds: 0},
 ) {
-	const indexer = new EthereumIndexer<Abi, string[]>(chain.provider, processor, SOURCE, {
+	const indexer = new IndexerGeneration<Abi, string[]>(chain.provider, processor, SOURCE, {
 		stream: {finality: FINALITY},
 		...(keepStream ? {keepStream} : {}),
 		streamWriteRetry,
@@ -255,7 +255,7 @@ export function makeIndexer(
  * Drive to the tip the way every driver in this repo does, with a bound so a
  * spin is a red line rather than a hang.
  */
-export async function indexToTip(indexer: EthereumIndexer<Abi, string[]>, maxRounds = 30): Promise<number> {
+export async function indexToTip(indexer: IndexerGeneration<Abi, string[]>, maxRounds = 30): Promise<number> {
 	let rounds = 0;
 	let lastSync = await indexer.indexMore();
 	while (lastSync.lastToBlock < lastSync.latestBlock) {

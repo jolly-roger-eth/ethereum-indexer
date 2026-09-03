@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi, IndexingSource, LogEvent} from '@etherfold/core';
 import {createIndexerState, type EntityEventProcessorLike} from '../src/IndexerState.js';
+import {generationOf} from './utils/fakeGeneration.js';
 
 /**
  * The app-facing half of tx reconciliation: after indexing, an app asks whether
@@ -72,12 +73,12 @@ function makeProvider() {
 
 describe('checkTxInclusion through the browser hook', () => {
 	it('answers nothing before anything is indexed', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		expect(indexer.checkTxInclusion([{txHash: TX}])[TX]).toEqual({status: 'unknown', basis: 'not-synced'});
 	});
 
 	it('reports a transaction it has processed as included, and says where', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 		await indexer.indexToLatest();
 
@@ -91,7 +92,7 @@ describe('checkTxInclusion through the browser hook', () => {
 	});
 
 	it('reports a transaction it has never seen as absent, receipt or no receipt', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 		await indexer.indexToLatest();
 
@@ -100,7 +101,7 @@ describe('checkTxInclusion through the browser hook', () => {
 	});
 
 	it('answers a whole pending set in one call', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 		await indexer.indexToLatest();
 

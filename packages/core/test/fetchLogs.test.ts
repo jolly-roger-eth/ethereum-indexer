@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
-import {EthereumIndexer} from '../src/indexer.js';
+import {IndexerGeneration} from '../src/indexer.js';
 import type {IndexingSource, LastSync, LogEvent} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ function makeIndexer(provider: any, logsToReturn: any[], latestBlock: number) {
 		reset: async () => {},
 		clear: async () => {},
 	};
-	const indexer = new EthereumIndexer<Abi>(provider, processor, SOURCE, {
+	const indexer = new IndexerGeneration<Abi>(provider, processor, SOURCE, {
 		stream: {finality: 12, alwaysFetchTimestamps: true},
 	});
 	// Stub the log fetcher to avoid real eth_getLogs decoding.

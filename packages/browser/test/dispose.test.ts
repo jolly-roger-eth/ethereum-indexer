@@ -1,7 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi, IndexingSource, LogEvent} from '@etherfold/core';
-import {EthereumIndexer} from '@etherfold/core';
+import {IndexerGeneration} from '@etherfold/core';
 import {createIndexerState, type EntityEventProcessorLike} from '../src/IndexerState.js';
+import {generationOf} from './utils/fakeGeneration.js';
 
 const CHAIN_ID_HEX = '0x1';
 
@@ -46,15 +47,15 @@ const SOURCE: IndexingSource<Abi> = {
 
 describe('createIndexerState - dispose() (teardown / leak prevention)', () => {
 	it('exposes a dispose() method', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		expect(typeof (indexer as any).dispose).toBe('function');
 	});
 
 	it('stops the auto-index loop so no further ticks fire after dispose()', async () => {
 		let indexMoreCalls = 0;
-		const indexer = createIndexerState<Abi, State>(makeProcessor(), {
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()), {
 			createIndexer: (provider, processor, source, config) => {
-				const real = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+				const real = new IndexerGeneration<Abi, State>(provider, processor, source, config);
 				const realIndexMore = real.indexMore.bind(real);
 				real.indexMore = (async (...args: any[]) => {
 					indexMoreCalls++;
@@ -84,11 +85,23 @@ describe('createIndexerState - dispose() (teardown / leak prevention)', () => {
 		expect(indexMoreCalls).toBe(callsAfterDispose);
 	});
 
+	/**
+	 * The stores this hook holds are DETACHED from the engine by `dispose()`.
+	 *
+	 * Asserted by DRIVING the engine's callbacks afterwards rather than by reading
+	 * them back, because WHICH object holds the hook's closures is not the same on
+	 * the two shapes: on a bare generation the hook attaches to the engine, and on
+	 * the container the engine forwards to the container and the container is what
+	 * the hook attached to. The invariant is the same on both and is what the leak
+	 * was about -- after `dispose()` nothing the engine reports may still reach the
+	 * `syncing` and `status` stores -- so it is the invariant that is asserted, not
+	 * the object graph that carries it.
+	 */
 	it('detaches the indexer callbacks (onLoad / onLastSyncUpdated / onStateUpdated) on dispose()', async () => {
-		let captured!: EthereumIndexer<Abi, State>;
-		const indexer = createIndexerState<Abi, State>(makeProcessor(), {
+		let captured!: IndexerGeneration<Abi, State>;
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()), {
 			createIndexer: (provider, processor, source, config) => {
-				captured = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+				captured = new IndexerGeneration<Abi, State>(provider, processor, source, config);
 				return captured;
 			},
 		});
@@ -99,11 +112,22 @@ describe('createIndexerState - dispose() (teardown / leak prevention)', () => {
 		expect(captured.onLoad).toBeDefined();
 		expect(captured.onLastSyncUpdated).toBeDefined();
 		expect(captured.onStateUpdated).toBeDefined();
+		expect(indexer.syncing.$state.lastSync).toBeDefined();
 
 		await (indexer as any).dispose();
 
-		expect(captured.onLoad).toBeUndefined();
-		expect(captured.onLastSyncUpdated).toBeUndefined();
-		expect(captured.onStateUpdated).toBeUndefined();
+		// the engine may still hold a callback -- what it must no longer do is reach
+		// this hook's stores through one
+		await captured.onLoad?.('Loading');
+		captured.onLastSyncUpdated?.({
+			context: {source: SOURCE, config: {} as never},
+			lastToBlock: 999,
+			latestBlock: 999,
+			nextStreamID: 1,
+			unconfirmedBlocks: [],
+		} as never);
+
+		expect(indexer.syncing.$state.lastSync).toBeUndefined();
+		expect(indexer.status.$state.state).toBe('Idle');
 	});
 });
