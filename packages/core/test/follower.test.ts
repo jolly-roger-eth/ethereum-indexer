@@ -1,0 +1,414 @@
+import type {Abi} from 'abitype';
+import {describe, expect, it} from 'vitest';
+import {openIndexer, type AnyGenerationSpec, type Indexer} from '../src/container.js';
+import {openMemoryGenerationRegistry} from '../src/generation/memory.js';
+import {IndexerGeneration} from '../src/indexer.js';
+import {resolveStreamConfig} from '../src/internal/engine/utils.js';
+import {streamDigestOf} from '../src/stream/identity.js';
+import {readOnlyStream} from '../src/stream/readOnly.js';
+import type {
+	EventProcessor,
+	ExistingStream,
+	IndexingSource,
+	LastSync,
+	LogEvent,
+	ProvidedIndexerConfig,
+	UsedStreamConfig,
+} from '../src/types.js';
+import {
+	ADDRESS,
+	BRANCH_A,
+	BRANCH_A_TIP,
+	BRANCH_B,
+	BRANCH_B_TIP,
+	fakeProcessor,
+	FINALITY,
+	idOf,
+	makeLog,
+	SOURCE,
+	START_BLOCK,
+} from './utils/streamCacheWorld.js';
+
+// ---------------------------------------------------------------------------
+// A NON-CANONICAL GENERATION ADVANCES, AND HOW IT ADVANCES IS DETERMINED
+// ---------------------------------------------------------------------------
+// A generation is a stream plus a fold over it. WHETHER a second generation
+// fetches is decided by whether it SHARES A STREAM with one already held, and by
+// nothing else -- there is no knob here and there must never be one.
+//
+//   SAME stream  -> a FOLLOWER. It fetches NOTHING (zero, not fewer), writes no
+//                   segment, re-folds the stored stream from the start and then
+//                   follows it as the indexing generation appends.
+//   OTHER stream -> an ordinary indexer at a different address. It fetches its
+//                   own history, into its own keyspace.
+//
+// The zero matters for three reasons and the third is the load-bearing one: a
+// follower with a poller of its own would make its state a function of ITS OWN
+// FETCH rather than of the stream, so a later re-fold of the stored stream would
+// yield a DIFFERENT state -- and a generation would stop being "a stream plus a
+// fold over it", taking the exact-revert promise with it.
+// ---------------------------------------------------------------------------
+
+const ADDRESS_B = '0x0000000000000000000000000000000000000002';
+
+/** A DIFFERENT FILTER, so a different stream: the logs it needs were never requested under the first. */
+const SOURCE_B: IndexingSource<Abi> = {
+	chainId: '1',
+	contracts: [{abi: [] as unknown as Abi, address: ADDRESS_B, startBlock: START_BLOCK}],
+};
+
+/** What the node serves under the OTHER filter: different blocks, so a mix-up is visible. */
+const BRANCH_C = [makeLog(101, '0xc101'), makeLog(103, '0xc103')];
+
+const STREAM_CONFIG: UsedStreamConfig = resolveStreamConfig({finality: FINALITY});
+
+function addressOf(source: IndexingSource<Abi>): string {
+	return (source.contracts as readonly {address: string}[])[0].address;
+}
+
+/**
+ * A stream keeper that ADDRESSES by stream digest, as the shipped one does.
+ *
+ * `memoryStream` stores one blob and ignores the source, which is right for the
+ * engine's cache arithmetic and useless here: the whole question in the
+ * separate-stream case is whether two filters land in two keyspaces. So this
+ * keeps one bucket per `streamDigestOf(source, config)` and reports the buckets,
+ * which is what "the two streams never share entries" is asserted against.
+ */
+function keyedStream() {
+	type Stored = {lastSync: LastSync<Abi>; eventStream: LogEvent<Abi>[]};
+	const stored = new Map<string, Stored>();
+	const writes: {digest: string; events: LogEvent<Abi>[]}[] = [];
+	let clears = 0;
+	let streamConfig = resolveStreamConfig(undefined);
+	const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+	const digestOf = (source: IndexingSource<Abi>) => streamDigestOf(source, streamConfig);
+
+	const keeper: ExistingStream<Abi> = {
+		setStreamConfig: (config) => {
+			streamConfig = config;
+		},
+		fetchFrom: async (source, fromBlock) => {
+			const held = stored.get(digestOf(source));
+			return held
+				? {
+						eventStream: held.eventStream.filter((event) => event.blockNumber >= fromBlock),
+						lastSync: clone(held.lastSync),
+					}
+				: undefined;
+		},
+		saveNewEvents: async (source, {eventStream, lastSync}) => {
+			const digest = digestOf(source);
+			writes.push({digest, events: eventStream.map((event) => ({...event}))});
+			const held = stored.get(digest);
+			stored.set(digest, {
+				lastSync: clone(lastSync),
+				eventStream: [...(held?.eventStream ?? []), ...eventStream.map((event) => ({...event}))],
+			});
+		},
+		clear: async (source) => {
+			if (stored.delete(digestOf(source))) {
+				clears++;
+			}
+		},
+	};
+
+	return {
+		keeper,
+		writes,
+		get clears() {
+			return clears;
+		},
+		digests: () => [...stored.keys()].sort(),
+		eventsOf: (source: IndexingSource<Abi>) => stored.get(digestOf(source))?.eventStream ?? [],
+	};
+}
+
+/**
+ * The world: one provider, one keeper, and a per-generation FETCH RECORDER.
+ *
+ * The fetch seam is instrumented PER GENERATION and not once for the world,
+ * because "the follower issued no `eth_getLogs`" is a claim about one
+ * generation's calls, and a shared counter cannot make it.
+ */
+async function openWorld(specs: {name: string; source?: IndexingSource<Abi>}[]) {
+	const chain = {logs: {[ADDRESS]: [...BRANCH_A], [ADDRESS_B]: [...BRANCH_C]} as Record<string, LogEvent<Abi>[]>};
+	let tip = BRANCH_A_TIP;
+	const stream = keyedStream();
+	const folds = new Map<string, ReturnType<typeof fakeProcessor>>();
+	const configs = new Map<string, ProvidedIndexerConfig<Abi>>();
+	const fetches: {by: string; from: number; to: number}[] = [];
+
+	const provider = {
+		async request(args: {method: string}): Promise<unknown> {
+			switch (args.method) {
+				case 'eth_chainId':
+					return '0x1';
+				case 'eth_blockNumber':
+					return `0x${tip.toString(16)}`;
+			}
+			throw new Error(`unexpected method ${args.method}`);
+		},
+	} as never;
+
+	const specFor = (spec: {name: string; source?: IndexingSource<Abi>}): AnyGenerationSpec<Abi, string[]> => ({
+		...(spec.source ? {source: spec.source} : {}),
+		createState: () => ({name: spec.name}),
+		createProcessor: () => {
+			const fold = fakeProcessor();
+			fold.processor.getVersionHash = () => `proc-${spec.name}`;
+			folds.set(spec.name, fold);
+			return fold.processor as EventProcessor<Abi, string[]>;
+		},
+		stateOf: () => [],
+	});
+
+	const registry = await openMemoryGenerationRegistry({maxGenerations: 4, maxStreams: 2});
+	const indexer = await openIndexer<Abi, string[]>({
+		registry,
+		provider,
+		source: SOURCE,
+		config: {stream: {finality: FINALITY}, keepStream: stream.keeper, streamWriteRetry: {delaySeconds: 0}},
+		generations: specs.map(specFor),
+		createGeneration: (generationProvider, processor, source, config) => {
+			const generation = new IndexerGeneration<Abi, string[]>(generationProvider, processor, source, config);
+			const by = processor.getVersionHash();
+			configs.set(by, config);
+			(generation as unknown as {logEventFetcher: unknown}).logEventFetcher = {
+				async getLogEvents({fromBlock, toBlock}: {fromBlock: number; toBlock: number}) {
+					fetches.push({by, from: fromBlock, to: toBlock});
+					const served = chain.logs[addressOf(source)] ?? [];
+					return {
+						events: served.filter((log) => log.blockNumber >= fromBlock && log.blockNumber <= toBlock),
+						toBlockUsed: toBlock,
+					};
+				},
+				reparse: (events: LogEvent<Abi>[]) => events.map((event) => ({...event})),
+			};
+			return generation;
+		},
+	});
+
+	return {
+		indexer,
+		stream,
+		folds,
+		configs,
+		fetches,
+		registry,
+		serve(address: string, logs: LogEvent<Abi>[], newTip: number) {
+			chain.logs[address] = logs;
+			tip = newTip;
+		},
+		fetchesBy: (name: string) => fetches.filter((call) => call.by === `proc-${name}`),
+		stateOf: (name: string) => folds.get(name)?.state ?? [],
+		/** Build a generation BESIDE the ones already held, the way a reconfigure will. */
+		add: (spec: {name: string; source?: IndexingSource<Abi>}) => indexer.add(specFor(spec)),
+	};
+}
+
+async function driveToTip(indexer: Indexer<Abi, string[]>, maxRounds = 30): Promise<void> {
+	let rounds = 0;
+	let lastSync = await indexer.indexMore();
+	while (lastSync.lastToBlock < lastSync.latestBlock) {
+		if (rounds++ >= maxRounds) {
+			throw new Error(`did not reach the tip in ${maxRounds} rounds (lastToBlock ${lastSync.lastToBlock})`);
+		}
+		lastSync = await indexer.indexMore();
+	}
+}
+
+/**
+ * FOLD THE STORED STREAM FROM SCRATCH, with no node and no writer.
+ *
+ * This is what "the successor's state is a function of the STREAM" is asserted
+ * against: a generation built later, over the same stored stream, through the
+ * same read-only view, must arrive at the same state.
+ */
+async function refoldStoredStream(stream: ReturnType<typeof keyedStream>, source = SOURCE): Promise<string[]> {
+	const fold = fakeProcessor();
+	fold.processor.getVersionHash = () => 'proc-refold';
+	const provider = {
+		async request(args: {method: string}): Promise<unknown> {
+			if (args.method === 'eth_chainId') {
+				return '0x1';
+			}
+			throw new Error(`a re-fold must not reach the node: ${args.method}`);
+		},
+	} as never;
+	const generation = new IndexerGeneration<Abi, string[]>(provider, fold.processor, source, {
+		stream: {finality: FINALITY},
+		keepStream: readOnlyStream<Abi>(stream.keeper),
+	});
+	(generation as unknown as {logEventFetcher: unknown}).logEventFetcher = {
+		getLogEvents: async () => {
+			throw new Error('a re-fold must not fetch');
+		},
+		reparse: (events: LogEvent<Abi>[]) => events.map((event) => ({...event})),
+	};
+	await generation.load();
+	return fold.state;
+}
+
+describe('a SHARED stream: the successor FOLLOWS and fetches nothing', () => {
+	it('advances alongside the canonical generation, to the same state', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+
+		// the canonical generation indexed the chain...
+		expect(world.stateOf('A')).toEqual(BRANCH_A.map(idOf));
+		// ...and the non-canonical one ADVANCED, which is the whole point
+		expect(world.stateOf('B')).toEqual(world.stateOf('A'));
+		expect(world.indexer.canonical.record.processor).toBe('proc-A');
+	});
+
+	it('issues NO `eth_getLogs` AT ALL: zero, not fewer', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+
+		expect(world.fetchesBy('A').length).toBeGreaterThan(0);
+		// a head-following poller would make this "fewer"; the criterion is ZERO
+		expect(world.fetchesBy('B')).toEqual([]);
+	});
+
+	it('writes NO segment: only the indexing generation appends', async () => {
+		const together = await openWorld([{name: 'A'}, {name: 'B'}]);
+		await together.indexer.load();
+		await driveToTip(together.indexer);
+
+		const alone = await openWorld([{name: 'A'}]);
+		await alone.indexer.load();
+		await driveToTip(alone.indexer);
+
+		// byte for byte what the canonical generation alone would have written
+		expect(together.stream.writes).toEqual(alone.stream.writes);
+		expect(together.stream.digests()).toEqual(alone.stream.digests());
+		expect(together.stream.eventsOf(SOURCE).map(idOf)).toEqual(BRANCH_A.map(idOf));
+		// nor did it CLEAR: the load path clears on every shape it cannot use, and a
+		// follower taking one of those branches would delete the live history
+		expect(together.stream.clears).toBe(0);
+	});
+
+	it('holds the stream through a READ-ONLY VIEW, so a write cannot reach the keeper', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+
+		const follower = world.configs.get('proc-B')?.keepStream as ExistingStream<Abi>;
+		const writer = world.configs.get('proc-A')?.keepStream as ExistingStream<Abi>;
+
+		// the WRITER holds the keeper itself; the FOLLOWER holds a view of it
+		expect(writer).toBe(world.stream.keeper);
+		expect(follower).not.toBe(world.stream.keeper);
+
+		const before = world.stream.writes.length;
+		await follower.saveNewEvents(SOURCE, {
+			eventStream: [makeLog(199, '0xdead')],
+			lastSync: {
+				context: {source: [], config: 'c', processor: 'proc-B'},
+				latestBlock: 200,
+				lastFromBlock: 199,
+				lastToBlock: 199,
+				unconfirmedBlocks: [],
+			},
+		});
+		await follower.clear(SOURCE);
+
+		expect(world.stream.writes.length).toBe(before);
+		expect(world.stream.clears).toBe(0);
+		expect(world.stream.eventsOf(SOURCE).map(idOf)).toEqual(BRANCH_A.map(idOf));
+	});
+
+	it('is DETERMINED by the shared stream and never configured', async () => {
+		const shared = await openWorld([{name: 'A'}, {name: 'B'}]);
+		expect(shared.indexer.generations.map((held) => held.follows)).toEqual([false, true]);
+		// one stream, two generations: the second cannot be a second writer
+		expect(shared.indexer.generations[0].record.stream).toBe(shared.indexer.generations[1].record.stream);
+
+		const separate = await openWorld([{name: 'A'}, {name: 'B', source: SOURCE_B}]);
+		expect(separate.indexer.generations.map((held) => held.follows)).toEqual([false, false]);
+	});
+
+	it('RE-FOLDS the stored stream from the start when it is added to a running indexer', async () => {
+		const world = await openWorld([{name: 'A'}]);
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+		const writesBefore = world.stream.writes.length;
+
+		// the successor arrives with the whole history already on disk
+		const added = await world.add({name: 'B'});
+		expect(added.follows).toBe(true);
+		await world.indexer.load();
+
+		// the load IS the re-fold: it arrives at the canonical state having fetched
+		// nothing and written nothing
+		expect(world.stateOf('B')).toEqual(BRANCH_A.map(idOf));
+		expect(world.fetchesBy('B')).toEqual([]);
+		expect(world.stream.writes.length).toBe(writesBefore);
+		expect(world.stream.clears).toBe(0);
+	});
+
+	it('keeps following as the indexing generation appends, retractions included', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+
+		// the chain reorgs at 104 and moves on
+		world.serve(ADDRESS, [...BRANCH_B], BRANCH_B_TIP);
+		await driveToTip(world.indexer);
+
+		expect(world.stateOf('A')).toEqual(BRANCH_B.map(idOf));
+		expect(world.stateOf('B')).toEqual(world.stateOf('A'));
+		expect(world.fetchesBy('B')).toEqual([]);
+	});
+});
+
+describe('the successor state is a function of the STREAM, not of its own fetch', () => {
+	it('re-folding the stored stream LATER reproduces the follower state exactly', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+
+		expect(await refoldStoredStream(world.stream)).toEqual(world.stateOf('B'));
+	});
+
+	it('still reproduces it after a reorg has been appended to the stream', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+		world.serve(ADDRESS, [...BRANCH_B], BRANCH_B_TIP);
+		await driveToTip(world.indexer);
+
+		// story 4's promise: what a generation answers is what the stream says, so
+		// moving the pointer back and re-folding are the same state
+		expect(await refoldStoredStream(world.stream)).toEqual(world.stateOf('B'));
+	});
+});
+
+describe('DIFFERENT streams: the successor fetches its own history', () => {
+	it('fetches under its own filter and the two streams never share entries', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B', source: SOURCE_B}]);
+
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+
+		// it MUST fetch: the logs it needs were never requested under the old filter
+		expect(world.fetchesBy('B').length).toBeGreaterThan(0);
+		expect(world.stateOf('A')).toEqual(BRANCH_A.map(idOf));
+		expect(world.stateOf('B')).toEqual(BRANCH_C.map(idOf));
+
+		// two filters, two keyspaces, disjoint contents
+		expect(world.stream.digests()).toHaveLength(2);
+		expect(world.stream.eventsOf(SOURCE).map(idOf)).toEqual(BRANCH_A.map(idOf));
+		expect(world.stream.eventsOf(SOURCE_B).map(idOf)).toEqual(BRANCH_C.map(idOf));
+		const shared = world.stream
+			.eventsOf(SOURCE)
+			.map(idOf)
+			.filter((id) => world.stream.eventsOf(SOURCE_B).map(idOf).includes(id));
+		expect(shared).toEqual([]);
+	});
+});

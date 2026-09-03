@@ -1,6 +1,7 @@
 import type {Abi} from 'abitype';
 import type {EventProcessor, ExistingStream, IndexingSource, LastSync, LogEvent, UsedStreamConfig} from '../types.js';
 import {taggedBnReplacer, taggedBnReviver} from '../utils/bigint.js';
+import {readOnlyStream} from './readOnly.js';
 
 /**
  * The on-disk format version of a captured stream.
@@ -141,9 +142,14 @@ export function blocksOf<ABI extends Abi>(fixture: StreamFixture<ABI>): FixtureB
  * `saveNewEvents` is a no-op rather than an error: a fixture is immutable by
  * definition, and a replay that appended to it would stop being a replay of the
  * thing whose provenance is recorded at the top of the file.
+ *
+ * The no-op HALF is `readOnlyStream`, and it is shared rather than repeated. A
+ * fixture is one reader; a follower over a stream another generation is indexing
+ * is the other, and what "read-only" means on this seam is one definition for
+ * both. All that is left here is the fixture's own `fetchFrom`.
  */
 export function replayStream<ABI extends Abi>(fixture: StreamFixture<ABI>): ExistingStream<ABI> {
-	return {
+	return readOnlyStream<ABI>({
 		fetchFrom: async (source: IndexingSource<ABI>, fromBlock: number) => {
 			if (source.chainId !== fixture.source.chainId) {
 				throw new Error(`stream fixture is for chain ${fixture.source.chainId}, asked for chain ${source.chainId}`);
@@ -153,13 +159,7 @@ export function replayStream<ABI extends Abi>(fixture: StreamFixture<ABI>): Exis
 				lastSync: fixture.lastSync,
 			};
 		},
-		saveNewEvents: async () => {
-			// a fixture is a snapshot; replaying it must not change it
-		},
-		clear: async () => {
-			// nothing is stored, so nothing is cleared
-		},
-	};
+	});
 }
 
 export type ReplayOptions<ABI extends Abi> = {

@@ -309,6 +309,7 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		{newEvents: LogEvent<ABI>[]; lastSyncFetched: LastSync<ABI>; replay?: boolean}
 	>(this.promiseToFeed.bind(this));
 	protected _load = createAction<LastSync<ABI>>(this.promiseToLoad.bind(this));
+	protected _follow = createAction<LastSync<ABI>>(this.promiseToFollow.bind(this));
 	protected _save = createAction<
 		StreamWriteOutcome,
 		{source: IndexingSource<ABI>; eventStream: LogEvent<ABI>[]; lastSync: LastSync<ABI>}
@@ -511,16 +512,61 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		return this._index.ifNotExecuting();
 	}
 
+	/**
+	 * ADVANCE FROM THE STORED STREAM ALONE, and fetch NOTHING.
+	 *
+	 * This is how a generation that does not OWN its stream moves: it reads what
+	 * the stream now holds beyond its own cursor and REPLAYS it. `indexMore` is the
+	 * other verb and the two are never both right for one generation -- which one
+	 * applies is DETERMINED by whether this generation shares its stream with the
+	 * one indexing it (`Indexer.add`), and is never a configuration knob.
+	 *
+	 * ## Why a follower must not poll the head
+	 *
+	 * Three things break at once if it does, and the third is the one that matters.
+	 * The re-fetch stops being zero and becomes merely fewer. The one-writer rule
+	 * goes, because the save is driven by the indexing loop rather than by the
+	 * caller's intent (which is why the read-only stream view exists at all). And
+	 * -- the load-bearing one -- this generation's state becomes a function of ITS
+	 * OWN FETCH rather than of the stream, so re-folding the stored stream later
+	 * yields a DIFFERENT state. A generation would stop being "a stream plus a fold
+	 * over it", and the promise that moving the canonical pointer back restores
+	 * answers EXACTLY would go with it.
+	 *
+	 * ## What it is, mechanically
+	 *
+	 * The CATCH-UP branch of `promiseToLoad`, made repeatable. The first call has
+	 * no cursor, so it loads -- which re-folds the whole stored stream from the
+	 * start -- and every call after it reads the stream from where this cursor
+	 * resumes and replays what is new. Nothing here fetches, and nothing here
+	 * writes or CLEARS: a stream this generation does not own is not its to repair,
+	 * which is why every branch below simply returns rather than clearing as the
+	 * load path does.
+	 */
+	followMore(): Promise<LastSync<ABI>> {
+		if (this._load.executing) {
+			throw new Error(`loading not complete`);
+		}
+
+		if (this._feed.executing) {
+			throw new Error(`feed is not complete`);
+		}
+
+		return this._follow.ifNotExecuting();
+	}
+
 	disableProcessing() {
 		// this will stop whatever it is doing
 		// except reset
 		this._load.cancel();
 		this._feed.cancel();
 		this._index.block();
+		this._follow.block();
 	}
 
 	reenableProcessing() {
 		this._index.unblock();
+		this._follow.unblock();
 	}
 
 	async updateIndexer(update: {
@@ -587,6 +633,7 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		this._index.reset();
 		this._save.reset();
 		this._load.reset();
+		this._follow.reset();
 		this.reinit(
 			newProvider,
 			update.source || this.source,
@@ -632,6 +679,7 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 			this._feed.reset();
 			this._index.reset();
 			this._load.reset();
+			this._follow.reset();
 
 			try {
 				await oldProcessor.clear().then(() => this.load());
@@ -880,6 +928,81 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		}
 		await this._onLoad('Loaded');
 		return this.lastSync;
+	}
+
+	/**
+	 * One FOLLOW step: what the stream holds beyond this cursor, replayed.
+	 *
+	 * Every early return leaves the stream exactly where it is. The load path
+	 * CLEARS on each of these shapes because it owns the stream it is reading; this
+	 * does not own it, and a follower that cleared would delete the indexing
+	 * generation's history out from under it. The cost of returning instead is one
+	 * idle cycle, and the next one asks again.
+	 */
+	protected async promiseToFollow({unlessCancelled}: CancelOperations): Promise<LastSync<ABI>> {
+		if (!this.lastSync) {
+			// The FIRST advance is the whole re-fold: `load` replays the stored stream
+			// from the start into this generation's own fresh state.
+			await unlessCancelled(this.load());
+		}
+		const current = this.lastSync as LastSync<ABI>;
+		const keepStream = this.config.keepStream;
+		if (!keepStream) {
+			// nothing to follow: a generation with no stream to read has no other way to
+			// advance, and inventing one here would be the head-following poller
+			return current;
+		}
+
+		const fromBlock = getFromBlock(current, this.defaultFromBlock, this.finality);
+		const existingStreamData = await unlessCancelled(keepStream.fetchFrom(this.source, fromBlock));
+		if (!existingStreamData) {
+			return current;
+		}
+
+		const {eventStream: eventsStored, lastSync: lastSyncStored} = existingStreamData;
+		// the requested `fromBlock`, assigned onto the fetched cursor exactly as both
+		// load branches do: `generateStreamFromReplay` refuses a stream that does not
+		// reach back to where this cursor resumes
+		lastSyncStored.lastFromBlock = fromBlock;
+		if (!this.streamMatches(lastSyncStored.lastToBlock, lastSyncStored.context)) {
+			// The stream was fetched under a filter this source is not covered by. The
+			// indexing generation is the one that decides what happens to it.
+			return current;
+		}
+		this.streamLastToBlock = lastSyncStored.lastToBlock;
+		if (lastSyncStored.lastToBlock <= current.lastToBlock) {
+			// level with the stream: there is nothing yet to follow
+			return current;
+		}
+
+		// Re-decoded on the way through, like both load branches: the stored `args` are
+		// what SOME earlier ABI made of those bytes (ADR-0034), and one decoding rule
+		// for a replayed stream is better than two.
+		const replayable = this.logEventFetcher.reparse(eventsStored);
+		if (!replayable) {
+			return current;
+		}
+		if (replayable.length === 0) {
+			// The stream moved and carried no events into this range, which is what an
+			// empty save writes. The CURSOR still has to move, or `getFromBlock` would
+			// ask from the same block forever. The window is carried forward untouched:
+			// nothing was applied and nothing was taken back, and the next replay prunes
+			// it against the tip it is given.
+			this.lastSync = {
+				context: current.context,
+				latestBlock: lastSyncStored.latestBlock,
+				lastFromBlock: lastSyncStored.lastFromBlock,
+				lastToBlock: lastSyncStored.lastToBlock,
+				unconfirmedBlocks: current.unconfirmedBlocks,
+			};
+			this._onLastSyncUpdated();
+			return this.lastSync;
+		}
+
+		// REPLAY and not feed: this stream carries its own verdicts (ADR-0042), and a
+		// follower has no fetch window to derive them from.
+		await unlessCancelled(this.replay(replayable, lastSyncStored));
+		return this.lastSync as LastSync<ABI>;
 	}
 
 	protected async promiseToFeed(
