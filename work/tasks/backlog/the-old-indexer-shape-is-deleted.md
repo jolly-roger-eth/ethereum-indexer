@@ -4,7 +4,6 @@ slug: the-old-indexer-shape-is-deleted
 spec: a-reconfigure-is-not-an-outage
 blockedBy: [every-caller-moves-onto-the-generation-container]
 covers: [2, 6, 7]
-needsAnswers: true
 ---
 
 ## What to build
@@ -14,46 +13,72 @@ The **CONTRACT** batch (`TASKING-PROTOCOL` §3a). No caller remains on the old f
 - the `EthereumIndexer` ALIAS (which lives in **`@etherfold/core`**, `src/indexer.ts` — NOT the browser
   package — and is re-exported/read from `browser`, `processor-sqlite` and `server`),
 - the old `createIndexerState` factory shape,
-- and the `stateDiscarded` DISCARD that
-  `the-invalidation-verdict-becomes-a-published-answer` deliberately left in place so that landable
-  could go green on its own.
+- and the browser hook's `stateDiscarded` RE-SEED, which the container makes redundant once the
+  direct-state shape is gone.
 
-With the container holding generations and the verdict published and now ACTED ON, this is where the
-landable completes and its two stories become true.
+With the container holding generations and every caller already on it, this is where the landable
+completes: one name, one call shape, and no second path by which a reader can hold a stale fold.
 
-### The stories this completes
+**There are no users, so DELETE rather than deprecate.** Do not keep a compatibility re-export, a
+shim or a deprecation window for the old name or the old shape, and do not soften the changeset: say
+plainly that both are gone.
 
-- **Story 2** — a developer changes the processor without re-fetching a single log, because the filter
-  did not move. The digest task makes the stream RESOLVE to the same keyspace; the container is what
-  makes the new generation use it. With both landed, this is now assertable end to end.
-- **Story 6** — a reader holding a state handle across a pointer move keeps answering from whichever
-  generation is now canonical. The indirect handle landed in the expand batch; this is where the old
-  direct path stops existing, so holding a reference is never a way to be silently stale.
+### The stories this keeps true, and where they are ALREADY asserted
 
-### The one thing that must not slip
+All three landed with earlier tasks in this decomposition. This batch does not re-deliver them. It
+keeps their assertions GREEN through the deletion, and RE-HOMES any assertion that lives in a test
+file it removes.
 
-Deleting the discard is a BEHAVIOUR change, and it is the point: a no-op reconfigure becomes
-OBSERVABLY free. **Story 7 is therefore carried HERE, not on the verdict task**, which builds the
-verdict but explicitly defers the observable half. Assert it here rather than assuming the earlier
-task covered it — it explicitly did not.
+- **Story 2** (a processor-only change re-fetches nothing) — asserted at
+  `packages/browser/test/reconfigure.test.ts:418` and `packages/browser/test/invalidation.test.ts:177`
+  as `expect(chain.ranges.length).toBe(fetchesBefore)`: ZERO, not fewer.
+- **Story 6** (a handle held across a pointer move keeps answering) — asserted at
+  `packages/core/test/container.test.ts:185` and, on the entities path,
+  `packages/browser/test/generationContainer.test.ts:162`, both from the EXPAND batch.
+- **Story 7** (a verdict-clean reconfigure costs nothing) — asserted at
+  `packages/browser/test/eventRanges.test.ts:97`, landed by
+  `the-invalidation-verdict-becomes-a-published-answer`.
+
+### What this batch is NOT, and why it was narrowed
+
+**It is not a behaviour change, and that is deliberate.** An earlier version of this task asked for
+"the `stateDiscarded` discard removed and the published verdict acted on". A build STOPPED on that
+criterion and was right to: it has no in-fence implementation.
+
+- A verdict-clean reconfigure is ALREADY free. `IndexerGeneration.updateIndexer` discards only when
+  `!invalidation.state.valid` (`packages/core/src/indexer.ts:558`), so there is no discard on that
+  path left to remove.
+- The only reading that WOULD be a behaviour change is "a reconfigure builds a NEW generation over the
+  same stream instead of clearing the fold in place". That is the promotion policy's landable, as the
+  EXPAND batch already recorded in shipped code (`packages/core/src/container.ts`, `updateProcessor`:
+  reaching for it early "would be the outage-shaped in-place discard wearing a container"). Built here
+  it would also be unsafe: without the shared-stream follower
+  (`a-non-canonical-generation-advances-on-a-shared-stream`) and the policy
+  (`the-promotion-policy-moves-the-canonical-pointer`), a successor that is created but neither
+  advanced nor promoted leaves the canonical generation answering from a fold the reconfigure just
+  invalidated — silent staleness, worse than the discard.
+
+So what lands here is the browser-side RE-SEED deletion only, which is cleanup, not behaviour.
 
 ## Acceptance criteria
 
 - [ ] The `EthereumIndexer` alias is deleted; the container name is the only name.
 - [ ] The old `createIndexerState` factory shape is deleted; the processor-factory + per-generation
       state-factory shape is the only shape. One name, one call shape.
-- [ ] The `stateDiscarded` discard is removed and the published verdict is what the verbs act on.
-- [ ] **A processor-only change re-fetches NOTHING**, asserted on the ranges the node was asked for —
-      **zero, not fewer** (story 2). **Assert it in the SINGLE-GENERATION sense available here**: the
-      filter did not move, so the stream is reused whole and a re-fold costs no fetch. The
-      MULTI-generation case (a second generation folding the stored stream while the canonical one
-      still answers) needs the shared-stream follower, which is
-      `a-non-canonical-generation-advances-on-a-shared-stream` and lands AFTER this. Do not reach
-      forward into that scope; assert what this batch can honestly deliver and leave the rest to it.
-- [ ] **A handle held across a pointer move keeps answering**, from the newly canonical generation
-      (story 6).
-- [ ] **A no-op reconfigure is now OBSERVABLY free**, asserted on ranges fetched AND state discarded.
-      An event appended above the cursor remains the regression guard.
+- [ ] The browser hook's `stateDiscarded` RE-SEED is deleted, because the container owns the discard
+      once the direct-state shape is gone (`Indexer.updateIndexer`/`updateProcessor` already drop the
+      published handle, and the indirect handle has stable identity). **No behaviour change**: the
+      verbs still discard exactly when they discard today.
+- [ ] **Story 2 stays green** — ALREADY asserted at `packages/browser/test/reconfigure.test.ts:418`
+      and `packages/browser/test/invalidation.test.ts:177` (ZERO re-fetch, not fewer). Keep it
+      passing and re-home it if the deletion removes its file. Do NOT write a duplicate: a second test
+      asserting what one already asserts is noise, not coverage.
+- [ ] **Story 6 stays green** — ALREADY asserted at `packages/core/test/container.test.ts:185` and
+      `packages/browser/test/generationContainer.test.ts:162`. Same rule: keep, re-home if needed, do
+      not duplicate.
+- [ ] **Story 7 stays green** — ALREADY asserted at `packages/browser/test/eventRanges.test.ts:97`
+      (the stream digest MOVES while the verdict stays valid, nothing is discarded, nothing below the
+      cursor is re-fetched). Same rule.
 - [ ] No workspace reference to the old name or old shape remains, in source, tests, examples or docs,
       across ALL FOUR packages that used the class (`core`, `browser`, `processor-sqlite`, `server`) —
       not the browser package alone. If a straggler exists, the migrate batch was incomplete: surface
@@ -80,9 +105,11 @@ task covered it — it explicitly did not.
 > shape; if something does, that is drift — surface it rather than migrating it here, because
 > discovering a straggler at contract time means the migrate batch was incomplete.
 >
-> **The behaviour change to assert, not assume.** Removing the discard is what finally makes a no-op
-> reconfigure OBSERVABLY free. The verdict task deliberately left the verbs discarding so it could go
-> green alone, so nothing has asserted the observable half yet. Assert it here.
+> **This batch changes no behaviour, and that is deliberate.** The verbs still discard exactly when
+> they discard today. The only `stateDiscarded` work here is deleting the BROWSER HOOK's re-seed,
+> which the container makes redundant once the direct-state shape is gone. Read "What this batch is
+> NOT" in the task body before touching anything named `stateDiscarded`: an earlier version of this
+> task asked for more, a build stopped on it, and the narrowing is the answer.
 >
 > **Where to look.** The container and the alias are in **`@etherfold/core`** (`src/indexer.ts`), read
 > from `core`, `browser`, `processor-sqlite` and `server`. `createIndexerState`'s two accepted shapes
@@ -91,13 +118,16 @@ task covered it — it explicitly did not.
 >
 > **Easy to get wrong:**
 >
-> - Assuming the earlier verdict task already asserted the free no-op. It explicitly did not — it was
->   additive by design.
-> - Weakening the story-2 assertion to "fewer fetches". It is ZERO: the filter did not move, so the
->   stream is reused whole.
+> - Re-asserting stories 2, 6 and 7. They are ALREADY asserted, at the file:line sites named in the
+>   task body. Keep them green and re-home any that lives in a file you delete; a duplicate test
+>   asserts nothing new.
+> - Reaching for "a reconfigure builds a new generation instead of discarding". That is the promotion
+>   policy's landable and it is unsafe without the follower and the policy. Out of fence here.
+> - Keeping the old name or the old shape alive "for compatibility". There are no users: delete them,
+>   and say so plainly in the changeset.
 >
 > **Scope fence.** Do NOT build the promotion policy, pausing, or a running non-canonical generation.
 > Do NOT change the read unit of work — it was settled in the expand batch.
 >
-> Done means: one name, one call shape, no discard, a processor-only change fetches zero ranges, and a
-> held handle follows the pointer.
+> Done means: one name, one call shape, the browser re-seed gone, no workspace reference to either old
+> form in any of the four packages, and every already-existing story assertion still green.
