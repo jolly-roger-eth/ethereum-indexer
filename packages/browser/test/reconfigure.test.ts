@@ -279,11 +279,21 @@ describe('axis two: a new implementation behind the same address', () => {
  * that rendered once) went on showing the discarded state until an event
  * happened to arrive and overwrite it.
  *
- * `$state` here is a read HANDLE rather than a state value, so "the subscriber
- * is holding the old thing" is read through the handle: the store behind it was
- * wiped by the reset, so the ROWS are what says whether the discard was
- * published. These used to run on the free-form kind, whose `$state` was the
- * value itself; the rows are the same claim through the surviving path.
+ * `$state` here is a read HANDLE rather than a state value, so the claim has TWO
+ * halves and they are asserted separately.
+ *
+ * - WHAT THE HANDLE ANSWERS: the store behind it was wiped, so the ROWS say
+ *   whether the discard reached the read path.
+ * - WHETHER THE SUBSCRIBER WAS TOLD: a handle answers correctly whether or not
+ *   anybody was notified, so the rows alone cannot see a UI that is never woken
+ *   and therefore renders the old numbers for the rest of the session. That is
+ *   the exact bug this describe exists for, so `publications()` below counts the
+ *   NOTIFICATIONS as well.
+ *
+ * The hook used to publish the discard itself. `Indexer.publishDiscard`
+ * (`@etherfold/core`) does it now, one level lower, so every consumer of a
+ * container gets it -- and these assertions are what keep that true from up
+ * here, where a UI actually lives.
  */
 async function indexerOnBranchA(chain = fakeChain(), countBy = 1) {
 	const definition = processorVariant({countBy});
@@ -296,6 +306,24 @@ async function indexerOnBranchA(chain = fakeChain(), countBy = 1) {
 
 /** What an EMPTY state reads as through the handle: no owners, no counter row. */
 const EMPTY = {owners: {'1': undefined, '2': undefined, '3': undefined, '4': undefined}, transfers: 0};
+
+/**
+ * How many times `$state` has been PUBLISHED since this call, as a UI counts it.
+ *
+ * A svelte-shaped subscription fires immediately with the current value, so the
+ * count starts at -1 and the first (synchronous) call brings it to zero: what is
+ * returned afterwards is the number of publications the subscriber was woken by.
+ */
+function publications(indexer: {state: {subscribe: (run: (value: unknown) => void) => () => void}}) {
+	let count = -1;
+	const unsubscribe = indexer.state.subscribe(() => count++);
+	return {
+		get count() {
+			return count;
+		},
+		unsubscribe,
+	};
+}
 
 describe('the state a subscriber is holding, after a discard', () => {
 	/**
@@ -346,10 +374,16 @@ describe('the state a subscriber is holding, after a discard', () => {
 	 */
 	it('publishes the discard immediately, before anything is re-indexed', async () => {
 		const {indexer, store} = await indexerOnBranchA();
+		const woken = publications(indexer);
 
 		await indexer.updateProcessor(entityProcessorOver(store, processorVariant({version: '2.0.0', countBy: 10})));
 
 		expect(await readState(indexer.state.$state)).toEqual(EMPTY);
+		// and the subscriber was TOLD, which the rows above cannot see: a UI that is
+		// never woken renders the old contract's numbers until an event arrives, and
+		// on a freshly redeployed implementation that is never
+		expect(woken.count).toBe(1);
+		woken.unsubscribe();
 		indexer.dispose();
 	});
 
@@ -363,6 +397,7 @@ describe('the state a subscriber is holding, after a discard', () => {
 	 */
 	it('leaves the state alone when the reconfigure did not discard it', async () => {
 		const {indexer, store} = await indexerOnBranchA();
+		const woken = publications(indexer);
 
 		// same version: the core skips the swap and keeps the running processor
 		await indexer.updateProcessor(entityProcessorOver(store, processorVariant({version: '1.0.0', countBy: 10})));
@@ -372,6 +407,10 @@ describe('the state a subscriber is holding, after a discard', () => {
 		await indexer.updateIndexer({source: SOURCE_REDEPLOYED_SAME_ABI});
 		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 
+		// and nothing was announced either: a UI that empties itself when a developer
+		// saves a file that changed nothing is its own silent bug
+		expect(woken.count).toBe(0);
+		woken.unsubscribe();
 		indexer.dispose();
 	});
 
@@ -405,6 +444,7 @@ describe('the state a subscriber is holding, after a discard', () => {
 		await indexToTip(indexer);
 		expect((await readState(indexer.state.$state)).transfers).toBe(5);
 		const fetchesBefore = chain.ranges.length;
+		const woken = publications(indexer);
 
 		// the edited processor, version bumped: the state goes, the stream stays
 		const outcome = await indexer.updateProcessor(
@@ -416,6 +456,10 @@ describe('the state a subscriber is holding, after a discard', () => {
 		expect((await readState(indexer.state.$state)).transfers).toBe(50);
 		// and without going back to the node for the history it already had
 		expect(chain.ranges.length).toBe(fetchesBefore);
+		// announced ONCE, by the rebuild. A second announcement on top of it would be
+		// the discard talking over the replay that had already answered.
+		expect(woken.count).toBe(1);
+		woken.unsubscribe();
 
 		indexer.dispose();
 	});
@@ -424,11 +468,14 @@ describe('the state a subscriber is holding, after a discard', () => {
 	it('publishes the discard on an explicit reset', async () => {
 		const {indexer, chain} = await indexerOnBranchA();
 		expect((await readState(indexer.state.$state)).transfers).toBe(5);
+		const woken = publications(indexer);
 
 		chain.serve([], 120);
 		await indexer.reset();
 
 		expect(await readState(indexer.state.$state)).toEqual(EMPTY);
+		expect(woken.count).toBe(1);
+		woken.unsubscribe();
 		indexer.dispose();
 	});
 });

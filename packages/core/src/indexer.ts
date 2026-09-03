@@ -113,8 +113,9 @@ const DEFAULT_STREAM_WRITE_RETRY_DELAY = 1;
 export type ReconfigureOutcome = {
 	/**
 	 * True when the previously computed state is GONE and a fresh one is being
-	 * built. A caller holding a copy must replace it; see
-	 * `createIndexerState`'s `state` store for what that looks like.
+	 * built. A caller holding a copy must replace it; `Indexer.publishDiscard`
+	 * (`container.ts`) is what does that for every caller driving a container, by
+	 * republishing the read handle at the moment the fold goes.
 	 */
 	stateDiscarded: boolean;
 	/**
@@ -179,20 +180,17 @@ export type ReconfigureOutcome = {
  * ONE GENERATION: one stream, one processor, one state.
  *
  * A **generation** is a stream plus a fold over it, and this class is exactly
- * that -- which is why it is no longer called `EthereumIndexer`. An **indexer**
- * is the CONTAINER that holds several generations and points at the one that
- * answers reads (`Indexer`, `container.ts`); `CONTEXT.md` has said so since
- * ADR-0036, and this rename is what makes the code say it too. Nothing about
- * what this class DOES changed with the name: it still fetches, still derives
- * reorgs, still drives one `EventProcessor`, and a container drives one of these
- * per generation.
+ * that. An **indexer** is the CONTAINER that holds several generations and
+ * points at the one that answers reads (`Indexer`, `container.ts`); `CONTEXT.md`
+ * has said so since ADR-0036, and this class's name is what makes the code say
+ * it too. Nothing about what it DOES changed with the name: it still fetches,
+ * still derives reorgs, still drives one `EventProcessor`, and a container
+ * drives one of these per generation.
  *
- * `EthereumIndexer` remains as an ALIAS to THIS class (below), so every existing
- * construction site keeps compiling and keeps meaning what it meant. The alias
- * points at the generation and never at the container: `new EthereumIndexer(provider,
- * processor, source, config)` is handed one already-constructed processor and
- * one already-constructed state, which is precisely what a container that holds
- * N generations cannot be handed.
+ * It is handed ONE already-constructed processor over ONE already-constructed
+ * state, which is precisely what a container holding N generations cannot be
+ * handed -- so a caller builds a container through `openIndexer` and hands it
+ * the FACTORIES instead, and the container builds one of these per generation.
  */
 export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 	// ------------------------------------------------------------------------------------------------------------------
@@ -1374,20 +1372,3 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		}
 	}
 }
-
-/**
- * The name this class shipped under, kept pointing at the GENERATION.
- *
- * The EXPAND half of an expand -> migrate -> contract rename: the identifier is
- * read at dozens of sites across four packages, so swapping it in one commit
- * cannot leave `pnpm -r build` green. It means what it always meant -- one
- * source, one processor, one state -- and the CONTRACT batch
- * (`the-old-indexer-shape-is-deleted`) removes it once no caller reads it.
- *
- * Deliberately NOT aliased to `Indexer`, the container: re-pointing an exported
- * identifier at a different concept is the silent change this three-batch split
- * exists to avoid. Deliberately NOT marked `@deprecated` either -- nothing is
- * published (`CONTEXT.md`, Conventions), so this is internal scaffolding for one
- * refactor rather than a compatibility promise.
- */
-export {IndexerGeneration as EthereumIndexer};

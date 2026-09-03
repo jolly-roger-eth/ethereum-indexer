@@ -12,18 +12,13 @@ import {processor as entityProcessor, fakeChain, FINALITY, SOURCE, type TestABI}
  *
  * It used to take a union -- a `{kind, processor}` tag, or a free-form
  * `EventProcessorWithInitialState` bare, which meant `'js-object'`. That second
- * authoring path is deleted (ADR-0037), so the tag discriminates nothing and the
- * argument is either the processor or the FACTORIES that build a generation.
+ * authoring path is deleted (ADR-0037); so is the third, a processor already
+ * built over a store, which meant exactly ONE generation and which an indexer
+ * holding several can never be handed. What is left is the FACTORIES.
  *
  * **`pnpm typecheck` is what runs half of this file.** Each `@ts-expect-error`
  * FAILS the typecheck if the line it guards starts compiling, which is the only
  * way to assert that something is NOT accepted.
- *
- * **Where the retired one-generation shape still appears**, it appears as a
- * REFUSAL fixture below and nowhere else. `every-caller-moves-onto-the-generation-container`
- * moved every caller onto the factories; the assertion that the old shape is
- * still ACCEPTED lives in `generationContainer.test.ts`, in one place, and
- * `the-old-indexer-shape-is-deleted` removes it with the shape.
  */
 
 type State = {count: number};
@@ -44,12 +39,12 @@ describe('the shape createIndexerState takes', () => {
 		indexer.dispose();
 	});
 
-	it('does not compile the shapes the retired path used', () => {
+	it('does not compile the shapes the retired paths used', () => {
 		// Deliberately never CALLED: the assertions here are the `@ts-expect-error`
 		// comments, which `pnpm typecheck` evaluates. Vitest strips types, so running
 		// the body would only construct indexers nobody drives.
 		function refusals(entity: EntityEventProcessor<TestABI>, store: StateStore) {
-			// @ts-expect-error the KIND TAG is gone: the argument is the processor, not a wrapper around one
+			// @ts-expect-error the KIND TAG is gone: the argument is the factories, not a wrapper around a processor
 			createIndexerState<TestABI, EntityStateView>({kind: 'entities', processor: entity});
 			// the free-form processor the retired path produced, as a value so the
 			// refusal below lands on the CALL rather than on one property of a literal
@@ -63,10 +58,17 @@ describe('the shape createIndexerState takes', () => {
 				reset: async () => {},
 				clear: async () => {},
 			};
-			// @ts-expect-error it has no `state` handle, so it is not a processor this hook takes
+			// @ts-expect-error it builds no generation, so it is not something this hook takes
 			createIndexerState<Abi, State>(freeForm);
+			// A processor ALREADY BUILT over a store, which is the one-generation shape
+			// `the-old-indexer-shape-is-deleted` removed: an indexer holds any number of
+			// generations and each folds into its OWN state, so a value handed over once
+			// can never be what the next generation folds into.
+			// @ts-expect-error it is the fold itself and not the factory that builds one
+			createIndexerState<TestABI, EntityStateView>(entity);
+			const spec = {createState: () => store, createProcessor: () => entity};
 			// @ts-expect-error and the `keepState` option went with the keeper family it configured
-			createIndexerState<TestABI, EntityStateView>(entity, {keepState: store});
+			createIndexerState<TestABI, EntityStateView>(spec, {keepState: store});
 		}
 
 		expect(typeof refusals).toBe('function');
