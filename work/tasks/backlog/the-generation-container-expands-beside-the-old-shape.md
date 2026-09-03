@@ -2,26 +2,31 @@
 title: 'EXPAND: the generation container lands beside the old indexer shape, both accepted'
 slug: the-generation-container-expands-beside-the-old-shape
 spec: a-reconfigure-is-not-an-outage
-needsAnswers: true
 blockedBy: [the-invalidation-verdict-becomes-a-published-answer]
 covers: []
 ---
 
-## Open questions
+## Answers
 
-1. **What are the two concrete class names, and which one does the retained alias point at?** The
-   direction is settled by `CONTEXT.md`: `EthereumIndexer` is "one source plus one processor plus one
-   state, which is a GENERATION rather than the container, so that class is renamed when the container
-   lands". So the existing class becomes the GENERATION and a NEW class becomes the container. What is
-   NOT settled is the two identifiers. This blocks the build because the name propagates through three
-   batches and 46 call sites, and two builders on two batches could choose differently.
+1. **The two class names.** The existing class `EthereumIndexer` (one source, one processor, one
+   state) is renamed to **`IndexerGeneration`**. The container is **`Indexer`**, a new export. The
+   retained `EthereumIndexer` alias points at **`IndexerGeneration`**, never at the container.
 
-   Concretely, answer both halves: (a) what is the existing class renamed TO (e.g. `Generation`,
-   `IndexerGeneration`)? (b) what is the CONTAINER called (e.g. `EthereumIndexer` reused for it, since
-   `CONTEXT.md` says "an indexer holds several generations", or a distinct new name)? Reusing
-   `EthereumIndexer` for the container is the reading `CONTEXT.md` most supports, but it silently
-   RE-MEANS an exported identifier that 46 sites already construct with generation-shaped arguments,
-   so it must be a deliberate choice rather than a default.
+   `Indexer` is the container because `CONTEXT.md` already defines that word as the named unit holding
+   generations, carrying the caps and the canonical pointer. Reusing `EthereumIndexer` for the
+   container was rejected: it contradicts this task's own criterion that the alias means the
+   generation, and re-meaning an exported identifier is the silent-change hazard the split exists to
+   avoid.
+
+   **No deprecation annotation on the alias.** This library has no users, so the alias is internal
+   scaffolding that keeps this batch small, not a compatibility promise. Do not add `@deprecated`,
+   migration prose, or consumer-facing notes; the contract batch deletes the alias outright.
+
+   Rejected names, so no later batch reopens this: `EthereumGeneration` (reads as a chain era),
+   `EtherfoldIndexer` (near-homograph of `EthereumIndexer`, and both are in scope during expand),
+   `IndexerHost` (`host` already means the embedding runtime), `GenerationSet`/`GenerationPool` (drop
+   the named, capped, one-canonical-answer meaning). Bare `Generation` was the runner-up, declined
+   only to keep the exported identifier unambiguous.
 
 ## What to build
 
