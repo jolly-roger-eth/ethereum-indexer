@@ -2,46 +2,62 @@
 title: 'One command runs the whole pipeline, and the split is a deployment choice rather than a milestone'
 slug: one-command-runs-the-whole-pipeline
 taskedAfter: [one-processor-everywhere]
-needsAnswers: true
 ---
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 
-> **NOT TASKED — DRIFTED, 2026-09-02.** Tasking was attempted and STOPPED at `TASKING-PROTOCOL` §2's
-> drift check: one of the two problems this spec is motivated by has since been SOLVED, so tasking it
-> as written would emit tasks on a false premise. The open questions are below; the Solution's command
-> set is probably still right, but its SCOPE is now unknown. Answer the questions, correct the Problem
-> Statement, clear `needsAnswers`, and it is taskable again.
+> **ANSWERED AND RE-SCOPED, 2026-09-03.** Tasking was attempted on 2026-09-02 and STOPPED at
+> `TASKING-PROTOCOL` §2's drift check, because one of the two problems this spec is motivated by had
+> been solved. The four questions are answered below against the tree, the Problem Statement is
+> corrected, and the spec is taskable. The command set survived; the SCOPE shrank.
 
-## Open questions
+## Answers
 
-1. **How much of this spec is already delivered?** The Problem Statement's first bullet — "`etherfold
-   index` folds, but is one-shot and REFUSES an entity processor outright (`packages/cli/src/index.ts`
-   throws `this processor do not support "keepState" config`)" — is now **FALSE**. The done task
-   `index-to-a-store-from-the-cli` quotes that exact throw and removes it, delivering "the same
-   processor object, unchanged, indexing on a server into SQLite". Verified: no `keepState` refusal
-   remains in `packages/cli/src`, and `packages/cli/src/keepState.ts` is gone entirely (deleted with
-   the `KeepState` family by `retire-the-js-object-processor-path`, ADR-0037). So the `index` row of
-   the five-command table substantially EXISTS. Which rows are genuinely missing now — `run`, `build`,
-   `fetch`, and the `/status` cursor field — and which are already there?
+1. **How much is already delivered? Three things, and the spec is smaller than it reads.** Verified
+   row by row against the tree on 2026-09-03:
 
-2. **Does the command RENAME still stand, and who owns it?** This spec re-means `index` (no chain
-   following) and introduces `build` as the one-shot that exits at the tip. Today's CLI is `index`
-   (default, one-shot) plus `serve`. Two landed tasks already wrote around this rename as a future
-   event (`retire-the-js-object-processor-path` warned "if the rename has landed, the refusal you are
-   deleting lives on `build`"), so the rename is still pending and still owned by this spec — confirm
-   that is intended, because it is a user-visible breaking change to the only shipped command.
+   | row | today | verdict |
+   | --- | --- | --- |
+   | `run` | nothing assembles it | **MISSING, and it is the headline** |
+   | `build` | today's `index` (the default command) | exists, misnamed |
+   | `fetch` | the `etherfold-fetch` bin in `platforms/nodejs-fetcher` | exists, wrong front door |
+   | `index` (new meaning) | nothing | **MISSING** |
+   | `serve` | `serve` | exists |
+   | `/status` cursor | `healthy`, `database`, `reorgs`, `schema`, `lastError` and nothing else | **MISSING** |
 
-3. **What happened to `--store` / `--folder`?** `retire-the-js-object-processor-path` recorded that
-   `--store` survives with exactly one value and stays REQUIRED, and that `--folder` went with the
-   free-form path. This spec's command table assigns a database to four of five commands but predates
-   that decision. Does the flag surface described here still match?
+   So the genuinely NEW work is `run`, the new `index`, and one `/status` field. `build` and `fetch`
+   are a rename and a re-homing of things that already work. **Do not let the shrink lose the new
+   `index`:** it is not a cosmetic re-meaning, it is the WIRE RECEIVER, and its absence is exactly the
+   "a split deployment is missing its RECEIVER" gap the Problem Statement names — today's `serve` is
+   constructed with `{getDB, getEnv}` and no `getIngestion`, so it hosts no processor.
 
-4. **Is the `/status` cursor field still the only new surface?** The spec says so, and says the cursor
-   must arrive as an injected reporter beside `getDB`/`getEnv`/`getIngestion` rather than teaching
-   `@etherfold/server` to read a cursor table. `d1-limits-reach-the-stores-batch-bounds` has since
-   landed and wired host configuration into the store — confirm that did not already create (or
-   foreclose) the seam this spec planned to use.
+2. **The rename stands, this spec owns it, and it MUST land before publishing.** Nothing is published
+   yet, so renaming the only shipped command costs nothing today and becomes a breaking change to a
+   shipped CLI the moment `publish-etherfold-and-deprecate-old-names` runs. That is the same
+   permanent asymmetry the publish task already respects by blocking on
+   `a-snapshot-a-client-cannot-read-is-refused-not-installed` ("today the fix is free; after
+   publishing, the same fix is a breaking correction to a shipped package"). **The rename task this
+   spec emits must therefore be added to `publish-etherfold-and-deprecate-old-names`'s `blockedBy`,
+   on that precedent.**
+
+3. **The flag surface still matches, with ONE correction.** Verified: `--store` survives, is
+   REQUIRED, takes exactly one value (`sqlite`), and `--db <url>` is required alongside it. The
+   surviving `-d` flag is the DEPLOYMENTS folder (hardhat-deploy/rocketh format) and is unrelated to
+   the retired fs-state `--folder`; do not conflate them. The correction: because `--store` is
+   required, the `fetch` row — the one command that owns no database — must state that `--store` and
+   `--db` are **NOT ACCEPTED** there rather than optional. Otherwise `fetch` inherits a required flag
+   it has no use for, and the failure lands on the one command that should need nothing but a node URL
+   and an ingest endpoint.
+
+4. **Still the only new surface, and the seam is intact.** Verified: `/status` reports no cursor, and
+   `d1-limits-reach-the-stores-batch-bounds` did NOT foreclose the seam — the server remains
+   host-agnostic, with everything host-shaped arriving through `getDB`/`getEnv`. So the injected
+   reporter is still right, and now has a landed precedent to imitate rather than a plan to invent.
+   **Forward-note, load-bearing:** `a-reconfigure-is-not-an-outage` landed a model where an indexer
+   holds several GENERATIONS and progress is reported per generation. The server does not hold
+   generations yet (`the-server-and-cli-hold-generations-too`), so report ONE cursor now — but shape
+   the field so it can grow a generation dimension later, rather than hard-coding a scalar that work
+   would have to break.
 
 ## Problem Statement
 
@@ -52,9 +68,11 @@ exists in the repo and is unreachable from a terminal.
 
 What a terminal offers instead is two commands that each do part of it:
 
-- **`etherfold index`** folds, but is one-shot and REFUSES an entity processor outright
-  (`packages/cli/src/index.ts` throws `this processor do not support "keepState" config`), which is
-  exactly the processor kind the project is built around.
+- **`etherfold index`** follows the chain, folds an ENTITY processor into SQLite, and exits at the
+  tip. This is the one row that has since been DELIVERED: `index-to-a-store-from-the-cli` removed the
+  `this processor do not support "keepState" config` refusal, and `packages/cli/src/keepState.ts` is
+  gone entirely (ADR-0037). What is wrong with it now is only its NAME: a one-shot that terminates at
+  the tip is this spec's `build`, and the `index` name is needed for the wire receiver.
 - **`etherfold serve`** starts the HTTP server with `{getDB, getEnv}` and **no `getIngestion`**, so it
   hosts no processor and no fetcher. It is the RECEIVING half of a split — and the half it is waiting
   for is the one thing here that IS already runnable.
@@ -89,7 +107,7 @@ needs no knowledge of how the components divide:
 | --- | --- | --- | --- | --- | --- |
 | **`run`** | yes | yes | yes | no | owns it |
 | **`build`** | yes | yes | no | at the tip | owns it |
-| **`fetch`** | yes | no | no | no | none |
+| **`fetch`** | yes | no | no | no | none (`--store`/`--db` are REFUSED, not optional) |
 | **`index`** | no | yes | no | no | owns it |
 | **`serve`** | no | no | yes | no | reads one written elsewhere |
 
