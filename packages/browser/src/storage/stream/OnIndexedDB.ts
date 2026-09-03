@@ -1,11 +1,14 @@
 import {
 	createSegmentedStream,
+	resolveStreamConfig,
+	streamDigestOf,
 	type Abi,
 	type ExistingStream,
 	type IndexingSource,
 	type StoredSegment,
 	type StreamCursorRecord,
 	type StreamSegmentPort,
+	type UsedStreamConfig,
 } from '@etherfold/core';
 import {createStore, del, get, promisifyRequest, type UseStore} from 'idb-keyval';
 import {logs} from 'named-logs';
@@ -34,28 +37,11 @@ const STREAM = 'stream';
 const CURSOR = 'cursor';
 
 /**
- * The DIGEST level, until `a-reconfigure-is-not-an-outage` computes the real one.
- *
- * Derived from `chainId` and deliberately not a bare constant. `chainId` is
- * absent from the address because the REAL digest already contains it (the
- * block-0 skeleton entry hashes `chainId` and `genesisHash`), and that is FALSE
- * of a constant: with one, every chain under a single indexer name would share
- * one subtree, which is a regression against the shipped keeper
- * (`stream_<name>_<chainId>`),
- * and precisely the cross-chain corruption hierarchical addressing is supposed
- * to have deleted. Deriving it keeps the isolation with no extra level, and the
- * address does not change SHAPE when the real digest lands.
- */
-export function placeholderStreamDigest(chainId: string): string {
-	return `chain-${chainId}`;
-}
-
-/**
  * One stream's address: a HIERARCHICAL array key, plus the flat key it replaces.
  *
  * ```
- * ['stream', <indexer-name>, <digest>, <ordinal>]   a segment
- * ['stream', <indexer-name>, <digest>, 'cursor']    the cursor record
+ * ['stream', <indexer-name>, <streamDigest>, <ordinal>]   a segment
+ * ['stream', <indexer-name>, <streamDigest>, 'cursor']    the cursor record
  * ```
  *
  * An earlier design packed these components into one delimited STRING and then
@@ -64,9 +50,23 @@ export function placeholderStreamDigest(chainId: string): string {
  * All of that was a consequence of the flat namespace: comparing key ELEMENTS
  * cannot confuse chain `1` with chain `10`, so the hazard is gone rather than
  * guarded. There is no string-prefix matching anywhere below.
+ *
+ * The DIGEST level is `@etherfold/core`'s `streamDigestOf`: what the stream
+ * CONTAINS -- its fetch filter and its stream config -- and nothing about who
+ * indexed it. `chainId` is not a level of its own because that digest already
+ * covers it (its block-0 skeleton entry hashes `chainId` and `genesisHash`), and
+ * `<indexer-name>` is the caller-supplied discriminator, untouched here. This
+ * level held a `chain-<chainId>` PLACEHOLDER while the digest was being built;
+ * subtrees written under it are simply unreachable now, and disposing of them
+ * belongs to the sweep in the generation registry, which is the only place that
+ * can know which digests are registered.
  */
-export function streamAddress(name: string, chainId: string) {
-	const prefix: IDBValidKey[] = [STREAM, name, placeholderStreamDigest(chainId)];
+export function streamAddress<ABI extends Abi>(
+	name: string,
+	source: IndexingSource<ABI>,
+	streamConfig: UsedStreamConfig,
+) {
+	const prefix: IDBValidKey[] = [STREAM, name, streamDigestOf(source, streamConfig)];
 	return {
 		prefix,
 		cursor: [...prefix, CURSOR] as IDBValidKey,
@@ -84,7 +84,7 @@ export function streamAddress(name: string, chainId: string) {
 		segments: IDBKeyRange.bound([...prefix, 0], [...prefix, CURSOR], false, true),
 		subtree: IDBKeyRange.bound([...prefix, 0], [...prefix, []]),
 		/** The SHIPPED keeper's flat key, which is deleted rather than adopted. */
-		legacy: `${STREAM}_${name}_${chainId}`,
+		legacy: `${STREAM}_${name}_${source.chainId}`,
 	};
 }
 
@@ -116,8 +116,12 @@ function keyvalStore(): UseStore {
  * including its rule that inside a transaction you may await only IndexedDB's
  * own promises.
  */
-function portOver<ABI extends Abi>(name: string, store: UseStore): StreamSegmentPort<ABI> {
-	const addressOf = (source: IndexingSource<ABI>) => streamAddress(name, source.chainId);
+function portOver<ABI extends Abi>(
+	name: string,
+	store: UseStore,
+	streamConfig: () => UsedStreamConfig,
+): StreamSegmentPort<ABI> {
+	const addressOf = (source: IndexingSource<ABI>) => streamAddress(name, source, streamConfig());
 
 	return {
 		async readCursor(source) {
@@ -231,9 +235,20 @@ function portOver<ABI extends Abi>(name: string, store: UseStore): StreamSegment
 export function keepStreamOnIndexedDB<ABI extends Abi>(
 	name: string,
 	options: {store?: UseStore} = {},
-): ExistingStream<ABI> {
+): ExistingStream<ABI> & {setStreamConfig: (streamConfig: UsedStreamConfig) => void} {
 	const store = options.store ?? keyvalStore();
-	const segmented = createSegmentedStream<ABI>(portOver<ABI>(name, store));
+	/**
+	 * The config half of the stream's IDENTITY, which the indexer hands over in
+	 * its `reinit` (`setStreamConfig`) before it asks for anything.
+	 *
+	 * It starts at the RESOLVED DEFAULT rather than at nothing, so a keeper driven
+	 * directly -- a test, a tool -- addresses the same stream an indexer given no
+	 * `stream` config would, instead of a fourth thing. It is a single mutable
+	 * value on purpose: one keeper serves one indexer, and a reconfigure MOVES it
+	 * to the new stream, which is exactly what leaves the old subtree intact.
+	 */
+	let streamConfig = resolveStreamConfig(undefined);
+	const segmented = createSegmentedStream<ABI>(portOver<ABI>(name, store, () => streamConfig));
 
 	/**
 	 * The shipped keeper's blob is DELETED, not adopted, and it is detected HERE
@@ -248,7 +263,7 @@ export function keepStreamOnIndexedDB<ABI extends Abi>(
 	 * stream, and half of each is worse than neither.
 	 */
 	async function dropLegacyBlob(source: IndexingSource<ABI>): Promise<boolean> {
-		const address = streamAddress(name, source.chainId);
+		const address = streamAddress(name, source, streamConfig);
 		const legacy = await get(address.legacy, store);
 		if (legacy === undefined) {
 			return false;
@@ -263,6 +278,9 @@ export function keepStreamOnIndexedDB<ABI extends Abi>(
 	}
 
 	return {
+		setStreamConfig(next) {
+			streamConfig = next;
+		},
 		async fetchFrom(source, fromBlock) {
 			if (await dropLegacyBlob(source)) {
 				return undefined;
@@ -273,7 +291,7 @@ export function keepStreamOnIndexedDB<ABI extends Abi>(
 			return segmented.saveNewEvents(source, stream);
 		},
 		async clear(source) {
-			await del(streamAddress(name, source.chainId).legacy, store);
+			await del(streamAddress(name, source, streamConfig).legacy, store);
 			await segmented.clear(source);
 		},
 	};

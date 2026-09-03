@@ -34,6 +34,28 @@ function normalizeAsArray(obj: object): any {
 }
 
 /**
+ * The BYTES a digest of this value is taken over: key-sorted, whitespace-free,
+ * `undefined` dropped, BigInts stringified with an `n` suffix.
+ *
+ * Extracted from `simple_hash` rather than copied, because a second
+ * canonicalisation is a second answer to "are these two values the same": the
+ * stream digest (`stream/identity.ts`) takes a WIDE hash over these same bytes,
+ * and two normalisations that disagreed anywhere would make one digest move
+ * where the other did not. A string passes through untouched, which is what
+ * makes hashing an already-canonical value idempotent.
+ *
+ * Note what changing this would cost: every digest ever computed, and digests
+ * are persisted.
+ */
+export function canonical_form(obj: any): string {
+	return typeof obj === 'string'
+		? obj
+		: JSON.stringify(normalizeAsArray(obj as object), (_, value) =>
+				typeof value === 'bigint' ? `${value}n` : value,
+			).replace(/\s+/g, '');
+}
+
+/**
  * A short, stable, order-insensitive digest of any JSON-ish value.
  *
  * BigInt values are stringified with an `n` suffix on the way in, because
@@ -63,12 +85,7 @@ function normalizeAsArray(obj: object): any {
  * outside this repo that kept the old convention.
  */
 export function simple_hash(obj: any): string {
-	const str =
-		typeof obj === 'string'
-			? obj
-			: JSON.stringify(normalizeAsArray(obj as object), (_, value) =>
-					typeof value === 'bigint' ? `${value}n` : value,
-				).replace(/\s+/g, '');
+	const str = canonical_form(obj);
 	let hash = 0;
 	for (let i = 0; i < str.length; i++) {
 		const char = str.charCodeAt(i);

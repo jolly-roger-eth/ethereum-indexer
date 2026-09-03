@@ -300,6 +300,17 @@ export class EthereumIndexer<ABI extends Abi, ProcessResultType = void> {
 		this.streamConfigHash = simple_hash(this.config.stream || 'undefined');
 		this.finality = this.config.stream.finality;
 
+		// The half of the stream's IDENTITY that does not travel with each call. A
+		// keeper is handed a `source` on every operation and never the config, so a
+		// keeper that ADDRESSES a stream by `{filter, config}` would otherwise key
+		// two configs onto one subtree -- and a generation would adopt logs the
+		// invalidation verdict has already declared invalid. Here rather than at the
+		// keeper's construction site because this is where the config is RESOLVED,
+		// and here rather than once in the constructor because `reinit` is also what
+		// a RECONFIGURE goes through: the keeper follows onto the new stream and the
+		// old one is left exactly where it is.
+		this.config.keepStream?.setStreamConfig?.(this.config.stream);
+
 		this.streamWriteFailureLimit =
 			this.config.streamWriteRetry?.maxConsecutiveFailures ?? DEFAULT_STREAM_WRITE_FAILURE_LIMIT;
 		this.streamWriteRetryDelay = this.config.streamWriteRetry?.delaySeconds ?? DEFAULT_STREAM_WRITE_RETRY_DELAY;

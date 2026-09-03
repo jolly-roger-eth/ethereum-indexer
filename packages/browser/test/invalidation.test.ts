@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import {describe, expect, it} from 'vitest';
 import {get, set} from 'idb-keyval';
-import {simple_hash, type LastSync} from '@etherfold/core';
+import {resolveStreamConfig, simple_hash, type LastSync} from '@etherfold/core';
 import {
 	deserializeLastSync,
 	EntityEventProcessor,
@@ -228,7 +228,10 @@ describe('a context persisted by the SHIPPED code, read by this one', () => {
 		// stream's subtree, at the hierarchical address. Same ageing, deliberately
 		// re-aimed: the trap this test exists for is a persisted `ContextIdentifier`
 		// misread by its successor, and moving where it is stored does not retire it.
-		const cursorKey = streamAddress(tag, SOURCE.chainId).cursor;
+		// at the address the INDEXER's own stream config resolves to: the digest
+		// level covers the filter AND the config, so naming a different one here
+		// would age a subtree nothing reads
+		const cursorKey = streamAddress(tag, SOURCE, resolveStreamConfig({finality: FINALITY})).cursor;
 		const cursor = await get<{context: LastSync<TestABI>['context']}>(cursorKey);
 		expect(cursor).toBeDefined();
 		expect(cursor!.context.source.length).toBeGreaterThan(1);
