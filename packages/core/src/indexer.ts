@@ -56,6 +56,20 @@ function sameEvent<ABI extends Abi>(a: LogEvent<ABI>, b: LogEvent<ABI>): boolean
 	return a.blockHash === b.blockHash && a.logIndex === b.logIndex && !!a.removed === !!b.removed;
 }
 
+/**
+ * ONE EMISSION, as small a thing as an equality test needs it to be.
+ *
+ * The same identity `sameEvent` uses -- block HASH, index in that block, and
+ * whether this is the application or the retraction -- flattened to a string so
+ * a follower can remember a WINDOW of them without holding the events
+ * themselves. Never the block NUMBER, which a reorg reuses for a different
+ * block; never the decoded `args`, which are what SOME ABI made of the bytes
+ * (ADR-0034) and are re-derived on every replay anyway.
+ */
+function emissionMarkOf<ABI extends Abi>(event: LogEvent<ABI>): string {
+	return `${event.blockHash}:${event.logIndex}:${event.removed ? 'R' : 'A'}`;
+}
+
 export type LoadingState = 'Loading' | 'FetchingEventStream' | 'ProcessingEventStream' | 'Loaded';
 
 /**
@@ -287,6 +301,39 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 	 * why this lives here.
 	 */
 	protected streamLastToBlock: number | undefined;
+
+	/**
+	 * THE EMISSIONS THIS FOLLOWER HAS ALREADY FOLDED, over the range it resumes
+	 * from -- and the whole of how a follower decides there is something new.
+	 *
+	 * A follower advances by re-reading the stream from `getFromBlock` and replaying
+	 * what is beyond its own fold, so it needs a cheap "has this stream changed"
+	 * question or every idle cycle re-walks and re-decodes the window. That question
+	 * used to be asked of the stream's CURSOR (`lastToBlock`), and a cursor is a
+	 * SUMMARY of a stream, which can lie: a PAUSED writer caps its `toBlock`
+	 * (ADR-0045), so a reorg it detects at or below the cap is appended to the
+	 * stream with the cursor NEVER MOVING, and a follower level with the cap
+	 * concluded there was nothing to follow and kept a branch the chain had
+	 * abandoned. The guard was written when a frozen cursor could not exist -- a
+	 * running writer's `lastToBlock` rises with the tip every cycle -- so neither
+	 * that rule nor pause is wrong on its own; the defect lived only where they met.
+	 *
+	 * So this remembers the EMISSIONS THEMSELVES (`emissionMarkOf`, in stream order)
+	 * rather than a number describing them. It cannot go stale the way
+	 * `lastToBlock` did, because it is not a claim the writer makes ABOUT the
+	 * stream: it is the content of the stream over exactly the range this follower
+	 * would replay, compared against the content it last folded. Anything appended
+	 * there -- a retraction, its replacement, a block the cursor does not mention --
+	 * makes the two differ, whatever any cursor says. ADR-0049 records the decision
+	 * and why a cursor-derived shortcut is the thing to be suspicious of here.
+	 *
+	 * Set ONLY where this generation has just folded that exact slice, so "equal"
+	 * always means "already folded", and `undefined` (nothing folded yet, or the
+	 * stream this follows has changed underneath) means FOLD, which is the safe
+	 * direction: a replay of what is already folded is de-duplicated against the
+	 * unconfirmed window (`generateStreamFromReplay`) and delivers nothing.
+	 */
+	protected followedEmissions: string[] | undefined;
 
 	/**
 	 * The batch that IS written but that the processor has not accepted yet.
@@ -777,6 +824,10 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		this._save.reset();
 		this._load.reset();
 		this._follow.reset();
+		// A reconfigure can point the keeper at a DIFFERENT stream, so what this
+		// generation folded no longer describes what it is about to read. Forgetting it
+		// costs one replay that de-duplicates to nothing; keeping it could skip one.
+		this.followedEmissions = undefined;
 		this.reinit(
 			newProvider,
 			update.source || this.source,
@@ -823,6 +874,9 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 			this._index.reset();
 			this._load.reset();
 			this._follow.reset();
+			// the fold that folded those emissions is being replaced, so the record of
+			// what it folded goes with it
+			this.followedEmissions = undefined;
 
 			try {
 				await oldProcessor.clear().then(() => this.load());
@@ -878,6 +932,31 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		this.streamLastToBlock = undefined;
 		this.streamWrittenNotProcessed = undefined;
 		this.streamDeclineReported = false;
+		// and nothing this generation folded describes what is there now
+		this.followedEmissions = undefined;
+	}
+
+	/**
+	 * Whether this slice of the stream is EXACTLY the one this generation last
+	 * folded, emission for emission and in order.
+	 *
+	 * The replacement for the cursor comparison, and it is deliberately an equality
+	 * and not an ordering: "the stream has not changed where I would read it" is the
+	 * only question whose answer justifies doing nothing. Anything else -- a longer
+	 * slice, a shorter one, one that shares a prefix -- falls through to the replay,
+	 * which is always correct and merely costs a walk.
+	 */
+	protected hasAlreadyFolded(eventsStored: LogEvent<ABI>[]): boolean {
+		const folded = this.followedEmissions;
+		if (!folded || folded.length !== eventsStored.length) {
+			return false;
+		}
+		for (let i = 0; i < folded.length; i++) {
+			if (folded[i] !== emissionMarkOf(eventsStored[i])) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	protected async promiseToLoad(): Promise<LastSync<ABI>> {
@@ -1113,8 +1192,16 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 			return current;
 		}
 		this.streamLastToBlock = lastSyncStored.lastToBlock;
-		if (lastSyncStored.lastToBlock <= current.lastToBlock) {
-			// level with the stream: there is nothing yet to follow
+		// NOTHING TO FOLLOW is a question about the STREAM, and it is asked of the
+		// stream. The cursor is consulted only for the half it cannot be wrong about:
+		// a stream reaching PAST this fold is new by definition and there is no need to
+		// compare anything. The other half -- a cursor level with or behind this fold --
+		// used to be the whole test and is exactly where a PAUSED writer's frozen
+		// `lastToBlock` hid an appended retraction (see `followedEmissions`), so what
+		// settles it is whether the emissions themselves are the ones already folded.
+		if (lastSyncStored.lastToBlock <= current.lastToBlock && this.hasAlreadyFolded(eventsStored)) {
+			// level with the stream, and the stream says the same thing it said last time:
+			// there is nothing yet to follow
 			return current;
 		}
 
@@ -1123,8 +1210,17 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		// for a replayed stream is better than two.
 		const replayable = this.logEventFetcher.reparse(eventsStored);
 		if (!replayable) {
+			// not folded, so nothing is remembered: the next cycle asks again rather than
+			// concluding it is level with a stream it could not read
 			return current;
 		}
+		// Taken from the STORED slice and not from `replayable`, because the stored
+		// slice is what the next cycle re-reads and is therefore what it can be
+		// compared against. It is only REMEMBERED once the fold below has returned: a
+		// replay that throws part-way has not folded this slice, and the next cycle
+		// re-offers the whole of it (`generateStreamFromReplay` de-duplicates whatever
+		// did land against the window).
+		const folded = eventsStored.map(emissionMarkOf);
 		if (replayable.length === 0) {
 			// The stream moved and carried no events into this range, which is what an
 			// empty save writes. The CURSOR still has to move, or `getFromBlock` would
@@ -1138,6 +1234,7 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 				lastToBlock: lastSyncStored.lastToBlock,
 				unconfirmedBlocks: current.unconfirmedBlocks,
 			};
+			this.followedEmissions = folded;
 			this._onLastSyncUpdated();
 			return this.lastSync;
 		}
@@ -1145,6 +1242,10 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		// REPLAY and not feed: this stream carries its own verdicts (ADR-0042), and a
 		// follower has no fetch window to derive them from.
 		await unlessCancelled(this.replay(replayable, lastSyncStored));
+		// AFTER the replay, and only on the way out of a successful one: a fold that
+		// threw has not folded this slice, and remembering it as folded would make the
+		// next cycle skip exactly the emissions that never landed.
+		this.followedEmissions = folded;
 		return this.lastSync as LastSync<ABI>;
 	}
 
