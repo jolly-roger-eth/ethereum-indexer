@@ -4,6 +4,7 @@ import pkg from '../package.json' with {type: 'json'};
 import {INPUTS, OWNERSHIP, type ConfigInput} from './config.js';
 import {fetchMain} from './fetch.js';
 import {main} from './index.js';
+import {indexMain} from './indexCommand.js';
 import {runMain} from './run.js';
 import {serve} from './serve.js';
 import type {CommandName, Options} from './types.js';
@@ -25,6 +26,8 @@ export type ProgramDependencies = {
 	run?: (options: Options) => void | Promise<void>;
 	/** Runs the chain-facing half. Defaults to `fetchMain`, which also hooks the log sink to the console. */
 	fetch?: (options: Options) => void | Promise<void>;
+	/** Runs the receiving half. Defaults to `indexMain`, which keeps receiving until a signal and resolves the exit code. */
+	index?: (options: Options) => void | Promise<void>;
 	/** Starts the read tier. Defaults to `serve`, which resolves its database and starts the Node adapter. */
 	serve?: (options: Options) => Promise<void>;
 };
@@ -60,20 +63,20 @@ function registerInputs(command: Command, name: CommandName): void {
 }
 
 /**
- * The command surface: five names are coming, and each of them means one thing.
+ * The command surface: five names, each of them meaning one thing.
  *
  * `CONTEXT.md` ("The COMMAND SET names deployment intents, not components")
- * is the authority for the set. Four of the five ship: **`run`** follows the
+ * is the authority for the set, and all five now ship: **`run`** follows the
  * chain, folds AND answers queries without terminating -- the milestone, and the
  * default thing to reach for; **`build`** is the same assembly stopping at the
- * tip; **`serve`** answers queries over a database written elsewhere; and
- * **`fetch`** is the chain-facing half of a SPLIT deployment, which folds
- * nothing, holds no state and pushes to a receiver elsewhere -- the ONLY way to
- * run a fetcher, now that the standalone binary is retired. The one that does
- * not exist yet is `index`, the other half of that pair, and the word is held
- * free for it rather than borrowed -- but its configuration already resolves
- * (`OWNERSHIP` in `src/config.ts`), so adding it is a registration and an
- * assembly rather than a second way to read a flag.
+ * tip; **`serve`** answers queries over a database written elsewhere; **`fetch`**
+ * is the chain-facing half of a SPLIT deployment, which folds nothing, holds no
+ * state and pushes to a receiver elsewhere -- the ONLY way to run a fetcher, now
+ * that the standalone binary is retired; and **`index`** is the other half of
+ * that pair, receiving those pushes and owning the database. Adding the last one
+ * was a registration and an assembly rather than a second way to read a flag,
+ * because every row of the table already resolved through one resolver
+ * (`OWNERSHIP` in `src/config.ts`).
  *
  * ## Why there is no DEFAULT command any more
  *
@@ -155,6 +158,33 @@ export function createProgram(deps: ProgramDependencies = {}): Command {
 	registerInputs(fetchCommand, 'fetch');
 	fetchCommand.action(async (options: Options) => {
 		await runFetch(options);
+	});
+
+	const runReceiver =
+		deps.index ??
+		(async (options: Options) => {
+			// Hooked for the same reason `fetch` hooks it, in the same place: a split
+			// deployment's two processes are observable through their cycle logs and
+			// their `/status`, and hooking the facade belongs in a process entry point
+			// rather than in a library. On this half it is what surfaces the refusals the
+			// wire makes -- a foreign `{source, config}`, an absence-driven revert -- which
+			// no HTTP response of ours ever shows an operator.
+			await import('named-logs-console');
+			// `indexMain` resolves the exit code the same way `runMain` does: a receiver
+			// that never started must not look like one that was asked to stop.
+			await indexMain(options, {env});
+		});
+
+	const indexCommand = program
+		.command('index')
+		.description(
+			'receive pushed ranges of raw logs over HTTP and fold them into a libSQL database: ' +
+				'the folding half, which makes no chain call and answers no queries beyond /status',
+		)
+		.usage("-p <processor's path> --store sqlite --db <libsql url> -d <deployment folder> [--port 2000]");
+	registerInputs(indexCommand, 'index');
+	indexCommand.action(async (options: Options) => {
+		await runReceiver(options);
 	});
 
 	const serveCommand = program
