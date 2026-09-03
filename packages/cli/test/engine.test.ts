@@ -6,7 +6,7 @@ import {describe, expect, it} from 'vitest';
 // ---------------------------------------------------------------------------------------------------
 // THERE IS ONE SERVER-SIDE FOLDING ENGINE, AND IT IS NOT `IndexerGeneration`
 // ---------------------------------------------------------------------------------------------------
-// `work/specs/ready/one-command-runs-the-whole-pipeline.md` builds `run` and
+// `work/specs/tasked/one-command-runs-the-whole-pipeline.md` builds `run` and
 // `index` on the same `StreamBuilder` and asserts they produce identical state
 // from the same input. That assertion is worth making only if the transport is
 // the only difference between them: if this command folded through

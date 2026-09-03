@@ -8,7 +8,7 @@ It knows `RemoteSQL` and nothing else: no Node built-ins, no Cloudflare types, n
 
 You are building a HOST. Everything platform-shaped -- which database, which environment, how the app is served -- is the host's, and the shipped ones are [`@etherfold/platform-nodejs`](../../platforms/nodejs) and [the Cloudflare Worker host](../../platforms/cf-worker). Reach for this package directly to write a third.
 
-To simply RUN a server on Node, use [`etherfold serve`](../cli). To index into a database in one shot, use `etherfold index`.
+To simply RUN a read tier on Node, use [`etherfold serve`](../cli). To fold into a database in one shot, use `etherfold build`.
 
 ## What a host supplies
 

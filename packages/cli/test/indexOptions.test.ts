@@ -11,7 +11,7 @@ import type {Options} from '../src/types.js';
 // kept as the axis a second backend arrives on.
 //
 // Everything below is resolved BEFORE anything is loaded or dialled, which is
-// what lets `etherfold index` refuse a wrong combination without a network call.
+// what lets `etherfold build` refuse a wrong combination without a network call.
 // ---------------------------------------------------------------------------------------------------
 
 const BASE: Options = {processor: './processor.js', nodeUrl: 'http://localhost:8545'};

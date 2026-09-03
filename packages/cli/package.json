@@ -1,7 +1,7 @@
 {
 	"name": "etherfold",
 	"version": "0.7.0",
-	"description": "The etherfold command line: run a processor over a chain and write the derived state into a libSQL database (one shot, exits at the tip), or serve the indexer-server over HTTP.",
+	"description": "The etherfold command line: `build` runs a processor over a chain and writes the derived state into a libSQL database (one shot, exits at the tip); `serve` answers queries over a database written elsewhere.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",

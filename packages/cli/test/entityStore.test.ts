@@ -22,7 +22,7 @@ import {
 } from './utils/chain.js';
 
 // ---------------------------------------------------------------------------------------------------
-// `etherfold index --store sqlite` RUNS AN ENTITY PROCESSOR INTO A STORE
+// `etherfold build --store sqlite` RUNS AN ENTITY PROCESSOR INTO A STORE
 // ---------------------------------------------------------------------------------------------------
 // The server half of "one processor, everywhere": the same processor object a
 // tab runs against IndexedDB, indexing on a server into versioned rows -- and

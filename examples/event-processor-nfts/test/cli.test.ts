@@ -5,7 +5,7 @@ import {describe, expect, it} from 'vitest';
 // THE SAME PROCESSOR, UNDER THE CLI
 // ---------------------------------------------------------------------------------------------------
 // `src/entities.ts` is what `browser/main.ts` runs against IndexedDB in a tab.
-// This drives THAT FILE, unchanged, through `etherfold index --store sqlite`
+// This drives THAT FILE, unchanged, through `etherfold build --store sqlite`
 // into versioned rows -- which is the whole claim of "one processor,
 // everywhere", checked rather than asserted.
 //
@@ -91,7 +91,7 @@ function fakeChain() {
 	} as any;
 }
 
-describe('etherfold index --store sqlite, over src/entities.ts', () => {
+describe('etherfold build --store sqlite, over src/entities.ts', () => {
 	it('indexes the browser demo’s processor into a database, unchanged', async () => {
 		const prepared = await prepareIndexing(
 			{

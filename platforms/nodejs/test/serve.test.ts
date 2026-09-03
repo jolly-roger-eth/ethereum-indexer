@@ -177,3 +177,66 @@ describe('the adapter carries the host-supplied capabilities through to the app'
 		expect((await fetch(`${running.url}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
 	});
 });
+
+// ---------------------------------------------------------------------------------------------------
+// THIS IS THE READ TIER, AND IT REFUSES TO WRITE
+// ---------------------------------------------------------------------------------------------------
+// `etherfold serve` starts a server exactly this way: `{getDB, getEnv}` and no
+// `getIngestion` (`src/index.ts`). So it holds no processor, receives no logs,
+// and answers queries over a database something else writes -- which is what
+// `CONTEXT.md` reserves the word `serve` for.
+//
+// The routes are MOUNTED either way, so what separates a read tier from a wire
+// receiver is a CAPABILITY and not a route table. Two things are asserted
+// together, because either alone would be misleading:
+//
+//   - an AUTHENTICATED caller gets `501 ingestion-not-configured`. It has to be
+//     authenticated: the token guard is registered on the PATH (`/ingest` and
+//     `/ingest/*`) AHEAD of the capability lookup and fails closed, exactly as
+//     `packages/server/test/ingest.test.ts` drives it;
+//   - an UNAUTHENTICATED one still gets `401`, and must keep doing so. Moving
+//     the capability check in front of the guard would make the prose literal at
+//     the cost of telling an anonymous caller whether a server hosts a processor.
+//
+// The database is named explicitly (`:memory:`), so running the suite never
+// lands on the adapter's `file:./etherfold.db` convenience default and never
+// leaves a stray database behind.
+// ---------------------------------------------------------------------------------------------------
+
+const AUTHENTICATED = {Authorization: `Bearer ${TOKEN}`};
+
+describe('the tier `serve` starts holds no processor', () => {
+	it('answers 501 on the ingestion routes, while /status still answers', async () => {
+		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
+
+		const cursor = await fetch(`${running.url}/ingest/expected-from-block`, {
+			method: 'POST',
+			headers: AUTHENTICATED,
+		});
+		expect(cursor.status).toBe(501);
+		expect(((await cursor.json()) as {error: string}).error).toBe('ingestion-not-configured');
+
+		const pushed = await fetch(`${running.url}/ingest`, {
+			method: 'POST',
+			headers: AUTHENTICATED,
+			body: JSON.stringify({fromBlock: 100, toBlock: 105, latestBlock: 105, logs: []}),
+		});
+		expect(pushed.status).toBe(501);
+		expect(((await pushed.json()) as {error: string}).error).toBe('ingestion-not-configured');
+
+		// the read half is untouched by the refusal of the write half
+		const status = await fetch(`${running.url}/status`);
+		expect(status.status).toBe(200);
+		expect(((await status.json()) as {healthy: boolean}).healthy).toBe(true);
+	});
+
+	it('refuses an unauthenticated caller first, so the absence is not a probe', async () => {
+		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
+
+		const cursor = await fetch(`${running.url}/ingest/expected-from-block`, {method: 'POST'});
+		expect(cursor.status).toBe(401);
+
+		const pushed = await fetch(`${running.url}/ingest`, {method: 'POST', body: '{}'});
+		expect(pushed.status).toBe(401);
+	});
+});

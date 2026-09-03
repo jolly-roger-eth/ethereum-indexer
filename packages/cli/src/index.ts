@@ -39,7 +39,7 @@ const logger = logs('etherfold');
  */
 const STREAM_CONFIG: ProvidedStreamConfig = {};
 
-/** What a test (or a future `build`) may substitute for the real world. */
+/** What a test may substitute for the real world. */
 export type IndexingDependencies = {
 	/** Loads the processor module. Defaults to a dynamic `import()`. */
 	importModule?: (specifier: string) => Promise<any>;
@@ -81,7 +81,7 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
  * ## Why this and not `IndexerGeneration`
  *
  * Because there is one server-side folding engine or there are two.
- * `work/specs/ready/one-command-runs-the-whole-pipeline.md` builds `run` and
+ * `work/specs/tasked/one-command-runs-the-whole-pipeline.md` builds `run` and
  * `index` on the same `StreamBuilder` and asserts they produce identical state
  * from the same input; that assertion is worth making only if the transport is
  * the only difference between them. Folding here through a second engine would
@@ -227,7 +227,7 @@ async function indexToTip<ABI extends Abi>(host: FetcherHost<ABI>, deps: Indexin
  *
  * The imports are dynamic so that a command that never opens a database does not
  * pay for libSQL, matching how `serve` keeps the server's dependency tree off
- * this command.
+ * `build`.
  */
 async function buildProcessor<ABI extends Abi, ProcessResultType>(
 	declared: EntityProcessor<ABI, any>,
@@ -258,31 +258,38 @@ async function buildProcessor<ABI extends Abi, ProcessResultType>(
 	return {processor: processor as unknown as EventProcessor<ABI, ProcessResultType>, store};
 }
 
-/** Assemble the pipeline and drive it to the tip. */
-export async function run(options: Options, deps: IndexingDependencies = {}): Promise<RunSummary> {
+/**
+ * Assemble the pipeline and drive it to the tip: what `etherfold build` is.
+ *
+ * Named for the command rather than for "running", because under the five-name
+ * set `run` is a DIFFERENT deployment intent -- one that follows the chain,
+ * answers queries and never terminates (`CONTEXT.md`). This one stops at the
+ * tip, so it is `build`.
+ */
+export async function build(options: Options, deps: IndexingDependencies = {}): Promise<RunSummary> {
 	logger.info(JSON.stringify(options, null, 2));
 	const prepared = await prepareIndexing<Abi, unknown>(options, deps);
 	return prepared.index();
 }
 
-// Run the indexer and resolve the process exit code: 0 on success, 1 on failure. The `run`,
+// Build to the tip and resolve the process exit code: 0 on success, 1 on failure. The `build`,
 // `exit`, `log` and `error` collaborators are injectable so the success/failure contract can be
-// unit-tested without driving the real process. `cli.ts` calls this with `process.exit`.
+// unit-tested without driving the real process. `program.ts` calls this with `process.exit`.
 export async function main(
 	options: Options,
 	deps?: {
-		run?: (options: Options) => Promise<unknown>;
+		build?: (options: Options) => Promise<unknown>;
 		exit?: (code: number) => void;
 		log?: (...args: any[]) => void;
 		error?: (...args: any[]) => void;
 	},
 ): Promise<void> {
-	const runFn = deps?.run ?? ((opts: Options) => run(opts));
+	const buildFn = deps?.build ?? ((opts: Options) => build(opts));
 	const exit = deps?.exit ?? ((code: number) => process.exit(code));
 	const log = deps?.log ?? console.log;
 	const error = deps?.error ?? console.error;
 	try {
-		await runFn(options);
+		await buildFn(options);
 		log('DONE');
 		exit(0);
 	} catch (err) {
