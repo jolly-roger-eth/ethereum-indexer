@@ -4,6 +4,7 @@ slug: the-old-indexer-shape-is-deleted
 spec: a-reconfigure-is-not-an-outage
 blockedBy: [every-caller-moves-onto-the-generation-container]
 covers: [2, 6, 7]
+needsAnswers: true
 ---
 
 ## What to build
