@@ -15,15 +15,17 @@ It is [`@etherfold/core`](../core) plus the three things a browser application n
 
 ## Minimal usage
 
-Two lines beyond the processor. The first names WHERE the state lives, which is the only deployment decision here; the second wires the hook:
+Two lines beyond the processor. The first names WHERE the state lives, which is the only deployment decision here; the second wires the hook. You hand over the two FACTORIES rather than their results: an indexer holds any number of **generations** (a stream plus a fold over it), one of which is canonical and answers every read, and each folds into its own state — so the hook is what calls these, once per generation.
 
 ```ts
 import {createBrowserStateStore, createIndexerState} from '@etherfold/browser';
 import {fromEntityProcessor} from '@etherfold/processor-entities';
 
-// versioned rows in IndexedDB: the browser default, decided on measurement (ADR-0024)
-const store = await createBrowserStateStore(myProcessor.entities, {databaseName: 'my-app'});
-const indexer = createIndexerState(fromEntityProcessor(myProcessor)(store));
+const indexer = createIndexerState({
+	// versioned rows in IndexedDB: the browser default, decided on measurement (ADR-0024)
+	createState: () => createBrowserStateStore(myProcessor.entities, {databaseName: 'my-app'}),
+	createProcessor: (store) => fromEntityProcessor(myProcessor)(store),
+});
 
 await indexer.init({
 	provider: window.ethereum,
@@ -67,7 +69,7 @@ const store = await createBrowserStateStore(entities, {
 
 Both axes are in-place calls that report whether the state survived, so a caller holding a copy knows to replace it:
 
-- **the processor changed** (a handler was edited): `indexer.updateProcessor(fromEntityProcessor(next)(store))`. The core compares the processor's DECLARED `version`, so an edited handler under an unchanged version is not a change it can see and the swap is SKIPPED. Bump `version` (or pass `{force: true}`) to make an edit take effect. A processor whose code moved under an unchanged `version` is reported at load time as an error-level drift report, and `config: {strictProcessorDrift: true}` turns that report into a refusal to start.
+- **the processor changed** (a handler was edited): `indexer.updateProcessor(fromEntityProcessor(next)(store))`, where `store` is the one this generation's `createState` opened — keep the reference your factory built, or reopen the same `databaseName`. The core compares the processor's DECLARED `version`, so an edited handler under an unchanged version is not a change it can see and the swap is SKIPPED. Bump `version` (or pass `{force: true}`) to make an edit take effect. A processor whose code moved under an unchanged `version` is reported at load time as an error-level drift report, and `config: {strictProcessorDrift: true}` turns that report into a refusal to start.
 - **the contract changed** (a redeploy, a new ABI): `indexer.updateIndexer({source})`. The ABI is hashed into the source, so a changed one discards and re-indexes by itself. `reset()` as well would be a second full rebuild.
 
 Both return a `ReconfigureOutcome`: `{stateDiscarded}` for the caller that only has to re-seed its own copy, plus `sourceInvalidation` — the verdict that bit was collapsed from, which names WHICH half stopped being valid (the raw log stream, the state folded out of it, or both) and FROM WHICH block. It is `undefined` on `updateProcessor` and `reset`, which ask no source question. `examples/browser-reference` is the worked version of this, with both axes wired to a live-reload.

@@ -78,7 +78,7 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
  * LogFetcher -> createDirectIngestion -> StreamBuilder -> EventProcessor -> StateStore
  * ```
  *
- * ## Why this and not `EthereumIndexer`
+ * ## Why this and not `IndexerGeneration`
  *
  * Because there is one server-side folding engine or there are two.
  * `work/specs/ready/one-command-runs-the-whole-pipeline.md` builds `run` and
@@ -86,7 +86,7 @@ export type PreparedIndexing<ABI extends Abi = Abi, ProcessResultType = unknown>
  * from the same input; that assertion is worth making only if the transport is
  * the only difference between them. Folding here through a second engine would
  * turn it into an equivalence between two IMPLEMENTATIONS that happen to agree
- * today. `EthereumIndexer` also cannot be split into halves at all (it opens
+ * today. `IndexerGeneration` also cannot be split into halves at all (it opens
  * `load()` with `eth_chainId`, which is why the chain-free `StreamBuilder`
  * exists), and what it has that a server does not want is the kept-stream CACHE:
  * here the folder or the database IS the durable artifact. It stays the

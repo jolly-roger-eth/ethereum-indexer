@@ -63,7 +63,7 @@ export function getNewToBlockFromError(error: any): number | undefined {
  * component: the **log-fetcher** of ADR-0003 is the public `LogFetcher`, which
  * is a deployable that asks a receiver where to start, fetches and pushes. This
  * is the primitive underneath it, shared with the single-process
- * `EthereumIndexer`.
+ * `IndexerGeneration`.
  *
  * The property both of them are built on is `toBlockUsed`: when a node caps a
  * result set, the range SHRINKS and the answer says how far it really got. A

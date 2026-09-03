@@ -16,7 +16,7 @@ import type {
 } from '@etherfold/core';
 import {
 	checkTxInclusion as checkTxInclusionAgainst,
-	EthereumIndexer,
+	IndexerGeneration,
 	openIndexer,
 	openMemoryGenerationRegistry,
 } from '@etherfold/core';
@@ -97,6 +97,9 @@ export type EntityEventProcessorLike<ABI extends Abi, ProcessResultType, Process
  * });
  * ```
  *
+ * This is the shape every caller in this repository is written against; the
+ * one-generation shape below is what the contract batch removes.
+ *
  * The order is `createState` then `createProcessor`, and it is the order a
  * generation's IDENTITY forces: the stream half is known from the source and the
  * stream config, and the FOLD half is the processor's own version hash, so the
@@ -106,9 +109,11 @@ export type EntityEventProcessorLike<ABI extends Abi, ProcessResultType, Process
  * store from the next one's.
  *
  * The old shape -- `createIndexerState(fromEntityProcessor(p)(store))` -- still
- * works and still means one generation. This is the EXPAND batch of the rename;
- * `every-caller-moves-onto-the-generation-container` moves the call sites and
- * `the-old-indexer-shape-is-deleted` removes the old shape.
+ * works and still means one generation, but nothing in this repository calls it
+ * any more: `every-caller-moves-onto-the-generation-container` moved every site
+ * onto the factories, and the only remaining uses are the tests that assert the
+ * old shape is still ACCEPTED, which go with it when
+ * `the-old-indexer-shape-is-deleted` removes it.
  */
 export type BrowserGenerationSpec<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined> = {
 	/** Where THIS generation's state lives. Called once, before its processor. */
@@ -192,9 +197,12 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
  * The browser indexing hook.
  *
  * ```ts
- * // the state (and its cursor) live in a store the app chose
- * const store = await createBrowserStateStore(myProcessor.entities);
- * const indexer = createIndexerState(fromEntityProcessor(myProcessor)(store));
+ * // the state (and its cursor) live in a store the app chose, and a GENERATION
+ * // builds its own: the hook is handed the factories, not their results
+ * const indexer = createIndexerState({
+ *   createState: () => createBrowserStateStore(myProcessor.entities),
+ *   createProcessor: (store) => fromEntityProcessor(myProcessor)(store),
+ * });
  * ```
  *
  * ## Where the state is persisted, and by whom
@@ -230,19 +238,21 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		trackNumRequests?: boolean;
 		logRequests?: boolean;
 		keepStream?: ExistingStream<ABI>;
-		// Optional factory used to construct the underlying EthereumIndexer. Receives the same
+		// Optional factory used to construct the underlying IndexerGeneration. Receives the same
 		// arguments (already request-tracked/logged provider, configured processor, source, config)
-		// that would otherwise be passed to `new EthereumIndexer(...)`. Useful for injecting a
-		// subclass, a shared instance, or a spy/fake in tests. Defaults to `new EthereumIndexer(...)`.
+		// that would otherwise be passed to `new IndexerGeneration(...)`. Useful for injecting a
+		// subclass, a shared instance, or a spy/fake in tests. Defaults to
+		// `new IndexerGeneration(...)`.
 		//
 		// The processor arrives as the `EventProcessor` the core drives, which is all
-		// `new EthereumIndexer(...)` takes.
+		// `new IndexerGeneration(...)` takes. On the container shape this is the
+		// container's `createGeneration`: one of these is built per generation.
 		createIndexer?: (
 			provider: EIP1193ProviderWithoutEvents,
 			processor: EventProcessor<ABI, ProcessResultType>,
 			source: IndexingSource<ABI>,
 			config: ProvidedIndexerConfig<ABI>,
-		) => EthereumIndexer<ABI, ProcessResultType>;
+		) => IndexerGeneration<ABI, ProcessResultType>;
 	},
 ) {
 	/**
@@ -454,7 +464,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			}
 			indexer = options?.createIndexer
 				? options.createIndexer(provider, given, source, config)
-				: new EthereumIndexer<ABI, ProcessResultType>(provider, given, source, config);
+				: new IndexerGeneration<ABI, ProcessResultType>(provider, given, source, config);
 		}
 		setSyncing({waitingForProvider: false});
 	}

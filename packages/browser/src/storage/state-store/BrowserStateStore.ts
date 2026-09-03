@@ -11,15 +11,21 @@ import {IndexedDBStateStore} from '@etherfold/state-store-indexeddb';
  *
  * ```ts
  * // the default: versioned rows in IndexedDB (ADR-0024)
- * const store = await createBrowserStateStore(processor.entities);
+ * const createState = () => createBrowserStateStore(processor.entities);
  *
  * // the same app on the light store instead: nothing else changes
- * const store = await createBrowserStateStore(processor.entities, {
- *   backend: (entities) => new PatchStateStore(entities, {retention: 'revert-only', finalityDepth: 64}),
- * });
+ * const createState = () =>
+ *   createBrowserStateStore(processor.entities, {
+ *     backend: (entities) => new PatchStateStore(entities, {retention: 'revert-only', finalityDepth: 64}),
+ *   });
  *
- * // ...and either one indexes through the hook, with the processor untouched
- * const indexer = createIndexerState(fromEntityProcessor(processor)(store));
+ * // ...and either one indexes through the hook, with the processor untouched.
+ * // It is the FACTORY the hook takes, not the store: each GENERATION folds into
+ * // its own state, so the hook is what calls this, once per generation.
+ * const indexer = createIndexerState({
+ *   createState,
+ *   createProcessor: (store) => fromEntityProcessor(processor)(store),
+ * });
  * ```
  *
  * ## Does a RELOAD keep it? Ask the store, at startup

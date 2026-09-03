@@ -1,6 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi, IndexingSource, LastSync, LogEvent} from '@etherfold/core';
 import {createIndexerState, type EntityEventProcessorLike} from '../src/IndexerState.js';
+import {generationOf} from './utils/fakeGeneration.js';
 
 // chainId '1' as the 0x-hex the provider returns
 const CHAIN_ID_HEX = '0x1';
@@ -51,7 +52,7 @@ const SOURCE: IndexingSource<Abi> = {
 
 describe('createIndexerState - setupIndexing error handling', () => {
 	it('does NOT set a FAILED_TO_LOAD error after a successful load', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 
 		// indexMore() calls setupIndexing() internally
@@ -63,7 +64,7 @@ describe('createIndexerState - setupIndexing error handling', () => {
 	});
 
 	it('reports an error when loading actually fails', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider({failChainId: true}), source: SOURCE});
 
 		await expect(indexer.indexMore()).rejects.toBeTruthy();

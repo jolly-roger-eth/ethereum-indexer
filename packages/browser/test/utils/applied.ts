@@ -61,13 +61,27 @@ export function browserStore(name: string, definition: EntityProcessor<TestABI>)
 	return createBrowserStateStore(definition.entities, {databaseName: name});
 }
 
-/** The hook over one store, with a stream keeper where a case wants one. */
+/**
+ * The hook over one store, with a stream keeper where a case wants one.
+ *
+ * The hook takes the FACTORIES a generation is built from, not a processor built
+ * over a store: each generation folds into its own state, so the store arrives
+ * through `createState`. These cases hand back a store the case itself opened,
+ * because WHICH database it is is the thing under test (a reload reopens the
+ * same one; a discard opens a fresh one).
+ */
 export function indexerOver(
 	definition: EntityProcessor<TestABI>,
 	store: StateStore,
 	keepers: {keepStream?: unknown} = {},
 ) {
-	return createIndexerState<TestABI, EntityStateView>(new EntityEventProcessor<TestABI>(store, definition), {
-		...(keepers.keepStream ? {keepStream: keepers.keepStream as never} : {}),
-	});
+	return createIndexerState<TestABI, EntityStateView>(
+		{
+			createState: () => store,
+			createProcessor: (state) => new EntityEventProcessor<TestABI>(state, definition),
+		},
+		{
+			...(keepers.keepStream ? {keepStream: keepers.keepStream as never} : {}),
+		},
+	);
 }

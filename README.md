@@ -120,15 +120,17 @@ export const greetings: EntityProcessor<typeof abi> = {
 };
 ```
 
-Indexing it in a browser tab is two more lines. The first names WHERE the state lives, which is the only deployment decision here; the second wires the hook:
+Indexing it in a browser tab is two more lines. The first names WHERE the state lives, which is the only deployment decision here; the second wires the hook. Both are FACTORIES rather than values: an indexer holds any number of **generations** (a stream plus a fold over it), one of which is canonical and answers every read, and each folds into its own state — so the hook is what calls these, once per generation.
 
 ```ts
 import {createBrowserStateStore, createIndexerState} from '@etherfold/browser';
 import {fromEntityProcessor} from '@etherfold/processor-entities';
 
-// versioned rows in IndexedDB: the browser default, decided on measurement (ADR-0024)
-const store = await createBrowserStateStore(greetings.entities, {databaseName: 'greetings'});
-const indexer = createIndexerState(fromEntityProcessor(greetings)(store));
+const indexer = createIndexerState({
+	// versioned rows in IndexedDB: the browser default, decided on measurement (ADR-0024)
+	createState: () => createBrowserStateStore(greetings.entities, {databaseName: 'greetings'}),
+	createProcessor: (store) => fromEntityProcessor(greetings)(store),
+});
 
 await indexer.init({
 	provider: (window as any).ethereum,

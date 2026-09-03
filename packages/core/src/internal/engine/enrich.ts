@@ -75,11 +75,11 @@ export function transactionFetcherFor(
  * Fill in the parts of an event the log itself does not carry: the block
  * timestamp and the transaction that emitted it.
  *
- * ## Why it is here and not in `EthereumIndexer`
+ * ## Why it is here and not in `IndexerGeneration`
  *
  * `alwaysFetchTimestamps` and `alwaysFetchTransactions` live in the STREAM
  * CONFIG, which is hashed into the wire identity, so the two deployment shapes
- * of ADR-0003 must honour them identically: the single-process `EthereumIndexer`
+ * of ADR-0003 must honour them identically: the single-process `IndexerGeneration`
  * and the split `LogFetcher` both push events at a processor that was promised
  * those fields. The receiving half makes no chain calls at all, so the fetcher
  * is the ONLY side that can pay for them, and a second implementation of this

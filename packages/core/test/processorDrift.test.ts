@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import type {Abi} from 'abitype';
-import {EthereumIndexer} from '../src/indexer.js';
+import {IndexerGeneration} from '../src/indexer.js';
 import {simple_hash} from '../src/utils/hash.js';
 import type {ContextIdentifier, EventProcessor, IndexingSource, LastSync, ProcessorDriftReport} from '../src/types.js';
 
@@ -78,7 +78,7 @@ function makeProcessor(
 
 function indexerWith(processor: EventProcessor<Abi, void>, config: {strictProcessorDrift?: boolean} = {}) {
 	const reports: ProcessorDriftReport[] = [];
-	const indexer = new EthereumIndexer<Abi, void>(makeProvider(), processor, SOURCE, config);
+	const indexer = new IndexerGeneration<Abi, void>(makeProvider(), processor, SOURCE, config);
 	indexer.onProcessorDrift = (report) => reports.push(report);
 	return {indexer, reports};
 }
@@ -202,7 +202,7 @@ describe('processor drift detection', () => {
 
 	it('survives a listener that throws, because a drift report must not break loading', async () => {
 		const processor = makeProcessor('v1', {stored: storedContext('v1', 'fingerprint-A'), fingerprint: 'fingerprint-B'});
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), processor, SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), processor, SOURCE);
 		indexer.onProcessorDrift = () => {
 			throw new Error('listener blew up');
 		};
@@ -223,7 +223,7 @@ describe('processor drift detection', () => {
 				stored: storedContext('v1', 'fingerprint-A'),
 				fingerprint: 'fingerprint-B',
 			});
-			const indexer = new EthereumIndexer<Abi, void>(makeProvider(), processor, SOURCE);
+			const indexer = new IndexerGeneration<Abi, void>(makeProvider(), processor, SOURCE);
 
 			await indexer.load();
 

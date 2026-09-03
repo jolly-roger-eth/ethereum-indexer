@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
-import {EthereumIndexer} from '../src/indexer.js';
+import {IndexerGeneration} from '../src/indexer.js';
 import type {EventProcessor, IndexingSource} from '../src/types.js';
 
 // Minimal provider: empty chain, no logs.
@@ -51,14 +51,14 @@ function deferred() {
 	return {promise, resolve};
 }
 
-describe('EthereumIndexer.updateProcessor (core #5: align with updateIndexer)', () => {
+describe('IndexerGeneration.updateProcessor (core #5: align with updateIndexer)', () => {
 	it('blocks the index action while a (version-changing) updateProcessor is in flight (like updateIndexer)', async () => {
 		// gate the OLD processor's clear() — that is what updateProcessor awaits before calling load(),
 		// so during this window load() has NOT started yet and the only thing that should prevent a
 		// racing indexMore is disableProcessing()/block().
 		const gate = deferred();
 		const original = makeProcessor('v1', {clearGate: gate.promise});
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), original, SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), original, SOURCE);
 		await indexer.load();
 
 		const updating = indexer.updateProcessor(makeProcessor('v2'));
@@ -74,7 +74,7 @@ describe('EthereumIndexer.updateProcessor (core #5: align with updateIndexer)', 
 	});
 
 	it('re-enables processing after a version-changing updateProcessor resolves', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		await indexer.updateProcessor(makeProcessor('v2'));
@@ -85,7 +85,7 @@ describe('EthereumIndexer.updateProcessor (core #5: align with updateIndexer)', 
 
 	it('does not swap this.processor before deciding (no-op path must not replace the instance mid-flight)', async () => {
 		const original = makeProcessor('v1');
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), original, SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), original, SOURCE);
 		await indexer.load();
 
 		// A same-version-hash update is a no-op: there is nothing to reset/reload, so the running
@@ -99,7 +99,7 @@ describe('EthereumIndexer.updateProcessor (core #5: align with updateIndexer)', 
 
 	it('swaps a same-version processor when force:true is passed', async () => {
 		const original = makeProcessor('v1');
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), original, SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), original, SOURCE);
 		await indexer.load();
 
 		// Same version hash, but the caller explicitly forces the swap (e.g. they know the new
@@ -116,7 +116,7 @@ describe('EthereumIndexer.updateProcessor (core #5: align with updateIndexer)', 
 		(original as any).clear = async () => {
 			cleared = true;
 		};
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), original, SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), original, SOURCE);
 		await indexer.load();
 
 		await indexer.updateProcessor(makeProcessor('v1'), {force: true});
@@ -137,16 +137,16 @@ describe('EthereumIndexer.updateProcessor (core #5: align with updateIndexer)', 
  * re-deriving this rule (the version hash, `force`, and the source hashes), and
  * a caller that derives it wrong fails silently.
  */
-describe('EthereumIndexer reconfigure outcomes', () => {
+describe('IndexerGeneration reconfigure outcomes', () => {
 	it('reports a discard when the processor version changed', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		expect(await indexer.updateProcessor(makeProcessor('v2'))).toEqual({stateDiscarded: true});
 	});
 
 	it('reports NO discard when the version hash did not move, because the swap was skipped', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		// the "author edited a handler and forgot to bump `version`" case: the core
@@ -155,14 +155,14 @@ describe('EthereumIndexer reconfigure outcomes', () => {
 	});
 
 	it('reports a discard when force is passed against an unchanged version', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		expect(await indexer.updateProcessor(makeProcessor('v1'), {force: true})).toEqual({stateDiscarded: true});
 	});
 
 	it('reports a discard when the source changed, and none when it hashes the same', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		// a DIFFERENT object carrying the same contents: the hash is over the
@@ -188,7 +188,7 @@ describe('EthereumIndexer reconfigure outcomes', () => {
 	});
 
 	it('always reports a discard from reset, because reset IS the discard', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		expect(await indexer.reset()).toEqual({stateDiscarded: true});
@@ -212,7 +212,7 @@ describe('EthereumIndexer reconfigure outcomes', () => {
  */
 describe('the invalidation verdict a reconfigure publishes', () => {
 	it('reports both halves valid when the source did not move', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		// a DIFFERENT object carrying the same contents, which is what a redeploy
@@ -227,7 +227,7 @@ describe('the invalidation verdict a reconfigure publishes', () => {
 	});
 
 	it('names the BLOCK and the REASON, which is what one bit could not say', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		// a stream CONFIG change is the both-halves case: it is hashed into the wire
@@ -243,7 +243,7 @@ describe('the invalidation verdict a reconfigure publishes', () => {
 	});
 
 	it('carries no source verdict from the two verbs that ask no source question', async () => {
-		const indexer = new EthereumIndexer<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
+		const indexer = new IndexerGeneration<Abi, void>(makeProvider(), makeProcessor('v1'), SOURCE);
 		await indexer.load();
 
 		// A processor swap moves neither the fetch filter nor the decoding shape, and

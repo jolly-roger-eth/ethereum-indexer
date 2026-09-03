@@ -4,13 +4,13 @@ import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 
 // ---------------------------------------------------------------------------------------------------
-// THERE IS ONE SERVER-SIDE FOLDING ENGINE, AND IT IS NOT `EthereumIndexer`
+// THERE IS ONE SERVER-SIDE FOLDING ENGINE, AND IT IS NOT `IndexerGeneration`
 // ---------------------------------------------------------------------------------------------------
 // `work/specs/ready/one-command-runs-the-whole-pipeline.md` builds `run` and
 // `index` on the same `StreamBuilder` and asserts they produce identical state
 // from the same input. That assertion is worth making only if the transport is
 // the only difference between them: if this command folded through
-// `EthereumIndexer` instead, the equivalence would be between two
+// `IndexerGeneration` instead, the equivalence would be between two
 // IMPLEMENTATIONS that happen to agree today, and every later divergence would
 // surface as a mysteriously failing equivalence test rather than as a bug in one
 // place.
@@ -23,15 +23,41 @@ import {describe, expect, it} from 'vitest';
 // IT HAS TWO NAMES DURING THE RENAME, AND THE GUARD MATCHES BOTH. The class is
 // `IndexerGeneration` now -- one stream, one processor, one state IS a
 // GENERATION -- and `EthereumIndexer` remains as an alias to it until the
-// contract batch (`the-old-indexer-shape-is-deleted`) removes it. A guard left
-// on the old spelling alone would stay GREEN and stop enforcing anything the
-// moment a file used the new one, which is worse than no guard. Deliberately NOT
-// extended to `Indexer`, the generation CONTAINER: whether a CLI holds
-// generations is `the-server-and-cli-hold-generations-too`'s question, and a
-// grep here must not pre-answer it.
+// contract batch (`the-old-indexer-shape-is-deleted`) removes it, which is also
+// when the old spelling comes out of the patterns below. A guard left on the old
+// spelling alone would stay GREEN and stop enforcing anything the moment a file
+// used the new one, which is worse than no guard; a guard narrowed to the new
+// one alone would stop seeing a file that reached for the alias while the alias
+// still resolves. Deliberately NOT extended to `Indexer`, the generation
+// CONTAINER: whether a CLI holds generations is
+// `the-server-and-cli-hold-generations-too`'s question, and a grep here must not
+// pre-answer it.
+//
+// A SOURCE-TEXT GUARD IS ONLY WORTH ITS LINES IF IT STILL BITES, so the patterns
+// are named here and asserted against deliberate violations below. A rename that
+// left them on an identifier nothing uses any more would keep them green and
+// VACUOUS -- passing forever, enforcing nothing, with nothing going red to say
+// so. That is the one failure mode this file cannot detect by reading `src/`,
+// because `src/` is clean either way.
 // ---------------------------------------------------------------------------------------------------
 
 const src = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
+
+/** Does this source text CONSTRUCT the browser engine, under either of its names? */
+function constructsEngine(text: string): boolean {
+	return /new\s+(EthereumIndexer|IndexerGeneration)\b|\b(EthereumIndexer|IndexerGeneration)\s*[<(]/.test(text);
+}
+
+/**
+ * Does it IMPORT the identifier?
+ *
+ * Separate from the construction check because the words appear in PROSE in this
+ * package (it explains why it does not use that class), so the reachable-symbol
+ * question is asked about an import rather than about a mention.
+ */
+function importsEngine(text: string): boolean {
+	return /import\s*\{[^}]*\b(EthereumIndexer|IndexerGeneration)\b[^}]*\}/.test(text);
+}
 
 function sources(): {file: string; text: string}[] {
 	return fs
@@ -42,18 +68,12 @@ function sources(): {file: string; text: string}[] {
 
 describe("the CLI's indexing path", () => {
 	it('constructs no IndexerGeneration, under either of its names', () => {
-		const offenders = sources().filter(({text}) =>
-			/new\s+(EthereumIndexer|IndexerGeneration)\b|\b(EthereumIndexer|IndexerGeneration)\s*[<(]/.test(text),
-		);
+		const offenders = sources().filter(({text}) => constructsEngine(text));
 		expect(offenders.map(({file}) => file)).toEqual([]);
 	});
 
 	it('imports it under neither name either, so nothing can quietly start using one', () => {
-		const offenders = sources().filter(({text}) =>
-			// the words appear in prose here (this package explains why it does NOT use
-			// that class), so the check is on an IMPORT of the identifier
-			/import\s*\{[^}]*\b(EthereumIndexer|IndexerGeneration)\b[^}]*\}/.test(text),
-		);
+		const offenders = sources().filter(({text}) => importsEngine(text));
 		expect(offenders.map(({file}) => file)).toEqual([]);
 	});
 
@@ -65,5 +85,66 @@ describe("the CLI's indexing path", () => {
 		// classification and the backoff this command's one-shot rides on
 		expect(index).toMatch(/createFetcherHost/);
 		expect(index).toMatch(/runFetcherLoop/);
+	});
+});
+
+/**
+ * THE GUARD BITES: the same patterns, put in front of deliberate violations.
+ *
+ * The two checks above pass because `src/` is clean. They would ALSO pass if the
+ * patterns matched nothing at all, which is exactly what a rename does to a
+ * source-text guard left on the old identifier. So the violations are written
+ * out here, under BOTH names, and the patterns are asserted to catch each one.
+ */
+describe('the guard that says so still bites', () => {
+	const constructions = [
+		[
+			"a construction under the class's own name",
+			`const engine = new IndexerGeneration(provider, processor, source, config);`,
+		],
+		[
+			'a construction under the retained alias',
+			`const engine = new EthereumIndexer(provider, processor, source, config);`,
+		],
+		['a type argument, which needs no `new` at all', `let engine: IndexerGeneration<Abi, void> | undefined;`],
+		['the same under the alias', `let engine: EthereumIndexer<Abi, void> | undefined;`],
+		['a call of it, however it got here', `const engine = IndexerGeneration(provider);`],
+	] as const;
+
+	for (const [what, violation] of constructions) {
+		it(`refuses ${what}`, () => {
+			expect(constructsEngine(violation)).toBe(true);
+		});
+	}
+
+	const imports = [
+		['an import under the new name', `import {IndexerGeneration} from '@etherfold/core';`],
+		['an import under the alias', `import {EthereumIndexer} from '@etherfold/core';`],
+		[
+			'one buried in a longer import list',
+			`import {LogFetcher, IndexerGeneration, StreamBuilder} from '@etherfold/core';`,
+		],
+	] as const;
+
+	for (const [what, violation] of imports) {
+		it(`refuses ${what}`, () => {
+			expect(importsEngine(violation)).toBe(true);
+		});
+	}
+
+	it('leaves the CLI\u2019s own prose alone, which is why the import check is separate', () => {
+		// this package's `src/index.ts` explains at length why it does NOT use that
+		// class; a guard that fired on the explanation would be deleted within a week
+		const prose = ` * ## Why this and not \`IndexerGeneration\`\n * ...it opens \`load()\` with \`eth_chainId\`.`;
+		expect(constructsEngine(prose)).toBe(false);
+		expect(importsEngine(prose)).toBe(false);
+	});
+
+	it('does not fire on the generation CONTAINER, which is a different question', () => {
+		// `Indexer` is the container. Whether a CLI holds generations is
+		// `the-server-and-cli-hold-generations-too`'s to answer, not this grep's.
+		const container = `import {openIndexer, type Indexer} from '@etherfold/core';\nconst indexer: Indexer<Abi, void> = await openIndexer({});`;
+		expect(constructsEngine(container)).toBe(false);
+		expect(importsEngine(container)).toBe(false);
 	});
 });

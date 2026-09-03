@@ -453,9 +453,20 @@ export function indexerFor(store: StateStore) {
  * hook, so the reconfigure tests need to build a second `EntityEventProcessor`
  * over the same store from a second definition. That is exactly this call, and
  * `indexerFor` is now it with the fixture's own processor.
+ *
+ * The hook is handed the FACTORIES that build a generation rather than a
+ * processor already built over a store: an indexer holds any number of
+ * generations and each folds into its OWN state, so the store cannot be a value
+ * the hook is given once. The store here is one the caller already opened (a
+ * reload reopens the same database, which is what makes a reload a reload), so
+ * `createState` hands that one back -- the factory is what distinguishes THIS
+ * generation's state, and this fixture has exactly one.
  */
 export function indexerForProcessor(store: StateStore, definition: EntityProcessor<TestABI>) {
-	return createIndexerState<TestABI, EntityStateView>(entityProcessorOver(store, definition));
+	return createIndexerState<TestABI, EntityStateView>({
+		createState: () => store,
+		createProcessor: (state) => entityProcessorOver(state, definition),
+	});
 }
 
 /**

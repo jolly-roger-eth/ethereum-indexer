@@ -1,6 +1,6 @@
 import type {Abi} from 'abitype';
 import {beforeEach, describe, expect, it} from 'vitest';
-import {EthereumIndexer} from '../src/indexer.js';
+import {IndexerGeneration} from '../src/indexer.js';
 import {InvalidBatchError, UnexpectedFromBlockError, WireContextMismatchError} from '../src/errors.js';
 import {StreamBuilder, parseWireBatch, serializeWireBatch} from '../src/streamBuilder.js';
 import type {EventProcessor, IndexingSource, LastSync, LogEvent, WireBatch} from '../src/types.js';
@@ -15,7 +15,7 @@ import type {EventProcessor, IndexingSource, LastSync, LogEvent, WireBatch} from
 // create:
 //
 //   1. a batch starting anywhere but `expectedFromBlock` applies NOTHING, and
-//   2. the stream it derives is the SAME one `EthereumIndexer` derives from the
+//   2. the stream it derives is the SAME one `IndexerGeneration` derives from the
 //      same logs, because both go through `generateStreamToAppend`.
 // ---------------------------------------------------------------------------
 
@@ -187,7 +187,7 @@ describe('the receiver owns the cursor', () => {
 		await builder.receive(batch(builder, {fromBlock: 100, toBlock: 105, latestBlock: 105}));
 		const expected = await builder.expectedFromBlock();
 
-		const indexer = new EthereumIndexer<TestABI, void>(noChain(), recordingProcessor().processor, SOURCE, {
+		const indexer = new IndexerGeneration<TestABI, void>(noChain(), recordingProcessor().processor, SOURCE, {
 			stream: {finality: FINALITY},
 		});
 		await indexer.feed([], {
@@ -355,7 +355,7 @@ describe('reorgs are derived here, from raw logs alone', () => {
 		const viaWire = recordingProcessor();
 		const builder = builderOn(viaWire.processor);
 		const viaEngine = recordingProcessor();
-		const indexer = new EthereumIndexer<TestABI, void>(noChain(), viaEngine.processor, SOURCE, {
+		const indexer = new IndexerGeneration<TestABI, void>(noChain(), viaEngine.processor, SOURCE, {
 			stream: {finality: FINALITY},
 		});
 
@@ -426,7 +426,7 @@ describe('the wire codec', () => {
  * A provider that refuses every call.
  *
  * The receiving half has no chain (ADR-0003 keeps every chain call in the
- * log-fetcher), and `feed()` is the one `EthereumIndexer` entry point that makes
+ * log-fetcher), and `feed()` is the one `IndexerGeneration` entry point that makes
  * none. Handing it a refusing provider is how that stays true.
  */
 function noChain() {

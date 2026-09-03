@@ -1,6 +1,6 @@
 import type {Abi} from 'abitype';
 import {describe, expect, it} from 'vitest';
-import {EthereumIndexer} from '../src/indexer.js';
+import {IndexerGeneration} from '../src/indexer.js';
 import type {IndexingSource, LastSync, LogEvent} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ function makeIndexer(processor: any) {
 			throw new Error(`unexpected ${method}`);
 		},
 	};
-	return new EthereumIndexer<Abi>(provider as any, processor, SOURCE, {stream: {finality: FINALITY}});
+	return new IndexerGeneration<Abi>(provider as any, processor, SOURCE, {stream: {finality: FINALITY}});
 }
 
 function cursor(over: Partial<LastSync<Abi>>): LastSync<Abi> {

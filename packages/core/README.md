@@ -19,12 +19,12 @@ Take this package directly when you are building the host: a runtime this repo d
 
 ## The two shapes it comes in
 
-**One process, one source, one processor, one state: `EthereumIndexer`.** This is the client engine, and what [`@etherfold/browser`](../browser) is built on. It holds the sync cursor, the unconfirmed-block window and the optional cached stream, and it opens `load()` with `eth_chainId`, so it is the shape for a host that can talk to a chain.
+**One process, one source, one processor, one state: `IndexerGeneration`.** This is the client engine, and what [`@etherfold/browser`](../browser) is built on. It holds the sync cursor, the unconfirmed-block window and the optional cached stream, and it opens `load()` with `eth_chainId`, so it is the shape for a host that can talk to a chain. One stream plus one fold over it is a **generation**, which is what the name says; `Indexer` is the container that holds several of them and points at the one that answers reads.
 
 ```ts
-import {EthereumIndexer} from '@etherfold/core';
+import {IndexerGeneration} from '@etherfold/core';
 
-const indexer = new EthereumIndexer(provider, eventProcessor, {
+const indexer = new IndexerGeneration(provider, eventProcessor, {
 	chainId: '1',
 	contracts: [{abi, address: '0x…', startBlock: 21000000}],
 });

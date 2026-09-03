@@ -209,17 +209,30 @@ async function start() {
 	// ------------------------------------------------------------------
 	// ONE LINE decides where the state lives. The processor does not change.
 	// ------------------------------------------------------------------
-	const store = await createBrowserStateStore(NFTProcessor.entities, {
-		databaseName: `etherfold-nfts-${chainId}-${account}`,
-	});
+	// A FACTORY rather than a value: an indexer holds any number of GENERATIONS --
+	// a stream plus a fold over it -- one of which is canonical and answers every
+	// read, and each folds into its OWN state. The hook calls this once per
+	// generation; this app has one.
+	const createState = () =>
+		createBrowserStateStore(NFTProcessor.entities, {
+			databaseName: `etherfold-nfts-${chainId}-${account}`,
+		});
 	// ...or the light store instead: current state as a plain object, history as
 	// immer reverse patches. It is memory-only by design (ADR-0023), so a reload
 	// starts over rather than resuming -- which is the trade you are making.
-	// const store = await createBrowserStateStore(NFTProcessor.entities, {
-	// 	backend: (entities) => new PatchStateStore(entities, {finalityDepth: 12}),
-	// });
+	// const createState = () =>
+	// 	createBrowserStateStore(NFTProcessor.entities, {
+	// 		backend: (entities) => new PatchStateStore(entities, {finalityDepth: 12}),
+	// 	});
 
-	const indexer = createIndexerState(fromEntityProcessor(NFTProcessor)(store));
+	// Kept because the capability report below is read off the store this
+	// generation was built over: what it CAN DO is what the one line above decides.
+	let store!: Awaited<ReturnType<typeof createState>>;
+
+	const indexer = createIndexerState({
+		createState: async () => (store = await createState()),
+		createProcessor: (state) => fromEntityProcessor(NFTProcessor)(state),
+	});
 
 	await indexer.init({
 		// cast because `EIP1193ProviderWithoutEvents` enumerates every JSON-RPC method

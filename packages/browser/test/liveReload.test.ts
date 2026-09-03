@@ -1,7 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi, IndexingSource, LogEvent} from '@etherfold/core';
-import {EthereumIndexer} from '@etherfold/core';
+import {IndexerGeneration} from '@etherfold/core';
 import {createIndexerState, type EntityEventProcessorLike} from '../src/IndexerState.js';
+import {generationOf} from './utils/fakeGeneration.js';
 
 // chainId '1' as the 0x-hex the provider returns
 const CHAIN_ID_HEX = '0x1';
@@ -58,7 +59,7 @@ const NEW_SOURCE: IndexingSource<Abi> = {
 
 describe('createIndexerState - live reload (HIGH #1: async + error routing)', () => {
 	it('updateIndexer returns an awaitable promise and routes core errors to $syncing.error', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 
 		// do an initial load so the indexer is in a stable state
@@ -81,7 +82,7 @@ describe('createIndexerState - live reload (HIGH #1: async + error routing)', ()
 
 describe('createIndexerState - live reload (HIGH #2: clear syncing state on reconfigure)', () => {
 	it('clears $syncing.lastSync on updateIndexer so setupIndexing re-runs for the new config', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 
 		// initial load -> $syncing.lastSync becomes populated
@@ -97,7 +98,7 @@ describe('createIndexerState - live reload (HIGH #2: clear syncing state on reco
 	});
 
 	it('does NOT clear $syncing.lastSync when the core reconfigure fails (option b)', async () => {
-		const indexer = createIndexerState<Abi, State>(makeProcessor());
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()));
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 
 		await indexer.indexMore();
@@ -118,9 +119,9 @@ describe('createIndexerState - live reload (MEDIUM #3: pause auto-indexing durin
 		let releaseReconfigure!: () => void;
 		const reconfigureGate = new Promise<void>((resolve) => (releaseReconfigure = resolve));
 
-		const indexer = createIndexerState<Abi, State>(makeProcessor(), {
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor()), {
 			createIndexer: (provider, processor, source, config) => {
-				const real = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+				const real = new IndexerGeneration<Abi, State>(provider, processor, source, config);
 				const realUpdateIndexer = real.updateIndexer.bind(real);
 				real.updateIndexer = (async (update: any) => {
 					// stay in flight until the test releases the gate
@@ -157,7 +158,7 @@ describe('createIndexerState - live reload (MEDIUM #3: pause auto-indexing durin
 	});
 });
 
-// Helper: wrap a real EthereumIndexer so that updateIndexer/updateProcessor record an ordered
+// Helper: wrap a real IndexerGeneration so that updateIndexer/updateProcessor record an ordered
 // trace of enter/exit and (optionally) block until a test-controlled gate is released. This lets
 // us deterministically detect whether two overlapping reconfigure calls interleave.
 function recordingIndexer() {
@@ -172,7 +173,7 @@ function recordingIndexer() {
 	}
 
 	const createIndexer = (provider: any, processor: any, source: any, config: any) => {
-		const real = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+		const real = new IndexerGeneration<Abi, State>(provider, processor, source, config);
 
 		const realUpdateIndexer = real.updateIndexer.bind(real);
 		real.updateIndexer = (async (update: any) => {
@@ -205,7 +206,7 @@ function recordingIndexer() {
 describe('createIndexerState - live reload (MEDIUM #4: overlapping reconfigure calls must serialize)', () => {
 	it('updateProcessor started while updateIndexer is in flight must NOT interleave (source then processor)', async () => {
 		const {createIndexer, trace, gate} = recordingIndexer();
-		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {createIndexer});
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor('v1')), {createIndexer});
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 		await indexer.indexMore();
 
@@ -232,7 +233,7 @@ describe('createIndexerState - live reload (MEDIUM #4: overlapping reconfigure c
 
 	it('updateIndexer started while updateProcessor is in flight must NOT interleave (processor then source)', async () => {
 		const {createIndexer, trace, gate} = recordingIndexer();
-		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {createIndexer});
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor('v1')), {createIndexer});
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 		await indexer.indexMore();
 
@@ -256,7 +257,7 @@ describe('createIndexerState - live reload (MEDIUM #4: overlapping reconfigure c
 
 	it('two updateIndexer calls in quick succession must serialize (not interleave)', async () => {
 		const {createIndexer, trace, gate} = recordingIndexer();
-		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {createIndexer});
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor('v1')), {createIndexer});
 		await indexer.init({provider: makeProvider(), source: SOURCE});
 		await indexer.indexMore();
 
@@ -283,9 +284,9 @@ describe('createIndexerState - live reload (MEDIUM #4: overlapping reconfigure c
 describe('createIndexerState - live reload (#5: updateProcessor force option passthrough)', () => {
 	it('forwards the {force} option to the core updateProcessor', async () => {
 		let receivedOptions: any;
-		const indexer = createIndexerState<Abi, State>(makeProcessor('v1'), {
+		const indexer = createIndexerState<Abi, State>(generationOf(makeProcessor('v1')), {
 			createIndexer: (provider, processor, source, config) => {
-				const real = new EthereumIndexer<Abi, State>(provider, processor, source, config);
+				const real = new IndexerGeneration<Abi, State>(provider, processor, source, config);
 				const realUpdateProcessor = real.updateProcessor.bind(real);
 				real.updateProcessor = (async (p: any, opts: any) => {
 					receivedOptions = opts;
