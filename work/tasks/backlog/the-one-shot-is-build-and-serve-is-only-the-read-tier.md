@@ -4,6 +4,7 @@ slug: the-one-shot-is-build-and-serve-is-only-the-read-tier
 spec: one-command-runs-the-whole-pipeline
 blockedBy: []
 covers: [4, 5, 7]
+needsAnswers: true
 ---
 
 ## What to build
