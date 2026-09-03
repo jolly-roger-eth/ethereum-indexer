@@ -25,6 +25,7 @@ import {
 	FINALITY,
 	idOf,
 	makeLog,
+	shapeOf,
 	SOURCE,
 	START_BLOCK,
 } from './utils/streamCacheWorld.js';
@@ -121,6 +122,8 @@ function keyedStream() {
 		},
 		digests: () => [...stored.keys()].sort(),
 		eventsOf: (source: IndexingSource<Abi>) => stored.get(digestOf(source))?.eventStream ?? [],
+		/** The stream's OWN cursor, which is the summary a follower must not trust. */
+		cursorOf: (source: IndexingSource<Abi>) => stored.get(digestOf(source))?.lastSync,
 	};
 }
 
@@ -138,6 +141,10 @@ async function openWorld(specs: {name: string; source?: IndexingSource<Abi>}[]) 
 	const folds = new Map<string, ReturnType<typeof fakeProcessor>>();
 	const configs = new Map<string, ProvidedIndexerConfig<Abi>>();
 	const fetches: {by: string; from: number; to: number}[] = [];
+	// Re-decoding the stored stream is the FIRST thing an advance costs, so counting
+	// it is how "an unchanged stream costs nothing" is asserted: a follower that
+	// re-walks what it has already folded reparses it again.
+	const reparses: string[] = [];
 
 	const provider = {
 		async request(args: {method: string}): Promise<unknown> {
@@ -183,7 +190,10 @@ async function openWorld(specs: {name: string; source?: IndexingSource<Abi>}[]) 
 						toBlockUsed: toBlock,
 					};
 				},
-				reparse: (events: LogEvent<Abi>[]) => events.map((event) => ({...event})),
+				reparse: (events: LogEvent<Abi>[]) => {
+					reparses.push(by);
+					return events.map((event) => ({...event}));
+				},
 			};
 			return generation;
 		},
@@ -200,7 +210,22 @@ async function openWorld(specs: {name: string; source?: IndexingSource<Abi>}[]) 
 			chain.logs[address] = logs;
 			tip = newTip;
 		},
+		/** The chain moves on by one block, then ONE cycle: every generation steps once. */
+		round: async (logs?: LogEvent<Abi>[]) => {
+			if (logs) {
+				chain.logs[ADDRESS] = logs;
+			}
+			tip = tip + 1;
+			return indexer.indexMore();
+		},
 		fetchesBy: (name: string) => fetches.filter((call) => call.by === `proc-${name}`),
+		reparsesBy: (name: string) => reparses.filter((who) => who === `proc-${name}`).length,
+		batchesOf: (name: string) => folds.get(name)?.batches ?? [],
+		heldOf: (name: string) => indexer.generations.find((entry) => entry.record.processor === `proc-${name}`),
+		id: (name: string) => ({
+			stream: indexer.generations.find((entry) => entry.record.processor === `proc-${name}`)?.record.stream as string,
+			processor: `proc-${name}`,
+		}),
 		stateOf: (name: string) => folds.get(name)?.state ?? [],
 		/** Build a generation BESIDE the ones already held, the way a reconfigure will. */
 		add: (spec: {name: string; source?: IndexingSource<Abi>}) => indexer.add(specFor(spec)),
@@ -364,6 +389,167 @@ describe('a SHARED stream: the successor FOLLOWS and fetches nothing', () => {
 		expect(world.stateOf('A')).toEqual(BRANCH_B.map(idOf));
 		expect(world.stateOf('B')).toEqual(world.stateOf('A'));
 		expect(world.fetchesBy('B')).toEqual([]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// A PAUSED WRITER MOVES THE STREAM WITHOUT MOVING ITS CURSOR
+// ---------------------------------------------------------------------------
+// A pause caps `toBlock` at the cursor it paused on (ADR-0045), so a paused
+// writer's `lastToBlock` is FROZEN while it re-scans a shrinking window -- and a
+// reorg it detects at or below that cap is appended to the stream with the
+// cursor never moving. A follower level with the cap therefore cannot ask "has
+// this stream changed" by comparing cursors: the stream moved and the summary of
+// it did not. What it asks instead is the stream ITSELF, which is the only
+// answer that cannot lie about it.
+// ---------------------------------------------------------------------------
+
+/** Two generations over one stream, indexed to the tip of branch A, the WRITER then paused there. */
+async function pausedWriterWithFollower() {
+	const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+	await world.indexer.load();
+	await driveToTip(world.indexer);
+
+	expect(world.stateOf('A')).toEqual(BRANCH_A.map(idOf));
+	expect(world.stateOf('B')).toEqual(BRANCH_A.map(idOf));
+
+	world.indexer.pause(world.id('A'));
+	expect(world.heldOf('A')?.pauseState).toBe('draining');
+	return world;
+}
+
+/** Poll until the cap is final, bounded so a drain that never idles is a red line and not a hang. */
+async function drainToIdle(world: Awaited<ReturnType<typeof pausedWriterWithFollower>>, maxRounds = 12) {
+	for (let round = 0; round < maxRounds; round++) {
+		if (world.heldOf('A')?.pauseState === 'drained') {
+			return;
+		}
+		await world.round();
+	}
+	throw new Error(`the writer did not drain in ${maxRounds} rounds`);
+}
+
+describe('a PAUSED writer appends, and the follower follows THE STREAM and not the cursor', () => {
+	it('replays a retraction appended below the cap, and lands where a from-scratch fold lands', async () => {
+		const world = await pausedWriterWithFollower();
+
+		await world.round(); // re-scan [102, 105]: nothing new
+		await world.round([...BRANCH_B]); // the reorg at 104, which is BELOW the cap
+
+		// the writer corrected itself and APPENDED both verdicts to the stream...
+		expect(world.stateOf('A')).toEqual(BRANCH_B.map(idOf));
+		expect(world.stream.eventsOf(SOURCE).map(shapeOf)).toEqual([
+			...BRANCH_A.map(shapeOf),
+			`R:${idOf(BRANCH_A[3])}`,
+			`A:${idOf(BRANCH_B[3])}`,
+		]);
+		// ...while the stored CURSOR never moved: that frozen summary is exactly what
+		// a follower comparing cursors would have believed
+		expect(world.stream.cursorOf(SOURCE)?.lastToBlock).toBe(105);
+
+		// THE REGRESSION: the follower replays them rather than keeping the dead branch
+		expect(world.stateOf('B')).toEqual(BRANCH_B.map(idOf));
+		expect(world.stateOf('B')).toEqual(world.stateOf('A'));
+		// and it is the state the stream itself folds to, from scratch, with no writer
+		expect(await refoldStoredStream(world.stream)).toEqual(world.stateOf('B'));
+	});
+
+	it('delivers the retraction and its replacement in the order the writer emitted them', async () => {
+		const world = await pausedWriterWithFollower();
+		await world.round();
+		await world.round([...BRANCH_B]);
+
+		const delivered = world.batchesOf('B').flat().map(shapeOf);
+		expect(delivered.slice(-2)).toEqual([`R:${idOf(BRANCH_A[3])}`, `A:${idOf(BRANCH_B[3])}`]);
+	});
+
+	it('still fetches NOTHING and writes NOTHING while it does it', async () => {
+		const world = await pausedWriterWithFollower();
+		await world.round();
+		await world.round([...BRANCH_B]);
+
+		expect(world.fetchesBy('B')).toEqual([]);
+		expect(world.stream.clears).toBe(0);
+		// the one-writer rule: the stream holds the writer's emissions and nothing else
+		expect(world.stream.digests()).toHaveLength(1);
+		expect(world.stream.eventsOf(SOURCE)).toHaveLength(BRANCH_A.length + 2);
+	});
+
+	it('costs NOTHING while the stream is unchanged: no re-walk, nothing re-delivered', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+		// the chain stands still: two cycles for the follower to settle level with the stream
+		await world.indexer.indexMore();
+		await world.indexer.indexMore();
+
+		const reparses = world.reparsesBy('B');
+		const batches = world.batchesOf('B').length;
+
+		await world.indexer.indexMore();
+		await world.indexer.indexMore();
+		await world.indexer.indexMore();
+
+		// not "fewer": an idle follower re-walks nothing and re-delivers nothing, which
+		// is what makes this a replacement for the early return rather than its removal
+		expect(world.reparsesBy('B')).toBe(reparses);
+		expect(world.batchesOf('B').length).toBe(batches);
+	});
+
+	it('costs nothing beside a DRAINED writer either, whose stream has stopped moving', async () => {
+		const world = await pausedWriterWithFollower();
+		await drainToIdle(world);
+		// the drained writer fetches nothing, so the stream stands still: two cycles to settle
+		await world.round();
+		await world.round();
+
+		const reparses = world.reparsesBy('B');
+		const batches = world.batchesOf('B').length;
+
+		await world.round();
+		await world.round();
+		await world.round();
+
+		expect(world.reparsesBy('B')).toBe(reparses);
+		expect(world.batchesOf('B').length).toBe(batches);
+		expect(world.fetchesBy('B')).toEqual([]);
+	});
+
+	it('behaves exactly as it does today when the writer is RUNNING', async () => {
+		const world = await openWorld([{name: 'A'}, {name: 'B'}]);
+		await world.indexer.load();
+		await driveToTip(world.indexer);
+
+		// the same reorg, with no cap anywhere: the path that was already correct
+		world.serve(ADDRESS, [...BRANCH_B], BRANCH_B_TIP);
+		await driveToTip(world.indexer);
+
+		expect(world.stateOf('A')).toEqual(BRANCH_B.map(idOf));
+		expect(world.stateOf('B')).toEqual(world.stateOf('A'));
+		expect(world.batchesOf('B').flat().map(shapeOf).slice(-2)).toEqual([
+			`R:${idOf(BRANCH_A[3])}`,
+			`A:${idOf(BRANCH_B[3])}`,
+		]);
+		expect(world.fetchesBy('B')).toEqual([]);
+		expect(await refoldStoredStream(world.stream)).toEqual(world.stateOf('B'));
+	});
+
+	it('leaves a RESUMED writer’s follower exactly where it was: it follows the uncapped stream too', async () => {
+		const world = await pausedWriterWithFollower();
+		await drainToIdle(world);
+
+		// the chain moved on ABOVE the cap while the writer drained
+		const branchC = [...BRANCH_A, makeLog(107, '0xc107')];
+		world.indexer.resume(world.id('A'));
+		expect(world.heldOf('A')?.pauseState).toBe('running');
+
+		await world.round(branchC);
+		await driveToTip(world.indexer);
+
+		expect(world.stateOf('A')).toEqual(branchC.map(idOf));
+		expect(world.stateOf('B')).toEqual(world.stateOf('A'));
+		expect(world.fetchesBy('B')).toEqual([]);
+		expect(await refoldStoredStream(world.stream)).toEqual(world.stateOf('B'));
 	});
 });
 
