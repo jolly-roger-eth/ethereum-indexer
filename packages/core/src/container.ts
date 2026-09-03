@@ -27,7 +27,7 @@ const namedLogger = logs('@etherfold/core');
  * THE GENERATION CONTAINER: the indexer that HOLDS generations, one of which is
  * canonical and answers every read.
  *
- * `IndexerGeneration` (once `EthereumIndexer`) is one stream plus one processor
+ * `IndexerGeneration` is one stream plus one processor
  * plus one state, which under this model is a GENERATION and not the container.
  * This is the container, and the name follows `CONTEXT.md`, which has defined
  * *indexer* as the named unit holding generations, carrying the caps and holding
@@ -50,13 +50,17 @@ const namedLogger = logs('@etherfold/core');
  *    single rule is the whole read unit of work, and why no scope API, no
  *    transaction handle and no timer is needed to get it.
  *
+ * It also PUBLISHES a discard (`publishDiscard`), which is not a fourth thing but
+ * the second one applied to the case `onStateUpdated` never covered: a fold that
+ * was thrown away is neither adopted nor produced, so without this a subscriber
+ * holding the state it lost is told by nothing.
+ *
  * It does NOT decide WHEN the pointer moves (the promotion policy is
  * `the-promotion-policy-moves-the-canonical-pointer`), it does not advance a
  * non-canonical generation (that needs the shared-stream follower,
  * `a-non-canonical-generation-advances-on-a-shared-stream`), and it does not yet
  * turn a reconfigure into a new generation: `updateIndexer` and `updateProcessor`
- * still do to the canonical generation exactly what they did before, because
- * this batch removes nothing.
+ * still do to the canonical generation exactly what they did before.
  * ------------------------------------------------------------------------- */
 
 /** What both of a generation's factories are told about the generation being built. */
@@ -148,6 +152,18 @@ type HeldEntry<ABI extends Abi, ProcessResultType> = {
 	published?: ProcessResultType;
 	/** Distinguishes "published nothing yet" from "published `undefined`", which a `void` fold does. */
 	hasPublished: boolean;
+	/**
+	 * How many times this generation has published a state.
+	 *
+	 * Read ONLY as a comparison across a reconfigure, to answer "did the fold
+	 * produce a state while that call was running?". A discard does not always
+	 * leave nothing: when the STREAM survives (a processor swap leaves the cached
+	 * events untouched, since the stream verdict is about the source and the config
+	 * and not the processor), the `load` inside the verb replays it and publishes
+	 * the REBUILT state before the verb returns. Dropping the handle after that
+	 * would throw away the very thing the rebuild produced.
+	 */
+	publications: number;
 };
 
 /** One generation this container holds: its record, its engine, its fold. */
@@ -394,7 +410,14 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		}
 
 		const generation = this.createGeneration(this.provider, processor, this.source, this.config);
-		const entry: HeldEntry<ABI, ProcessResultType> = {record, generation, processor, spec, hasPublished: false};
+		const entry: HeldEntry<ABI, ProcessResultType> = {
+			record,
+			generation,
+			processor,
+			spec,
+			hasPublished: false,
+			publications: 0,
+		};
 		this.held.push(entry);
 
 		generation.onLoad = async (loadingState) => {
@@ -415,6 +438,7 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		generation.onStateUpdated = (published) => {
 			entry.published = published;
 			entry.hasPublished = true;
+			entry.publications++;
 			if (entry === this.current) {
 				this.notifyState();
 			}
@@ -537,8 +561,12 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		this.requireCurrent().generation.reenableProcessing();
 	}
 
-	reset(): Promise<ReconfigureOutcome> {
-		return this.requireCurrent().generation.reset();
+	async reset(): Promise<ReconfigureOutcome> {
+		const entry = this.requireCurrent();
+		const publishedBefore = entry.publications;
+		const outcome = await entry.generation.reset();
+		this.publishDiscard(entry, outcome, publishedBefore);
+		return outcome;
 	}
 
 	async updateIndexer(update: {
@@ -547,16 +575,8 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		streamConfig?: ProvidedStreamConfig;
 	}): Promise<ReconfigureOutcome> {
 		const entry = this.requireCurrent();
+		const publishedBefore = entry.publications;
 		const outcome = await entry.generation.updateIndexer(update);
-		if (outcome.stateDiscarded) {
-			// What this generation last published no longer exists, so the handle must
-			// stop answering with it: it falls back to the fold's own read handle, which
-			// is what a processor that has processed nothing has. This is the same
-			// re-seed `createIndexerState` does for its `state` store, held one level
-			// lower so a reader going through the container gets it too.
-			entry.hasPublished = false;
-			entry.published = undefined;
-		}
 		// The source or the stream config may have moved, so the stream a
 		// generation built from here folds has too. Recomputed rather than cached
 		// once: a generation added after a reconfigure belongs to the stream running
@@ -565,6 +585,9 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		this.source = update.source ?? this.source;
 		this.config = update.streamConfig ? {...this.config, stream: update.streamConfig} : this.config;
 		this.streamDigest = this.digestOf(this.source, this.config);
+		// Last, so a listener woken by the discard reads a container that has already
+		// finished moving.
+		this.publishDiscard(entry, outcome, publishedBefore);
 		return outcome;
 	}
 
@@ -587,12 +610,15 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		options?: {force?: boolean},
 	): Promise<ReconfigureOutcome> {
 		const entry = this.requireCurrent();
+		const publishedBefore = entry.publications;
 		const outcome = await entry.generation.updateProcessor(newProcessor, options);
 		if (outcome.stateDiscarded) {
+			// Recorded BEFORE the discard is published, and unconditionally: the state to
+			// publish is the NEW fold's read handle, which is a handle onto a different
+			// store whenever the declarations changed.
 			entry.processor = newProcessor;
-			entry.hasPublished = false;
-			entry.published = undefined;
 		}
+		this.publishDiscard(entry, outcome, publishedBefore);
 		return outcome;
 	}
 
@@ -602,6 +628,51 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 
 	protected digestOf(source: IndexingSource<ABI>, config: ProvidedIndexerConfig<ABI>): string {
 		return streamDigestOf(source, resolveStreamConfig(config.stream));
+	}
+
+	/**
+	 * DROP WHAT THE DISCARD DESTROYED, AND SAY SO.
+	 *
+	 * The three reconfiguring verbs all end in one of two places -- the fold
+	 * survived, or it is gone and being rebuilt -- and `onStateUpdated` fires when a
+	 * state is ADOPTED or PRODUCED, so it fires for neither. A subscriber holding
+	 * the state the fold just lost is therefore told by nothing, and on the
+	 * reconfigure this exists for (a contract redeployed behind its proxy, which has
+	 * emitted nothing yet) the next publication never comes at all: the old
+	 * contract's numbers stay on screen for the rest of the session.
+	 *
+	 * So the container publishes the discard, which is a NOTIFICATION and not a new
+	 * state: what goes out is the same indirect handle every publication carries,
+	 * now resolving to the fold that has processed nothing. `createIndexerState` did
+	 * this for its own `state` store until `the-old-indexer-shape-is-deleted`; it is
+	 * here because the container is what knows a verb discarded, and because every
+	 * other consumer of one (a server, a CLI, a test) was never told at all.
+	 *
+	 * **A DISCARD DOES NOT ALWAYS LEAVE NOTHING**, which is the whole reason for the
+	 * `publishedBefore` guard. When the STREAM survives -- which a processor swap
+	 * always leaves it, since the stream verdict is about the source and the config
+	 * and not the processor -- the `load` inside the verb REPLAYS the cached events
+	 * and publishes the rebuilt state before the verb returns. That publication is
+	 * the truth; dropping the handle and re-announcing an empty fold on top of it
+	 * would report a correct rebuild to every subscriber as an empty state, with the
+	 * cursor already past the blocks, so nothing would arrive later to correct it.
+	 */
+	protected publishDiscard(
+		entry: HeldEntry<ABI, ProcessResultType>,
+		outcome: ReconfigureOutcome,
+		publishedBefore: number,
+	): void {
+		if (!outcome.stateDiscarded || entry.publications !== publishedBefore) {
+			return;
+		}
+		// What this generation last published no longer exists, so the handle must stop
+		// answering with it: it falls back to the fold's own read handle, which is what
+		// a processor that has processed nothing has.
+		entry.hasPublished = false;
+		entry.published = undefined;
+		if (entry === this.current) {
+			this.notifyState();
+		}
 	}
 
 	/** Point the read path at the generation the registry already calls canonical. */

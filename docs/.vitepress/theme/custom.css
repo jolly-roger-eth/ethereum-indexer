@@ -61,7 +61,7 @@
 /* Brand surfaces only: the hero, the nav title and hand-written page titles.
    Body copy, sidebars and code stay on the default stack, Audiowide is a
    display face. API pages are excluded via the 'api-page' class set in
-   config.mts, because their h1 is a symbol name (EthereumIndexer, JSProcessor)
+   config.mts, because their h1 is a symbol name (IndexerGeneration, StreamBuilder)
    and those should read as code identifiers, not as branding. */
 .VPHero .name,
 .VPNavBarTitle .title,

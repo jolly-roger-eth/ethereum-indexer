@@ -20,18 +20,15 @@ import {describe, expect, it} from 'vitest';
 // construction, and the file that would introduce one is the file this reads.
 // That engine stays the browser's.
 //
-// IT HAS TWO NAMES DURING THE RENAME, AND THE GUARD MATCHES BOTH. The class is
-// `IndexerGeneration` now -- one stream, one processor, one state IS a
-// GENERATION -- and `EthereumIndexer` remains as an alias to it until the
-// contract batch (`the-old-indexer-shape-is-deleted`) removes it, which is also
-// when the old spelling comes out of the patterns below. A guard left on the old
-// spelling alone would stay GREEN and stop enforcing anything the moment a file
-// used the new one, which is worse than no guard; a guard narrowed to the new
-// one alone would stop seeing a file that reached for the alias while the alias
-// still resolves. Deliberately NOT extended to `Indexer`, the generation
-// CONTAINER: whether a CLI holds generations is
-// `the-server-and-cli-hold-generations-too`'s question, and a grep here must not
-// pre-answer it.
+// IT HAS ONE NAME AGAIN, AND THE GUARD MATCHES THAT ONE. The class is
+// `IndexerGeneration` -- one stream, one processor, one state IS a GENERATION --
+// and the second spelling it carried through the rename was deleted with the old
+// shape (`the-old-indexer-shape-is-deleted`), so that spelling came out of the
+// patterns below with it. A guard left on an identifier nothing can resolve any
+// more would stay GREEN and enforce nothing, which is worse than no guard.
+// Deliberately NOT extended to `Indexer`, the generation CONTAINER: whether a
+// CLI holds generations is `the-server-and-cli-hold-generations-too`'s question,
+// and a grep here must not pre-answer it.
 //
 // A SOURCE-TEXT GUARD IS ONLY WORTH ITS LINES IF IT STILL BITES, so the patterns
 // are named here and asserted against deliberate violations below. A rename that
@@ -43,9 +40,9 @@ import {describe, expect, it} from 'vitest';
 
 const src = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
 
-/** Does this source text CONSTRUCT the browser engine, under either of its names? */
+/** Does this source text CONSTRUCT the browser engine? */
 function constructsEngine(text: string): boolean {
-	return /new\s+(EthereumIndexer|IndexerGeneration)\b|\b(EthereumIndexer|IndexerGeneration)\s*[<(]/.test(text);
+	return /new\s+IndexerGeneration\b|\bIndexerGeneration\s*[<(]/.test(text);
 }
 
 /**
@@ -56,7 +53,7 @@ function constructsEngine(text: string): boolean {
  * question is asked about an import rather than about a mention.
  */
 function importsEngine(text: string): boolean {
-	return /import\s*\{[^}]*\b(EthereumIndexer|IndexerGeneration)\b[^}]*\}/.test(text);
+	return /import\s*\{[^}]*\bIndexerGeneration\b[^}]*\}/.test(text);
 }
 
 function sources(): {file: string; text: string}[] {
@@ -67,12 +64,12 @@ function sources(): {file: string; text: string}[] {
 }
 
 describe("the CLI's indexing path", () => {
-	it('constructs no IndexerGeneration, under either of its names', () => {
+	it('constructs no IndexerGeneration', () => {
 		const offenders = sources().filter(({text}) => constructsEngine(text));
 		expect(offenders.map(({file}) => file)).toEqual([]);
 	});
 
-	it('imports it under neither name either, so nothing can quietly start using one', () => {
+	it('does not import it either, so nothing can quietly start using one', () => {
 		const offenders = sources().filter(({text}) => importsEngine(text));
 		expect(offenders.map(({file}) => file)).toEqual([]);
 	});
@@ -94,7 +91,7 @@ describe("the CLI's indexing path", () => {
  * The two checks above pass because `src/` is clean. They would ALSO pass if the
  * patterns matched nothing at all, which is exactly what a rename does to a
  * source-text guard left on the old identifier. So the violations are written
- * out here, under BOTH names, and the patterns are asserted to catch each one.
+ * out here and the patterns are asserted to catch each one.
  */
 describe('the guard that says so still bites', () => {
 	const constructions = [
@@ -102,12 +99,7 @@ describe('the guard that says so still bites', () => {
 			"a construction under the class's own name",
 			`const engine = new IndexerGeneration(provider, processor, source, config);`,
 		],
-		[
-			'a construction under the retained alias',
-			`const engine = new EthereumIndexer(provider, processor, source, config);`,
-		],
 		['a type argument, which needs no `new` at all', `let engine: IndexerGeneration<Abi, void> | undefined;`],
-		['the same under the alias', `let engine: EthereumIndexer<Abi, void> | undefined;`],
 		['a call of it, however it got here', `const engine = IndexerGeneration(provider);`],
 	] as const;
 
@@ -118,8 +110,7 @@ describe('the guard that says so still bites', () => {
 	}
 
 	const imports = [
-		['an import under the new name', `import {IndexerGeneration} from '@etherfold/core';`],
-		['an import under the alias', `import {EthereumIndexer} from '@etherfold/core';`],
+		['a bare import of it', `import {IndexerGeneration} from '@etherfold/core';`],
 		[
 			'one buried in a longer import list',
 			`import {LogFetcher, IndexerGeneration, StreamBuilder} from '@etherfold/core';`,

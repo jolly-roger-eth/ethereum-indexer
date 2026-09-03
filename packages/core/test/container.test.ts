@@ -1,21 +1,19 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
 import type {EventProcessor, IndexingSource} from '../src/types.js';
-import {EthereumIndexer, IndexerGeneration} from '../src/indexer.js';
-import {Indexer, openIndexer, UnheldGenerationError, type GenerationSpec} from '../src/container.js';
+import {openIndexer, UnheldGenerationError, type GenerationSpec} from '../src/container.js';
 import {openMemoryGenerationRegistry} from '../src/generation/memory.js';
 import type {GenerationRegistry} from '../src/generation/registry.js';
 
 // ---------------------------------------------------------------------------
-// THE GENERATION CONTAINER, beside the shape it lands next to.
+// THE GENERATION CONTAINER, which is now the only shape there is.
 // ---------------------------------------------------------------------------
-// An indexer HOLDS generations and points at the one that answers reads; what
-// used to be called `EthereumIndexer` is ONE of them. Nothing here indexes a
-// chain: what is asserted is the container's own three claims -- generations are
-// BUILT from factories, reads resolve through the canonical pointer INDIRECTLY,
-// and a pointer move is applied AT A NOTIFICATION -- plus the two the expand
-// batch exists for: the old name still names the generation, and the old
-// construction shape still works.
+// An indexer HOLDS generations and points at the one that answers reads;
+// `IndexerGeneration` is ONE of them. Nothing here indexes a chain: what is
+// asserted is the container's own claims -- generations are BUILT from
+// factories, reads resolve through the canonical pointer INDIRECTLY, a pointer
+// move is applied AT A NOTIFICATION, and a DISCARD is published rather than
+// merely applied.
 
 const CHAIN_ID_HEX = '0x1';
 
@@ -44,6 +42,16 @@ const SOURCE: IndexingSource<Abi> = {
 /** A read HANDLE, like the entity path's: the same object every time, bound to one generation's state. */
 type Handle = {read(): string};
 
+/**
+ * Which handle belongs to which processor.
+ *
+ * `stateOf` is asked about a PROCESSOR, and the container re-points the held
+ * processor when a swap discards -- so a fixture that answered from a captured
+ * variable instead would go on naming the fold that was replaced, which is the
+ * one thing these assertions are about.
+ */
+const handles = new WeakMap<EventProcessor<Abi, Handle>, Handle>();
+
 type Fold = {
 	processor: EventProcessor<Abi, Handle>;
 	/** The state this generation folds into: a name, so a read says which generation answered. */
@@ -70,6 +78,7 @@ function makeFold(name: string): Fold {
 		reset: async () => {},
 		clear: async () => {},
 	};
+	handles.set(processor, handle);
 	return {processor, store, handle, calls};
 }
 
@@ -81,7 +90,7 @@ function specFor(fold: Fold): GenerationSpec<Abi, Handle, {name: string; opened:
 			return fold.store;
 		},
 		createProcessor: () => fold.processor,
-		stateOf: () => fold.handle,
+		stateOf: (processor) => handles.get(processor) as Handle,
 	};
 }
 
@@ -95,25 +104,6 @@ async function openContainer(folds: Fold[], registry?: GenerationRegistry) {
 	});
 	return {indexer, registry: held};
 }
-
-describe('the old name and the old shape', () => {
-	it('keeps `EthereumIndexer` pointing at the GENERATION, never at the container', () => {
-		// The whole correction of the expand batch. `new EthereumIndexer(provider,
-		// processor, source, config)` is handed ONE already-constructed processor
-		// over ONE already-constructed state, which is a generation; aliasing that
-		// identifier to the container would silently re-mean every existing site.
-		expect(EthereumIndexer).toBe(IndexerGeneration);
-		expect(EthereumIndexer as unknown).not.toBe(Indexer);
-	});
-
-	it('still constructs and still drives one processor', async () => {
-		const fold = makeFold('old-shape');
-		const generation = new EthereumIndexer<Abi, Handle>(makeProvider(), fold.processor, SOURCE);
-		expect(generation).toBeInstanceOf(IndexerGeneration);
-		await generation.load();
-		expect(fold.calls.load).toBe(1);
-	});
-});
 
 describe('the generation container', () => {
 	it('BUILDS each generation from its factories: state first, then the fold over it', async () => {
@@ -134,7 +124,7 @@ describe('the generation container', () => {
 						order.push(`processor:${(state as {name: string}).name}:${context.stream}`);
 						return fold.processor;
 					},
-					stateOf: () => fold.handle,
+					stateOf: (processor) => handles.get(processor) as Handle,
 				},
 			],
 		});
@@ -209,6 +199,62 @@ describe('the state handle is INDIRECT', () => {
 		expect(handle.read()).toBe('B');
 		await indexer.promote(indexer.generations[0].record);
 		expect(handle.read()).toBe('A');
+	});
+});
+
+/**
+ * A DISCARD IS PUBLISHED, and the container is what publishes it.
+ *
+ * `onStateUpdated` fires when a state is ADOPTED or PRODUCED, and a discard is
+ * neither (`ReconfigureOutcome`), so a subscriber holding the state the fold
+ * just lost is told by nothing -- and on the reconfigure this exists for (a
+ * contract redeployed behind its proxy, which has emitted nothing yet) the next
+ * publication never comes at all.
+ *
+ * The browser hook used to fill that silence itself. It is HERE now, because the
+ * container is what knows a verb discarded, and because a consumer that drives
+ * the container without that hook (a server, a CLI, a test) was never told at
+ * all.
+ */
+describe('a discard is PUBLISHED and not merely applied', () => {
+	it('tells subscribers when a processor swap discarded the fold', async () => {
+		const a = makeFold('A');
+		const b = makeFold('B');
+		const {indexer} = await openContainer([a]);
+
+		const published: string[] = [];
+		indexer.onStateUpdated = (state) => published.push(state.read());
+
+		expect(await indexer.updateProcessor(b.processor)).toEqual({stateDiscarded: true});
+
+		// the NEW fold's handle, because the old one no longer exists: a subscriber
+		// that kept what it was handed is now reading the generation that is folding
+		expect(published).toEqual(['B']);
+		expect(indexer.state.read()).toBe('B');
+	});
+
+	it('tells subscribers when an explicit reset discarded the fold', async () => {
+		const a = makeFold('A');
+		const {indexer} = await openContainer([a]);
+
+		const published: string[] = [];
+		indexer.onStateUpdated = (state) => published.push(state.read());
+
+		expect(await indexer.reset()).toEqual({stateDiscarded: true});
+		expect(published).toEqual(['A']);
+	});
+
+	it('says nothing when the reconfigure kept the fold', async () => {
+		const a = makeFold('A');
+		const {indexer} = await openContainer([a]);
+
+		const published: string[] = [];
+		indexer.onStateUpdated = (state) => published.push(state.read());
+
+		// the same version hash, unforced: the core skips the swap, so there is
+		// nothing to say -- and a store blanked on every save would be its own bug
+		expect(await indexer.updateProcessor(a.processor)).toEqual({stateDiscarded: false});
+		expect(published).toEqual([]);
 	});
 });
 

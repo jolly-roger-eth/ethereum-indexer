@@ -4,22 +4,16 @@ import type {
 	GenerationContext,
 	GenerationRegistry,
 	Indexer,
+	IndexerGeneration,
 	IndexingSource,
 	LastSync,
-	LoadingState,
 	ExistingStream,
 	ProvidedStreamConfig,
 	ProvidedIndexerConfig,
-	ReconfigureOutcome,
 	TxInclusionQuery,
 	TxInclusionVerdict,
 } from '@etherfold/core';
-import {
-	checkTxInclusion as checkTxInclusionAgainst,
-	IndexerGeneration,
-	openIndexer,
-	openMemoryGenerationRegistry,
-} from '@etherfold/core';
+import {checkTxInclusion as checkTxInclusionAgainst, openIndexer, openMemoryGenerationRegistry} from '@etherfold/core';
 import type {StateStore} from '@etherfold/state-store';
 import {BROWSER_GENERATION_CAPS} from './storage/generation/OnIndexedDB.js';
 import {createRootStore, createStore} from './utils/stores.js';
@@ -82,8 +76,8 @@ export type EntityEventProcessorLike<ABI extends Abi, ProcessResultType, Process
 };
 
 /**
- * THE CONTAINER SHAPE of this hook: the factories that BUILD a generation,
- * rather than one already-built processor over one already-built store.
+ * THE SHAPE of this hook: the factories that BUILD a generation, rather than one
+ * already-built processor over one already-built store.
  *
  * An indexer holds any number of **generations** -- a stream plus a fold over it
  * -- and one of them is canonical and answers every read. So it cannot be handed
@@ -97,9 +91,6 @@ export type EntityEventProcessorLike<ABI extends Abi, ProcessResultType, Process
  * });
  * ```
  *
- * This is the shape every caller in this repository is written against; the
- * one-generation shape below is what the contract batch removes.
- *
  * The order is `createState` then `createProcessor`, and it is the order a
  * generation's IDENTITY forces: the stream half is known from the source and the
  * stream config, and the FOLD half is the processor's own version hash, so the
@@ -108,12 +99,11 @@ export type EntityEventProcessorLike<ABI extends Abi, ProcessResultType, Process
  * instead, so the caller's own closure is what distinguishes this generation's
  * store from the next one's.
  *
- * The old shape -- `createIndexerState(fromEntityProcessor(p)(store))` -- still
- * works and still means one generation, but nothing in this repository calls it
- * any more: `every-caller-moves-onto-the-generation-container` moved every site
- * onto the factories, and the only remaining uses are the tests that assert the
- * old shape is still ACCEPTED, which go with it when
- * `the-old-indexer-shape-is-deleted` removes it.
+ * There used to be a second accepted shape -- `createIndexerState(fromEntityProcessor(p)(store))`,
+ * one already-built processor over one already-built store, which meant exactly
+ * one generation. It is DELETED: an indexer that holds generations cannot be
+ * handed one, so keeping it would have been a second call shape that could never
+ * reach what the first one is for.
  */
 export type BrowserGenerationSpec<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined> = {
 	/** Where THIS generation's state lives. Called once, before its processor. */
@@ -138,45 +128,6 @@ export type BrowserGenerationSpec<ABI extends Abi, ProcessResultType, ProcessorC
 	 */
 	registry?: GenerationRegistry;
 };
-
-/**
- * What this hook drives: one generation's engine, or the container that holds
- * several.
- *
- * Structural rather than either class, so the hook does not have to know which
- * of the two shapes built it. Every verb here means the same thing on both: on
- * the container they act on the CANONICAL generation.
- */
-type IndexerEngine<ABI extends Abi, ProcessResultType> = {
-	readonly defaultFromBlock: number;
-	readonly finalityDepth: number;
-	onLoad: ((state: LoadingState) => Promise<void>) | undefined;
-	onStateUpdated: ((state: ProcessResultType) => void) | undefined;
-	onLastSyncUpdated: ((lastSync: LastSync<ABI>) => void) | undefined;
-	load(): Promise<LastSync<ABI>>;
-	indexMore(): Promise<LastSync<ABI>>;
-	reset(): Promise<ReconfigureOutcome>;
-	updateIndexer(update: {
-		provider?: EIP1193ProviderWithoutEvents;
-		source?: IndexingSource<ABI>;
-		streamConfig?: ProvidedStreamConfig;
-	}): Promise<ReconfigureOutcome>;
-	updateProcessor(
-		newProcessor: EventProcessor<ABI, ProcessResultType>,
-		options?: {force?: boolean},
-	): Promise<ReconfigureOutcome>;
-};
-
-/** Which of the two accepted shapes was passed. A spec BUILDS a processor; a processor IS one. */
-function isGenerationSpec<ABI extends Abi, ProcessResultType, ProcessorConfig>(
-	given:
-		| EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>
-		| BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>,
-): given is BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig> {
-	return (
-		typeof (given as BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>).createProcessor === 'function'
-	);
-}
 
 type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfig extends undefined
 	? (indexerSetup: {
@@ -230,9 +181,7 @@ type InitFunction<ABI extends Abi, ProcessorConfig = undefined> = ProcessorConfi
  * empty tab.
  */
 export function createIndexerState<ABI extends Abi, ProcessResultType, ProcessorConfig = undefined>(
-	givenProcessor:
-		| EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>
-		| BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>,
+	spec: BrowserGenerationSpec<ABI, ProcessResultType, ProcessorConfig>,
 	options?: {
 		catchupThreshold?: number;
 		trackNumRequests?: boolean;
@@ -245,8 +194,8 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		// `new IndexerGeneration(...)`.
 		//
 		// The processor arrives as the `EventProcessor` the core drives, which is all
-		// `new IndexerGeneration(...)` takes. On the container shape this is the
-		// container's `createGeneration`: one of these is built per generation.
+		// `new IndexerGeneration(...)` takes. This is the container's
+		// `createGeneration`: one of these is built per generation.
 		createIndexer?: (
 			provider: EIP1193ProviderWithoutEvents,
 			processor: EventProcessor<ABI, ProcessResultType>,
@@ -255,27 +204,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		) => IndexerGeneration<ABI, ProcessResultType>;
 	},
 ) {
-	/**
-	 * The CONTAINER shape, or nothing when this hook was given a processor.
-	 *
-	 * Both are accepted, and they differ in exactly one thing: whether this hook
-	 * BUILDS the generation (state then processor, at `init`) or is handed one
-	 * already built. Everything after `init` is the same on both paths, which is
-	 * why the engine below is structural.
-	 */
-	const spec = isGenerationSpec(givenProcessor) ? givenProcessor : undefined;
-	// `let`, because `updateProcessor` replaces it -- and because on the container
-	// shape the processor does not exist until `init` builds the generation. It used
-	// to be `const`, and the hook consequently went on describing the processor it
-	// no longer drove.
-	let selected: EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig> | undefined = spec
-		? undefined
-		: (givenProcessor as EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>);
-	// The object the core is handed at `init`. It is the one `selected` names at
-	// construction, and it stays that object for the life of the underlying
-	// indexer: `updateProcessor` hands the NEW one to the core directly and
-	// re-points `selected`, so the two are only ever the same before a swap.
-	const processor = selected;
 	const {
 		$state: $syncing,
 		set: setSyncing,
@@ -290,58 +218,18 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		numRequests: options?.trackNumRequests ? 0 : undefined,
 	});
 
-	/**
-	 * How many times the core has published a state.
-	 *
-	 * Read ONLY as a comparison across a reconfigure, to answer "did the core
-	 * produce a state while that call was running?". A reconfigure that discards
-	 * does not always end with nothing: when a kept STREAM is still valid (a
-	 * processor swap leaves the cached events untouched, since the STREAM verdict
-	 * is about the source and the config and not the processor), `load` replays it
-	 * and publishes the REBUILT state before the call returns. Re-seeding after
-	 * that would throw away the very thing the rebuild produced.
-	 */
-	let statePublications = 0;
-
-	/**
-	 * The state to publish when there is nothing computed yet.
-	 *
-	 * It is the processor's READ HANDLE: there is nothing to create, because the
-	 * state is rows in a store and the handle onto them exists the moment the
-	 * processor does.
-	 *
-	 * Called at construction and again after a reconfigure that DISCARDED the
-	 * state, which are the same situation: a processor that has processed nothing.
-	 * One expression for both, so the value a subscriber sees before the first
-	 * event cannot depend on how it got here.
-	 */
-	function emptyStateOf(current: EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>): ProcessResultType {
-		return current.state;
-	}
-
-	/**
-	 * The same question on the container shape: the INDIRECT handle.
-	 *
-	 * It resolves to whichever generation is canonical, so publishing it here is
-	 * what makes a handle a subscriber kept across a pointer move go on answering
-	 * -- from the generation that is canonical NOW rather than the one that was.
-	 * Before `init` there is no generation and therefore nothing to read.
-	 */
-	function currentEmptyState(): ProcessResultType {
-		if (container) {
-			return container.state;
-		}
-		return emptyStateOf(selected as EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>);
-	}
-
-	const initialState = selected ? emptyStateOf(selected) : (undefined as ProcessResultType);
-
 	const {set: setStatus, readable: readableStatus} = createStore<StatusState>({state: 'Idle'});
-	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(initialState);
+	/**
+	 * There is nothing to publish until `init` has built the generation.
+	 *
+	 * The state is a READ HANDLE onto a store, and neither exists before the
+	 * factories have been called -- which is the whole point of taking factories.
+	 * `init` publishes the container's INDIRECT handle the moment it does.
+	 */
+	const {set: setState, readable: readableState} = createRootStore<ProcessResultType>(undefined as ProcessResultType);
 
-	let indexer: IndexerEngine<ABI, ProcessResultType> | undefined;
-	/** The container, on the container shape only. `indexer` IS this one then. */
-	let container: Indexer<ABI, ProcessResultType> | undefined;
+	/** The container this hook drives, once `init` has opened it. */
+	let indexer: Indexer<ABI, ProcessResultType> | undefined;
 	// `ReturnType<typeof setTimeout>` rather than `number`: this module is browser
 	// code, but its own test tooling puts node's typings in scope, and the handle is
 	// only ever passed back to `clearTimeout`, which takes either.
@@ -422,50 +310,35 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			});
 		}
 
-		if (spec) {
-			// The CONTAINER shape: build the generation here, because a generation's
-			// state and its fold are this hook's to construct now, not the caller's to
-			// have constructed. The registry is what holds WHICH generations exist and
-			// which one is canonical.
-			container = await openIndexer<ABI, ProcessResultType>({
-				registry: spec.registry ?? (await openMemoryGenerationRegistry(BROWSER_GENERATION_CAPS)),
-				provider,
-				source,
-				config,
-				generations: [
-					{
-						createState: (context) => spec.createState(context),
-						createProcessor: async (state, context) => {
-							const built = await spec.createProcessor(state as StateStore, context);
-							if (built.configure && processorConfig) {
-								built.configure(processorConfig);
-							}
-							// This is now the processor the hook describes, exactly as the
-							// given one is on the other shape.
-							selected = built;
-							return built;
-						},
-						// The entity path's state is a read HANDLE that exists the moment the
-						// processor does, so the container can answer from a generation that
-						// has folded nothing -- which is what a just-promoted generation is.
-						stateOf: (built) => (built as EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>).state,
+		// Build the generation here, because a generation's state and its fold are
+		// this hook's to construct, not the caller's to have constructed. The registry
+		// is what holds WHICH generations exist and which one is canonical.
+		indexer = await openIndexer<ABI, ProcessResultType>({
+			registry: spec.registry ?? (await openMemoryGenerationRegistry(BROWSER_GENERATION_CAPS)),
+			provider,
+			source,
+			config,
+			generations: [
+				{
+					createState: (context) => spec.createState(context),
+					createProcessor: async (state, context) => {
+						const built = await spec.createProcessor(state as StateStore, context);
+						if (built.configure && processorConfig) {
+							built.configure(processorConfig);
+						}
+						return built;
 					},
-				],
-				createGeneration: options?.createIndexer,
-			});
-			indexer = container;
-			// Published straight away, and it is the INDIRECT handle: a subscriber that
-			// keeps what it is handed keeps something that follows the canonical pointer.
-			setState(container.state);
-		} else {
-			const given = processor as EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>;
-			if (given.configure && processorConfig) {
-				given.configure(processorConfig);
-			}
-			indexer = options?.createIndexer
-				? options.createIndexer(provider, given, source, config)
-				: new IndexerGeneration<ABI, ProcessResultType>(provider, given, source, config);
-		}
+					// The entity path's state is a read HANDLE that exists the moment the
+					// processor does, so the container can answer from a generation that
+					// has folded nothing -- which is what a just-promoted generation is.
+					stateOf: (built) => (built as EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>).state,
+				},
+			],
+			createGeneration: options?.createIndexer,
+		});
+		// Published straight away, and it is the INDIRECT handle: a subscriber that
+		// keeps what it is handed keeps something that follows the canonical pointer.
+		setState(indexer.state);
 		setSyncing({waitingForProvider: false});
 	}
 
@@ -537,7 +410,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 			setCatchup(lastSync);
 		};
 		indexer.onStateUpdated = (state) => {
-			statePublications++;
 			setState(state);
 		};
 
@@ -662,22 +534,18 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	/**
 	 * Throw the computed state away and rebuild it from the start block.
 	 *
-	 * The re-seed is the whole reason this is not a one-line delegation: `reset` IS
-	 * a discard, so the copy this hook publishes has to go at the same moment the
-	 * processor's does. Without it a subscriber keeps rendering the state that was
-	 * just reset until the next event arrives to overwrite it -- and on a chain
-	 * with nothing left to replay, that is never.
+	 * A one-line delegation, because the CONTAINER publishes the discard
+	 * (`Indexer.publishDiscard`, `@etherfold/core`): `reset` IS a discard, and the
+	 * copy this hook holds goes at the same moment the fold's does, through the
+	 * ordinary state notification. This hook used to fill that silence itself, back
+	 * when it could be handed one already-built processor and there was no container
+	 * underneath to know.
 	 */
-	async function reset() {
+	function reset() {
 		if (!indexer) {
 			throw new Error(`no indexer`);
 		}
-		const publishedBefore = statePublications;
-		const outcome = await indexer.reset();
-		if (outcome.stateDiscarded && statePublications === publishedBefore) {
-			setState(currentEmptyState());
-		}
-		return outcome;
+		return indexer.reset();
 	}
 
 	// Tear down the indexer-state so it can be safely dropped (e.g. SPA navigation / component
@@ -688,8 +556,9 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 	//     the stores, so the stores become unreachable;
 	//  3. drops the indexer reference and resets the browser-layer syncing/status state.
 	// It is idempotent (safe to call more than once). After dispose(), `init(...)` may be called
-	// again to re-initialise — note this reuses the SAME stores and processor instance (the
-	// processor keeps whatever internal state it had); it is not a full fresh start of those.
+	// again to re-initialise — note this opens a NEW container and calls the generation factories
+	// again, so how much is a fresh start is the caller's: a `createState` that hands back a store
+	// it captured (which is what a hot reload wants) reuses that store and whatever it holds.
 	function dispose() {
 		// 1. stop auto-indexing and unconditionally clear the timer (a tick may have armed it).
 		stopAutoIndexing();
@@ -707,7 +576,6 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 
 		// 3. drop the indexer reference and reset browser-layer state so a later init() starts clean.
 		indexer = undefined;
-		container = undefined;
 		setSyncing({
 			waitingForProvider: true,
 			loading: false,
@@ -802,11 +670,12 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 		 * than applied. Bump the processor's `version`, or pass `{force: true}`, to
 		 * make an edit take effect.
 		 *
-		 * When the core does discard, so does this hook: `$state` is re-seeded from the
-		 * new processor at that moment rather than being left holding the old value
-		 * until the next event overwrites it. That wait used to be unbounded -- a
-		 * processor swapped in against a freshly redeployed contract has nothing to
-		 * replay, so nothing ever arrived to correct the display.
+		 * When the core does discard, `$state` is republished at that moment rather
+		 * than left holding the old value until the next event overwrites it -- a wait
+		 * that used to be unbounded, since a processor swapped in against a freshly
+		 * redeployed contract has nothing to replay. The CONTAINER is what does that
+		 * now (`Indexer.publishDiscard`, `@etherfold/core`), so it reaches every
+		 * consumer of one and not this hook's subscribers alone.
 		 */
 		updateProcessor(
 			newProcessor: EntityEventProcessorLike<ABI, ProcessResultType, ProcessorConfig>,
@@ -828,22 +697,7 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					stopAutoIndexing();
 				}
 				try {
-					const publishedBefore = statePublications;
 					const outcome = await indexer.updateProcessor(newProcessor, options);
-					if (outcome.stateDiscarded) {
-						// The core took the new processor, so this is now the processor the hook
-						// describes. Recorded unconditionally, and BEFORE any re-seed, because the
-						// empty state to publish is the NEW processor's: it is a handle onto the
-						// new store, which is a different store whenever the declarations
-						// changed.
-						selected = newProcessor;
-						// ...but only when the discard really did leave nothing. If a kept stream
-						// was replayed during `load`, the rebuilt state is already published and is
-						// the truth; blanking it here would undo the rebuild.
-						if (statePublications === publishedBefore) {
-							setState(currentEmptyState());
-						}
-					}
 					// On success only (option b): clear stale syncing state so setupIndexing() re-runs.
 					// Must run before resuming auto-indexing so the resumed loop does not early-return
 					// on the stale lastSync.
@@ -883,14 +737,11 @@ export function createIndexerState<ABI extends Abi, ProcessResultType, Processor
 					stopAutoIndexing();
 				}
 				try {
-					const publishedBefore = statePublications;
+					// The container publishes the discard if there was one: a new source at the
+					// same address is the redeploy case, and it is the one where the stale copy
+					// was most dangerous -- the state on screen was computed from the events of
+					// the implementation that is no longer deployed.
 					const outcome = await indexer.updateIndexer(update);
-					if (outcome.stateDiscarded && statePublications === publishedBefore) {
-						// A new source at the same address is the redeploy case, and it is the one
-						// where the stale copy was most dangerous: the state on screen was computed
-						// from the events of the implementation that is no longer deployed.
-						setState(currentEmptyState());
-					}
 					// On success only (option b): clear stale syncing state so setupIndexing() re-runs
 					// cleanly for the new source/config instead of early-returning with old progress.
 					// Must run before resuming auto-indexing.

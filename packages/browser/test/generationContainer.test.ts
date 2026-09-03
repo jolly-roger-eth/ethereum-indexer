@@ -19,25 +19,21 @@ import {
 } from '../browser/workload.js';
 
 /**
- * THE GENERATION CONTAINER, from the browser side: both call shapes, and the
- * handle that follows the canonical pointer.
+ * THE GENERATION CONTAINER, from the browser side: the factories, and the handle
+ * that follows the canonical pointer.
  *
  * An indexer holds any number of GENERATIONS -- a stream plus a fold over it --
  * and one of them is canonical and answers every read. This file asserts the two
  * things that are only observable here, on the ENTITY path with real stores:
  *
- * - `createIndexerState` accepts BOTH the shape that is handed a built processor
- *   and the shape that is handed the factories to build one, and both index.
- *   The built-processor cases here are the LAST ones in this repository:
- *   `every-caller-moves-onto-the-generation-container` moved every caller onto
- *   the factories, and what is left is this ACCEPTANCE assertion, which
- *   `the-old-indexer-shape-is-deleted` removes with the shape itself.
+ * - `createIndexerState` is handed the two FACTORIES a generation is built from,
+ *   calls them once each in that order, and indexes.
  * - the state handle a consumer holds is INDIRECT, so holding it across a
  *   pointer move is never a way to read a retired generation (story 6).
  *
  * The container's own rules -- the pointer applied AT a notification, one
- * generation per read interval -- are asserted where they live, in
- * `@etherfold/core`'s `container.test.ts`.
+ * generation per read interval, a discard PUBLISHED -- are asserted where they
+ * live, in `@etherfold/core`'s `container.test.ts`.
  */
 
 let counter = 0;
@@ -51,24 +47,7 @@ function browserRegistry() {
 	});
 }
 
-describe('createIndexerState accepts both call shapes', () => {
-	// THE LAST CALL IN THIS REPOSITORY ON THE ONE-GENERATION SHAPE, and it is here
-	// as a SUBJECT: this is the assertion that the migrate batch kept the workspace
-	// green without depending on the contract batch having landed.
-	// `the-old-indexer-shape-is-deleted` deletes this case with the shape it covers.
-	it('indexes when handed a BUILT processor, exactly as before', async () => {
-		const chain = fakeChain();
-		const store = new MemoryStateStore(processor.entities);
-		await store.migrate();
-
-		const indexer = createIndexerState<TestABI, EntityStateView>(entityProcessorOver(store, processor));
-		await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
-		await indexToTip(indexer);
-
-		expect(await readState(indexer.state.$state)).toEqual(EXPECTED_A);
-		indexer.dispose();
-	});
-
+describe('createIndexerState takes the factories a generation is built from', () => {
 	it('indexes when handed the FACTORIES that build one', async () => {
 		const chain = fakeChain();
 		const built: {states: number; processors: number; context: GenerationContext | undefined} = {
@@ -95,8 +74,8 @@ describe('createIndexerState accepts both call shapes', () => {
 		await indexer.init({provider: chain.provider, source: SOURCE, config: {stream: {finality: FINALITY}}});
 		await indexToTip(indexer);
 
-		// the same state the built-processor shape lands on, from factories the hook
-		// called itself: state first, then the fold over it, once each
+		// the state the fold lands on, from factories the hook called itself: state
+		// first, then the fold over it, once each
 		expect(await readState(indexer.state.$state)).toEqual(EXPECTED_A);
 		expect(built).toMatchObject({states: 1, processors: 1});
 		// the context names the STREAM, which is the half of a generation's identity
