@@ -16,13 +16,19 @@ The release half of ADR-0017. The rename landed in the tree; nothing has been pu
 
 ### Step 1: publish the new names
 
-**EIGHTEEN publishable packages, not nine — re-derive the list, do not trust a number in this file.**
-The count was nine when this task was written and the workspace has grown a lot since (the whole
-`state-store*` family, `processor-entities`, `processor-sqlite`, `server`, `fetcher-host`, and two
-under `platforms/*`). Derive it: every `package.json` under `packages/*` and `platforms/*` whose
-`private` is not `true`. At the time of this correction that is 16 under `packages/*` plus
+**FIFTEEN publishable packages — re-derive the list, do not trust a number in this file.** The count
+has been wrong twice: nine when this task was written, then eighteen, and it is fifteen now. It went
+UP as the workspace grew (the whole `state-store*` family, `processor-entities`, `processor-sqlite`,
+`server`, `fetcher-host`, and two under `platforms/*`) and then DOWN when three packages were
+retired outright (see step 3). Derive it: every `package.json` under `packages/*` and `platforms/*`
+whose `private` is not `true`. At the time of this correction that is 13 under `packages/*` plus
 `@etherfold/platform-nodejs` and `@etherfold/platform-nodejs-fetcher`, with only
 `@etherfold/conformance-workload-stratagems` and `@etherfold/platform-cf-worker` private.
+
+**Ignore `packages/fs/`, `packages/fs-cache/` and `packages/js-processor/` if you see them on disk.**
+They are untracked `dist/` + `node_modules/` leftovers from before those packages were deleted; they
+hold no `package.json` and no source, and git does not track them. `pnpm -r` and changesets already
+skip them. Delete them locally if they bother you.
 `.changeset/config.json` has an EMPTY `ignore` and `privatePackages: false`, so changesets already
 sees exactly that set.
 
@@ -46,17 +52,33 @@ Do this BEFORE step 3, so the deprecation warnings do not fire in your own CI.
 
 ### Step 3: deprecate the old names
 
-Seven renamed packages. Deprecate every version, since no version of the old name forwards to the new one:
+Seven old names, in TWO groups, because three of them were not renamed at all. **A deprecation
+message naming a replacement that will never exist on npm is worse than no message**: it sends a
+reader to `npm i @etherfold/js-processor` and a 404, and it tells them a migration exists when the
+path is gone.
+
+**FOUR were RENAMED.** Deprecate every version, since no version of the old name forwards to the new
+one:
 
 ```sh
 npm deprecate ethereum-indexer@"*"              "renamed to @etherfold/core (ADR-0017); no further updates will be published under this name"
 npm deprecate ethereum-indexer-browser@"*"      "renamed to @etherfold/browser (ADR-0017); no further updates will be published under this name"
-npm deprecate ethereum-indexer-js-processor@"*" "renamed to @etherfold/js-processor (ADR-0017); no further updates will be published under this name"
-npm deprecate ethereum-indexer-fs@"*"           "renamed to @etherfold/fs (ADR-0017); no further updates will be published under this name"
-npm deprecate ethereum-indexer-fs-cache@"*"     "renamed to @etherfold/fs-cache (ADR-0017); no further updates will be published under this name"
 npm deprecate ethereum-indexer-utils@"*"        "renamed to @etherfold/utils (ADR-0017); no further updates will be published under this name"
 npm deprecate ethereum-indexer-cli@"*"          "renamed to etherfold (ADR-0017); the command is now 'etherfold', not 'ei'"
 ```
+
+**THREE were RETIRED, not renamed**, after this task was written. `@etherfold/js-processor`,
+`@etherfold/fs` and `@etherfold/fs-cache` were deleted from the workspace and will NEVER be published,
+so their messages must name the decision and the surviving path rather than a package:
+
+```sh
+npm deprecate ethereum-indexer-js-processor@"*" "the JS-object processor path is RETIRED (ADR-0037), not renamed; author processors with @etherfold/processor-entities. No @etherfold/js-processor exists or will"
+npm deprecate ethereum-indexer-fs@"*"           "filesystem storage is DELETED (ADR-0041), not renamed; the supported backends are @etherfold/state-store-indexeddb in the browser and @etherfold/state-store-sqlite on the server. No @etherfold/fs exists or will"
+npm deprecate ethereum-indexer-fs-cache@"*"     "filesystem storage is DELETED (ADR-0041), not renamed; it cached the free-form path that ADR-0037 retired. No @etherfold/fs-cache exists or will"
+```
+
+All three are live on npm today (`0.7.2`, `0.7.9`, `0.6.23`), so all three still need the call. Only
+the MESSAGE changed.
 
 **Do NOT deprecate `ethereum-indexer-server` or `ethereum-indexer-db-utils` — the ACTION is
 unchanged, the REASON in this file was stale and is corrected here.** Neither was renamed, so neither
@@ -71,16 +93,19 @@ effect of this one.
 ### Step 4: close the loop
 
 - `npm view <old-name>` reports the deprecation for all seven.
-- A fresh `npm i @etherfold/browser @etherfold/js-processor` in an empty directory resolves and type-checks against a trivial processor.
+- A fresh `npm i @etherfold/browser @etherfold/processor-entities` in an empty directory resolves and type-checks against a trivial ENTITY processor. (Not `@etherfold/js-processor`: it does not exist, ADR-0037 retired that path.)
 - `npm i -g etherfold && etherfold --help` prints usage with the program name `etherfold`.
 
 ## Acceptance criteria
 
 - [ ] **Every** non-private package under `packages/*` and `platforms/*` is on npm under its new name — the list DERIVED at publish time, not read off this file (18 at the time of writing) — and `npm view etherfold bin` reports the `etherfold` bin. A criterion naming a fixed count can pass while packages newer than the count go unpublished, which is the failure this wording exists to prevent.
 - [ ] `stratagems` and `stratagems-snapshots` build and pass CI against the new names, with no `ei` invocation left.
-- [ ] All seven renamed old names are deprecated with a message naming their replacement.
+- [ ] All seven old names are deprecated, and each message tells the TRUTH about its name: the four
+      RENAMED ones name their replacement package, and the three RETIRED ones (`-js-processor`, `-fs`,
+      `-fs-cache`) name the ADR that deleted the path and the surviving alternative, never a
+      `@etherfold/*` package that will never be published.
 - [ ] `ethereum-indexer-server` and `ethereum-indexer-db-utils` are NOT deprecated as part of this task (they were archived, not renamed; their npm fate is ADR-0010's).
-- [ ] A clean-room install of the browser + js-processor pair works from the published registry, not just from the workspace.
+- [ ] A clean-room install of the browser + processor-entities pair works from the published registry, not just from the workspace.
 - [ ] `etherfold --help` works from a global install.
 
 ## Blocked by
