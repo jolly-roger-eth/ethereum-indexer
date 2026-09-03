@@ -4,6 +4,7 @@ slug: a-follower-replays-a-retraction-a-paused-writer-appended
 promotedFrom: observation:a-paused-writers-frozen-cursor-can-hide-a-retraction-from-its-followers
 blockedBy: []
 covers: []
+needsAnswers: true
 ---
 
 ## What to build
