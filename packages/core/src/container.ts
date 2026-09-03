@@ -9,6 +9,12 @@ import {
 	type GenerationRecord,
 	type GenerationRegistry,
 } from './generation/registry.js';
+import {
+	hasReachedCursor,
+	resolvePromotionConfig,
+	type PromotionConfig,
+	type UsedPromotionConfig,
+} from './generation/promotion.js';
 import {streamDigestOf} from './stream/identity.js';
 import {readOnlyStream} from './stream/readOnly.js';
 import {resolveStreamConfig} from './internal/engine/utils.js';
@@ -68,11 +74,16 @@ const namedLogger = logs('@etherfold/core');
  *    its own -- the cap lives on the engine and the drain is the existing
  *    `getFromBlock` -- and `HeldGeneration.pauseState` is what a consumer watches
  *    for the DRAINING period to end.
+ * 6. **It APPLIES the promotion policy**, which is WHEN the pointer moves on its
+ *    own and what happens to the generation left behind. The three values and
+ *    their one default live in `generation/promotion.ts`; what lives here is the
+ *    application of them -- see `applyPolicyTo` (at creation), `settlePromotion`
+ *    (the trigger, once per advance) and `dropSuperseded`.
  *
- * It does NOT decide WHEN the pointer moves (the promotion policy is
- * `the-promotion-policy-moves-the-canonical-pointer`), and it does not yet turn a
- * reconfigure into a new generation: `updateIndexer` and `updateProcessor` still
- * do to the canonical generation exactly what they did before.
+ * It still does not turn a RECONFIGURE VERB into a new generation:
+ * `updateIndexer` and `updateProcessor` do to the canonical generation exactly
+ * what they did before. Building a successor is `add`, which is what a caller
+ * that wants a reconfigure without an outage calls.
  * ------------------------------------------------------------------------- */
 
 /** What both of a generation's factories are told about the generation being built. */
@@ -181,6 +192,42 @@ type HeldEntry<ABI extends Abi, ProcessResultType> = {
 	spec: AnyGenerationSpec<ABI, ProcessResultType>;
 	/** Whether this generation FOLLOWS a stream another generation writes. See `add`. */
 	follows: boolean;
+	/**
+	 * The cursor this generation last reported, or nothing before it has loaded.
+	 *
+	 * Kept per generation and not for the canonical one alone, because the
+	 * promotion TRIGGER is a comparison BETWEEN two of them (`lastToBlock`), and
+	 * because a promotion has to be able to PUBLISH the cursor of the generation
+	 * that now answers -- a consumer left holding the retired generation's would
+	 * reason about a window that is no longer being maintained. Recorded from what
+	 * each generation publishes and from what each advance returns, so it needs no
+	 * new surface on the engine.
+	 */
+	lastSync?: LastSync<ABI>;
+	/**
+	 * Whether this generation is a candidate for AUTOMATIC promotion.
+	 *
+	 * ARMED by `add` under `on-catch-up` -- creating a generation beside the live
+	 * one is what asks for the move -- and cleared the moment the pointer reaches
+	 * it. It is deliberately not "every non-canonical generation is a candidate":
+	 * that rule would re-promote the successor on the next cycle after a REVERT,
+	 * since a reverted-from generation is caught up by construction, and story 4's
+	 * whole point is that the way back holds. IN MEMORY, like the pause cap and for
+	 * the same reason (ADR-0045): the registry holds what a generation IS, and being
+	 * a candidate is what a container is DOING with one.
+	 */
+	candidate: boolean;
+	/**
+	 * Whether the canonical pointer has EVER named this generation.
+	 *
+	 * It is what tells a PROMOTION from a REVERT, and nothing else can: a move to a
+	 * generation that has answered reads before is going BACK to it (story 4),
+	 * whichever way the clock reads. Deliberately not `createdAt`, which ties --
+	 * two generations registered in the same millisecond compare equal, and the
+	 * registry breaks that tie on the identity, which is a fine order for a listing
+	 * and no basis at all for deciding whether to DELETE one.
+	 */
+	everCanonical: boolean;
 	published?: ProcessResultType;
 	/** Distinguishes "published nothing yet" from "published `undefined`", which a `void` fold does. */
 	hasPublished: boolean;
@@ -321,6 +368,15 @@ export type IndexerOptions<ABI extends Abi, ProcessResultType = void> = {
 	 */
 	generations: readonly AnyGenerationSpec<ABI, ProcessResultType>[];
 	/**
+	 * WHEN the canonical pointer moves on its own, and what happens to the
+	 * generation left behind.
+	 *
+	 * Defaults to `on-catch-up` with nothing dropped, and that default is the same
+	 * in every runtime: see `generation/promotion.ts` for why there is deliberately
+	 * no per-runtime and no per-environment selection.
+	 */
+	promotion?: PromotionConfig;
+	/**
 	 * How a generation's ENGINE is constructed. Defaults to
 	 * `new IndexerGeneration(...)`.
 	 *
@@ -335,6 +391,11 @@ export type IndexerOptions<ABI extends Abi, ProcessResultType = void> = {
 		config: ProvidedIndexerConfig<ABI>,
 	) => IndexerGeneration<ABI, ProcessResultType>;
 };
+
+/** How far a held generation's fold has got, or nothing before it has loaded. */
+function cursorOf<ABI extends Abi, ProcessResultType>(entry: HeldEntry<ABI, ProcessResultType>): number | undefined {
+	return entry.lastSync?.lastToBlock;
+}
 
 /** Whether a value can be reached THROUGH, which is what an indirect handle needs. */
 function isIndirectable(value: unknown): value is object {
@@ -411,12 +472,53 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	public onStateUpdated: ((state: ProcessResultType) => void) | undefined;
 	public onLastSyncUpdated: ((lastSync: LastSync<ABI>) => void) | undefined;
 	public onProcessorDrift: ((report: ProcessorDriftReport) => void) | undefined;
+	/**
+	 * THE POINTER MOVED. Fired for every move, whether the policy took it or a
+	 * caller asked for it.
+	 *
+	 * It fires BEFORE the state notification that applies the move on the read
+	 * path, so a consumer that keeps anything DERIVED from the canonical generation
+	 * -- a cursor, a progress figure, a `checkTxInclusion` window -- can drop it
+	 * before the notification tells everybody to re-read. A consumer told the other
+	 * way round would answer one notification's worth of questions about the new
+	 * generation from the retired one's cursor.
+	 */
+	public onPromoted: ((promoted: GenerationRecord, superseded: GenerationRecord | undefined) => void) | undefined;
 
 	protected readonly registry: GenerationRegistry;
 	protected provider: EIP1193ProviderWithoutEvents;
 	protected source: IndexingSource<ABI>;
 	protected config: ProvidedIndexerConfig<ABI>;
 	protected readonly createGeneration: NonNullable<IndexerOptions<ABI, ProcessResultType>['createGeneration']>;
+	/** The promotion policy this indexer runs under, with nothing left to decide. */
+	protected readonly promotionConfig: UsedPromotionConfig;
+
+	/**
+	 * Whether `open` has finished, so `add` knows a SUCCESSOR from the BOOT SET.
+	 *
+	 * The generations an indexer is opened with are the set it holds; which of them
+	 * is canonical is the registry's durable answer, and the policy has no business
+	 * second-guessing it at open -- under `immediate` it would otherwise promote the
+	 * last spec in the list, and under `on-catch-up` it would undo a revert recorded
+	 * in a previous session. A generation ADDED to a running indexer is a successor,
+	 * and that is what the policy is about.
+	 */
+	protected opened = false;
+
+	/**
+	 * The drops the `immediate` policy DEFERRED, and the cursor each one waits for.
+	 *
+	 * `immediate` promotes a generation that has caught up to nothing, so dropping
+	 * the previous one at that moment would discard a complete state for an empty
+	 * one with no fallback. The two are resolved by ORDER rather than by an
+	 * interlock: retention simply continues until the successor reaches the cursor
+	 * the previous generation had AT THE PROMOTION.
+	 */
+	protected readonly deferredDrops: {
+		superseded: HeldEntry<ABI, ProcessResultType>;
+		successor: HeldEntry<ABI, ProcessResultType>;
+		at: number;
+	}[] = [];
 
 	/** The stream every generation built from here folds. Recomputed by a reconfigure. */
 	protected streamDigest: string;
@@ -441,6 +543,7 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		this.provider = options.provider;
 		this.source = options.source;
 		this.config = options.config ?? {};
+		this.promotionConfig = resolvePromotionConfig(options.promotion);
 		this.createGeneration =
 			options.createGeneration ??
 			((provider, processor, source, config) =>
@@ -454,6 +557,9 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			await this.add(spec);
 		}
 		await this.resolveCanonical();
+		// LAST: from here on, a generation handed to `add` is a SUCCESSOR beside a live
+		// one, which is the only thing the promotion policy has an opinion about.
+		this.opened = true;
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------
@@ -514,6 +620,11 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 				`the generation {stream: ${record.stream}, processor: ${record.processor}} is already held, so the spec ` +
 					`resolved to it rather than adding a second engine over the same state.`,
 			);
+			// The POLICY still applies, because the caller still ASKED for this
+			// generation beside the live one: naming a generation that already exists is
+			// how a caller re-arms one it created in an earlier session, and under
+			// `immediate` it is how one is promoted again after a revert.
+			await this.applyPolicyTo(existing);
 			return this.heldOf(existing);
 		}
 
@@ -532,6 +643,8 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			processor,
 			spec,
 			follows,
+			candidate: false,
+			everCanonical: false,
 			hasPublished: false,
 			publications: 0,
 		};
@@ -543,6 +656,9 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			}
 		};
 		generation.onLastSyncUpdated = (lastSync) => {
+			// EVERY generation's cursor is recorded, not the canonical one's alone: the
+			// promotion trigger is a comparison between two of them.
+			entry.lastSync = lastSync;
 			if (entry === this.current) {
 				this.onLastSyncUpdated?.(lastSync);
 			}
@@ -561,6 +677,7 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			}
 		};
 
+		await this.applyPolicyTo(entry);
 		return this.heldOf(entry);
 	}
 
@@ -572,6 +689,17 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	/** The generation that answers reads right now. */
 	get canonical(): HeldGeneration<ABI, ProcessResultType> {
 		return this.heldOf(this.requireCurrent());
+	}
+
+	/**
+	 * The promotion policy this indexer runs under, resolved.
+	 *
+	 * REPORTED so a caller (or a test) can see WHICH value is in force rather than
+	 * re-deriving the default: the whole point of having one default everywhere is
+	 * lost if each runtime keeps its own copy of what it is.
+	 */
+	get promotion(): UsedPromotionConfig {
+		return this.promotionConfig;
 	}
 
 	/**
@@ -624,10 +752,7 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	 * was canonical when it was made, and neither read is stale.
 	 */
 	async promote(id: GenerationId): Promise<GenerationRecord> {
-		const entry = this.require(id);
-		const record = await this.registry.moveCanonicalTo(id);
-		this.applyAtNotification(entry);
-		return record;
+		return this.movePointerTo(this.require(id));
 	}
 
 	/**
@@ -692,9 +817,14 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	async load(): Promise<LastSync<ABI>> {
 		const current = this.requireCurrent();
 		for (const entry of this.held) {
-			await entry.generation.load();
+			entry.lastSync = await entry.generation.load();
 		}
-		return current.generation.load();
+		const answer = await current.generation.load();
+		// A load is an advance -- for a FOLLOWER it is the whole re-fold of the stored
+		// stream -- so a successor can arrive at the trigger here and not only in
+		// `indexMore`.
+		await this.settlePromotion();
+		return answer;
 	}
 
 	/**
@@ -716,12 +846,17 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	async indexMore(): Promise<LastSync<ABI>> {
 		const current = this.requireCurrent();
 		let answer: LastSync<ABI> | undefined;
-		for (const entry of this.held) {
+		for (const entry of [...this.held]) {
 			const lastSync = entry.follows ? await entry.generation.followMore() : await entry.generation.indexMore();
+			entry.lastSync = lastSync;
 			if (entry === current) {
 				answer = lastSync;
 			}
 		}
+		// The TRIGGER, evaluated once per cycle and after every generation has moved,
+		// so a successor is measured against the cursor the canonical generation has
+		// NOW rather than the one it had at the top of the loop.
+		await this.settlePromotion();
 		// The canonical generation is always one this container holds -- that is what
 		// `resolveCanonical` refuses to open without -- so the loop always answered.
 		return answer as LastSync<ABI>;
@@ -817,6 +952,204 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		return streamDigestOf(source, resolveStreamConfig(config.stream));
 	}
 
+	// ------------------------------------------------------------------------------------------------------------------
+	// THE PROMOTION POLICY, applied
+	// ------------------------------------------------------------------------------------------------------------------
+	// The values, the default and the trigger arithmetic are in
+	// `generation/promotion.ts`. What is here is WHERE each of them is applied:
+	// at creation (`applyPolicyTo`), once per advance (`settlePromotion`), and at
+	// the move itself (`movePointerTo` / `arrangeDrop`).
+
+	/**
+	 * What the policy does about a generation that has just been ADDED beside the
+	 * live one.
+	 *
+	 * Nothing at all during `open`: see `opened`. And nothing for the canonical
+	 * generation itself, which is not a successor to anything.
+	 */
+	protected async applyPolicyTo(entry: HeldEntry<ABI, ProcessResultType>): Promise<void> {
+		if (!this.opened || entry === this.current) {
+			return;
+		}
+		switch (this.promotionConfig.policy) {
+			case 'immediate':
+				// Canonical BEFORE it has caught up, which is the opt-in: a developer
+				// iterating on a fold would rather see an incomplete answer from the new one
+				// than a complete answer from the one they replaced (story 13).
+				await this.movePointerTo(entry);
+				return;
+			case 'on-catch-up':
+				entry.candidate = true;
+				// Evaluated at once as well as per cycle: a generation added when it has
+				// already caught up (one named a second time, or one whose fold is level
+				// because it was built from the same stream) is ready NOW.
+				await this.settlePromotion();
+				return;
+			case 'manual':
+				// The pointer moves only when asked, so an operator can inspect first.
+				return;
+		}
+	}
+
+	/**
+	 * THE TRIGGER, and the deferred drops that hang off it.
+	 *
+	 * A candidate is promoted the moment its cursor reaches the cursor the
+	 * CANONICAL generation has -- the one it must not fall behind, since promoting
+	 * a successor that is behind the incumbent is the state going backwards that
+	 * story 14 is about. One move per cycle: a second candidate is still a
+	 * candidate on the next one, and promoting twice inside one advance would
+	 * publish a generation nobody ever read from.
+	 */
+	protected async settlePromotion(): Promise<void> {
+		const current = this.current;
+		if (current) {
+			const ready = this.held.find(
+				(entry) => entry !== current && entry.candidate && hasReachedCursor(cursorOf(entry), cursorOf(current)),
+			);
+			if (ready) {
+				await this.movePointerTo(ready);
+			}
+		}
+		for (const deferred of [...this.deferredDrops]) {
+			if (!hasReachedCursor(cursorOf(deferred.successor), deferred.at)) {
+				continue;
+			}
+			this.deferredDrops.splice(this.deferredDrops.indexOf(deferred), 1);
+			await this.dropSuperseded(deferred.superseded, deferred.successor);
+		}
+	}
+
+	/**
+	 * Move the pointer to a generation this container holds: the registry first,
+	 * the read path at the notification, then what happens to the one left behind.
+	 */
+	protected async movePointerTo(entry: HeldEntry<ABI, ProcessResultType>): Promise<GenerationRecord> {
+		const superseded = this.current;
+		const record = await this.registry.moveCanonicalTo(entry.record);
+		// It is canonical: it is no longer waiting to become so, and a REVERT past it
+		// later must not re-promote it on the next cycle.
+		entry.candidate = false;
+		if (superseded !== entry) {
+			// BEFORE the notification, so a consumer drops what it derived from the
+			// retired generation's cursor before it is told to re-read.
+			try {
+				this.onPromoted?.(entry.record, superseded?.record);
+			} catch (err) {
+				namedLogger.error(`onPromoted listener threw`, err);
+			}
+		}
+		// Read BEFORE the move applies, because that is what makes it readable at all:
+		// a generation the pointer has named before is one this is going BACK to.
+		const wasRevert = entry.everCanonical;
+		this.applyAtNotification(entry);
+		if (superseded !== entry && entry.lastSync) {
+			// The cursor of the generation that answers NOW. Without it a consumer would
+			// go on reporting how far the RETIRED generation had got -- and would answer
+			// `checkTxInclusion` from a window nothing is maintaining any more.
+			this.onLastSyncUpdated?.(entry.lastSync);
+		}
+		if (superseded && superseded !== entry) {
+			await this.arrangeDrop(superseded, entry, wasRevert);
+		}
+		return record;
+	}
+
+	/**
+	 * DROP-ON-PROMOTION, and the one case it is resolved by ORDER rather than by an
+	 * interlock.
+	 *
+	 * Under `on-catch-up` and `manual` a promotion means the successor DEMONSTRATED
+	 * something, so the generation left behind can go at that moment. Under
+	 * `immediate` it demonstrated nothing -- it is canonical having caught up to
+	 * NOTHING -- so dropping the previous one would discard a complete state for an
+	 * empty one, with no fallback when the new fold throws on its first event.
+	 * There is no interlock and no refusal: retention simply CONTINUES until the
+	 * successor reaches the cursor the previous generation had at the promotion,
+	 * and the drop happens then.
+	 *
+	 * A BACKWARDS move drops nothing. Moving the pointer to an older generation is
+	 * a REVERT, not a promotion, and dropping what it moved away from would delete
+	 * the very thing the developer might revert forwards to again.
+	 */
+	protected async arrangeDrop(
+		superseded: HeldEntry<ABI, ProcessResultType>,
+		successor: HeldEntry<ABI, ProcessResultType>,
+		wasRevert: boolean,
+	): Promise<void> {
+		if (!this.promotionConfig.dropOnPromotion || wasRevert) {
+			return;
+		}
+		if (this.promotionConfig.policy === 'immediate') {
+			const at = cursorOf(superseded) ?? 0;
+			this.deferredDrops.push({superseded, successor, at});
+			namedLogger.info(
+				`the generation {stream: ${superseded.record.stream}, processor: ${superseded.record.processor}} is ` +
+					`RETAINED: an \`immediate\` promotion demonstrates nothing, so it is kept until the new canonical ` +
+					`generation reaches block ${at}, the cursor it had at the promotion.`,
+			);
+			return;
+		}
+		await this.dropSuperseded(superseded, successor);
+	}
+
+	/**
+	 * Drop a superseded generation: its state store, its record, and its stream if
+	 * it was the last one folding it.
+	 *
+	 * **It never drops the WRITER of a stream another held generation follows.**
+	 * Which generation writes a stream is the first one held on it and not the
+	 * canonical one (ADR-0044), precisely so a promotion does not hand the append
+	 * duty to a different engine mid-flight -- so dropping the writer would leave
+	 * its followers folding a stream nothing appends to, and the app would simply
+	 * stop advancing. That is worse than keeping the bytes, so the drop is DECLINED
+	 * and said out loud. The case it costs is the common reconfigure (a processor
+	 * change, on the stream that is already there); the case it serves is the
+	 * expensive one (a filter change), where the retired generation owns a whole
+	 * stream of its own that goes with it.
+	 */
+	protected async dropSuperseded(
+		superseded: HeldEntry<ABI, ProcessResultType>,
+		successor: HeldEntry<ABI, ProcessResultType>,
+	): Promise<void> {
+		if (!this.held.includes(superseded)) {
+			return;
+		}
+		const strands = this.held.some(
+			(entry) => entry !== superseded && entry.follows && entry.record.stream === superseded.record.stream,
+		);
+		if (!superseded.follows && strands) {
+			namedLogger.info(
+				`drop-on-promotion DECLINED for {stream: ${superseded.record.stream}, processor: ` +
+					`${superseded.record.processor}}: it WRITES a stream another generation follows, and dropping it would ` +
+					`leave that one folding a stream nothing appends to. It is retained; delete it explicitly once nothing ` +
+					`follows its stream.`,
+			);
+			return;
+		}
+		// Out of the held list FIRST, so nothing drives an engine whose state store is
+		// being dropped underneath it.
+		this.held.splice(this.held.indexOf(superseded), 1);
+		try {
+			const deletion = await this.registry.deleteGeneration(superseded.record);
+			namedLogger.info(
+				`dropped the superseded generation {stream: ${superseded.record.stream}, processor: ` +
+					`${superseded.record.processor}} on the promotion of {stream: ${successor.record.stream}, processor: ` +
+					`${successor.record.processor}}` +
+					`${deletion.reaped ? `, reaping the stream ${deletion.reaped} with it` : ''}.`,
+			);
+		} catch (err) {
+			// The state may or may not have gone; what must not happen is this container
+			// going on driving a generation it has decided to drop, so it stays out of the
+			// held list and the registry keeps whatever it kept.
+			namedLogger.error(
+				`failed to drop the superseded generation {stream: ${superseded.record.stream}, processor: ` +
+					`${superseded.record.processor}}`,
+				err,
+			);
+		}
+	}
+
 	/** What the container hands OUT for a generation it holds. */
 	protected heldOf(entry: HeldEntry<ABI, ProcessResultType>): HeldGeneration<ABI, ProcessResultType> {
 		return {
@@ -903,6 +1236,7 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 			);
 		}
 		this.current = entry;
+		entry.everCanonical = true;
 	}
 
 	protected requireCurrent(): HeldEntry<ABI, ProcessResultType> {
@@ -930,6 +1264,7 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 	 */
 	protected applyAtNotification(entry: HeldEntry<ABI, ProcessResultType>): void {
 		this.current = entry;
+		entry.everCanonical = true;
 		this.notifyState();
 	}
 
