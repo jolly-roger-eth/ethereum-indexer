@@ -18,7 +18,17 @@ import {describe, expect, it} from 'vitest';
 // So it is asserted rather than claimed, by reading this package's own sources.
 // A grep is crude and it is the right shape here: what must not exist is a
 // construction, and the file that would introduce one is the file this reads.
-// `EthereumIndexer` stays the browser's engine.
+// That engine stays the browser's.
+//
+// IT HAS TWO NAMES DURING THE RENAME, AND THE GUARD MATCHES BOTH. The class is
+// `IndexerGeneration` now -- one stream, one processor, one state IS a
+// GENERATION -- and `EthereumIndexer` remains as an alias to it until the
+// contract batch (`the-old-indexer-shape-is-deleted`) removes it. A guard left
+// on the old spelling alone would stay GREEN and stop enforcing anything the
+// moment a file used the new one, which is worse than no guard. Deliberately NOT
+// extended to `Indexer`, the generation CONTAINER: whether a CLI holds
+// generations is `the-server-and-cli-hold-generations-too`'s question, and a
+// grep here must not pre-answer it.
 // ---------------------------------------------------------------------------------------------------
 
 const src = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
@@ -31,16 +41,18 @@ function sources(): {file: string; text: string}[] {
 }
 
 describe("the CLI's indexing path", () => {
-	it('constructs no EthereumIndexer', () => {
-		const offenders = sources().filter(({text}) => /new\s+EthereumIndexer|EthereumIndexer\s*[<(]/.test(text));
+	it('constructs no IndexerGeneration, under either of its names', () => {
+		const offenders = sources().filter(({text}) =>
+			/new\s+(EthereumIndexer|IndexerGeneration)\b|\b(EthereumIndexer|IndexerGeneration)\s*[<(]/.test(text),
+		);
 		expect(offenders.map(({file}) => file)).toEqual([]);
 	});
 
-	it('imports no EthereumIndexer either, so nothing can quietly start using one', () => {
+	it('imports it under neither name either, so nothing can quietly start using one', () => {
 		const offenders = sources().filter(({text}) =>
 			// the words appear in prose here (this package explains why it does NOT use
 			// that class), so the check is on an IMPORT of the identifier
-			/import\s*\{[^}]*\bEthereumIndexer\b[^}]*\}/.test(text),
+			/import\s*\{[^}]*\b(EthereumIndexer|IndexerGeneration)\b[^}]*\}/.test(text),
 		);
 		expect(offenders.map(({file}) => file)).toEqual([]);
 	});
