@@ -8,6 +8,8 @@ import {getStatusAPI, recordError} from './api/status.js';
 import {getIngestAPI} from './api/ingest.js';
 
 export type {Env, ServerOptions};
+export type {CursorReporter} from './types.js';
+export type {CursorReport, StatusCursor} from './cursor.js';
 export {SCHEMA_VERSION, applySchema, readSchemaState} from './schema.js';
 export type {SchemaState} from './schema.js';
 export type {Config} from './setup.js';

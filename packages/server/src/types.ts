@@ -2,6 +2,18 @@ import type {LogIngestion} from '@etherfold/core';
 import type {Context} from 'hono';
 import type {Bindings} from 'hono/types';
 import type {RemoteSQL} from 'remote-sql';
+import type {CursorReport} from './cursor.js';
+
+/**
+ * How a host tells `/status` where its pipeline has got to.
+ *
+ * Async because reading a cursor is a STORE read (`StateStore.readCursor`),
+ * unlike `getDB` / `getEnv` / `getIngestion`, which hand back handles a host
+ * already holds.
+ */
+export type CursorReporter<Env extends Bindings = Bindings> = (
+	c: Context<{Bindings: Env}>,
+) => CursorReport | undefined | Promise<CursorReport | undefined>;
 
 export type ServerOptions<Env extends Bindings = Bindings> = {
 	getDB: (c: Context<{Bindings: Env}>) => RemoteSQL;
@@ -23,4 +35,35 @@ export type ServerOptions<Env extends Bindings = Bindings> = {
 	 * pretending the route is missing.
 	 */
 	getIngestion?: (c: Context<{Bindings: Env}>) => LogIngestion | undefined;
+	/**
+	 * Where this deployment's pipeline has got to, if this deployment can say.
+	 *
+	 * Injected exactly like the ingestion, and for the same reason: only the
+	 * process that OWNS the store can read a cursor, and this package has no store
+	 * dependency at all (it knows one storage abstraction and nothing else). The
+	 * cursor is also an OPAQUE STRING behind the storage seam (ADR-0027) -- only the
+	 * processor knows what one means -- so a server that read and parsed one would
+	 * have taken on both a dependency and a meaning that are not its.
+	 *
+	 * OPTIONAL, because a host with no store has no cursor to report rather than a
+	 * misconfiguration: the Workers host builds the app with a database binding and
+	 * an environment and nothing else, and its `/status` simply carries no `cursor`
+	 * field. Nothing is invented in its place.
+	 *
+	 * ## What a reporter OWES the server
+	 *
+	 * A SMALL, JSON-serialisable summary of where the pipeline has got to, and
+	 * NEVER the store's raw serialized cursor. That value is a serialized
+	 * `LastSync` carrying an unconfirmed window of DECODED EVENTS, so a host that
+	 * handed it over whole would put an unbounded blob on the one page an operator
+	 * refreshes while something is wrong. The constraint has to live here, on the
+	 * seam, because `/status` reports what this returns VERBATIM: the server does
+	 * not parse it, so it cannot bound it afterwards either.
+	 *
+	 * Failing is safe and is the reporter's own business: a reporter that throws,
+	 * rejects, or returns `undefined` because it cannot read right now yields a
+	 * cursor that is absent-with-a-reason. It never fails the request and never
+	 * changes `healthy`.
+	 */
+	getCursorReport?: CursorReporter<Env>;
 };
