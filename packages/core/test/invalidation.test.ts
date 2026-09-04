@@ -176,7 +176,7 @@ describe('a renamed NON-INDEXED parameter, which is the case that splits the ver
 	it('keeps the stream and discards the state', () => {
 		const verdict = decide(sourceOf([transferRenamedParameter]));
 
-		expect(verdict.stream).toEqual({valid: true});
+		expect(verdict.stream).toStrictEqual({valid: true});
 		expect(verdict.state).toMatchObject({valid: false, invalidFromBlock: START_BLOCK});
 	});
 
@@ -219,7 +219,7 @@ describe('an event REMOVED from the ABI', () => {
 	});
 
 	it('keeps the stream, because a shrunken topic set leaves a SUPERSET', () => {
-		expect(decide(base, storedWithBoth).stream).toEqual({valid: true});
+		expect(decide(base, storedWithBoth).stream).toStrictEqual({valid: true});
 	});
 });
 

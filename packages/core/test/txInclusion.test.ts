@@ -75,11 +75,11 @@ describe('checkTxInclusion', () => {
 
 	it('reports a transaction the window does not hold as absent', () => {
 		const sync = lastSync({unconfirmedBlocks: [block(95, [event(95, txHash(1))])]});
-		expect(check(sync, {txHash: txHash(2)})).toEqual({status: 'absent', basis: 'window-miss'});
+		expect(check(sync, {txHash: txHash(2)})).toStrictEqual({status: 'absent', basis: 'window-miss'});
 	});
 
 	it('reports an unmined transaction as absent, without any receipt', () => {
-		expect(check(lastSync(), {txHash: txHash(7)})).toEqual({status: 'absent', basis: 'window-miss'});
+		expect(check(lastSync(), {txHash: txHash(7)})).toStrictEqual({status: 'absent', basis: 'window-miss'});
 	});
 
 	// `feed` publishes the whole new window and only then walks the cursor through
@@ -89,7 +89,7 @@ describe('checkTxInclusion', () => {
 			lastToBlock: 94,
 			unconfirmedBlocks: [block(95, [event(95, txHash(1))])],
 		});
-		expect(check(sync, {txHash: txHash(1)})).toEqual({status: 'absent', basis: 'ahead-of-cursor'});
+		expect(check(sync, {txHash: txHash(1)})).toStrictEqual({status: 'absent', basis: 'ahead-of-cursor'});
 	});
 
 	it('reports a retraction marker in the window as not included', () => {
@@ -99,14 +99,20 @@ describe('checkTxInclusion', () => {
 
 	it('reports a receipt ahead of the cursor as absent', () => {
 		const sync = lastSync({lastToBlock: 90});
-		expect(check(sync, {txHash: txHash(1), minedAtBlock: 96})).toEqual({status: 'absent', basis: 'ahead-of-cursor'});
+		expect(check(sync, {txHash: txHash(1), minedAtBlock: 96})).toStrictEqual({
+			status: 'absent',
+			basis: 'ahead-of-cursor',
+		});
 	});
 
 	// Past finality the two nodes are assumed to agree, which is the same
 	// assumption the indexer makes when it drops the block out of its window.
 	it('reports a processed transaction below the window as included, on the receipt height', () => {
 		const sync = lastSync({latestBlock: 100, lastToBlock: 100});
-		expect(check(sync, {txHash: txHash(1), minedAtBlock: 50})).toEqual({status: 'included', basis: 'below-window'});
+		expect(check(sync, {txHash: txHash(1), minedAtBlock: 50})).toStrictEqual({
+			status: 'included',
+			basis: 'below-window',
+		});
 	});
 
 	it('does not conclude below-window without a receipt height', () => {
@@ -118,7 +124,7 @@ describe('checkTxInclusion', () => {
 		const behind = lastSync({latestBlock: 1000, lastToBlock: 100, unconfirmedBlocks: []});
 
 		it('refuses to answer about a transaction it knows no height for', () => {
-			expect(check(behind, {txHash: txHash(1)})).toEqual({status: 'unknown', basis: 'window-not-covering'});
+			expect(check(behind, {txHash: txHash(1)})).toStrictEqual({status: 'unknown', basis: 'window-not-covering'});
 		});
 
 		it('still answers when the receipt puts it beyond the cursor', () => {
@@ -131,7 +137,10 @@ describe('checkTxInclusion', () => {
 	});
 
 	it('answers nothing before the first sync', () => {
-		expect(check(undefined, {txHash: txHash(1), minedAtBlock: 50})).toEqual({status: 'unknown', basis: 'not-synced'});
+		expect(check(undefined, {txHash: txHash(1), minedAtBlock: 50})).toStrictEqual({
+			status: 'unknown',
+			basis: 'not-synced',
+		});
 	});
 
 	it('answers a whole pending set in one pass', () => {

@@ -41,12 +41,12 @@ describe('a deployment sets retention, in block numbers', () => {
 		// The default is the only one that changes nothing about a store nobody
 		// configured, and a default window would be a bound nobody chose (and, at 64
 		// blocks, nearly empty in updates on a real stream).
-		expect(resolveRetention(undefined, {})).toEqual({kind: 'unbounded'});
+		expect(resolveRetention(undefined, {})).toStrictEqual({kind: 'unbounded'});
 	});
 
 	it('reads the three settings a deployment may write', () => {
-		expect(resolveRetention('unbounded', {})).toEqual({kind: 'unbounded'});
-		expect(resolveRetention('revert-only', {})).toEqual({kind: 'revert-only'});
+		expect(resolveRetention('unbounded', {})).toStrictEqual({kind: 'unbounded'});
+		expect(resolveRetention('revert-only', {})).toStrictEqual({kind: 'revert-only'});
 		expect(resolveRetention({blocks: 128}, {finalityDepth: 64})).toEqual({kind: 'window', blocks: 128});
 	});
 

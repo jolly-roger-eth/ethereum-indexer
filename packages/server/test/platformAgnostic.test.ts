@@ -57,3 +57,30 @@ describe('the server package names no runtime', () => {
 		expect(Object.keys(pkg.dependencies).sort()).toEqual(['@etherfold/core', 'hono', 'named-logs', 'remote-sql']);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// THE INGEST TOKEN IS NOT COMPARED WITH `===`
+// ---------------------------------------------------------------------------
+// Timing safety is not observable in an outcome, so it cannot be asserted
+// behaviourally: a test that compares two tokens sees the same 401 whichever
+// comparison produced it. This package already guards unobservable properties by
+// reading its own source (the platform rules above), so the same technique
+// applies to the one security property that has no other witness.
+// ---------------------------------------------------------------------------
+
+describe('the ingest token comparison', () => {
+	const source = readFileSync(join(pkgRoot, 'src/api/ingest.ts'), 'utf-8');
+
+	it('accumulates a difference over every character rather than short-circuiting', () => {
+		// the shape of a constant-time compare: XOR into an accumulator, one test at
+		// the end. `a === b` and `a !== b` on the secrets would both leak WHERE they
+		// first differ.
+		expect(source).toMatch(/difference \|= a\.charCodeAt\(i\) \^ b\.charCodeAt\(i\)/);
+		expect(source).toMatch(/return difference === 0/);
+	});
+
+	it('is what the request path actually calls', () => {
+		// the guard above is worth nothing if the auth check stopped using it
+		expect(source).toMatch(/secretEquals\(/);
+	});
+});

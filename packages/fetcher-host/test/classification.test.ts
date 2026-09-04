@@ -196,6 +196,16 @@ describe('how long a host waits, given what the cycle did', () => {
 		const jittered = resolveBackoff({minRetryDelayMs: 1000, jitter: 0.2, random: () => 1});
 		expect(delayForReport(report({kind: 'retry', run: 1}), jittered)).toBe(800);
 	});
+
+	it('jitters BY DEFAULT, because the lockstep it prevents is the default deployment', () => {
+		// The default is the load-bearing value: redundant fetchers are the case the
+		// docstring names, and they are the ones least likely to have configured a
+		// jitter. Asserted separately because every other case here passes one
+		// explicitly, so a default of 0 would go unnoticed.
+		expect(resolveBackoff({}).jitter).toBe(0.2);
+		const defaulted = resolveBackoff({minRetryDelayMs: 1000, random: () => 1});
+		expect(delayForReport(report({kind: 'retry', run: 1}), defaulted)).toBe(800);
+	});
 });
 
 // ---------------------------------------------------------------------------

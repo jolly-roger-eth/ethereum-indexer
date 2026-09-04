@@ -13,7 +13,6 @@
 	"dependencies": {
 		"@etherfold/server": "workspace:*",
 		"@etherfold/state-store-sqlite": "workspace:*",
-		"named-logs": "^0.4.1",
 		"remote-sql": "^0.0.7",
 		"remote-sql-d1": "^0.0.7"
 	},

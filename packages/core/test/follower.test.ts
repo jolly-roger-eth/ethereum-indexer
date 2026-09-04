@@ -21,6 +21,7 @@ import {
 	BRANCH_A_TIP,
 	BRANCH_B,
 	BRANCH_B_TIP,
+	fakeChain,
 	fakeProcessor,
 	FINALITY,
 	idOf,
@@ -679,5 +680,88 @@ describe('the follower decides on the emissions themselves', () => {
 		const f = follower();
 		f.setFolded([makeLog(101, '0xa101')]);
 		expect(f.alreadyFolded([makeLog(101, '0xa101'), makeLog(102, '0xa102')])).toBe(false);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// THE PROVIDER MUST NOT HAVE CHANGED CHAINS UNDER THE FETCH
+// ---------------------------------------------------------------------------
+// The chain is checked twice per cycle, before the fetch and again after it, and
+// the two guards catch different things. The BEFORE guard catches a provider that
+// was already pointing elsewhere; the AFTER guard catches the one that moved
+// DURING the fetch -- which is the case where logs from the wrong chain are in
+// hand and about to be written. Only the second can produce a corrupt fold, and
+// it was the one with no test.
+// ---------------------------------------------------------------------------
+
+describe('a provider that changes chain mid-cycle', () => {
+	/** A chain whose `eth_chainId` answer can be moved, including from inside the fetch. */
+	function movableChain(logs: LogEvent<Abi>[], tip: number) {
+		const base = fakeChain(logs, tip);
+		let chainId = '0x1';
+		let flipDuringFetch: string | undefined;
+		return {
+			...base,
+			setChainId(next: string) {
+				chainId = next;
+			},
+			/** The provider moves WHILE the logs are being fetched, which is the dangerous case. */
+			flipDuringFetchTo(next: string) {
+				flipDuringFetch = next;
+			},
+			provider: {
+				async request(args: {method: string; params?: any}): Promise<any> {
+					if (args.method === 'eth_chainId') {
+						return chainId;
+					}
+					return base.provider.request(args);
+				},
+			} as any,
+			fetcher: {
+				async getLogEvents(range: {fromBlock: number; toBlock: number}) {
+					const result = await base.fetcher.getLogEvents(range);
+					if (flipDuringFetch) {
+						chainId = flipDuringFetch;
+					}
+					return result;
+				},
+				reparse: base.fetcher.reparse,
+			},
+		};
+	}
+
+	function indexerOn(chain: ReturnType<typeof movableChain>) {
+		const processor = fakeProcessor();
+		const indexer = new IndexerGeneration<Abi, string[]>(chain.provider, processor.processor, SOURCE, {
+			stream: {finality: FINALITY},
+		});
+		(indexer as any).logEventFetcher = chain.fetcher;
+		return {indexer, processor};
+	}
+
+	it('is REFUSED when it moves DURING the fetch, rather than folding the wrong chain', async () => {
+		// the case only the post-fetch guard can catch: the range was fetched from one
+		// chain and the provider is now answering for another, so the logs in hand are
+		// about to be written against a source they did not come from
+		const chain = movableChain([makeLog(100, '0xa100')], 200);
+		const {indexer, processor} = indexerOn(chain);
+		await indexer.load();
+		chain.flipDuringFetchTo('0x2');
+
+		await expect(indexer.indexMore()).rejects.toThrow(/chainId changed after fetch/);
+		// and nothing from the wrong chain reached the fold
+		expect(processor.state).toEqual([]);
+	});
+
+	it('is REFUSED before it fetches at all when it moved between cycles', async () => {
+		const chain = movableChain([makeLog(100, '0xa100')], 200);
+		const {indexer, processor} = indexerOn(chain);
+		await indexer.load();
+		chain.setChainId('0x2');
+
+		await expect(indexer.indexMore()).rejects.toThrow(/chainId changed before fetch/);
+		// refused before a single range was requested
+		expect(chain.ranges).toEqual([]);
+		expect(processor.state).toEqual([]);
 	});
 });

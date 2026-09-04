@@ -194,3 +194,72 @@ describe('a handler covering two versions of one event', () => {
 		expect(typeof ordinary.onTransfer).toBe('function');
 	});
 });
+
+// ---------------------------------------------------------------------------
+// A LOG THIS ABI COULD NOT PARSE STILL REACHES THE AUTHOR
+// ---------------------------------------------------------------------------
+// `handleUnparsedEvent` is part of the authoring contract (`EntityProcessor`),
+// and the entity path is the only shipped path that can call it. It is how an
+// author sees a log whose topic matched the filter but whose payload this ABI
+// could not decode -- an upgraded contract, a mis-declared event, a log the
+// fetch filter admitted on purpose (`an-event-is-never-silently-dropped-from-the-fetch-filter`).
+// Without it the event is simply skipped, which is the one outcome the fetch
+// filter's whole design exists to avoid.
+// ---------------------------------------------------------------------------
+
+/** A log carrying a decode failure, which is what the fetcher hands over when parsing fails. */
+function unparsed(blockNumber: number, blockHash: string): LogEvent<UpgradedABI> {
+	logCounter++;
+	return {
+		blockNumber,
+		blockHash,
+		blockTimestamp: 1_700_000_000 + blockNumber * 12,
+		transactionIndex: 0,
+		removed: false,
+		address: '0x0000000000000000000000000000000000000000',
+		data: '0xnotdecodable',
+		topics: [],
+		transactionHash: `0x${logCounter.toString(16).padStart(64, '0')}`,
+		logIndex: 0,
+		extra: undefined,
+		decodeError: 'parsing did not return any results',
+	} as unknown as LogEvent<UpgradedABI>;
+}
+
+describe('an event this ABI could not parse', () => {
+	it('is handed to `handleUnparsedEvent`, not silently skipped', async () => {
+		const seen: {block: number; error: string}[] = [];
+		const withHandler = {
+			...upgraded,
+			handleUnparsedEvent(_state: unknown, event: {blockNumber: number; decodeError: string}) {
+				seen.push({block: event.blockNumber, error: event.decodeError});
+			},
+		} as unknown as typeof upgraded;
+
+		const store = new MemoryStateStore([...ENTITIES]);
+		const p = new EntityEventProcessor<UpgradedABI>(store, withHandler);
+		await p.load(SOURCE, {finality: 12, alwaysFetchTimestamps: true});
+
+		await p.process(
+			[unparsed(100, '0xA'), transfer(101, '0xB', {from: '0x0', to: '0xbob', id: 2n})],
+			lastSync({latestBlock: 101, lastToBlock: 101}),
+		);
+
+		expect(seen).toEqual([{block: 100, error: 'parsing did not return any results'}]);
+		// and the parsable event in the same batch was still applied
+		expect(await store.getCurrent<{memoed: number}>('token', {id: '2'})).toBeDefined();
+	});
+
+	it('costs nothing when the author declares no handler, and the batch still applies', async () => {
+		const store = new MemoryStateStore([...ENTITIES]);
+		const p = new EntityEventProcessor<UpgradedABI>(store, upgraded);
+		await p.load(SOURCE, {finality: 12, alwaysFetchTimestamps: true});
+
+		await p.process(
+			[unparsed(100, '0xA'), transfer(101, '0xB', {from: '0x0', to: '0xbob', id: 2n})],
+			lastSync({latestBlock: 101, lastToBlock: 101}),
+		);
+
+		expect(await store.getCurrent<{memoed: number}>('token', {id: '2'})).toBeDefined();
+	});
+});

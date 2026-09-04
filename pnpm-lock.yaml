@@ -429,9 +429,6 @@ importers:
       '@etherfold/state-store-sqlite':
         specifier: workspace:*
         version: link:../state-store-sqlite
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
       remote-sql:
         specifier: ^0.0.7
         version: 0.0.7
@@ -679,9 +676,6 @@ importers:
       '@etherfold/state-store-sqlite':
         specifier: workspace:*
         version: link:../../packages/state-store-sqlite
-      named-logs:
-        specifier: ^0.4.1
-        version: 0.4.1
       remote-sql:
         specifier: ^0.0.7
         version: 0.0.7

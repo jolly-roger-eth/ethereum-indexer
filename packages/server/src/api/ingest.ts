@@ -95,12 +95,21 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			 * surface is the fetcher's private API, and one rule for all of it is one
 			 * rule to get wrong.
 			 *
-			 * BOTH patterns are registered on purpose. Hono matches `/ingest` exactly,
-			 * so it does NOT cover `/ingest/expected-from-block`, and the wildcard alone
-			 * does not cover the bare path. Registering one of the two would leave half
-			 * this surface open while looking guarded -- which is the failure mode the
-			 * path-level guard exists to remove. `test/ingest.test.ts` asserts a 401 on
-			 * each of them.
+			 * BOTH patterns are registered on purpose, but NOT for the reason this comment
+			 * used to give. It claimed the wildcard does not cover the bare path and that
+			 * each registration guards half the surface; that is not true of the Hono
+			 * version in use, where `/ingest/*` already answers for `/ingest` too. Removing
+			 * the exact-path registration leaves the whole server suite green, so it is
+			 * redundant rather than load-bearing, and the tests below cannot tell which of
+			 * the two answered.
+			 *
+			 * It is KEPT deliberately, as belt and braces: the cost is one middleware
+			 * registration, and the failure it insures against -- a routing change that
+			 * narrows the wildcard and silently opens the bare path -- is exactly the kind
+			 * this guard exists to make impossible. What is NOT claimed any more is that
+			 * the tests prove both are needed. `test/ingest.test.ts` asserts a 401 on each
+			 * path, which is the property that matters; which registration produces it is
+			 * deliberately not asserted.
 			 */
 			.use('/ingest', async (c, next) => {
 				const auth = authorized(c as never);
