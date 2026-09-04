@@ -3,7 +3,7 @@ import {describe, expect, it} from 'vitest';
 import {deserializeLastSync, SYNC_CURSOR_KEY} from '@etherfold/processor-entities';
 import {VersionedStateStore} from '@etherfold/state-store-sqlite';
 import {VersionedStateEventProcessor} from '../src/index.js';
-import {createTestDB, rows, sqlOf} from './utils/db.js';
+import {createTestDB, RecordingSQL, rows, sqlOf} from './utils/db.js';
 import {finality, lastSync, processor, SOURCE, transfer, type TestABI} from './utils/fixtures.js';
 
 /**
@@ -86,19 +86,37 @@ async function stateAndCursor(db: RemoteSQL): Promise<{tip: number | undefined; 
 
 describe('the cursor and the block it describes are one transaction', () => {
 	it('lands in the same batch as the block, not in a second round trip', async () => {
-		const db = createTestDB();
-		const p = new VersionedStateEventProcessor<TestABI>(db, processor);
-		await p.load(SOURCE, STREAM_CONFIG);
-		await p.process(STREAM.slice(0, 1), lastSync({latestBlock: 100, lastToBlock: 100}));
-
 		// `_blocks` and `_cursor` are written by the SAME `batch([...])`, which is
-		// the only transaction `remote-sql` exposes. Asserted on the statements
-		// rather than inferred from the outcome, because the outcome is identical
-		// either way until something crashes.
-		const store = new VersionedStateStore(db, processor.entities);
-		const cursor = await store.readCursor(SYNC_CURSOR_KEY);
-		expect(cursor).toBeDefined();
-		expect(await stateAndCursor(db)).toEqual({tip: 100, cursor: 100});
+		// the only transaction `remote-sql` exposes. Asserted on the STATEMENTS rather
+		// than inferred from the outcome, because the outcome is identical either way
+		// until something crashes -- and a crash can only be staged at a batch
+		// boundary, so a cursor written in its own batch is a window no outcome
+		// assertion in this file can see.
+		const recording = new RecordingSQL(createTestDB());
+		const p = new VersionedStateEventProcessor<TestABI>(recording, processor);
+		await p.load(SOURCE, STREAM_CONFIG);
+		await p.process(STREAM, WHOLE_STREAM);
+
+		const writes = recording.batches
+			.map((list) => list.map(sqlOf))
+			.filter((sqls) => sqls.some((sql) => sql.startsWith('INSERT INTO _blocks')));
+
+		// one write batch per block, and not one of them moves the state without also
+		// moving the cursor that describes it
+		expect(writes).toHaveLength(STREAM.length);
+		for (const sqls of writes) {
+			expect(sqls.some((sql) => sql.includes('_cursor'))).toBe(true);
+		}
+		// and nothing WRITES the cursor on its own, which is the same window seen from
+		// the other side. Scoped to writes rather than to any mention of `_cursor`,
+		// because the migration batch creates that table and is not a cursor move.
+		const writesCursor = (sql: string) => /^\s*(INSERT|REPLACE|UPDATE)\b/i.test(sql) && sql.includes('_cursor');
+		const cursorOnly = recording.batches
+			.map((list) => list.map(sqlOf))
+			.filter((sqls) => sqls.some(writesCursor) && !sqls.some((sql) => sql.startsWith('INSERT INTO _blocks')));
+		expect(cursorOnly).toEqual([]);
+
+		expect(await stateAndCursor(recording)).toEqual({tip: 102, cursor: 102});
 	});
 
 	it.each([0, 1, 2])('leaves the cursor exactly at the last applied block after a crash (%i survived)', async (n) => {

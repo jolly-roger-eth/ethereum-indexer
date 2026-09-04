@@ -598,3 +598,86 @@ describe('DIFFERENT streams: the successor fetches its own history', () => {
 		expect(shared).toEqual([]);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// THE FOLLOWER'S QUESTION IS ABOUT CONTENT, NOT ABOUT COUNT
+// ---------------------------------------------------------------------------
+// `hasAlreadyFolded` is the whole of the follower's "is there anything new"
+// shortcut (ADR-0049), and it is the piece that replaced a cursor comparison
+// precisely because a SUMMARY of a stream can lie about it. A length check is
+// another such summary: two slices of the same size are not the same slice, and
+// a follower that skips on equal length alone would miss an emission superseded
+// one-for-one -- the same class of miss, one level down.
+//
+// Pinned directly rather than through a driven world, because the scenario that
+// distinguishes them is exactly the one a cursor cannot express: same count,
+// different content. The mutation this kills is deleting the comparison loop and
+// keeping the length guard, which the whole core suite otherwise passes.
+// ---------------------------------------------------------------------------
+
+/** Exposes the two protected members that ARE the shortcut, so it can be pinned directly. */
+class FollowerUnderTest extends IndexerGeneration<Abi> {
+	setFolded(events: LogEvent<Abi>[] | undefined) {
+		this.followedEmissions = events?.map(
+			(event) => `${event.blockHash}:${event.logIndex}:${event.removed ? 'R' : 'A'}`,
+		);
+	}
+	alreadyFolded(events: LogEvent<Abi>[]): boolean {
+		return this.hasAlreadyFolded(events);
+	}
+}
+
+describe('the follower decides on the emissions themselves', () => {
+	function follower() {
+		const provider = {
+			async request({method}: {method: string}) {
+				if (method === 'eth_chainId') return '0x1';
+				throw new Error(`unexpected ${method}`);
+			},
+		};
+		return new FollowerUnderTest(provider as any, fakeProcessor().processor as any, SOURCE, {
+			stream: {finality: FINALITY},
+		});
+	}
+
+	it('is FOLDED only when the slice is emission-for-emission what it folded', () => {
+		const f = follower();
+		const slice = [makeLog(101, '0xa101'), makeLog(102, '0xa102')];
+		f.setFolded(slice);
+		expect(f.alreadyFolded([makeLog(101, '0xa101'), makeLog(102, '0xa102')])).toBe(true);
+	});
+
+	it('is NOT folded when an emission was superseded ONE FOR ONE, so the count did not move', () => {
+		// the case a length check cannot see, and the reason the comparison exists
+		const f = follower();
+		f.setFolded([makeLog(101, '0xa101'), makeLog(102, '0xa102')]);
+		expect(f.alreadyFolded([makeLog(101, '0xa101'), makeLog(102, '0xb102')])).toBe(false);
+	});
+
+	it('is NOT folded when the same block is now a RETRACTION at the same position', () => {
+		// identical hash, identical index, opposite meaning: the emission mark carries
+		// the application/retraction bit for exactly this
+		const f = follower();
+		f.setFolded([makeLog(101, '0xa101')]);
+		const retracted = {...makeLog(101, '0xa101'), removed: true} as LogEvent<Abi>;
+		expect(f.alreadyFolded([retracted])).toBe(false);
+	});
+
+	it('is NOT folded when the slice is REORDERED, though it holds the same emissions', () => {
+		const f = follower();
+		f.setFolded([makeLog(101, '0xa101'), makeLog(101, '0xa101', 1)]);
+		expect(f.alreadyFolded([makeLog(101, '0xa101', 1), makeLog(101, '0xa101')])).toBe(false);
+	});
+
+	it('is NOT folded when nothing has been folded yet, which is the safe direction', () => {
+		const f = follower();
+		f.setFolded(undefined);
+		expect(f.alreadyFolded([makeLog(101, '0xa101')])).toBe(false);
+	});
+
+	it('is NOT folded when the slice changed LENGTH either', () => {
+		const f = follower();
+		f.setFolded([makeLog(101, '0xa101')]);
+		expect(f.alreadyFolded([makeLog(101, '0xa101'), makeLog(102, '0xa102')])).toBe(false);
+	});
+});
