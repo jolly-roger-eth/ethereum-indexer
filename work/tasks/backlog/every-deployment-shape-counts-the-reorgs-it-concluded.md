@@ -9,6 +9,13 @@ covers: []
 
 ## Open questions
 
+> **BOTH ANSWERED 2026-09-04 by wighawag**, surfaced by the `drive-tasks` conductor after building the
+> other two staged defects. The answers are recorded inline under each question below. `needsAnswers`
+> is deliberately still `true`: what remains is not a decision but the RE-SCOPE those decisions imply —
+> "What to build" and the acceptance criteria below still describe the three-way fork, while answer 1
+> (option **b**) moves work into core and the store seam and answer 2 adds a `Meta` table to `build`.
+> Re-task it against the settled shape (`to-task`), then clear the flag.
+
 1. **Where does an operational counter get written when there is no HTTP route, and what does that
    make the CLI depend on?** `recordReorg` lives in `@etherfold/server` and is called from its
    ingestion route. A combined process concludes the same reorg in core, through
@@ -34,6 +41,19 @@ covers: []
    about the transport, and that the equivalence tests should be able to compare `/status` between the
    two shapes rather than carrying an exception. But it is the largest of the three and it touches a
    seam two other commands sit on, so it needs a human decision rather than a builder's.
+
+   > **ANSWER: (b).** Core reports the reorg outcome and whoever owns the store persists it, so ONE
+   > writer serves both deployment shapes. The counter is a fact about the FOLD and not about the
+   > transport, which is precisely why it does not belong to the HTTP route in either shape. Accepted
+   > with the cost named above open-eyed: it is the largest of the three, the ingestion outcome type
+   > and the store seam both move, and the server route becomes a CALLER of the write rather than its
+   > owner. Option (a) is rejected for the reason given — it would make the CLI depend on
+   > `@etherfold/server` for a WRITE to a database the CLI itself owns, and put the same write in two
+   > places, which is the shape ADR-0042 already caught once. Option (c) is rejected because the
+   > milestone names `run` the default thing to reach for, so a blind default is not defensible.
+   >
+   > The seam move is likely ADR-worthy on its own terms (hard to reverse, surprising without context,
+   > a real trade-off): judge it when building, per `work/protocol/ADR-FORMAT.md`.
 
 2. **What does `build` do?** The one-shot terminates at the tip and has no `Meta` table at all, so
    there is nowhere to put a counter and arguably nothing to observe: nobody polls `/status` on a
