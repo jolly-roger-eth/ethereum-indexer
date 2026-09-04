@@ -121,11 +121,29 @@ export type GenerationSpec<ABI extends Abi, ProcessResultType = void, State = un
 	 * Build the state THIS generation folds into. Called ONCE, before the
 	 * processor.
 	 *
-	 * The container never touches the value: it exists as a separate step (rather
-	 * than being folded into `createProcessor`) so that "each generation has its
-	 * own state" is structural instead of a convention a caller may forget. On the
-	 * entity path it is a `StateStore`; the container names no storage seam and
-	 * cannot, since `@etherfold/core` does not depend on one.
+	 * The container never touches the value: it is a separate step (rather than
+	 * folded into `createProcessor`) so that "each generation has its own state" has
+	 * somewhere to be expressed. On the entity path it is a `StateStore`; the
+	 * container names no storage seam and cannot, since `@etherfold/core` does not
+	 * depend on one.
+	 *
+	 * ## It is a CONVENTION, and the caller has to keep it
+	 *
+	 * This used to claim the separate step made per-generation state STRUCTURAL.
+	 * It does not, and it cannot: `State` is opaque here, so the container cannot
+	 * tell two stores apart, and two distinct store objects can address one
+	 * underlying database anyway -- which is the way this actually goes wrong, and
+	 * is invisible from here by construction.
+	 *
+	 * So it is on the caller, and this is the rule: **key the state on
+	 * `context.stream`.** Two generations under one storage location are ONE store
+	 * by that backend's own definition, and their cursors collide as well as their
+	 * rows, because the sync cursor lives under a fixed key. The whole point of a
+	 * successor -- the canonical generation keeps answering complete old answers
+	 * while the new fold catches up -- does not survive that.
+	 *
+	 * The factory is handed the `GenerationContext` for exactly this reason: it is
+	 * the identity to derive a database name, a table prefix or a directory from.
 	 */
 	createState: (context: GenerationContext) => State | Promise<State>;
 	/**

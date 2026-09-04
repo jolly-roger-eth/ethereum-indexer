@@ -1,4 +1,4 @@
-import {createBrowserStateStore, createIndexerState} from '@etherfold/browser';
+import {createBrowserStateStore, createIndexerState, type GenerationContext} from '@etherfold/browser';
 import {fromEntityProcessor} from '@etherfold/processor-entities';
 import {createConnection} from '@etherplay/connect';
 import {abi, tokenProcessor} from '../src/processor.js';
@@ -98,9 +98,15 @@ async function start() {
 	// GENERATIONS -- a stream plus a fold over it -- one of which is canonical and
 	// answers every read, and each folds into its own state. The hook calls this
 	// once per generation.
-	const createState = () =>
+	// KEYED ON THE CONTEXT, which is what keeps each generation's state its own.
+	// The container hands the factory a `GenerationContext` precisely so the
+	// storage location can be derived from it: two generations sharing one
+	// `databaseName` are one store by IndexedDB's own definition, and they would
+	// collide on the sync cursor as well as on the rows, because that cursor lives
+	// under a fixed key.
+	const createState = (context: GenerationContext) =>
 		createBrowserStateStore(tokenProcessor.entities, {
-			databaseName: `reference-${CHAIN.id}-${CONTRACT}`,
+			databaseName: `reference-${CHAIN.id}-${CONTRACT}-${context.stream}`,
 		});
 
 	// The store the CANONICAL generation was built over, kept because the
@@ -112,7 +118,7 @@ async function start() {
 	// 3. THE HOOK, AND THE TWO SUBSCRIPTIONS
 	// =====================================================================
 	const indexer = createIndexerState({
-		createState: async () => (store = await createState()),
+		createState: async (context) => (store = await createState(context)),
 		createProcessor: (state) => fromEntityProcessor(tokenProcessor)(state),
 	});
 

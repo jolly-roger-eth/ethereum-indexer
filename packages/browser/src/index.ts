@@ -1,6 +1,14 @@
 export * from './IndexerState.js';
 
 export {simple_hash} from '@etherfold/core';
+/**
+ * Re-exported because this package's own public signatures NAME it: `createState`
+ * is handed a `GenerationContext`, and a caller that cannot name the type cannot
+ * write the factory with an explicit annotation. It is also the value the state
+ * must be keyed on -- two generations sharing one storage location are one store
+ * -- so it is exactly the type a consumer reaches for.
+ */
+export type {GenerationContext} from '@etherfold/core';
 // where a browser deployment's state lives (the storage seam)
 export * from './storage/state-store/BrowserStateStore.js';
 export * from './storage/keyval.js';

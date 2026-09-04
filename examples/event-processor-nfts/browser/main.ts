@@ -1,4 +1,9 @@
-import {createBrowserStateStore, createIndexerState, type LogParseConfig} from '@etherfold/browser';
+import {
+	createBrowserStateStore,
+	createIndexerState,
+	type GenerationContext,
+	type LogParseConfig,
+} from '@etherfold/browser';
 import {fromEntityProcessor} from '@etherfold/processor-entities';
 import {createConnection} from '@etherplay/connect';
 // Uncomment together with the ONE LINE marked below to run on the light store.
@@ -213,9 +218,14 @@ async function start() {
 	// a stream plus a fold over it -- one of which is canonical and answers every
 	// read, and each folds into its OWN state. The hook calls this once per
 	// generation; this app has one.
-	const createState = () =>
+	// KEYED ON THE CONTEXT: the container hands this factory a `GenerationContext`
+	// so each generation's state can be its own. Two generations under one
+	// `databaseName` are one store by IndexedDB's own definition, and they collide
+	// on the sync cursor as well as the rows, since that cursor lives under a fixed
+	// key.
+	const createState = (context: GenerationContext) =>
 		createBrowserStateStore(NFTProcessor.entities, {
-			databaseName: `etherfold-nfts-${chainId}-${account}`,
+			databaseName: `etherfold-nfts-${chainId}-${account}-${context.stream}`,
 		});
 	// ...or the light store instead: current state as a plain object, history as
 	// immer reverse patches. It is memory-only by design (ADR-0023), so a reload
@@ -230,7 +240,7 @@ async function start() {
 	let store!: Awaited<ReturnType<typeof createState>>;
 
 	const indexer = createIndexerState({
-		createState: async () => (store = await createState()),
+		createState: async (context) => (store = await createState(context)),
 		createProcessor: (state) => fromEntityProcessor(NFTProcessor)(state),
 	});
 

@@ -1,6 +1,6 @@
 # etherfold
 
-The command line. `etherfold run` follows a chain, folds a processor into a libSQL database and answers HTTP over it, in one process; `etherfold build` is the same thing as a one-shot that exits at the tip; `etherfold fetch` is the chain-facing half of a split deployment, pushing raw logs to a server elsewhere; `etherfold index` is the half that receives those pushes and owns the database; `etherfold serve` answers queries over a database written elsewhere.
+The command line. `etherfold run` follows a chain, folds a processor into a libSQL database and answers HTTP over it, in one process; `etherfold build` is the same thing as a one-shot that exits at the tip; `etherfold fetch` is the chain-facing half of a split deployment, pushing raw logs to a server elsewhere; `etherfold index` is the half that receives those pushes and owns the database; `etherfold serve` is the READ tier over a database written elsewhere, answering `/status` -- health, schema version, reorg counters and the cursor the fold has reached.
 
 ```sh
 npm i -g etherfold        # or: npx etherfold …
