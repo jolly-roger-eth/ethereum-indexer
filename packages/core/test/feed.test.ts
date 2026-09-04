@@ -271,3 +271,135 @@ describe('expectedFromBlock', () => {
 		expect(indexer.expectedFromBlock).toBe(Math.max(Math.min(102, 101 - 12), 0));
 	});
 });
+
+// ---------------------------------------------------------------------------
+// AN INTERMEDIATE CURSOR DESCRIBES WHAT HAS BEEN FOLDED, NOT WHAT WILL BE
+// ---------------------------------------------------------------------------
+// `feed`/`replay` hand the processor one batch at a time, and every batch is
+// handed a cursor the processor PERSISTS (`applyEventStream` writes it verbatim
+// for the last block of the batch). So each of those cursors has to be true on
+// its own: if a batch is interrupted, the last one written is what the next run
+// resumes from.
+//
+// The rule the cursor must satisfy is the one `syncedThrough` states: the
+// unconfirmed window is the set of blocks already folded, and the engine treats
+// the top of it as the boundary above which events are NEW. So a cursor whose
+// window reaches ABOVE its own `lastToBlock` makes the blocks in between
+// invisible to the next round -- they are neither below the resume point nor
+// above the window, so nothing ever delivers them. That is silent, permanent
+// loss, bounded by the finality window.
+// ---------------------------------------------------------------------------
+
+/** The reorg shape these all use: three blocks on branch A, replaced by branch B. */
+async function reorgedFeed(processor: any, feedBatchSize = 1) {
+	const indexer = makeIndexer(processor, feedBatchSize);
+	await indexer.load();
+	await indexer.feed(
+		[makeEvent(101, '0xA1'), makeEvent(102, '0xB1'), makeEvent(103, '0xC1')],
+		lastSyncFor({latestBlock: 103, lastToBlock: 103, lastFromBlock: 0}),
+	);
+	// the same three heights on a different branch
+	await indexer.feed(
+		[makeEvent(101, '0xA2'), makeEvent(102, '0xB2'), makeEvent(103, '0xC2')],
+		lastSyncFor({latestBlock: 103, lastToBlock: 103, lastFromBlock: 91}),
+	);
+	return indexer;
+}
+
+describe('the cursor handed to each batch is true on its own', () => {
+	it('never carries an unconfirmed block ABOVE its own lastToBlock', async () => {
+		const seen: {lastToBlock: number; window: number[]}[] = [];
+		const processor: any = {
+			getVersionHash: () => 'proc',
+			getCodeFingerprint: () => undefined,
+			load: async () => undefined,
+			process: async (_list: LogEvent<Abi>[], ls: LastSync<Abi>) => {
+				seen.push({lastToBlock: ls.lastToBlock, window: ls.unconfirmedBlocks.map((b) => b.number)});
+			},
+			reset: async () => {},
+			clear: async () => {},
+		};
+		await reorgedFeed(processor);
+
+		// asserted on EVERY cursor, not just the last: each one is persisted, so each
+		// one has to be resumable
+		for (const {lastToBlock, window} of seen) {
+			expect(Math.max(-1, ...window)).toBeLessThanOrEqual(lastToBlock);
+		}
+	});
+
+	it('does not hand a retraction batch the extent of a scan it has not folded', async () => {
+		// The retraction batch reverts 101-103 and applies nothing, so the fold is
+		// back at 100. Handing it `lastToBlock: 103` (the end of the whole stream)
+		// claims three blocks whose replacements are still queued behind it.
+		const seen: {removed: boolean; lastToBlock: number}[] = [];
+		const processor: any = {
+			getVersionHash: () => 'proc',
+			getCodeFingerprint: () => undefined,
+			load: async () => undefined,
+			process: async (list: LogEvent<Abi>[], ls: LastSync<Abi>) => {
+				seen.push({removed: list.every((e) => e.removed), lastToBlock: ls.lastToBlock});
+			},
+			reset: async () => {},
+			clear: async () => {},
+		};
+		await reorgedFeed(processor);
+
+		const retraction = seen.find((s) => s.removed);
+		expect(retraction).toBeDefined();
+		expect(retraction!.lastToBlock).toBe(100);
+	});
+
+	it('loses nothing when a batch is INTERRUPTED and the run resumes from what was persisted', async () => {
+		// The whole point, end to end: the processor throws part-way, the last cursor
+		// it accepted is what a restart resumes from, and the replacement blocks must
+		// still be delivered. This is the shape that silently drops them.
+		const applied: string[] = [];
+		let persisted: LastSync<Abi> | undefined;
+		// Die on the batch immediately AFTER the retraction, which is the moment the
+		// retraction's cursor is the last thing on disk. Detected from the stream rather
+		// than by counting calls, so the test does not silently move if batching changes.
+		let retracted = false;
+		let armed = true;
+		const processor: any = {
+			getVersionHash: () => 'proc',
+			getCodeFingerprint: () => undefined,
+			load: async () => (persisted ? {state: {}, lastSync: persisted} : undefined),
+			process: async (list: LogEvent<Abi>[], ls: LastSync<Abi>) => {
+				const isRetraction = list.every((e) => e.removed);
+				if (armed && retracted && !isRetraction) {
+					throw new Error('processor died mid-stream');
+				}
+				if (isRetraction) {
+					retracted = true;
+				}
+				for (const e of list) {
+					applied.push(`${e.removed ? 'R' : 'A'}${e.blockNumber}`);
+				}
+				// what `applyEventStream` would have written for this batch
+				persisted = ls;
+			},
+			reset: async () => {},
+			clear: async () => {},
+		};
+
+		await expect(reorgedFeed(processor)).rejects.toThrow('processor died mid-stream');
+		expect(retracted).toBe(true);
+		expect(persisted).toBeDefined();
+		const interrupted = applied.length;
+
+		// the restart: a fresh generation loading exactly the cursor that was persisted
+		armed = false;
+		const resumed = makeIndexer(processor, 1);
+		await resumed.load();
+		await resumed.feed(
+			[makeEvent(101, '0xA2'), makeEvent(102, '0xB2'), makeEvent(103, '0xC2')],
+			lastSyncFor({latestBlock: 103, lastToBlock: 103, lastFromBlock: resumed.expectedFromBlock}),
+		);
+
+		// every replacement block landed after the restart. Asserted as the exact set,
+		// not `arrayContaining`: the failure here is blocks going MISSING.
+		const delivered = applied.slice(interrupted).filter((e) => e.startsWith('A'));
+		expect(delivered).toEqual(['A101', 'A102', 'A103']);
+	});
+});

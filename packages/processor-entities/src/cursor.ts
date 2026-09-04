@@ -1,4 +1,4 @@
-import {taggedBnReplacer, taggedBnReviver, type Abi, type LastSync} from '@etherfold/core';
+import {cursorSyncedThrough, taggedBnReplacer, taggedBnReviver, type Abi, type LastSync} from '@etherfold/core';
 
 /**
  * ## The sync cursor: what it MEANS, given that the store keeps it
@@ -129,13 +129,13 @@ export function parseStoredCursor<ABI extends Abi>(stored: string | undefined): 
  * The last block of a stream needs none of this and gets the `lastSync` itself,
  * so the common case (one block, or the tip of a backfill) costs no truncation
  * at all. See `applyEventStream`.
+ *
+ * ## Why this is a re-export and not an implementation
+ *
+ * The engine needs the SAME narrowing one level up: `promiseToFeed` hands each
+ * BATCH a cursor the processor persists, and it has to be true on its own for
+ * exactly the reason above. Two copies of a rule this subtle is how the halves
+ * drift, so it lives once in `@etherfold/core` as `cursorSyncedThrough` and is
+ * re-exported here under the name this package's callers already use.
  */
-export function syncedThrough<ABI extends Abi>(lastSync: LastSync<ABI>, blockNumber: number): LastSync<ABI> {
-	return {
-		context: lastSync.context,
-		lastFromBlock: lastSync.lastFromBlock,
-		latestBlock: lastSync.latestBlock,
-		lastToBlock: blockNumber,
-		unconfirmedBlocks: lastSync.unconfirmedBlocks.filter((block) => block.number <= blockNumber),
-	};
-}
+export const syncedThrough = cursorSyncedThrough;

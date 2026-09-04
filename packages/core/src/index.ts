@@ -49,6 +49,15 @@ export {resolveStreamConfig} from './internal/engine/utils.js';
  * leave every caller outside this package re-deriving it.
  */
 export {streamConfigHashOf} from './internal/engine/utils.js';
+/**
+ * Exported because NARROWING A CURSOR IS ONE RULE and must have one
+ * implementation. The engine narrows per batch; a processor writing a cursor per
+ * BLOCK needs the identical truncation, and the way to get it wrong is to lower
+ * `lastToBlock` without cutting the unconfirmed window to match, which silently
+ * hides every block in between. `@etherfold/processor-entities` re-exports this
+ * as `syncedThrough`.
+ */
+export {cursorSyncedThrough} from './internal/engine/utils.js';
 export * from './generation/registry.js';
 export * from './generation/memory.js';
 /**

@@ -25,6 +25,7 @@ import type {
 import {LogEventFetcher} from './internal/decoding/LogEventFetcher.js';
 import type {Abi} from 'abitype';
 import {
+	cursorSyncedThrough,
 	defaultFromBlockOf,
 	generateStreamFromReplay,
 	generateStreamToAppend,
@@ -1291,7 +1292,6 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		// stream through `indexMore()` reverted correctly.
 		const eventsInGroups = groupStreamPerBlock(eventStream);
 		const batchSize = this.config.feedBatchSize;
-		let currentLastSync = {...newLastSync};
 		while (eventsInGroups.length > 0) {
 			const list: LogEvent<ABI>[] = [];
 			// Every retraction goes in ONE batch, whatever `feedBatchSize` says. A revert
@@ -1310,11 +1310,33 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 			}
 
 			if (list.length > 0) {
-				// a retraction-only batch must not drag the cursor backwards
+				// THE CURSOR THIS BATCH IS HANDED HAS TO BE TRUE ON ITS OWN.
+				//
+				// The processor PERSISTS it (`applyEventStream` writes it verbatim for the
+				// batch's last block), so if the loop is interrupted -- a throwing processor, or
+				// a cancellation, which every reconfigure verb raises -- the last cursor accepted
+				// is what the next run resumes from. It used to be the FINAL cursor with only
+				// `lastToBlock` walked forward, so every intermediate batch carried the final
+				// unconfirmed WINDOW: a cursor claiming to have synced through X while listing
+				// blocks above X as already folded. Resuming from that skips exactly the blocks
+				// in between, permanently and without a word, because they are neither below the
+				// resume point nor above the window.
+				//
+				// So each batch gets a cursor narrowed to what IT has folded, and only the LAST
+				// gets the stream's own -- at which point the whole stream is folded and the
+				// claim is true. A retraction-only batch has folded nothing above the fork, so it
+				// reports the fork point rather than the extent of a scan whose replacements are
+				// still queued behind it. That IS a move backwards, and it is correct: the state
+				// really is back there until the replacements land. (When such a batch is the
+				// last one there is nothing queued behind it, so it takes the stream's cursor and
+				// a scan that legitimately found nothing still advances.)
 				const applied = list.filter((event) => !event.removed);
-				if (applied.length > 0) {
-					currentLastSync.lastToBlock = applied[applied.length - 1].blockNumber;
-				}
+				const isFinalBatch = eventsInGroups.length === 0;
+				const foldedThrough =
+					applied.length > 0
+						? applied[applied.length - 1].blockNumber
+						: Math.max(0, Math.min(...list.map((event) => event.blockNumber)) - 1);
+				const currentLastSync = isFinalBatch ? newLastSync : cursorSyncedThrough(newLastSync, foldedThrough);
 				const outcome = await unlessCancelled(this.processor.process(list, currentLastSync));
 				this.lastSync = currentLastSync;
 				this._onLastSyncUpdated();

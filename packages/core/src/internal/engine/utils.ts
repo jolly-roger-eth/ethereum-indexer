@@ -411,6 +411,48 @@ export function generateStreamToAppend<ABI extends Abi>(
 	};
 }
 
+/**
+ * The cursor that describes a fold SYNCED THROUGH `blockNumber`, and the one
+ * rule for narrowing a cursor anywhere in this system.
+ *
+ * A cursor is not a label, it is a claim that can be resumed from, so every
+ * cursor that is PUBLISHED or PERSISTED has to be true on its own. Narrowing one
+ * is therefore not "copy it and lower `lastToBlock`": the unconfirmed window is
+ * the set of blocks already folded, and the engine treats the top of it as the
+ * boundary above which events are NEW. A window reaching ABOVE `lastToBlock`
+ * makes the blocks in between invisible -- they are neither below the resume
+ * point nor above the window, so nothing ever delivers them, and the loss is
+ * silent and permanent.
+ *
+ * ## What is truncated, and what deliberately is not
+ *
+ * - `lastToBlock` becomes `blockNumber`, which is the point: it is what
+ *   `getFromBlock` resumes from.
+ * - `unconfirmedBlocks` is cut to the ones at or below it. They are ascending, so
+ *   this is a prefix, and it has to be one.
+ * - `latestBlock` is NOT truncated. It is the chain tip that was observed, not
+ *   progress through it, and lowering it would widen the re-fetch window for no
+ *   reason.
+ * - `context` is not touched: it is the identity the core validates, and it is
+ *   the same identity whichever block of the stream this is.
+ *
+ * It lives HERE, in the engine, because two layers need the identical rule and a
+ * second implementation is a divergence waiting to happen: the batch loop in
+ * `promiseToFeed` narrows a cursor per BATCH, and `applyEventStream` narrows one
+ * per BLOCK (`@etherfold/processor-entities` re-exports this as `syncedThrough`).
+ * The last unit of a stream needs no narrowing at all and gets the `lastSync`
+ * itself, so the common case costs nothing.
+ */
+export function cursorSyncedThrough<ABI extends Abi>(lastSync: LastSync<ABI>, blockNumber: number): LastSync<ABI> {
+	return {
+		context: lastSync.context,
+		lastFromBlock: lastSync.lastFromBlock,
+		latestBlock: lastSync.latestBlock,
+		lastToBlock: blockNumber,
+		unconfirmedBlocks: lastSync.unconfirmedBlocks.filter((block) => block.number <= blockNumber),
+	};
+}
+
 export function getFromBlock<ABI extends Abi>(
 	lastSync: LastSync<ABI>,
 	defaultFromBlock: number,
