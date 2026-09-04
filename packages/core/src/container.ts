@@ -881,7 +881,7 @@ export class Indexer<ABI extends Abi, ProcessResultType = void> {
 		return answer as LastSync<ABI>;
 	}
 
-	feed(eventStream: LogEvent<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
+	feed(eventStream: LogEvent<ABI>[], lastSyncFetched: LastSync<ABI>): Promise<LastSync<ABI>> {
 		return this.requireCurrent().generation.feed(eventStream, lastSyncFetched);
 	}
 

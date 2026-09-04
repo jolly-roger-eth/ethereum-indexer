@@ -290,6 +290,39 @@ describe('the envelope is checked before anything is applied', () => {
 		).rejects.toBeInstanceOf(InvalidBatchError);
 	});
 
+	it('refuses a payload whose blocks do not ascend, rather than dropping the late one', async () => {
+		// The receiver reads the payload IN ORDER: with an empty window the first
+		// group's number becomes the boundary above which events are new, so a lower
+		// block arriving later is silently discarded and the window it builds is left
+		// unordered for the next cycle too. Refused rather than sorted, because a node
+		// answers `eth_getLogs` in ascending order and anything else means something
+		// upstream reordered them.
+		await expect(
+			builder.receive(
+				batch(builder, {
+					fromBlock: 100,
+					toBlock: 110,
+					latestBlock: 115,
+					logs: [transfer(105, '0xC', 2n), transfer(101, '0xA', 1n)],
+				}),
+			),
+		).rejects.toThrow(/log at block 101 after one at block 105/);
+		expect(target.streams).toEqual([]);
+	});
+
+	it('accepts repeats WITHIN one block, which is ordinary', async () => {
+		await expect(
+			builder.receive(
+				batch(builder, {
+					fromBlock: 100,
+					toBlock: 110,
+					latestBlock: 115,
+					logs: [transfer(101, '0xA', 1n, 0), transfer(101, '0xA', 2n, 1), transfer(105, '0xC', 3n)],
+				}),
+			),
+		).resolves.toBeDefined();
+	});
+
 	it('refuses a log outside the range it claims to cover', async () => {
 		// completeness is an invariant, not a flag: a payload holds every log in
 		// [fromBlock, toBlock] and nothing else, and truncation is a LOWER toBlock.

@@ -2,6 +2,7 @@ import type {Abi} from 'abitype';
 import {logs} from 'named-logs';
 import {InvalidBatchError, WireContextMismatchError} from './errors.js';
 import {
+	assertAscendingByBlock,
 	defaultFromBlockOf,
 	generateStreamToAppend,
 	getFromBlock,
@@ -264,6 +265,7 @@ export function assertWellFormed<ABI extends Abi>(batch: WireBatch<ABI>): void {
 	if (!Array.isArray(batch.logs)) {
 		throw new InvalidBatchError(`a batch must carry a logs array, got ${typeof batch.logs}`);
 	}
+	assertAscendingByBlock(batch.logs, 'a batch');
 	for (const log of batch.logs) {
 		if (!isBlockNumber(log?.blockNumber) || log.blockNumber < batch.fromBlock || log.blockNumber > batch.toBlock) {
 			throw new InvalidBatchError(

@@ -1,6 +1,6 @@
 import type {Abi} from 'abitype';
 import {logs} from 'named-logs';
-import {UnexpectedFromBlockError} from '../../errors.js';
+import {InvalidBatchError, UnexpectedFromBlockError} from '../../errors.js';
 import type {
 	AllContractData,
 	ContextIdentifier,
@@ -409,6 +409,44 @@ export function generateStreamToAppend<ABI extends Abi>(
 				? {cause: reorgCause, blockNumber: reorgBlock.number, blockHash: reorgBlock.hash}
 				: undefined,
 	};
+}
+
+/**
+ * The block numbers of a payload must ASCEND, and a payload that does not is
+ * REFUSED rather than quietly repaired.
+ *
+ * The engine reads a payload in order. `generateStreamToAppend` takes the first
+ * group's number as the boundary above which events are new when the window is
+ * empty, and builds the next window in payload order, so a group appearing after
+ * a higher-numbered one is DROPPED -- silently, and with the window left
+ * unordered so the next cycle's boundary is wrong too. Losing logs is the one
+ * outcome an indexer must never produce quietly.
+ *
+ * Refusing rather than sorting is deliberate. `eth_getLogs` returns logs in
+ * ascending order, and no node has a reason to do otherwise, so an unordered
+ * payload means something upstream is wrong -- a merging proxy, a sharded
+ * provider reassembling shards, a host building a batch by hand. Sorting would
+ * paper over that and leave the real fault to surface later as missing data;
+ * failing names it at the point it can still be traced. If a provider is ever
+ * found doing this legitimately, this is the place to revisit, with the evidence
+ * in hand.
+ *
+ * Equal block numbers are fine: several logs share a block, and their order
+ * within it is the node's `logIndex`, not this rule's business.
+ */
+export function assertAscendingByBlock<ABI extends Abi>(logs: readonly LogEvent<ABI>[], source: string): void {
+	for (let i = 1; i < logs.length; i++) {
+		const previous = logs[i - 1];
+		const current = logs[i];
+		if (current.blockNumber < previous.blockNumber) {
+			throw new InvalidBatchError(
+				`${source} carries a log at block ${current.blockNumber} after one at block ${previous.blockNumber}. ` +
+					`Logs must ascend by block: the engine reads a payload in order, and a block appearing after a higher ` +
+					`one is dropped rather than folded. This is refused instead of sorted because a node returning logs out ` +
+					`of order means something upstream reordered them, and silently repairing it hides that.`,
+			);
+		}
+	}
 }
 
 /**

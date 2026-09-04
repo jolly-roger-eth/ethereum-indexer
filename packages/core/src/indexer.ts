@@ -25,6 +25,7 @@ import type {
 import {LogEventFetcher} from './internal/decoding/LogEventFetcher.js';
 import type {Abi} from 'abitype';
 import {
+	assertAscendingByBlock,
 	cursorSyncedThrough,
 	defaultFromBlockOf,
 	generateStreamFromReplay,
@@ -620,7 +621,7 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 	 * accepted with them dropped. A stream that already knows what it took back is
 	 * a REPLAY and goes through `replay()`.
 	 */
-	async feed(eventStream: LogEvent<ABI>[], lastSyncFetched?: LastSync<ABI>): Promise<LastSync<ABI>> {
+	async feed(eventStream: LogEvent<ABI>[], lastSyncFetched: LastSync<ABI>): Promise<LastSync<ABI>> {
 		// we first check if this valid to be called
 		if (this._index.executing) {
 			throw new Error(`indexing... should not feed`);
@@ -629,6 +630,11 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		if (this._feed.executing) {
 			throw new Error(`already feeding... should not feed`);
 		}
+
+		// Ascending by block, or refused. A payload the engine reads out of order loses
+		// the logs that arrive late, which is the one failure an indexer must not have
+		// quietly (`assertAscendingByBlock` says why this is not sorted instead).
+		assertAscendingByBlock(eventStream, 'the payload handed to `feed()`');
 
 		const retracted = eventStream.find((event) => event.removed);
 		if (retracted) {
@@ -649,7 +655,7 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		// we could as well say feed.ifNotExecuting
 		return this._feed.next({
 			newEvents: eventStream,
-			lastSyncFetched: lastSyncFetched || this.freshLastSync(this.processor.getVersionHash()),
+			lastSyncFetched,
 		});
 	}
 
@@ -1627,6 +1633,12 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 			unlessCancelled,
 		);
 		toBlock = newToBlock;
+
+		// The node's answer, checked for the one property the fold depends on and
+		// cannot verify later. `eth_getLogs` returns logs ascending, so an unordered
+		// answer means something between here and the chain reordered them, and the
+		// engine would silently drop whatever arrived late.
+		assertAscendingByBlock(eventsFetched as LogEvent<ABI>[], `the node's answer for [${fromBlock}, ${toBlock}]`);
 
 		// the timestamps and transactions the logs themselves did not carry. Shared
 		// with the split shape's `LogFetcher`, which is the only other thing allowed

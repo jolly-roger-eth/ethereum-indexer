@@ -403,3 +403,53 @@ describe('the cursor handed to each batch is true on its own', () => {
 		expect(delivered).toEqual(['A101', 'A102', 'A103']);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// A PAYLOAD OUT OF ORDER IS REFUSED, NOT QUIETLY REPAIRED
+// ---------------------------------------------------------------------------
+// The engine reads a payload in order: with an empty window the FIRST group's
+// number becomes the boundary above which events are new, and the next window is
+// built in payload order. So a block arriving after a higher-numbered one was
+// DROPPED, silently, and left the window unordered so the following cycle's
+// boundary was wrong too.
+//
+// Refused rather than sorted, deliberately. `eth_getLogs` answers in ascending
+// order and nothing legitimate reorders it, so an unordered payload means
+// something upstream is wrong; sorting would hide that and let it resurface later
+// as missing data. If a provider is ever found doing it legitimately, the
+// decision gets revisited with the evidence.
+// ---------------------------------------------------------------------------
+
+describe('a payload whose blocks do not ascend', () => {
+	it('is REFUSED by feed(), naming both blocks', async () => {
+		const {processor, batches} = recordingProcessor();
+		const indexer = makeIndexer(processor);
+		await indexer.load();
+
+		await expect(
+			indexer.feed([makeEvent(105, '0xC'), makeEvent(101, '0xA')], lastSyncFor({latestBlock: 105, lastToBlock: 105})),
+		).rejects.toThrow(/log at block 101 after one at block 105/);
+
+		// and nothing was folded from the payload it refused
+		expect(batches).toEqual([]);
+	});
+
+	it('accepts EQUAL block numbers, because a block holds many logs', async () => {
+		const {processor, batches} = recordingProcessor();
+		const indexer = makeIndexer(processor);
+		await indexer.load();
+
+		await indexer.feed(
+			[makeEvent(101, '0xA'), makeEvent(101, '0xA'), makeEvent(102, '0xB')],
+			lastSyncFor({latestBlock: 102, lastToBlock: 102}),
+		);
+		expect(batches.flat()).toHaveLength(3);
+	});
+
+	it('would otherwise have DROPPED the late block rather than folding it', async () => {
+		// the shape of the loss, stated as the reason the refusal exists: in payload
+		// order the first group sets the boundary, so 101 is below it and disappears
+		const ascending = groupStreamPerBlock([makeEvent(101, '0xA'), makeEvent(105, '0xC')] as LogEvent<Abi>[]);
+		expect(ascending.map((g) => g.number)).toEqual([101, 105]);
+	});
+});
