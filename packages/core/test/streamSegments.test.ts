@@ -232,6 +232,38 @@ describe('a forward JUMP is refused; an overlap is ordinary', () => {
 		logged.restore();
 	});
 
+	it('SAYS it declined, rather than reporting the write it did not make', async () => {
+		// The caller's next move depends on this answer. The indexer tracks how far the
+		// stored stream reaches, and a decline read as a write moves that mark past
+		// blocks the stream never received -- after which its own hole-check compares
+		// against a mark that has already lied, so every later decline is invisible
+		// too. A log line cannot carry that; a return value can.
+		const {port} = memoryPort();
+		const stream = createSegmentedStream<Abi>(port);
+		const logged = await captureLogs();
+
+		const accepted = await stream.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursor(100, 104)});
+		const refused = await stream.saveNewEvents(SOURCE, {eventStream: [event(200)], lastSync: cursor(200, 200)});
+
+		expect(accepted).toBeUndefined();
+		expect(refused).toBe('declined');
+		logged.restore();
+	});
+
+	it('says nothing again once a contiguous batch is accepted', async () => {
+		const {port} = memoryPort();
+		const stream = createSegmentedStream<Abi>(port);
+		const logged = await captureLogs();
+
+		await stream.saveNewEvents(SOURCE, {eventStream: [event(100)], lastSync: cursor(100, 104)});
+		expect(await stream.saveNewEvents(SOURCE, {eventStream: [event(200)], lastSync: cursor(200, 200)})).toBe(
+			'declined',
+		);
+		// the batch that continues what is stored
+		expect(await stream.saveNewEvents(SOURCE, {eventStream: [event(105)], lastSync: cursor(105, 105)})).toBeUndefined();
+		logged.restore();
+	});
+
 	it('accepts a tip re-fetch that dips back into the finality window', async () => {
 		const {port, rows} = memoryPort();
 		const stream = createSegmentedStream<Abi>(port);

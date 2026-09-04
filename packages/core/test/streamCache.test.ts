@@ -1,17 +1,20 @@
 import type {Abi} from 'abitype';
 import {describe, expect, it, vi} from 'vitest';
+import {IndexerGeneration} from '../src/indexer.js';
 import type {ExistingStream, LogEvent} from '../src/types.js';
 import {
 	BRANCH_A,
 	BRANCH_A_TIP,
 	fakeChain,
 	fakeProcessor,
+	FINALITY,
 	idOf,
 	indexToTip,
 	makeIndexer,
 	makeLog,
 	memoryStream,
 	shapeOf,
+	SOURCE,
 	START_BLOCK,
 	type ProcessorStore,
 } from './utils/streamCacheWorld.js';
@@ -487,5 +490,80 @@ describe('a reorg still behaves', () => {
 		await scratch.load();
 		await indexToTip(scratch);
 		expect(subject.state).toEqual(fromScratch.state);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// A KEEPER THAT DECLINES IS NOT A KEEPER THAT WROTE
+// ---------------------------------------------------------------------------
+// A keeper refuses a batch that would leave a hole behind a cursor claiming to
+// cover it. That refusal used to be a log line and a normal return, so the
+// indexer read it as a write: it moved `streamLastToBlock` to a block the stream
+// never received, and from then on its OWN hole-check compared against a mark
+// that had already lied, so every later decline was invisible as well. The
+// indexer's whole write-outcome apparatus -- do not process a batch that was not
+// written, freeze, retry -- was bypassed for exactly the failure it exists for.
+// ---------------------------------------------------------------------------
+
+describe('a keeper that declines the batch', () => {
+	/** A keeper that stores nothing and refuses everything, in the way a hole-check does. */
+	function decliningStream() {
+		let declines = 0;
+		const keeper: ExistingStream<Abi> = {
+			fetchFrom: async () => undefined,
+			saveNewEvents: async () => {
+				declines++;
+				return 'declined' as const;
+			},
+			clear: async () => {},
+			setStreamConfig: () => {},
+		};
+		return {
+			keeper,
+			get declines() {
+				return declines;
+			},
+		};
+	}
+
+	it('does not record the stream as covering what it refused', async () => {
+		const chain = fakeChain([makeLog(101, '0xa101')], 200);
+		const declining = decliningStream();
+		const processor = fakeProcessor();
+		const indexer = new IndexerGeneration<Abi, string[]>(chain.provider, processor.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			keepStream: declining.keeper,
+			streamWriteRetry: {delaySeconds: 0},
+		});
+		(indexer as any).logEventFetcher = chain.fetcher;
+		await indexer.load();
+		await indexer.indexMore();
+
+		expect(declining.declines).toBeGreaterThan(0);
+		// the mark that decides whether a later append can leave a hole must not have
+		// moved onto blocks the stream never received
+		expect((indexer as any).streamLastToBlock).toBeUndefined();
+	});
+
+	it('lets the FOLD go on, because a decline degrades the cache and does not stop indexing', async () => {
+		// Deliberately not the write-before-process rule, which governs a FAILED write:
+		// a decline is not a failure and retrying it cannot help, so the state keeps
+		// advancing while the stored stream stays the contiguous prefix it already is.
+		// It is replayed and the remainder re-fetched the next time the state is rebuilt.
+		const chain = fakeChain([makeLog(101, '0xa101')], 200);
+		const declining = decliningStream();
+		const processor = fakeProcessor();
+		const indexer = new IndexerGeneration<Abi, string[]>(chain.provider, processor.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			keepStream: declining.keeper,
+			streamWriteRetry: {delaySeconds: 0},
+		});
+		(indexer as any).logEventFetcher = chain.fetcher;
+		await indexer.load();
+		await indexer.indexMore();
+
+		expect(processor.state).toEqual([idOf(makeLog(101, '0xa101'))]);
+		// and the cache still claims nothing it does not hold
+		expect((indexer as any).streamLastToBlock).toBeUndefined();
 	});
 });

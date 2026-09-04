@@ -1398,10 +1398,28 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		}
 
 		const toWrite = this.streamRemainderOf(eventStream);
+		let saved: void | 'declined';
 		try {
-			await keepStream.saveNewEvents(source, {eventStream: toWrite, lastSync});
+			saved = await keepStream.saveNewEvents(source, {eventStream: toWrite, lastSync});
 		} catch (e) {
 			return this.onStreamWriteFailed(e, source);
+		}
+		if (saved === 'declined') {
+			// The KEEPER refused this batch, for the same reason `streamCanReceive` refuses
+			// one here: appending it would leave a hole behind a cursor claiming to cover
+			// it. It is not a failure and must not be retried, but treating a decline as a
+			// write was worse than either -- `streamLastToBlock` would move to a block the
+			// stream never received, so `streamCanReceive` kept answering true and every
+			// later decline was invisible as well.
+			if (!this.streamDeclineReported) {
+				this.streamDeclineReported = true;
+				namedLogger.error(
+					`the cached stream declined this batch: it does not continue what is stored, so appending it would ` +
+						`leave a hole no later check could see. Nothing is written and nothing is cleared; a contiguous ` +
+						`batch is accepted again as soon as one arrives.`,
+				);
+			}
+			return 'declined';
 		}
 		if (this.streamWriteFailures > 0 || this.streamFrozen) {
 			namedLogger.info(`the cached stream is writable again after ${this.streamWriteFailures} failed write(s)`);

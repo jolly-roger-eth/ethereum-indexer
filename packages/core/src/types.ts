@@ -314,13 +314,27 @@ export type StreamFetcher<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	fromBlock: number,
 ) => Promise<{lastSync: LastSync<ABI>; eventStream: LogEvent<ABI>[]} | undefined>;
+/**
+ * A keeper that DECLINED the batch: it was not written, and writing it would
+ * have left a hole behind a cursor claiming to cover it.
+ *
+ * A decline is not a failure and must not be retried -- the batch is wrong for
+ * this stream, not the write -- but it is emphatically not a success either, and
+ * that is the distinction this return value exists to carry. A keeper that
+ * declined by returning `undefined` was indistinguishable from one that wrote,
+ * so the indexer recorded the stream as covering blocks it never received, and
+ * every later decline was invisible too because the cursor it compares against
+ * had already moved.
+ */
+export type StreamSaveDeclined = 'declined';
+
 export type StreamSaver<ABI extends Abi> = (
 	source: IndexingSource<ABI>,
 	stream: {
 		lastSync: LastSync<ABI>;
 		eventStream: LogEvent<ABI>[];
 	},
-) => Promise<void>;
+) => Promise<void | StreamSaveDeclined>;
 export type StreamClearer<ABI extends Abi> = (source: IndexingSource<ABI>) => Promise<void>;
 
 type OptionsFlags<Type> = {

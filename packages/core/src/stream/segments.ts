@@ -291,6 +291,11 @@ export function createSegmentedStream<ABI extends Abi>(port: StreamSegmentPort<A
 			}
 
 			if (declined) {
+				// REPORTED, not just logged. The caller's next move depends on it: the indexer
+				// tracks how far the stored stream reaches, and a decline read as a write
+				// moves that mark past blocks that were never written -- after which its own
+				// hole-check compares against a cursor that has already lied, so every later
+				// decline goes unnoticed too.
 				if (!declineReported) {
 					declineReported = true;
 					namedLogger.error(
@@ -300,7 +305,7 @@ export function createSegmentedStream<ABI extends Abi>(port: StreamSegmentPort<A
 							`contiguous batch is accepted again as soon as one arrives.`,
 					);
 				}
-				return;
+				return 'declined';
 			}
 			declineReported = false;
 		},
