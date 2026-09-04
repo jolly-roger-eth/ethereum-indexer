@@ -21,10 +21,23 @@ import {freshDatabaseName} from './utils/database.js';
  * processor a server runs and the processor a tab runs are the same processor,
  * asserted rather than asserted-to.
  *
- * It lives in THIS package, not in `@etherfold/processor-entities`, to keep the
- * dependency direction one-way: a store may be depended on by a processor and
- * never the reverse (ADR-0016), and adding this store to that package's test
- * graph would make the two packages cyclic.
+ * It lives in THIS package because it is the NODE-SIDE HALF of the browser
+ * evidence: it runs `browser/workload.ts`, the same module the Playwright specs
+ * bundle into a tab, so the two comparisons quote one workload rather than two
+ * that resemble each other.
+ *
+ * It used to say it lived here "to keep the dependency direction one-way ...
+ * adding this store to that package's test graph would make the two packages
+ * cyclic". That reason was wrong twice over and is corrected rather than
+ * deleted, because it is the kind of thing that gets re-derived. ADR-0016's
+ * direction rule is about RUNTIME dependencies -- what a published store pulls
+ * in, which is what keeps it a primitive -- and `stays-a-primitive.test.ts`
+ * asserts exactly that, over `src/` and `dependencies`, saying in as many words
+ * that the test graph is out of its scope and that a devDependency is not a
+ * dependency. And the test graph IS cyclic today regardless:
+ * `@etherfold/processor-entities` devDepends on this store for its four-backend
+ * matrix, while this package devDepends on it for the workload above. That is
+ * sanctioned, not a violation.
  */
 
 describe('the same processor, on IndexedDB and on the reference store', () => {
