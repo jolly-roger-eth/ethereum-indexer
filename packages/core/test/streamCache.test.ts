@@ -567,3 +567,60 @@ describe('a keeper that declines the batch', () => {
 		expect((indexer as any).streamLastToBlock).toBeUndefined();
 	});
 });
+
+// ---------------------------------------------------------------------------
+// A CANCELLATION MUST NOT LOSE WORK THAT ALREADY LANDED
+// ---------------------------------------------------------------------------
+// `unlessCancelled(p)` rejects the CALLER; it cannot stop `p`. It also only
+// throws once `p` has RESOLVED, so when the cancellation fires the processor has
+// already applied the batch and persisted it -- state and cursor together, in
+// one transaction (ADR-0027). Throwing before the in-memory cursor moved left
+// the engine believing the batch never happened, so the next cycle re-derived it
+// and handed the SAME events over a second time.
+//
+// A processor whose store refuses a re-applied block turns that into a wedge
+// that no number of cycles clears; one that accepts it silently double-applies.
+// Reverting is not available to the engine -- `process` is the processor's own
+// transaction and the interface has no per-batch undo, only `reset`/`clear`,
+// which discard everything -- so the fix is to record the work that DID land and
+// then honour the cancellation.
+// ---------------------------------------------------------------------------
+
+describe('a cancellation landing while the processor is applying a batch', () => {
+	it('does not hand the same events over again on the next cycle', async () => {
+		const chain = fakeChain([makeLog(101, '0xa101'), makeLog(102, '0xa102')], 200);
+		const processor = fakeProcessor();
+		const indexer = new IndexerGeneration<Abi, string[]>(chain.provider, processor.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			streamWriteRetry: {delaySeconds: 0},
+		});
+		(indexer as any).logEventFetcher = chain.fetcher;
+		await indexer.load();
+
+		// cancel from INSIDE the process call, which is what every reconfigure verb
+		// does: they all call `disableProcessing()` first
+		let cancelled = false;
+		const inner = processor.processor.process.bind(processor.processor);
+		processor.processor.process = async (events: any, ls: any) => {
+			const result = await inner(events, ls);
+			if (!cancelled) {
+				cancelled = true;
+				indexer.disableProcessing();
+			}
+			return result;
+		};
+
+		await expect(indexer.indexMore()).rejects.toThrow();
+		const afterCancel = [...processor.state];
+		expect(afterCancel.length).toBeGreaterThan(0);
+
+		// the next cycle carries on from where the fold actually is
+		indexer.reenableProcessing();
+		(indexer as any).logEventFetcher = chain.fetcher;
+		await indexer.indexMore();
+
+		// not one event was delivered twice
+		expect(processor.state).toEqual([...new Set(processor.state)]);
+		expect(processor.state).toEqual(afterCancel);
+	});
+});

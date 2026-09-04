@@ -41,7 +41,7 @@ import {
 	wait,
 } from './internal/engine/utils.js';
 import {sourceHashesOf} from './internal/engine/eventRanges.js';
-import {CancelOperations, createAction} from './internal/utils/promises.js';
+import {CancellablePromiseCancelled, CancelOperations, createAction} from './internal/utils/promises.js';
 import {InvalidBatchError, isOutOfSpace} from './errors.js';
 
 const namedLogger = logs('@etherfold/core');
@@ -1343,7 +1343,19 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 						? applied[applied.length - 1].blockNumber
 						: Math.max(0, Math.min(...list.map((event) => event.blockNumber)) - 1);
 				const currentLastSync = isFinalBatch ? newLastSync : cursorSyncedThrough(newLastSync, foldedThrough);
-				const outcome = await unlessCancelled(this.processor.process(list, currentLastSync));
+				// Cancelled AFTER this batch landed is still landed: see the same window in
+				// `promiseToIndex`. Recording it here is what keeps the loop's next entry, and
+				// the next cycle, from re-delivering a batch the processor already holds.
+				let outcome: ProcessResultType;
+				try {
+					outcome = await unlessCancelled(this.processor.process(list, currentLastSync));
+				} catch (error) {
+					if (error instanceof CancellablePromiseCancelled) {
+						this.lastSync = currentLastSync;
+						this._onLastSyncUpdated();
+					}
+					throw error;
+				}
 				this.lastSync = currentLastSync;
 				this._onLastSyncUpdated();
 
@@ -1579,7 +1591,34 @@ export class IndexerGeneration<ABI extends Abi, ProcessResultType = void> {
 		// ----------------------------------------------------------------------------------------
 		// MAKE THE PROCESSOR PROCESS IT
 		// ----------------------------------------------------------------------------------------
-		const outcome = await unlessCancelled(this.processor.process(eventStream, newLastSync));
+		// A CANCELLATION HERE MUST NOT LOSE A BATCH THAT ALREADY LANDED.
+		//
+		// `unlessCancelled` rejects the CALLER; it cannot stop the work, and it only
+		// throws once the promise it wraps has RESOLVED. So when it fires here the
+		// processor has applied this batch and persisted it -- state and cursor in one
+		// transaction (ADR-0027) -- and throwing before the lines below left the engine
+		// believing it never happened. The next cycle re-derived the same range and
+		// handed the SAME events over again: a wedge on a store that refuses a
+		// re-applied block, a silent double-apply on one that does not. Every
+		// reconfigure verb calls `disableProcessing()` first, so this is the ordinary
+		// path and not an exotic one.
+		//
+		// Reverting the batch instead is not available and would be worse: `process` is
+		// the processor's OWN transaction, the interface has no per-batch undo (only
+		// `reset`/`clear`, which discard everything), and the write is already durable.
+		// So the completed work is recorded and the cancellation is then honoured, which
+		// leaves the in-memory cursor agreeing with what is on disk.
+		let outcome: ProcessResultType;
+		try {
+			outcome = await unlessCancelled(this.processor.process(eventStream, newLastSync));
+		} catch (error) {
+			if (error instanceof CancellablePromiseCancelled) {
+				this.streamWrittenNotProcessed = undefined;
+				this.lastSync = newLastSync;
+				this._onLastSyncUpdated();
+			}
+			throw error;
+		}
 		// accepted: the cursor is about to move past this batch, so the written
 		// high-water mark has done its job
 		this.streamWrittenNotProcessed = undefined;
