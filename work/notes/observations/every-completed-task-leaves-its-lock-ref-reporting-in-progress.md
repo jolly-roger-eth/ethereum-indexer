@@ -56,3 +56,20 @@ Where it will bite:
 ## Not fixed here
 
 Deliberately: clearing lock refs is a git-state mutation on the arbiter, it is repo-wide rather than belonging to any task driven today, and the right fix is probably configuring the arbiter remote / registering the repo (`dorfl remote add . --local`) so reconciliation fires on its own, rather than hand-deleting 19 refs and leaving the cause in place. Hand-deleting would also destroy the one piece of evidence a diagnosis needs.
+
+## Update 2026-09-04 — still present on dorfl 0.13.2, and the count has grown from 19 to 26
+
+The repo was updated from dorfl 0.13.1 to 0.13.2 (latest on npm at the time of writing) and this was re-checked immediately after. **It is unchanged.**
+
+```
+$ git ls-remote origin 'refs/dorfl/lock/*' | wc -l
+26
+```
+
+All 26 name a task resting in `work/tasks/done/`: not one of them is a live claim, and the count is exactly the number of tasks built since the refs started accumulating. `dorfl status` still reports every one as `implement/active = in-progress`.
+
+Two of the 26 were created TODAY, by builds that completed normally: `task-a-reconfigure-hashes-the-resolved-stream-config-everywhere` and `task-a-follower-replays-a-retraction-a-paused-writer-appended`. Both were driven with `do --isolated --allow-backlog`, both opened a PR, and the runner said in as many words that it was "keeping the per-item lock HELD (propose PR open; the work is not yet on main). It is released when the PR merges (reconciled against main)." Both PRs then squash-merged (#58, #59) and the refs are still there. So the release-on-merge step the runner promises is the part that does not happen, on the propose path, in the current version.
+
+That is a sharper statement of the cause than this note originally had, and it narrows where a fix would go: not in `do`'s claim/complete path, which behaves as described, but in whatever is supposed to reconcile a held lock against a merged PR. There is no `run` daemon on this machine to do it, and the repo is not registered (`dorfl remote add . --local`), which the note above already suspected. Whether registration alone would reconcile them is still UNTESTED.
+
+Still not fixed here, for the reasons above, and now for one more: the 26 refs are the evidence, and they are the only record of which builds this happened to.
