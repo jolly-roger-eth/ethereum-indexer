@@ -45,11 +45,11 @@ const {passed, failures} = await runStateStoreConformance(factory);
 
 ## Backends that run it
 
-- [`@etherfold/state-store`](../state-store)'s `MemoryStateStore`, under three retention claims (here, because that package cannot depend on this one).
-- [`@etherfold/state-store-sqlite`](../state-store-sqlite)'s `VersionedStateStore`, on a real libSQL database, under the same three.
-- [`@etherfold/state-store-indexeddb`](../state-store-indexeddb)'s `IndexedDBStateStore`, and [`@etherfold/state-store-patch`](../state-store-patch)'s `PatchStateStore`, each under the claims it can honestly make.
+- [`@etherfold/state-store`](https://github.com/wighawag/etherfold/tree/main/packages/state-store)'s `MemoryStateStore`, under three retention claims (here, because that package cannot depend on this one).
+- [`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite)'s `VersionedStateStore`, on a real libSQL database, under the same three.
+- [`@etherfold/state-store-indexeddb`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-indexeddb)'s `IndexedDBStateStore`, and [`@etherfold/state-store-patch`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-patch)'s `PatchStateStore`, each under the claims it can honestly make.
 
-The workload here is deliberately small and hand-written. The heavy one, [`@etherfold/conformance-workload-stratagems`](../conformance-workload-stratagems), replays 31,332 real logs from a launched game on Base through the same backends and compares against the state that game's ORIGINAL processor computed. It is a second SUBJECT for the same backends and not a replacement: a case that fails on 31,332 real events is a bug report nobody can read, so these small cases go first and that one asks the question they are too small to ask.
+The workload here is deliberately small and hand-written. The heavy one, [`@etherfold/conformance-workload-stratagems`](https://github.com/wighawag/etherfold/tree/main/packages/conformance-workload-stratagems), replays 31,332 real logs from a launched game on Base through the same backends and compares against the state that game's ORIGINAL processor computed. It is a second SUBJECT for the same backends and not a replacement: a case that fails on 31,332 real events is a bug report nobody can read, so these small cases go first and that one asks the question they are too small to ask.
 
 ## Tests
 

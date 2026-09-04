@@ -6,9 +6,9 @@ It knows `RemoteSQL` and nothing else: no Node built-ins, no Cloudflare types, n
 
 ## When you want this package
 
-You are building a HOST. Everything platform-shaped -- which database, which environment, how the app is served -- is the host's, and the shipped ones are [`@etherfold/platform-nodejs`](../../platforms/nodejs) and [the Cloudflare Worker host](../../platforms/cf-worker). Reach for this package directly to write a third.
+You are building a HOST. Everything platform-shaped -- which database, which environment, how the app is served -- is the host's, and the shipped ones are [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs) and [the Cloudflare Worker host](https://github.com/wighawag/etherfold/tree/main/platforms/cf-worker). Reach for this package directly to write a third.
 
-To simply RUN a read tier on Node, use [`etherfold serve`](../cli). To fold into a database in one shot, use `etherfold build`.
+To simply RUN a read tier on Node, use [`etherfold serve`](https://github.com/wighawag/etherfold/tree/main/packages/cli). To fold into a database in one shot, use `etherfold build`.
 
 ## What a host supplies
 
@@ -71,7 +71,7 @@ The Hono RPC client type is computed at compile time from the app, so a route ch
 
 ## Related
 
-[`@etherfold/core`](../core) for the `StreamBuilder` on the other side of `getIngestion` and the wire types, [`@etherfold/fetcher-host`](../fetcher-host) for the sender, and [`@etherfold/state-store-sqlite`](../state-store-sqlite) for what a host that DOES host a processor folds into.
+[`@etherfold/core`](https://github.com/wighawag/etherfold/tree/main/packages/core) for the `StreamBuilder` on the other side of `getIngestion` and the wire types, [`@etherfold/fetcher-host`](https://github.com/wighawag/etherfold/tree/main/packages/fetcher-host) for the sender, and [`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite) for what a host that DOES host a processor folds into.
 
 ## Tests
 

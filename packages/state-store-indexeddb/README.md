@@ -18,7 +18,7 @@ await store.revertTo(18_000_120); // a reorg: two index range scans
 await store.prune(); // drop what the declared retention no longer covers
 ```
 
-Most browser applications reach it through [`@etherfold/browser`](../browser), where it is the DEFAULT and where choosing something else is a line of configuration:
+Most browser applications reach it through [`@etherfold/browser`](https://github.com/wighawag/etherfold/tree/main/packages/browser), where it is the DEFAULT and where choosing something else is a line of configuration:
 
 ```ts
 const store = await createBrowserStateStore(processor.entities); // this backend
@@ -83,6 +83,6 @@ pnpm --filter @etherfold/state-store-indexeddb test          # node, under fake-
 pnpm --filter @etherfold/state-store-indexeddb test:browser  # Chromium, Firefox and WebKit
 ```
 
-`test/conformance.test.ts` runs [`@etherfold/state-store-conformance`](../state-store-conformance) under all three retention claims. The rest of `test/` is what only this backend can be asked: the access paths above, what a prune cannot reach, the cold start, and two connections to one database.
+`test/conformance.test.ts` runs [`@etherfold/state-store-conformance`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-conformance) under all three retention claims. The rest of `test/` is what only this backend can be asked: the access paths above, what a prune cannot reach, the cold start, and two connections to one database.
 
 The browser run is the same shared suite in a real engine, plus the four-tab case, plus persistence across a real reload, plus the same processor producing the same rows in a tab as in node. It is not in the acceptance gate (it needs three browser binaries); its output is kept in `docs/spikes/indexeddb-row-backend-browser-default/results/`.

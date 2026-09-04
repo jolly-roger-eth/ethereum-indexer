@@ -2,9 +2,9 @@
 
 > **The design this measured was SUPERSEDED.** It compared two layouts for a two-label stream. The chosen design (`work/specs/proposed/a-reconfigure-is-not-an-outage.md`) gives each generation its own stream keyed by its fetch filter, so there is no label and promotion is a pointer flip. The harness and the numbers are still valid and re-runnable; what they decide is no longer a live question. Kept as evidence, and because the measurement is part of why that design was abandoned.
 
-Evidence for [`work/notes/findings/promotion-cost-of-a-two-label-stream.md`](../../../work/notes/findings/promotion-cost-of-a-two-label-stream.md), which is where the conclusions live. This folder holds the harness and the raw output, so every number in that finding can be re-run rather than believed.
+Evidence for [`work/notes/findings/promotion-cost-of-a-two-label-stream.md`](https://github.com/wighawag/etherfold/blob/main/work/notes/findings/promotion-cost-of-a-two-label-stream.md), which is where the conclusions live. This folder holds the harness and the raw output, so every number in that finding can be re-run rather than believed.
 
-Design record whose open question this answers: [`work/notes/ideas/stream-grafting-what-we-established.md`](../../../work/notes/ideas/stream-grafting-what-we-established.md). Spec the answer feeds: `work/specs/proposed/a-reconfigure-is-not-an-outage.md`.
+Design record whose open question this answers: [`work/notes/ideas/stream-grafting-what-we-established.md`](https://github.com/wighawag/etherfold/blob/main/work/notes/ideas/stream-grafting-what-we-established.md). Spec the answer feeds: `work/specs/proposed/a-reconfigure-is-not-an-outage.md`.
 
 ## The question (as it stood)
 
@@ -42,7 +42,7 @@ Both keepers run the SAME `layouts.ts`, so the two arms differ only in the port 
 
 ### The workload
 
-The base stream is the captured launched game (`stratagems-alpha1`, 31,332 real logs, 23.2 MB of JSON), the same fixture [`docs/spikes/sqlite-in-the-browser`](../sqlite-in-the-browser) uses, so the shape of an event is real. `4x`/`8x` are that stream repeated with its block numbers advanced.
+The base stream is the captured launched game (`stratagems-alpha1`, 31,332 real logs, 23.2 MB of JSON), the same fixture [`docs/spikes/sqlite-in-the-browser`](https://github.com/wighawag/etherfold/tree/main/docs/spikes/sqlite-in-the-browser) uses, so the shape of an event is real. `4x`/`8x` are that stream repeated with its block numbers advanced.
 
 The seal threshold is **swept**, because it is the axis that separates the two layouts: a rename costs per SEGMENT and a rewrite costs per BYTE, so at a fixed history a coarser seal should make key-label cheaper and leave value-label where it was. If the numbers had not shown that, the model would have been wrong.
 

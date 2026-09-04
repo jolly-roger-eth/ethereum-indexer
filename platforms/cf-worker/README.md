@@ -1,14 +1,14 @@
 # @etherfold/platform-cf-worker
 
-The Cloudflare Worker host for [`@etherfold/server`](../../packages/server): it supplies a D1-backed `RemoteSQL` and the Worker env, and it is where D1's per-request limits are named.
+The Cloudflare Worker host for [`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server): it supplies a D1-backed `RemoteSQL` and the Worker env, and it is where D1's per-request limits are named.
 
 **A deployable, not a library.** It is `private` and never published: what you take from it is the wiring, by reading it or by copying it into your own Worker.
 
 ## When you want this
 
-A Worker is a good home for the RECEIVING half of a split deployment: `/ingest` is short, per-request work. It is a poor home for the chain-facing half, because a cron fires on a schedule rather than continuously and an invocation is capped well below a first sync. So the fetcher runs somewhere that can hold a process ([`@etherfold/platform-nodejs-fetcher`](../nodejs-fetcher)) and pushes here.
+A Worker is a good home for the RECEIVING half of a split deployment: `/ingest` is short, per-request work. It is a poor home for the chain-facing half, because a cron fires on a schedule rather than continuously and an invocation is capped well below a first sync. So the fetcher runs somewhere that can hold a process ([`@etherfold/platform-nodejs-fetcher`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs-fetcher)) and pushes here.
 
-To run a server on Node instead, use [`@etherfold/platform-nodejs`](../nodejs) or [`etherfold serve`](../../packages/cli).
+To run a server on Node instead, use [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs) or [`etherfold serve`](https://github.com/wighawag/etherfold/tree/main/packages/cli).
 
 ## The wiring
 
@@ -29,7 +29,7 @@ Two things this host deliberately does NOT do:
 
 ## D1's limits live here, and nowhere else
 
-[`@etherfold/state-store-sqlite`](../../packages/state-store-sqlite) targets the `remote-sql` interface, so a hosted backend is one backend among several and never the target; a test there asserts that no source file names D1. A HOST is the one place allowed to name its own backend, which is why the documented caps are in `src/d1.ts` and why they reach the store as CONFIGURATION (`BatchBounds`) rather than as constants inside it.
+[`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite) targets the `remote-sql` interface, so a hosted backend is one backend among several and never the target; a test there asserts that no source file names D1. A HOST is the one place allowed to name its own backend, which is why the documented caps are in `src/d1.ts` and why they reach the store as CONFIGURATION (`BatchBounds`) rather than as constants inside it.
 
 Which plan a deployment runs on is STATED, in `wrangler.toml`:
 

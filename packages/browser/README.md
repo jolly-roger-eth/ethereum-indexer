@@ -2,16 +2,16 @@
 
 Index a chain **in the tab**, with no server and no database to provision, and publish the result as observable stores a UI can subscribe to.
 
-It is [`@etherfold/core`](../core) plus the three things a browser application needs on top of the engine: a place for the state to live that survives a reload, a loop that keeps indexing, and stores that tell a component when to re-read.
+It is [`@etherfold/core`](https://github.com/wighawag/etherfold/tree/main/packages/core) plus the three things a browser application needs on top of the engine: a place for the state to live that survives a reload, a loop that keeps indexing, and stores that tell a component when to re-read.
 
 ## When you want this package
 
 | you are | use |
 | --- | --- |
 | indexing inside a tab, client-side, over EIP-1193 | here |
-| indexing on a server, into libSQL, from a terminal | [`etherfold`](../cli) |
-| writing the processor itself | [`@etherfold/processor-entities`](../processor-entities) |
-| driving the engine yourself, in a runtime with no adapter | [`@etherfold/core`](../core) |
+| indexing on a server, into libSQL, from a terminal | [`etherfold`](https://github.com/wighawag/etherfold/tree/main/packages/cli) |
+| writing the processor itself | [`@etherfold/processor-entities`](https://github.com/wighawag/etherfold/tree/main/packages/processor-entities) |
+| driving the engine yourself, in a runtime with no adapter | [`@etherfold/core`](https://github.com/wighawag/etherfold/tree/main/packages/core) |
 
 ## Minimal usage
 
@@ -61,9 +61,9 @@ const store = await createBrowserStateStore(entities, {
 });
 ```
 
-**Whether a RELOAD keeps the state is a property of the backend, and it is knowable in advance.** The sync cursor lives behind the storage seam and is written in the same transaction as the block it describes (ADR-0027), so a tab closed mid-index reopens consistent on [`@etherfold/state-store-indexeddb`](../state-store-indexeddb). [`@etherfold/state-store-patch`](../state-store-patch) is memory-only by design and reports `durability: 'memory-only'` in its capabilities, so an app that cares can read that at startup rather than discover it from an empty tab.
+**Whether a RELOAD keeps the state is a property of the backend, and it is knowable in advance.** The sync cursor lives behind the storage seam and is written in the same transaction as the block it describes (ADR-0027), so a tab closed mid-index reopens consistent on [`@etherfold/state-store-indexeddb`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-indexeddb). [`@etherfold/state-store-patch`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-patch) is memory-only by design and reports `durability: 'memory-only'` in its capabilities, so an app that cares can read that at startup rather than discover it from an empty tab.
 
-`openAndBootstrap` in [`@etherfold/processor-entities`](../processor-entities) starts a tab from state somebody else already computed, instead of replaying the chain from the start block. Open the store through it (or through `openSnapshotAware`) on EVERY boot, not just the one that installs a snapshot: a bootstrapped store has no history below the snapshot's block and must keep saying so.
+`openAndBootstrap` in [`@etherfold/processor-entities`](https://github.com/wighawag/etherfold/tree/main/packages/processor-entities) starts a tab from state somebody else already computed, instead of replaying the chain from the start block. Open the store through it (or through `openSnapshotAware`) on EVERY boot, not just the one that installs a snapshot: a bootstrapped store has no history below the snapshot's block and must keep saying so.
 
 ## Reconfiguring without an outage
 

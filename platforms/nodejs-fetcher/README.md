@@ -6,14 +6,14 @@ It is one half of a split deployment (ADR-0003). The other half is the **indexer
 
 This is the host that *drives* the chain, and it wants a runtime that can hold a process. A serverless runtime is a good home for the indexer-server, whose work is short and per-request, and a poor one for this: a cron fires on a schedule rather than continuously, and an invocation is capped well below what a first sync takes. So the usual split is a Node fetcher pointed at an indexer-server anywhere, including one on Workers.
 
-**This package is a LIBRARY, and it ships no binary.** There is exactly one way to run a fetcher and it is [`etherfold fetch`](../../packages/cli), which puts a flag surface in front of the configuration below and drives this:
+**This package is a LIBRARY, and it ships no binary.** There is exactly one way to run a fetcher and it is [`etherfold fetch`](https://github.com/wighawag/etherfold/tree/main/packages/cli), which puts a flag surface in front of the configuration below and drives this:
 
 ```sh
 npm i -g etherfold
 etherfold fetch -n https://rpc.example -d ./deployments --ingest-endpoint https://indexer.example
 ```
 
-(The standalone `etherfold-fetch` binary this package used to ship is RETIRED, along with its `bin` entry. It was a second front door onto the same loop, configured only from the environment. The CLI is the process now, which is the shape [`@etherfold/platform-nodejs`](../nodejs) already had: a library with no binary, called by the command.)
+(The standalone `etherfold-fetch` binary this package used to ship is RETIRED, along with its `bin` entry. It was a second front door onto the same loop, configured only from the environment. The CLI is the process now, which is the shape [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs) already had: a library with no binary, called by the command.)
 
 Embedded in your own program:
 

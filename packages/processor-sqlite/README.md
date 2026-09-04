@@ -1,8 +1,8 @@
 # @etherfold/processor-sqlite
 
-An `EventProcessor` whose derived state is versioned rows in [`@etherfold/state-store-sqlite`](../state-store-sqlite) rather than an object in memory. Indexing a chain normally leaves the state readable **as of any earlier block**, on the hash, height or time axis, without the processor author doing anything beyond declaring entities and writing handlers.
+An `EventProcessor` whose derived state is versioned rows in [`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite) rather than an object in memory. Indexing a chain normally leaves the state readable **as of any earlier block**, on the hash, height or time axis, without the processor author doing anything beyond declaring entities and writing handlers.
 
-The processor object below is **not** a SQLite thing. The authoring API (`EntityProcessor`, the `on<EventName>` handler map, `MutationContext`) is defined in [`@etherfold/processor-entities`](../processor-entities) and re-exported here, so the same object runs unchanged against any other `StateStore` backend; `SQLProcessor` remains as a deprecated alias. See ADR-0018.
+The processor object below is **not** a SQLite thing. The authoring API (`EntityProcessor`, the `on<EventName>` handler map, `MutationContext`) is defined in [`@etherfold/processor-entities`](https://github.com/wighawag/etherfold/tree/main/packages/processor-entities) and re-exported here, so the same object runs unchanged against any other `StateStore` backend; `SQLProcessor` remains as a deprecated alias. See ADR-0018.
 
 So is the indexing. `VersionedStateEventProcessor` is a thin SQLite flavour of `EntityEventProcessor`: it builds the store from your `RemoteSQL` handle and hands back the SQL read tier, and everything else -- revert-then-apply, the block grouping, the version hash, the sync cursor -- lives once, in `@etherfold/processor-entities`, written against the seam. If you already have a `StateStore`, use `EntityEventProcessor` directly and skip this package.
 

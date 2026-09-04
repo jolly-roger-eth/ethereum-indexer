@@ -61,7 +61,7 @@ Two things pruning here does NOT touch:
 
 ## One implementation of the seam
 
-This is a `StateStore` ([`@etherfold/state-store`](../state-store)): `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` / `revertTo` / `prune` / `readCursor` / `writeCursor` / `clearCursor`, plus the capabilities it declares. A processor written against `@etherfold/processor-entities` hands this store exactly what it would hand any other backend, and `packages/processor-entities/test/patch-backend.test.ts` asserts that one processor produces identical state here and on `@etherfold/state-store-sqlite`.
+This is a `StateStore` ([`@etherfold/state-store`](https://github.com/wighawag/etherfold/tree/main/packages/state-store)): `migrate` / `applyBlock` / `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` / `revertTo` / `prune` / `readCursor` / `writeCursor` / `clearCursor`, plus the capabilities it declares. A processor written against `@etherfold/processor-entities` hands this store exactly what it would hand any other backend, and `packages/processor-entities/test/patch-backend.test.ts` asserts that one processor produces identical state here and on `@etherfold/state-store-sqlite`.
 
 The bounded id-prefix listing is a **sorted walk** over the entity's own bucket here, rather than an indexed range scan — the answer is what the seam specifies (ascending in the declared id's order, bounded by the required limit, `truncated` reported as a fact), and the access path is this backend's own business.
 
@@ -74,4 +74,4 @@ What it is **not**:
 
 `pnpm --filter @etherfold/state-store-patch test`, vitest.
 
-`test/conformance.test.ts` runs the shared suite, [`@etherfold/state-store-conformance`](../state-store-conformance), which reads this store's claim and tests it against exactly that. What stays in this package's own tests is what only this backend can be asked: the SPARSE stream at the measured 429-block median (where a dense conformance ladder would make this store look like a time machine), the pruned patch log, the refusals, and the guarantee that the as-of methods touch no state at all.
+`test/conformance.test.ts` runs the shared suite, [`@etherfold/state-store-conformance`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-conformance), which reads this store's claim and tests it against exactly that. What stays in this package's own tests is what only this backend can be asked: the SPARSE stream at the measured 429-block median (where a dense conformance ladder would make this store look like a time machine), the pruned patch log, the refusals, and the guarantee that the as-of methods touch no state at all.

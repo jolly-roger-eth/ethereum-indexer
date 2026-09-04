@@ -2,7 +2,7 @@
 
 The **heavy conformance workload**: a real launched processor, its real captured event stream, and the state that game's ORIGINAL processor computed from it, replayed through every state-store backend.
 
-A conformance WORKLOAD is a subject fed to the conformance suite's question, not a second suite (ADR-0020). [`@etherfold/state-store-conformance`](../state-store-conformance) asks a backend small, hand-written questions whose failures are readable. This asks the one question a hand-written case cannot: whether **31,332 real logs out of a game that has been running on Base** still land on the state that game's own processor computed from the same bytes.
+A conformance WORKLOAD is a subject fed to the conformance suite's question, not a second suite (ADR-0020). [`@etherfold/state-store-conformance`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-conformance) asks a backend small, hand-written questions whose failures are readable. This asks the one question a hand-written case cannot: whether **31,332 real logs out of a game that has been running on Base** still land on the state that game's own processor computed from the same bytes.
 
 ```sh
 pnpm --filter @etherfold/conformance-workload-stratagems test          # the fast smoke case

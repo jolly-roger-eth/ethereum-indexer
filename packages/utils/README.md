@@ -6,7 +6,7 @@ This is host code, not engine code. It reads the filesystem (`node:fs`, `node:mo
 
 ## When you want this package
 
-You are writing a HOST that takes a processor path from an operator: `-p ./dist/processor.js`, an environment variable, a job definition. [`etherfold`](../cli) is built on it. If your processor is `import`ed by name in your own source, you do not need any of this: hand the object to [`@etherfold/processor-entities`](../processor-entities) directly.
+You are writing a HOST that takes a processor path from an operator: `-p ./dist/processor.js`, an environment variable, a job definition. [`etherfold`](https://github.com/wighawag/etherfold/tree/main/packages/cli) is built on it. If your processor is `import`ed by name in your own source, you do not need any of this: hand the object to [`@etherfold/processor-entities`](https://github.com/wighawag/etherfold/tree/main/packages/processor-entities) directly.
 
 ## Loading a processor
 
@@ -42,7 +42,7 @@ It takes a folder or a single file in hardhat-deploy / rocketh format: every `*.
 
 ## Related
 
-[`@etherfold/core`](../core) for the `IndexingSource` these functions produce, [`@etherfold/processor-entities`](../processor-entities) for what a processor module should export, and [`etherfold`](../cli) for a host that wires all of it together.
+[`@etherfold/core`](https://github.com/wighawag/etherfold/tree/main/packages/core) for the `IndexingSource` these functions produce, [`@etherfold/processor-entities`](https://github.com/wighawag/etherfold/tree/main/packages/processor-entities) for what a processor module should export, and [`etherfold`](https://github.com/wighawag/etherfold/tree/main/packages/cli) for a host that wires all of it together.
 
 ## Tests
 

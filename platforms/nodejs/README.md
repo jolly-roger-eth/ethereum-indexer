@@ -1,6 +1,6 @@
 # @etherfold/platform-nodejs
 
-The Node host for [`@etherfold/server`](../../packages/server): it supplies a libSQL-backed `RemoteSQL` and the process environment, and serves the app over HTTP.
+The Node host for [`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server): it supplies a libSQL-backed `RemoteSQL` and the process environment, and serves the app over HTTP.
 
 That is the whole adapter. No route, no chain logic and no storage decision lives here: those are the server's and the engine's.
 
@@ -8,10 +8,10 @@ That is the whole adapter. No route, no chain logic and no storage decision live
 
 | you want | use |
 | --- | --- |
-| a read tier on Node, from a terminal | [`etherfold serve`](../../packages/cli), which calls this |
+| a read tier on Node, from a terminal | [`etherfold serve`](https://github.com/wighawag/etherfold/tree/main/packages/cli), which calls this |
 | a server on Node, inside your own program | here |
-| a server on Cloudflare Workers | [`platforms/cf-worker`](../cf-worker) |
-| a host for a runtime neither of those covers | [`@etherfold/server`](../../packages/server) directly |
+| a server on Cloudflare Workers | [`platforms/cf-worker`](https://github.com/wighawag/etherfold/tree/main/platforms/cf-worker) |
+| a host for a runtime neither of those covers | [`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server) directly |
 
 ## Minimal usage
 
@@ -53,11 +53,11 @@ The server then reads what the store just wrote, because it is the same connecti
 
 **`autoSetup` defaults ON here and is deliberately absent on the Worker host.** Node is the single-operator case: one process, owning one database file, where making a user POST to an admin route before the server is usable is ceremony with no safety payoff. On Workers there are many instances against one D1, so migration stays an operator action rather than something several isolates race to do.
 
-**The two capabilities are carried through untouched, and this host builds neither.** `getIngestion` (the stream-builder that receives pushed batches) and `getCursorReport` (how far the pipeline has got, reported verbatim on `/status`) can only be built by the process that owns a processor and a store, so they arrive here in the server's own shape and are handed on unchanged. Supply both and the deployment RECEIVES pushes and folds them, which is what `etherfold index` is; supply neither and it SERVES a database rather than folding into one, which is what `etherfold serve` is. What a reporter owes the server -- a small, JSON-serialisable summary, never the store's raw serialized cursor -- is stated on `ServerOptions.getCursorReport` in [`@etherfold/server`](../../packages/server).
+**The two capabilities are carried through untouched, and this host builds neither.** `getIngestion` (the stream-builder that receives pushed batches) and `getCursorReport` (how far the pipeline has got, reported verbatim on `/status`) can only be built by the process that owns a processor and a store, so they arrive here in the server's own shape and are handed on unchanged. Supply both and the deployment RECEIVES pushes and folds them, which is what `etherfold index` is; supply neither and it SERVES a database rather than folding into one, which is what `etherfold serve` is. What a reporter owes the server -- a small, JSON-serialisable summary, never the store's raw serialized cursor -- is stated on `ServerOptions.getCursorReport` in [`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server).
 
 ## Related
 
-[`@etherfold/server`](../../packages/server) for the routes and the wire contract, [`@etherfold/platform-nodejs-fetcher`](../nodejs-fetcher) for the OTHER Node deployable (the chain-facing half that pushes to a server like this one).
+[`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server) for the routes and the wire contract, [`@etherfold/platform-nodejs-fetcher`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs-fetcher) for the OTHER Node deployable (the chain-facing half that pushes to a server like this one).
 
 ## Tests
 

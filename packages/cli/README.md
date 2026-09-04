@@ -18,9 +18,9 @@ Every run names its intent: there is no default command, so a bare `etherfold` p
 | to run the chain-facing half near your node, pushing to an indexer elsewhere | here, `fetch` |
 | to receive those pushes and own the database, on another host | here, `index` |
 | to answer over a database something else writes | here, `serve` |
-| to index inside a browser tab, with no server | [`@etherfold/browser`](../browser) |
-| to write the processor being run | [`@etherfold/processor-entities`](../processor-entities) |
-| to embed the same pipeline in your own Node program | [`@etherfold/core`](../core) + [`@etherfold/fetcher-host`](../fetcher-host) |
+| to index inside a browser tab, with no server | [`@etherfold/browser`](https://github.com/wighawag/etherfold/tree/main/packages/browser) |
+| to write the processor being run | [`@etherfold/processor-entities`](https://github.com/wighawag/etherfold/tree/main/packages/processor-entities) |
+| to embed the same pipeline in your own Node program | [`@etherfold/core`](https://github.com/wighawag/etherfold/tree/main/packages/core) + [`@etherfold/fetcher-host`](https://github.com/wighawag/etherfold/tree/main/packages/fetcher-host) |
 
 ## `etherfold run` -- the whole pipeline, in one process
 
@@ -95,7 +95,7 @@ etherfold fetch \
 
 **It follows the chain and pushes contiguous ranges of raw logs at an indexer-server elsewhere**, which is what makes splitting a deployment a deployment decision rather than a rewrite: run this on a host near your node and the folding half anywhere. It folds nothing, answers no queries, and keeps running until it is stopped.
 
-It is a front door onto [`@etherfold/platform-nodejs-fetcher`](../../platforms/nodejs-fetcher) and not a second implementation, and it is now the ONLY one: that package used to ship an `etherfold-fetch` binary configured from the environment alone, and that binary is retired with its `bin` entry. What survives there is the library the command drives.
+It is a front door onto [`@etherfold/platform-nodejs-fetcher`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs-fetcher) and not a second implementation, and it is now the ONLY one: that package used to ship an `etherfold-fetch` binary configured from the environment alone, and that binary is retired with its `bin` entry. What survives there is the library the command drives.
 
 | flag | |
 | --- | --- |
@@ -156,7 +156,7 @@ etherfold serve --db file:./etherfold.db --port 2000
 
 **It answers `/status` WITHOUT a cursor, and that is correct rather than missing.** The cursor reaches `/status` only through a reporter the host injects, and only a process that OWNS the store can read one; a read tier owns none and is given none, so its `/status` carries no `cursor` field at all rather than an invented one. What it does report is what the server derives from the DATABASE itself -- health, the schema version, the reorg counters -- so those agree with what the writer of that database reports.
 
-It starts [`@etherfold/server`](../server) on Node through [`@etherfold/platform-nodejs`](../../platforms/nodejs): `GET /status` (health, schema version, reorg counters, last error) and `POST /admin/setup`. Because it hosts no ingestion, the write path is a CAPABILITY it does not have rather than a route it lacks: an authenticated call to `/ingest` answers `501 ingestion-not-configured` (an unauthenticated one answers `401`, so the absence of a processor is not something an anonymous caller can probe). `platforms/nodejs/test/serve.test.ts` asserts both.
+It starts [`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server) on Node through [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs): `GET /status` (health, schema version, reorg counters, last error) and `POST /admin/setup`. Because it hosts no ingestion, the write path is a CAPABILITY it does not have rather than a route it lacks: an authenticated call to `/ingest` answers `501 ingestion-not-configured` (an unauthenticated one answers `401`, so the absence of a processor is not something an anonymous caller can probe). `platforms/nodejs/test/serve.test.ts` asserts both.
 
 The one thing it does write is the fixed-table SCHEMA, applied at startup if it is not already there, because the Node host is the single-operator case; `--no-auto-setup` turns that off and leaves migration to the operator.
 

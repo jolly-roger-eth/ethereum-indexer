@@ -30,7 +30,7 @@ const host = createFetcherHost(resolveFetcherHostConfig(process.env));
 await runFetcherLoop(host);
 ```
 
-**`resolveFetcherHostConfig(env, overrides)`** turns a plain record of strings into a deployment's configuration. Both adapters call it, which is what makes their configuration identical rather than merely similar: the same names, the same defaults, the same refusals. The full variable list is in the [Node adapter's README](../../platforms/nodejs-fetcher/README.md).
+**`resolveFetcherHostConfig(env, overrides)`** turns a plain record of strings into a deployment's configuration. Both adapters call it, which is what makes their configuration identical rather than merely similar: the same names, the same defaults, the same refusals. The full variable list is in the [Node adapter's README](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs-fetcher).
 
 **`host.runCycle()`** runs one cycle and classifies it. It does not throw and it does not wait:
 

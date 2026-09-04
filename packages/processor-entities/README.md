@@ -1,6 +1,6 @@
 # @etherfold/processor-entities
 
-Write a processor **once**, run it wherever its state has to live. Declare entities, write `on<EventName>` handlers against a `MutationContext`, and hand the result to any [`@etherfold/state-store`](../state-store) backend.
+Write a processor **once**, run it wherever its state has to live. Declare entities, write `on<EventName>` handlers against a `MutationContext`, and hand the result to any [`@etherfold/state-store`](https://github.com/wighawag/etherfold/tree/main/packages/state-store) backend.
 
 ```ts
 import {applyEventStream, type EntityProcessor} from '@etherfold/processor-entities';
@@ -40,7 +40,7 @@ It owns the whole lifecycle the core expects (`load` / `process` / `reset` / `cl
 
 **The sync cursor lives in the store**, as an opaque string written in the same transaction as the block it describes (ADR-0027). That is what makes a restart safe on every backend rather than only on the one with a SQL table to write into; `serializeLastSync` / `deserializeLastSync` are here, and the store never learns what the string means.
 
-**The handle `process` returns is the seam tier.** `EntityStateView` has `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` and the capability report, and deliberately no `queryCurrent` / `queryAsOf`: those take caller-supplied SQL, so asking a backend-neutral handle for them is a compile error rather than a runtime throw in a tab. Choose [`@etherfold/processor-sqlite`](../processor-sqlite) for that tier.
+**The handle `process` returns is the seam tier.** `EntityStateView` has `getCurrent` / `getAsOf` / `listCurrent` / `listAsOf` and the capability report, and deliberately no `queryCurrent` / `queryAsOf`: those take caller-supplied SQL, so asking a backend-neutral handle for them is a compile error rather than a runtime throw in a tab. Choose [`@etherfold/processor-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/processor-sqlite) for that tier.
 
 ## What you get, and what it costs
 
@@ -71,7 +71,7 @@ const surface = createReadSurface(store, entities);
 await surface.token.getCurrent({id: '1'}); // {id: string; owner: string | null; transferCount: number | null}
 ```
 
-The same four reads the seam has (`getCurrent` / `getAsOf` / `listCurrent` / `listAsOf`), typed off the declaration, so renaming a field breaks the consumer at COMPILE time; `declareEntities` is an identity function that exists only to keep the literal types an annotation would widen away. `test/read-surface.test.ts` runs one reader, unchanged, against all three backends. See [`@etherfold/state-store`](../state-store) for the details, and `createQuerySurface` in [`@etherfold/state-store-sqlite`](../state-store-sqlite) for the server-side tier that also takes predicates.
+The same four reads the seam has (`getCurrent` / `getAsOf` / `listCurrent` / `listAsOf`), typed off the declaration, so renaming a field breaks the consumer at COMPILE time; `declareEntities` is an identity function that exists only to keep the literal types an annotation would widen away. `test/read-surface.test.ts` runs one reader, unchanged, against all three backends. See [`@etherfold/state-store`](https://github.com/wighawag/etherfold/tree/main/packages/state-store) for the details, and `createQuerySurface` in [`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite) for the server-side tier that also takes predicates.
 
 ## Starting from a published snapshot
 
@@ -100,9 +100,9 @@ What has no free-form counterpart is the honesty, because a blob has no history 
 | `applyEventStream`, `runBlockHandlers`, `forkPoint`, `groupByBlock` | here: revert-then-apply, once, for every backend |
 | `EntityEventProcessor`, `EntityStateView`, the `LastSync` codec | here: the `EventProcessor` shell, once, for every backend |
 | `bootstrapFromSnapshot`, `openAndBootstrap`, `createSnapshot` | here: choosing between mirrors needs the cursor's codec |
-| `StateSnapshot`, `openSnapshotAware`, the history floor | [`@etherfold/state-store`](../state-store): a floor is a fact about a store |
-| `MutationContext`, `EntityDeclaration`, `StateStore`, capabilities, the cursor port | [`@etherfold/state-store`](../state-store): what a store must understand |
-| a `RemoteSQL`-flavoured wrapper and the SQL read tier | [`@etherfold/processor-sqlite`](../processor-sqlite) |
+| `StateSnapshot`, `openSnapshotAware`, the history floor | [`@etherfold/state-store`](https://github.com/wighawag/etherfold/tree/main/packages/state-store): a floor is a fact about a store |
+| `MutationContext`, `EntityDeclaration`, `StateStore`, capabilities, the cursor port | [`@etherfold/state-store`](https://github.com/wighawag/etherfold/tree/main/packages/state-store): what a store must understand |
+| a `RemoteSQL`-flavoured wrapper and the SQL read tier | [`@etherfold/processor-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/processor-sqlite) |
 
 ADR-0018 records why this is a separate package from `@etherfold/state-store` rather than one: a storage backend must be able to depend on the seam without inheriting `@etherfold/core`.
 

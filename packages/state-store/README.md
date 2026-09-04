@@ -79,11 +79,11 @@ A processor could have been written against raw SQL, forcing wasm SQLite into ev
 ## Implementations
 
 - `MemoryStateStore`, here: versioned rows in a Map. The reference implementation, so the contract has an executable definition, and the second backend a portability test needs. It matches the SQL store down to the sharp edges (a re-applied block raises, an unlisted field goes to `NULL`) because a lenient reference implementation would let caller bugs through.
-- [`@etherfold/state-store-sqlite`](../state-store-sqlite): versioned rows over `remote-sql`.
-- [`@etherfold/state-store-indexeddb`](../state-store-indexeddb): versioned rows in IndexedDB, and the browser default (ADR-0024).
+- [`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite): versioned rows over `remote-sql`.
+- [`@etherfold/state-store-indexeddb`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-indexeddb): versioned rows in IndexedDB, and the browser default (ADR-0024).
 
 ## Tests
 
 `pnpm --filter @etherfold/state-store test`, vitest.
 
-What the CONTRACT is, rather than what this package's reference store happens to do, is asserted by [`@etherfold/state-store-conformance`](../state-store-conformance): one suite, parameterised by a backend factory, asserting external behaviour only. `MemoryStateStore` is run through it under three retention claims, and that run lives in THAT package because it depends on this one and cannot be depended on back. A new backend earns its place behind this seam by passing the same suite.
+What the CONTRACT is, rather than what this package's reference store happens to do, is asserted by [`@etherfold/state-store-conformance`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-conformance): one suite, parameterised by a backend factory, asserting external behaviour only. `MemoryStateStore` is run through it under three retention claims, and that run lives in THAT package because it depends on this one and cannot be depended on back. A new backend earns its place behind this seam by passing the same suite.
