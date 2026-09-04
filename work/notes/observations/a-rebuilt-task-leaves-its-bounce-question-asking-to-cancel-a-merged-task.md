@@ -30,3 +30,32 @@ Two shapes a fix could take, neither decided here: have `complete` (or the merge
 Related but distinct: `every-completed-task-leaves-its-lock-ref-reporting-in-progress` (lock refs outliving a done task, dorfl 0.13.1) and `a-crashed-spec-tasking-run-leaves-a-lock-no-verb-can-release` (a lock with no release verb). This one is not about locks — the lock here was released correctly by the surface commit, and `dorfl requeue` rightly answered *"has no held per-item lock on origin"*. It is the QUESTION artifact that outlives the item.
 
 Not fixed here: it is dorfl's own lifecycle surface, not this repo's, and it was hit while driving an unrelated task.
+
+## Update — it was not one instance, it was ALL FOUR
+
+Before clearing anything I checked the rest of the directory against `work/tasks/done/`. **Every sidecar in `work/questions/` named a task that had already landed** — four for four:
+
+| sidecar | bounce reason | task |
+| --- | --- | --- |
+| `task-a-follower-replays-a-retraction-a-paused-writer-appended` | empty diff (environmental, mid-investigation) | `done/` (PR #59) |
+| `task-the-old-indexer-shape-is-deleted` | agent STOP on a false-premise acceptance criterion | `done/` |
+| `task-the-one-shot-is-build-and-serve-is-only-the-read-tier` | `api_error`, then a conflicted rebase | `done/` |
+| `task-the-stream-appends-in-segments-on-indexeddb` | `prepare (env-prep) failed (exit 127)` | `done/` |
+
+So this is not "a rebuilt task strands its sidecar" — it is that **nothing ever drains a sidecar**, and the bucket has been silently accumulating since sidecars were introduced. The scale changes the reading: `work/questions/` is supposed to be the set of things awaiting a human, and it was a set of four things awaiting nobody, all defaulting to destructive dispositions against merged work.
+
+The sharpest evidence is `task-the-stream-appends-in-segments-on-indexeddb`, which was **answered by a human in writing** and still sat there. Its answer reads, in part:
+
+> OBSOLETE — already resolved; nothing to proceed with. The bounce was ENVIRONMENTAL … Recovery is complete … **Close this sidecar.**
+
+The instruction to close it was written INTO the file and nothing acted on it. That rules out the gentler explanation that the drain only misses the rebuild path: the documented `resolve` rung ("clear `needsAnswers` + delete the sidecar") did not run even on a sidecar that was explicitly answered. Whatever drains these is either not wired to the human-answer path at all, or only runs inside a leg that these items never re-entered.
+
+All four are deleted as of this note; git history is the archive, per the contract's deletion-only lifecycle for transient artifacts. The one with real content worth knowing about is `task-the-old-indexer-shape-is-deleted`, whose Q1 is a substantial agent analysis arguing two of that task's premises were already false (it names commit `9e2c66d` and the specific tests that already asserted the criterion it was asked to add). That reasoning is worth reading in `git show` if that task's history ever comes up again.
+
+## Update — the instance is cleared, the signal is not
+
+`work/questions/task-a-follower-replays-a-retraction-a-paused-writer-appended.md` has been deleted by hand, which is what `resolve` would have done had there been anything left to resolve: the task it named is merged and resting in `work/tasks/done/`, so neither `resolve` (clear `needsAnswers` + delete the sidecar) nor `dispose` (terminal `git mv`) describes the end state a successful REBUILD leaves behind. That is the gap this note is about, and deleting one stranded file does not close it.
+
+This note therefore stays LIVE: the dorfl behaviour is unchanged, and the next task that bounces will strand its sidecar exactly the same way. Discharge it when dorfl retires an item's questions on landing (or scopes an answer to the attempt that raised it), not because these instances were tidied up.
+
+Given the four-for-four rate, the fix shape suggested above should be read as the MINIMUM. "Retire the sidecar when the item reaches its terminal" closes the rebuild path; it does not by itself explain why an explicitly answered sidecar survived, which is the second, likelier-to-bite defect: an answer a human wrote is only as good as the rung that drains it, and here that rung did not run.
