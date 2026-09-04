@@ -41,6 +41,19 @@ covers: []
    a database it produces carries the same facts as one `run` produced. This interacts with whether a
    database is a publishable artifact (`a-generation-can-be-seeded-from-a-published-artifact`).
 
+   > **ANSWER: give `build` the same schema, and RECORD the counters.** The framing that "nobody polls
+   > `/status` on a process that has exited" is true and beside the point: the value is not in the live
+   > poll, it is in what the produced DATABASE carries. `build` is intended to emit a publishable
+   > ARTIFACT that is later fed into another process — the same move stratagems already makes with its
+   > JSON snapshot — so a database `build` produced should carry the same facts as one `run` produced,
+   > or the artifact silently loses its provenance the moment it becomes an INPUT rather than an output.
+   >
+   > This settles the interaction flagged above in the same direction as
+   > `a-generation-can-be-seeded-from-a-published-artifact`: a database IS a publishable artifact, so
+   > the schema is a property of the ARTIFACT and not of the process that happens to be serving it.
+   > Concretely: `build` gets the `Meta` table, writes the counters through the SAME single writer
+   > answer 1 establishes, and the readme says all three shapes carry counters.
+
 ## What to build
 
 Make the reorg counters on `/status` true of every deployment shape that concludes a reorg, not only
