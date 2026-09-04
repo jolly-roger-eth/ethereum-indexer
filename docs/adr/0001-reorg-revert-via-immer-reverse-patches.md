@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0037
+---
+
 # Reorg revert via immer reverse-patches (not stream replay)
 
 The live in-browser processor (`JSObjectEventProcessor` + `History`) handles reorgs by keeping per-block immer **reverse-patches** within the finality window and undoing them on a `removed` event, rather than replaying the event stream to rebuild state. We chose this because replay requires a copy of the state **as of the replay start block** (or a way to query it), which the current in-memory/in-browser path does not have; reverse-patches revert without needing that snapshot.

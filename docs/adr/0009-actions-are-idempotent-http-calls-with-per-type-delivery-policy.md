@@ -1,3 +1,7 @@
+---
+status: accepted; the subject is built outside etherfold (ADR-0005)
+---
+
 # Trigger actions are authenticated HTTP calls with a per-type delivery policy
 
 A trigger action is exactly one primitive: an **authenticated outbound HTTP call carrying a semantic idempotency key**. Push notifications, reward APIs and NFT mints are all adapters over it. Delivery policy is **per action type** (a TTL and a retry budget), with **bounded retries then dead-letter as the floor**, so nothing is ever silently dropped: expiry and dead-lettering are both recorded, inspectable states.

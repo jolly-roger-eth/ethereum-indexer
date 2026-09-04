@@ -1,3 +1,7 @@
+---
+status: accepted; the subject is built outside etherfold (ADR-0005)
+---
+
 # Trigger conditions are data; predicates and actions are code
 
 A trigger is **declarative data referencing operator-deployed code**. The **matcher** is a filter over a log's **decoded arguments**, stored so that matching many subscribers against one log is an indexed lookup. The **state predicate** is a *named* implementation, deployed by the operator and parameterised by the registration. A user registers data (a filter, a predicate name, arguments); a user never supplies code, and there is no bespoke DSL.

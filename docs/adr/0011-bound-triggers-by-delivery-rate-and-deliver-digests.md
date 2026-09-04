@@ -1,3 +1,7 @@
+---
+status: accepted; the subject is built outside etherfold (ADR-0005)
+---
+
 # Trigger cost is bounded by delivery rate, and notifications are digests
 
 Trigger cost is bounded by **actual deliveries per subscriber per window** (a feedback loop), not by how many triggers exist (a limit). Breadth checks at registration are a fast-failing guardrail, and a per-address count quota is a backstop against registration spam. Matched events are **coalesced into digests** ("100 arrivals near your star systems", not 100 notifications), and the consumer's outbox is **two-stage**: a matches table, and a digests table materialised when the window closes.

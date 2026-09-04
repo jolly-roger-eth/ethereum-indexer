@@ -1,3 +1,7 @@
+---
+status: accepted; the subject is built outside etherfold (ADR-0005)
+---
+
 # Triggers expire unless renewed, with delivery feedback as a fast path
 
 A registered trigger has a **TTL and dies unless renewed** (a client refreshes on app open; renewal is per subscriber, cascading to all of that subscriber's triggers). In addition, a push trigger whose deliveries report **zero subscribers** N consecutive times is marked dormant and later deleted. We chose both because an abandoned trigger is invisible: every step of processing it continues to "succeed" forever.

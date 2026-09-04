@@ -18,7 +18,19 @@ That's it. An ADR can be a single paragraph. The value is in recording _that_ a 
 
 Only include these when they add genuine value. Most ADRs won't need them.
 
-- **Status** frontmatter (`proposed | accepted | deprecated | superseded by ADR-NNNN`) — useful when decisions are revisited
+- **Status** frontmatter — useful when decisions are revisited. **ABSENT means accepted and current**, which is what most ADRs are, so add one only when the plain reading would MISLEAD. The vocabulary:
+
+  | status | when |
+  | --- | --- |
+  | *(absent)* | accepted and current |
+  | `proposed` | not decided yet |
+  | `deprecated` | no longer the rule, with nothing replacing it |
+  | `superseded by ADR-NNNN` | fully replaced |
+  | `superseded in part by ADR-NNNN` | one axis replaced, the rest still holds |
+  | `accepted, not yet implemented` | decided, and the code is kept compatible with it |
+  | `accepted; the subject is built outside etherfold (ADR-NNNN)` | decided, and what it describes is not this repo's to build |
+
+  The last three exist because "no code implements this" has three different causes and only one of them means the decision is dead. Reading a corpus without them, an ADR that is pending (ADR-0006, which the stream builder is actively shaped around), one that is partly replaced (ADR-0014, which ADR-0017 supersedes ONLY on which word the scope spells) and one whose subject lives in another repo (the trigger family, which ADR-0005 deliberately placed outside) all look identical to one that was abandoned. State which it is, and name the ADR that did the superseding or the placing.
 - **Considered Options** — only when the rejected alternatives are worth remembering
 - **Consequences** — only when non-obvious downstream effects need to be called out
 

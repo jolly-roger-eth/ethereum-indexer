@@ -1,3 +1,7 @@
+---
+status: accepted; the subject is built outside etherfold (ADR-0005)
+---
+
 # Consumers gate themselves: safe and fast lanes
 
 A consumer never acts at the chain tip. It applies a **gate** and acts only at or below it, in one of two lanes: `safe` (the `finalized` tag, or a fixed depth on chains without one) or `fast` (`latestBlock - N`, with `N` configured per chain). The indexer-server publishes the facts (latest indexed block, finalized head, the chain's configured depth) and applies a gate when asked, but the choice of lane belongs to the consumer. We chose two lanes rather than one because the archetypes have opposite needs: a push notification is unretractable but tolerates being rarely wrong, while an achievement must never be wrong and can wait.

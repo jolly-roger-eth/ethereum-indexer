@@ -1,3 +1,7 @@
+---
+status: superseded in part by ADR-0017
+---
+
 # Packages move to the `@ethereum-indexer` scope, and a store names its backend
 
 > **Superseded in part by [ADR-0017](0017-rename-to-etherfold.md).** The scope is now `@etherfold`, and the CLI sits outside it under the flat name `etherfold`. Everything else below still holds: the move to a scope at all, the expand/migrate/contract mechanics, `<role>-store-<backend>`, directory-follows-leaf-name, and mandatory `publishConfig.access`. Read every `@ethereum-indexer` below as `@etherfold`.
