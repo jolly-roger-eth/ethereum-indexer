@@ -1,6 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import type {Abi} from 'abitype';
-import {generateStreamToAppend, getFromBlock, groupLogsPerBlock} from '../src/internal/engine/utils.js';
+import {
+	generateStreamToAppend,
+	getFromBlock,
+	groupLogsPerBlock,
+	resolveStreamConfig,
+	streamConfigHashOf,
+} from '../src/internal/engine/utils.js';
 import type {EventBlock, LastSync, LogEvent} from '../src/types.js';
 
 type TestABI = Abi;
@@ -65,6 +71,85 @@ describe('getFromBlock', () => {
 		const ls = lastSync({latestBlock: 5, lastToBlock: 4});
 		// min(5, 5-12=-7) = -7 -> clamped to 0
 		expect(getFromBlock(ls, 0, 12)).toBe(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// AN EXPLICIT `undefined` IS AN ABSENT KEY
+// ---------------------------------------------------------------------------
+// Every field of a `ProvidedStreamConfig` is optional, so `{finality: undefined}`
+// type-checks -- and it is what a JSON round-trip or an options object built as
+// `{finality: opts.finality}` produces, which makes it ordinary rather than
+// exotic. A plain spread let it overwrite the default back to nothing, and the
+// damage was silent on three axes at once: the reorg arithmetic went NaN, the
+// config hashed as though no default applied, and it therefore read as a
+// DIFFERENT config from every other spelling of the same default. The digest
+// this feeds already collapses explicit-undefined to absent (`hash.test.ts`), so
+// the resolver is simply made to agree with it.
+// ---------------------------------------------------------------------------
+
+describe('resolveStreamConfig', () => {
+	it('fills the default when the config is absent, empty, or leaves finality unset', () => {
+		expect(resolveStreamConfig(undefined)).toEqual({finality: 17});
+		expect(resolveStreamConfig({})).toEqual({finality: 17});
+		expect(resolveStreamConfig({alwaysFetchTimestamps: true})).toEqual({finality: 17, alwaysFetchTimestamps: true});
+	});
+
+	it('treats an explicit `undefined` finality as ABSENT, not as a value', () => {
+		expect(resolveStreamConfig({finality: undefined})).toEqual({finality: 17});
+		// the shape a JSON round-trip produces, and the shape an options object
+		// forwarding an unset flag produces
+		expect(resolveStreamConfig(JSON.parse(JSON.stringify({finality: undefined})))).toEqual({finality: 17});
+		expect(resolveStreamConfig({finality: undefined, alwaysFetchTimestamps: true})).toEqual({
+			finality: 17,
+			alwaysFetchTimestamps: true,
+		});
+	});
+
+	it('drops any other explicitly-undefined key rather than carrying it', () => {
+		// asserted on the KEYS, not with `toEqual`: `toEqual` ignores undefined-valued
+		// properties, so it would pass just as happily on a config that carried them
+		expect(Object.keys(resolveStreamConfig({alwaysFetchTimestamps: undefined}))).toEqual(['finality']);
+		expect(Object.keys(resolveStreamConfig({alwaysFetchTransactions: undefined, parse: undefined}))).toEqual([
+			'finality',
+		]);
+		expect(resolveStreamConfig({alwaysFetchTimestamps: undefined})).toStrictEqual({finality: 17});
+		// a carried `undefined` is not merely untidy: `canonical_form` drops it, so the
+		// object and its digest would disagree about which keys the config has
+		expect(Object.keys(resolveStreamConfig({finality: undefined}))).toEqual(['finality']);
+	});
+
+	it('still lets a REAL value win, including a falsy one', () => {
+		expect(resolveStreamConfig({finality: 5})).toEqual({finality: 5});
+		// 0 is a value, not an absence: a chain with no reorgs is a legitimate config
+		expect(resolveStreamConfig({finality: 0})).toEqual({finality: 0});
+		expect(resolveStreamConfig({alwaysFetchTimestamps: false})).toEqual({finality: 17, alwaysFetchTimestamps: false});
+	});
+
+	it('is IDEMPOTENT, so resolving an already-resolved config moves nothing', () => {
+		for (const provided of [undefined, {}, {finality: undefined}, {finality: 5}, {alwaysFetchTimestamps: true}]) {
+			expect(resolveStreamConfig(resolveStreamConfig(provided))).toEqual(resolveStreamConfig(provided));
+		}
+	});
+
+	it('keeps the reorg window ARITHMETIC out of NaN', () => {
+		// the consequence that made this worth fixing rather than noting: `getFromBlock`
+		// subtracts `finality` from the head, so an undefined one poisons the block the
+		// next round asks from
+		const ls = lastSync({latestBlock: 1000, lastToBlock: 999});
+		expect(getFromBlock(ls, 0, resolveStreamConfig({finality: undefined}).finality)).toBe(983);
+		expect(getFromBlock(ls, 0, resolveStreamConfig({}).finality)).toBe(983);
+	});
+
+	it('makes every spelling of the default ONE config to the digest', () => {
+		// the third axis: the hash is what decides a reconfigure is a no-op, so a
+		// spelling that hashes differently is a full re-index
+		const theDefault = streamConfigHashOf({});
+		expect(streamConfigHashOf({finality: undefined})).toBe(theDefault);
+		expect(streamConfigHashOf(undefined)).toBe(theDefault);
+		expect(streamConfigHashOf({finality: 17})).toBe(theDefault);
+		// and a config that genuinely moved is still its own digest
+		expect(streamConfigHashOf({finality: 5})).not.toBe(theDefault);
 	});
 });
 

@@ -682,7 +682,26 @@ export function streamMatches(
  * batch would be refused with a digest neither side can read.
  */
 export function resolveStreamConfig(stream: ProvidedStreamConfig | undefined): UsedStreamConfig {
-	return {finality: 17, ...(stream || {})};
+	// An explicit `undefined` is an ABSENT KEY, not a value. A plain spread would
+	// let `{finality: undefined}` overwrite the default back to nothing: every
+	// field here is optional, so that object type-checks, and the damage is silent
+	// -- `finality` becomes `undefined`, `getFromBlock`'s `latestBlock - finality`
+	// is NaN, and the config hashes as if no default applied, so it also reads as a
+	// different config from every other spelling of the default. It is exactly what
+	// a JSON round-trip or an options object built as `{finality: opts.finality}`
+	// produces, so it is ordinary rather than exotic.
+	//
+	// This is the same rule `canonical_form`/`simple_hash` already apply (pinned by
+	// `test/hash.test.ts`, "treats an explicit undefined as absent, exactly as JSON
+	// does"), and the resolver disagreeing with the digest it feeds is what made the
+	// disagreement reachable at all.
+	const provided: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(stream || {})) {
+		if (value !== undefined) {
+			provided[key] = value;
+		}
+	}
+	return {finality: 17, ...(provided as ProvidedStreamConfig)};
 }
 
 /**
