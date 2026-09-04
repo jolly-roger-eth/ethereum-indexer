@@ -1,7 +1,6 @@
 ---
 title: 'The server and the CLI hold generations too, over the emission-stream table'
 slug: the-server-and-cli-hold-generations-too
-needsAnswers: true
 taskedAfter: [a-reconfigure-is-not-an-outage, indexer-server-feed]
 ---
 
@@ -144,6 +143,28 @@ filesystem storage is not supported.
    Evidence as checked at the time: `etherfold index` was a one-shot `indexToTip` that exits, and
    `etherfold serve` lazily imported `@etherfold/platform-nodejs` and ran the same server, so the two
    verbs were already different HOSTS over shared machinery.
+
+   > **ANSWERED 2026-09-04 by wighawag.** The premise that the CLI and the server are two things is
+   > the part to drop: **the CLI IS the server.** `run` follows, folds and answers HTTP in ONE
+   > process, so "the server holds generations" and "the CLI holds generations" are one statement,
+   > which is what story 6 already asks for. What differs between the commands is EXECUTION, not the
+   > model.
+   >
+   > **`build` holds exactly ONE generation.** A one-shot has no reconfigure, so it never adds a
+   > second and never promotes; it creates one and exits. That is the same model instantiated at
+   > N=1, NOT a second model, and the distinction matters because
+   > `every-deployment-shape-counts-the-reorgs-it-concluded` requires a database `build` produced to
+   > carry the same facts as one `run` produced -- it emits a publishable artifact that is later fed
+   > into another process. A `build` that held a DIFFERENT shape would make that artifact
+   > distinguishable on exactly the axis that task says it must not be. Holding one costs a pointer
+   > read at startup, against an artifact that is otherwise identical.
+   >
+   > So the difference lives in the HOST, as this question anticipated: a long-running host may add
+   > and promote; a one-shot creates one and exits.
+
+   The evidence above is superseded by this answer and kept only so the reasoning is not re-run. Its
+   nouns (`indexToTip`, `EthereumIndexer`) are retired; the shape of its argument -- different HOSTS
+   over shared machinery -- is what survived, and is what the answer records.
 4. ~~**Where does `project`'s VALUE come from on a server or CLI?**~~ **ANSWERED, and the concept was
    renamed with it.** There is no `project`: the unit is a NAMED INDEXER (`CONTEXT.md`), because once
    an indexer is one chain and one answer set, a separate tenancy axis above it was a synonym. The
