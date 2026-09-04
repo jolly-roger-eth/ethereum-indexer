@@ -23,13 +23,13 @@ import {JSONRPCHTTPProvider} from 'eip-1193-jsonrpc-provider';
 import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
 import {resolveCommandConfig} from './config.js';
-import {buildProcessor, openExplicitSource, STREAM_CONFIG} from './folding.js';
+import {buildProcessor, openExplicitSource, streamConfigFor} from './folding.js';
 import type {BuildConfig, ConfigFor, Options, RunConfig, SourceOrigin} from './types.js';
 
 export * from './config.js';
 export * from './types.js';
 export {readCursorReport, type StoreCursorReport} from './cursorReport.js';
-export {buildProcessor, openExplicitSource, STREAM_CONFIG} from './folding.js';
+export {buildProcessor, openExplicitSource, streamConfigFor} from './folding.js';
 export {fetch, fetchMain, prepareFetching, type FetchDependencies} from './fetch.js';
 export {index, indexMain, type IndexDependencies, type RunningReceiver} from './indexCommand.js';
 export {run, runMain, type RunDependencies, type RunningIndexer} from './run.js';
@@ -168,7 +168,10 @@ export async function prepareIndexing<
 		processorPath: resolved.processor,
 	});
 
-	const streamConfig = resolveStreamConfig(STREAM_CONFIG);
+	// derived ONCE and handed to both halves below: the sending fetcher host and the
+	// receiving stream builder hash this same object into the wire identity
+	const providedStreamConfig = streamConfigFor(env);
+	const streamConfig = resolveStreamConfig(providedStreamConfig);
 	const {processor, store, db} = await buildProcessor<ABI, ProcessResultType>(declared, resolved.destination, {
 		finalityDepth: streamConfig.finality,
 		...(deps.createDB ? {createDB: deps.createDB} : {}),
@@ -188,13 +191,13 @@ export async function prepareIndexing<
 	// The receiving half of ADR-0004: authoritative about the cursor, derives every reorg, makes no
 	// chain call. It reads the persisted cursor on every batch rather than holding one, which is what
 	// makes an interrupted run resume from the store instead of from the start block.
-	const streamBuilder = new StreamBuilder<ABI, ProcessResultType>(processor, source, {stream: STREAM_CONFIG});
+	const streamBuilder = new StreamBuilder<ABI, ProcessResultType>(processor, source, {stream: providedStreamConfig});
 
 	const host = createFetcherHost<ABI>(
 		resolveFetcherHostConfig<ABI>(env, {
 			source,
 			nodeUrl: resolved.nodeUrl,
-			stream: STREAM_CONFIG,
+			stream: providedStreamConfig,
 			...(resolved.rps === undefined ? {} : {requestsPerSecond: resolved.rps}),
 		}),
 		{

@@ -216,6 +216,26 @@ function required(value: string | undefined, variable: string, what: string): st
  * runtime. What an adapter adds is where the record comes from and when a cycle
  * runs.
  */
+/**
+ * The stream settings the ENVIRONMENT owns, and the only place they are read.
+ *
+ * Exported because the commands that hold BOTH halves of the wire in one process
+ * have to hand the identical config to each, and the way to get that wrong is to
+ * derive it twice. A caller that needs the same config the fetcher host would
+ * have used asks for it here rather than re-reading three variables.
+ */
+export function streamConfigFromEnv(env: EnvRecord): ProvidedStreamConfig {
+	return {
+		...(readNumber(env, 'STREAM_FINALITY') !== undefined ? {finality: readNumber(env, 'STREAM_FINALITY')} : {}),
+		...(readBoolean(env, 'STREAM_ALWAYS_FETCH_TIMESTAMPS') !== undefined
+			? {alwaysFetchTimestamps: readBoolean(env, 'STREAM_ALWAYS_FETCH_TIMESTAMPS')}
+			: {}),
+		...(readBoolean(env, 'STREAM_ALWAYS_FETCH_TRANSACTIONS') !== undefined
+			? {alwaysFetchTransactions: readBoolean(env, 'STREAM_ALWAYS_FETCH_TRANSACTIONS')}
+			: {}),
+	};
+}
+
 export function resolveFetcherHostConfig<ABI extends Abi>(
 	env: EnvRecord = {},
 	overrides: FetcherHostConfigOverrides<ABI> = {},
@@ -245,16 +265,14 @@ export function resolveFetcherHostConfig<ABI extends Abi>(
 		throw new FetcherConfigError(`SUSPECT_RESULT_COUNT must be a positive whole number of logs`);
 	}
 
-	const stream: ProvidedStreamConfig = {
-		...(readNumber(env, 'STREAM_FINALITY') !== undefined ? {finality: readNumber(env, 'STREAM_FINALITY')} : {}),
-		...(readBoolean(env, 'STREAM_ALWAYS_FETCH_TIMESTAMPS') !== undefined
-			? {alwaysFetchTimestamps: readBoolean(env, 'STREAM_ALWAYS_FETCH_TIMESTAMPS')}
-			: {}),
-		...(readBoolean(env, 'STREAM_ALWAYS_FETCH_TRANSACTIONS') !== undefined
-			? {alwaysFetchTransactions: readBoolean(env, 'STREAM_ALWAYS_FETCH_TRANSACTIONS')}
-			: {}),
-		...overrides.stream,
-	};
+	// REPLACED, not merged. A caller that hands over a stream config has already
+	// resolved it -- it holds the other half of the wire and both must hash the same
+	// object -- so merging its config OVER the environment's is the wrong operation:
+	// a spread can ADD a key but can never say "no finality here", which made an
+	// override meaning "take the default" indistinguishable from an absent one. The
+	// combined commands passed exactly that, so the sender resolved `STREAM_FINALITY`
+	// while the receiver resolved the default and the two could never talk.
+	const stream: ProvidedStreamConfig = overrides.stream ?? streamConfigFromEnv(env);
 
 	return {
 		source,

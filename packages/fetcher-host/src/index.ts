@@ -39,6 +39,7 @@ export {
 	parseIndexingSource,
 	redactUrl,
 	resolveFetcherHostConfig,
+	streamConfigFromEnv,
 	type EnvRecord,
 	type FetcherHostConfig,
 	type FetcherHostConfigOverrides,

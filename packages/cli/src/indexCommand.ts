@@ -8,7 +8,7 @@ import {logs} from 'named-logs';
 import type {RemoteSQL} from 'remote-sql';
 import {resolveCommandConfig} from './config.js';
 import {readCursorReport} from './cursorReport.js';
-import {buildProcessor, openExplicitSource, STREAM_CONFIG} from './folding.js';
+import {buildProcessor, openExplicitSource, streamConfigFor} from './folding.js';
 import type {IndexConfig, Options} from './types.js';
 
 const logger = logs('etherfold');
@@ -162,7 +162,8 @@ export async function index<ABI extends Abi = Abi, ProcessResultType = unknown>(
 			processorPath: config.processor,
 		});
 
-		const streamConfig = resolveStreamConfig(STREAM_CONFIG);
+		const providedStreamConfig = streamConfigFor(env);
+		const streamConfig = resolveStreamConfig(providedStreamConfig);
 		const {processor, store, db} = await buildProcessor<ABI, ProcessResultType>(declared, config.destination, {
 			finalityDepth: streamConfig.finality,
 			...(deps.createDB ? {createDB: deps.createDB} : {}),
@@ -176,7 +177,7 @@ export async function index<ABI extends Abi = Abi, ProcessResultType = unknown>(
 		// authoritative about the cursor, deriving every reorg, making no chain call.
 		// It reads the persisted cursor on every batch rather than holding one, which
 		// is what makes a resumed or replayed push safe.
-		const streamBuilder = new StreamBuilder<ABI, ProcessResultType>(processor, source, {stream: STREAM_CONFIG});
+		const streamBuilder = new StreamBuilder<ABI, ProcessResultType>(processor, source, {stream: providedStreamConfig});
 
 		// The store's own tables, before a port is bound rather than when the first
 		// push lands. A receiver OWNS its database, and everything `load` refuses -- an

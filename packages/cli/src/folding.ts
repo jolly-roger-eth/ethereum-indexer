@@ -1,4 +1,5 @@
 import type {Abi, EventProcessor, IndexingSource, ProvidedStreamConfig} from '@etherfold/core';
+import {streamConfigFromEnv, type EnvRecord} from '@etherfold/fetcher-host';
 import type {EntityProcessor, StateStore} from '@etherfold/processor-entities';
 import {loadContracts} from '@etherfold/utils';
 import type {RemoteSQL} from 'remote-sql';
@@ -17,17 +18,36 @@ import type {ExplicitSource, StoreTarget} from './types.js';
 // ---------------------------------------------------------------------------------------------------
 
 /**
- * The stream configuration every command indexes under.
+ * The stream configuration every command indexes under, DERIVED ONCE from the
+ * environment and handed to both halves.
  *
- * Deliberately empty, and deliberately shared: the RESOLVED object is hashed
- * into the wire identity, so a sending `LogFetcher` and a receiving
- * `StreamBuilder` must reach the same `finality` from the same input -- which
- * for a split deployment means the sender's and the receiver's must be the same
- * object, and not two empties that happen to agree. Its resolved form is also
- * what the entity store's retention floor is checked against, which is why
- * nothing here writes a finality number of its own.
+ * The RESOLVED object is hashed into the wire identity, so a sending
+ * `LogFetcher` and a receiving `StreamBuilder` must reach the same `finality`
+ * from the same input. Its resolved form is also what the entity store's
+ * retention floor is checked against, which is why nothing here writes a
+ * finality number of its own.
+ *
+ * ## Why this is a function of the environment and not a constant
+ *
+ * It was `const STREAM_CONFIG = {}`, on the reasoning that an empty config makes
+ * both halves take the same default. That held only while nothing else fed the
+ * config. The fetcher host reads three settings from the environment
+ * (`STREAM_FINALITY`, `STREAM_ALWAYS_FETCH_TIMESTAMPS`,
+ * `STREAM_ALWAYS_FETCH_TRANSACTIONS`) and merged the caller's override OVER
+ * them -- and a spread of `{}` cannot remove a key the environment has already
+ * put there. So the sender resolved `STREAM_FINALITY` and the receiver resolved
+ * the default, the two digests could never match, and `run` and `build` refused
+ * to start on any host that set the documented variable.
+ *
+ * Deriving here fixes it in the direction that keeps the variable WORKING: both
+ * halves honour it, rather than agreeing by both ignoring it, which would have
+ * satisfied the hash while silently discarding a documented setting (and this
+ * repo's rule is that nothing is accepted and ignored). It also means the
+ * combined shape and the split shape read one environment the same way.
  */
-export const STREAM_CONFIG: ProvidedStreamConfig = {};
+export function streamConfigFor(env: EnvRecord): ProvidedStreamConfig {
+	return streamConfigFromEnv(env);
+}
 
 /**
  * Turn a source ORIGIN a chain-free command resolved into the source itself.
@@ -74,7 +94,7 @@ export async function buildProcessor<ABI extends Abi, ProcessResultType>(
 
 	const handle = context.createDB ? context.createDB(target.db) : createNodeDB(target.db);
 	// The finality depth is the stream's own, resolved by the caller from
-	// `STREAM_CONFIG`: a retention window is validated against the depth a reorg
+	// `streamConfigFor`: a retention window is validated against the depth a reorg
 	// can actually reach, and a number written here instead would be a second
 	// opinion about it.
 	const store = new VersionedStateStore(handle, declared.entities, {
