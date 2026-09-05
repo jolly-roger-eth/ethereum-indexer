@@ -2,7 +2,22 @@ import {Hono} from 'hono';
 import type {Context} from 'hono';
 import {logs} from 'named-logs';
 import type {Env} from '../env.js';
-import {encodeFeedCursor, openFeedCursor, STREAM_FEED_VIEW, type FeedCursorRefusal} from '../feed/cursor.js';
+import {readStreamHighWaterMark} from '../emissions.js';
+import {
+	CANONICAL_FEED_VIEW,
+	encodeFeedCursor,
+	openFeedCursor,
+	STREAM_FEED_VIEW,
+	type FeedCursorPosition,
+	type FeedCursorRefusal,
+} from '../feed/cursor.js';
+import {
+	CANONICAL_START_POSITION,
+	forkBlockSince,
+	isStillCanonical,
+	readCanonicalView,
+	type CanonicalPosition,
+} from '../feed/canonical.js';
 import {FEED_START_POSITION, readStreamFeed} from '../feed/stream.js';
 import {resolveIndexer} from './resolve.js';
 import {setup} from '../setup.js';
@@ -65,53 +80,245 @@ const MAX_PAGE_SIZE = 1000;
  * `etherfold serve`, the read tier, therefore does not serve this feed today.
  */
 export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomEnv>) {
-	return new Hono<{Bindings: CustomEnv}>().use(setup({serverOptions: options})).get('/:indexer/feed', async (c) => {
-		const resolved = resolveIndexer(options, c as never, 'feed');
-		if (!resolved.ok) return resolved.response;
-		const {name} = resolved;
-		// WHICH stream this name serves right now. Read once and used both to
-		// validate the cursor and to key the read, so the two cannot disagree.
-		const stream = resolved.entry.ingestion.streamDigest;
+	return (
+		new Hono<{Bindings: CustomEnv}>()
+			.use(setup({serverOptions: options}))
+			.get('/:indexer/feed', async (c) => {
+				const resolved = resolveIndexer(options, c as never, 'feed');
+				if (!resolved.ok) return resolved.response;
+				const {name} = resolved;
+				// WHICH stream this name serves right now. Read once and used both to
+				// validate the cursor and to key the read, so the two cannot disagree.
+				const stream = resolved.entry.ingestion.streamDigest;
+				const served = {indexer: name, stream, view: STREAM_FEED_VIEW, startAt: {seq: FEED_START_POSITION}};
 
-		const limit = pageSizeOf(c.req.query('limit'));
-		if (!limit.ok) {
-			return c.json(
-				{success: false, error: 'invalid-limit', maxLimit: MAX_PAGE_SIZE, message: limit.message} as const,
-				400,
-			);
-		}
+				const limit = pageSizeOf(c.req.query('limit'));
+				if (!limit.ok) {
+					return c.json(
+						{success: false, error: 'invalid-limit', maxLimit: MAX_PAGE_SIZE, message: limit.message} as const,
+						400,
+					);
+				}
 
-		let after = FEED_START_POSITION;
-		const presented = c.req.query('cursor');
-		if (presented !== undefined) {
-			const opened = openFeedCursor(presented, {view: STREAM_FEED_VIEW, indexer: name, stream});
-			if (!opened.ok) return refuse(c as never, opened.refusal, {indexer: name, stream});
-			const seq = opened.envelope.at['seq'];
-			// the right view carrying a position that is not one: a cursor this server
-			// cannot have written, so it is unreadable rather than out of range
-			if (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 0) {
-				return refuse(c as never, {kind: 'unreadable'}, {indexer: name, stream});
-			}
-			after = seq;
-		}
+				let after = FEED_START_POSITION;
+				const presented = c.req.query('cursor');
+				if (presented !== undefined) {
+					const opened = openFeedCursor(presented, {view: STREAM_FEED_VIEW, indexer: name, stream});
+					if (!opened.ok) return refuse(c as never, opened.refusal, served);
+					const seq = opened.envelope.at['seq'];
+					// the right view carrying a position that is not one: a cursor this server
+					// cannot have written, so it is unreadable rather than out of range
+					if (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 0) {
+						return refuse(c as never, {kind: 'unreadable'}, served);
+					}
+					after = seq;
+				}
 
-		const page = await readStreamFeed(c.get('config').db, {indexer: name, stream, after, limit: limit.value});
+				const page = await readStreamFeed(c.get('config').db, {indexer: name, stream, after, limit: limit.value});
 
-		return c.json({
-			success: true,
-			// the STREAM these logs belong to: readable, comparable, and the same value
-			// the stream-mismatch refusal names, so a consumer that re-subscribed can
-			// confirm where it landed. It says WHICH LOGS and deliberately nothing
-			// about which FOLD produced any state beside them.
-			stream,
-			entries: page.entries,
-			// a cursor is ALWAYS handed back, including on an empty page, so a
-			// caught-up poller keeps a valid position rather than having to remember
-			// the last one it was given
-			cursor: encodeFeedCursor({view: STREAM_FEED_VIEW, indexer: name, stream, at: {seq: page.position}}),
-			hasMore: page.hasMore,
-		} as const);
-	});
+				return c.json({
+					success: true,
+					// the STREAM these logs belong to: readable, comparable, and the same value
+					// the stream-mismatch refusal names, so a consumer that re-subscribed can
+					// confirm where it landed. It says WHICH LOGS and deliberately nothing
+					// about which FOLD produced any state beside them.
+					stream,
+					entries: page.entries,
+					// a cursor is ALWAYS handed back, including on an empty page, so a
+					// caught-up poller keeps a valid position rather than having to remember
+					// the last one it was given
+					cursor: encodeFeedCursor({view: STREAM_FEED_VIEW, indexer: name, stream, at: {seq: page.position}}),
+					hasMore: page.hasMore,
+				} as const);
+			})
+			/**
+			 * THE CANONICAL VIEW (ADR-0006, the second of the two views).
+			 *
+			 * `GET /{indexer}/canonical?gate=<block>` serves the LIVE entries only, in
+			 * `(blockNumber, logIndex)` order, at or below the CALLER's gate. This is the
+			 * view for a consumer that never wants to hear the word reorg: its entire
+			 * sync state is one advancing position and it implements no reorg handling.
+			 *
+			 * A separate route rather than a `?view=` on `/feed`, because the two views
+			 * take different parameters (a gate here, and nowhere else), answer different
+			 * refusals (a REWIND here, and never there) and hand back different entry
+			 * shapes. One path per contract; the cursor's `view` copy is what keeps them
+			 * from being crossed, and it is validated rather than used to route.
+			 *
+			 * ## What hiding reorgs OBLIGES
+			 *
+			 * The cursor carries the block HASH the consumer last saw and the server
+			 * VALIDATES it. When that block is no longer canonical the answer is a
+			 * REWIND naming the fork block, never a page: continuing from
+			 * `(blockNumber, logIndex)` on the new branch would silently skip exactly the
+			 * events the consumer never received, which is the failure this validation
+			 * exists to prevent. One hash check is provably enough, because a reorg
+			 * invalidates a contiguous suffix.
+			 *
+			 * It is the read-side twin of the rule ADR-0015 makes for state: a consumer
+			 * holding a block address that no longer resolves is TOLD, never served an
+			 * answer it cannot tell apart from a true one.
+			 */
+			.get('/:indexer/canonical', async (c) => {
+				const resolved = resolveIndexer(options, c as never, 'canonical');
+				if (!resolved.ok) return resolved.response;
+				const {name} = resolved;
+				const stream = resolved.entry.ingestion.streamDigest;
+				const served = {
+					indexer: name,
+					stream,
+					view: CANONICAL_FEED_VIEW,
+					startAt: positionOf(CANONICAL_START_POSITION, {since: 0}),
+				};
+				const db = c.get('config').db;
+
+				const limit = pageSizeOf(c.req.query('limit'));
+				if (!limit.ok) {
+					return c.json(
+						{success: false, error: 'invalid-limit', maxLimit: MAX_PAGE_SIZE, message: limit.message} as const,
+						400,
+					);
+				}
+				const gate = gateOf(c.req.query('gate'));
+				if (!gate.ok) {
+					return c.json({success: false, error: 'invalid-gate', message: gate.message} as const, 400);
+				}
+
+				// The stream's high-water mark, read BEFORE anything else touches the
+				// table. It is what the cursor this request hands back is marked at, and
+				// reading it early is what makes the mark CONSERVATIVE: a retraction landing
+				// between here and the page below lands ABOVE the mark, so the next fork
+				// search still counts it. The other order could drop one, and a fork block
+				// that is too HIGH is the silent skip this whole route exists to prevent.
+				const mark = await readStreamHighWaterMark(db, {indexer: name, stream});
+
+				let after: CanonicalPosition = CANONICAL_START_POSITION;
+				let seenBlockHash: string | undefined;
+				const presented = c.req.query('cursor');
+				if (presented !== undefined) {
+					const opened = openFeedCursor(presented, {view: CANONICAL_FEED_VIEW, indexer: name, stream});
+					if (!opened.ok) return refuse(c as never, opened.refusal, served);
+					const at = canonicalPositionOf(opened.envelope.at);
+					// the right view carrying a position that is not one: a cursor this server
+					// cannot have written, so it is unreadable rather than out of range
+					if (!at) return refuse(c as never, {kind: 'unreadable'}, served);
+					after = {blockNumber: at.blockNumber, logIndex: at.logIndex};
+
+					if (at.blockHash !== undefined) {
+						const stillCanonical = await isStillCanonical(db, {
+							indexer: name,
+							stream,
+							...after,
+							blockHash: at.blockHash,
+						});
+						if (!stillCanonical) {
+							// the fork is the lowest block retracted since this cursor was minted,
+							// and never the cursor's own block: the chain can have changed BELOW it
+							const forkBlock = (await forkBlockSince(db, {indexer: name, stream, since: at.since})) ?? at.blockNumber;
+							return rewind(c as never, {indexer: name, stream, forkBlock, mark});
+						}
+						seenBlockHash = at.blockHash;
+					}
+				}
+
+				const page = await readCanonicalView(db, {
+					indexer: name,
+					stream,
+					gate: gate.value,
+					after,
+					limit: limit.value,
+				});
+
+				// the position and the hash MOVE TOGETHER: a cursor either names an entry
+				// this server served (and carries the hash proving which chain it was on)
+				// or it names where the consumer asked from and carries whatever it already
+				// had. An empty page must not silently drop the hash, or the next request
+				// would have nothing to validate.
+				const position = page.last ?? after;
+				const blockHash = page.last?.blockHash ?? seenBlockHash;
+
+				return c.json({
+					success: true,
+					stream,
+					entries: page.entries,
+					cursor: encodeFeedCursor({
+						view: CANONICAL_FEED_VIEW,
+						indexer: name,
+						stream,
+						at: positionOf(position, {since: mark, ...(blockHash === undefined ? {} : {blockHash})}),
+					}),
+					hasMore: page.hasMore,
+				} as const);
+			})
+	);
+}
+
+/**
+ * The canonical view's position, as the shared codec carries it.
+ *
+ * Three things and not one, and only the first two are a POSITION:
+ *
+ * - `blockNumber` / `logIndex` -- WHERE the consumer is, and the only thing the
+ *   read advances on.
+ * - `blockHash` -- WHICH CHAIN it was on, validated on the next request. Absent
+ *   on a cursor that names no entry this server served: a fresh start, or the
+ *   place a rewind pointed at. There is nothing to validate there, and inventing
+ *   a hash to fill the field would be validating a claim nobody made.
+ * - `since` -- the stream's high-water MARK when the cursor was minted, which is
+ *   what makes "what has been retracted since you last looked" answerable. It is
+ *   deliberately NOT a position and never advances the read: `seq` is the OTHER
+ *   view's cursor, and ADR-0006 is explicit that a synthetic sequence is the
+ *   wrong ORDER for this one. Carrying it rather than looking it up keeps the
+ *   answer available after pair-compaction has reclaimed the row it would have
+ *   been looked up from.
+ */
+function positionOf(position: CanonicalPosition, extra: {since: number; blockHash?: string}): FeedCursorPosition {
+	return {blockNumber: position.blockNumber, logIndex: position.logIndex, ...extra};
+}
+
+/** Read a canonical position back out of a cursor, or nothing if it is not one. */
+function canonicalPositionOf(
+	at: FeedCursorPosition,
+): (CanonicalPosition & {since: number; blockHash?: string}) | undefined {
+	const {blockNumber, logIndex, since, blockHash} = at;
+	if (typeof blockNumber !== 'number' || !Number.isInteger(blockNumber) || blockNumber < 0) return undefined;
+	// `-1` is the START, which is BEFORE the first log of block 0: the read is
+	// strictly after the position, so a lower bound of 0 would make a genuine
+	// `(0, 0)` the one entry a fresh consumer never receives
+	if (typeof logIndex !== 'number' || !Number.isInteger(logIndex) || logIndex < -1) return undefined;
+	if (typeof since !== 'number' || !Number.isInteger(since) || since < 0) return undefined;
+	if (blockHash !== undefined && (typeof blockHash !== 'string' || blockHash === '')) return undefined;
+	return {blockNumber, logIndex, since, ...(blockHash === undefined ? {} : {blockHash})};
+}
+
+/**
+ * WHICH block a caller will act at or below, or why the request cannot be
+ * served.
+ *
+ * REQUIRED, and this is the one refusal on this route that is a statement about
+ * what the server will not do. A consumer that only wants final data passes a
+ * low gate and one that wants the tip passes a high one (ADR-0007's two lanes),
+ * so a default would be the server picking a consumer's RISK APPETITE -- the one
+ * thing about a consumer this system deliberately knows nothing about (ADR-0005).
+ * Every candidate default is wrong for somebody: the tip hands unfinalised logs
+ * to a consumer that asked for safety, and finality withholds logs from one that
+ * accepted the risk deliberately, and neither says so.
+ */
+function gateOf(asked: string | undefined): {ok: true; value: number} | {ok: false; message: string} {
+	if (asked === undefined) {
+		return {
+			ok: false,
+			message:
+				`gate is required: pass the block number you are willing to act at or below, as \`?gate=<block>\`. It is ` +
+				`not defaulted, because how deep a consumer trusts the chain is the consumer's decision and not this ` +
+				`server's: a low gate serves only settled blocks, a high one serves up to the tip.`,
+		};
+	}
+	const value = Number(asked);
+	if (asked.trim() === '' || !Number.isInteger(value) || value < 0) {
+		return {ok: false, message: `gate must be a whole block number of at least 0, and was ${JSON.stringify(asked)}`};
+	}
+	return {ok: true, value};
 }
 
 /**
@@ -162,18 +369,29 @@ function pageSizeOf(asked: string | undefined): {ok: true; value: number} | {ok:
  * - `indexer-mismatch` names the indexer the caller ADDRESSED and never the one
  *   its cursor was minted at. Echoing that back would both confirm the encoding
  *   carries a name and hand one tenant's name to a caller poking at another.
- * - `view-mismatch` is a cursor from the canonical view, whose positions count in
- *   `(blockNumber, logIndex)` rather than in `seq`. Two views, one codec, and
- *   this is what keeps the shared codec from serving one view's number as the
- *   other's.
+ * - `view-mismatch` is a cursor from the OTHER view, whose positions count in
+ *   another space (`seq` on one side, `(blockNumber, logIndex)` on the other).
+ *   Two views, one codec, and this is what keeps the shared codec from serving
+ *   one view's number as the other's.
  * - `stream-mismatch` is the one that is nobody's bug, so it is the one that
  *   ANSWERS: the current stream's identity, and a cursor at the position its feed
  *   starts at. It is explicitly NOT a correction to an earlier point on the
  *   caller's own stream -- there is no fork block, because the logs a filter
  *   change produces were never on the stream the cursor names -- so re-subscribing
  *   is a decision the consumer takes rather than a step it can automate blindly.
+ *   Note how that differs from the canonical view's REWIND below, which is a
+ *   correction on the caller's own stream and is meant to be followed.
+ *
+ * ONE mapper for BOTH views, parameterised by which view is served, for the same
+ * reason there is one codec: two copies would be two refusal contracts that
+ * drift, and a consumer would have to learn each view's dialect of the same four
+ * words.
  */
-function refuse(c: Context<{Bindings: Env}>, refusal: FeedCursorRefusal, served: {indexer: string; stream: string}) {
+function refuse(
+	c: Context<{Bindings: Env}>,
+	refusal: FeedCursorRefusal,
+	served: {indexer: string; stream: string; view: string; startAt: FeedCursorPosition},
+) {
 	switch (refusal.kind) {
 		case 'foreign-indexer':
 			logger.info(`feed: a cursor minted at another named indexer was presented at ${JSON.stringify(served.indexer)}`);
@@ -195,7 +413,7 @@ function refuse(c: Context<{Bindings: Env}>, refusal: FeedCursorRefusal, served:
 				{
 					success: false,
 					error: 'view-mismatch',
-					view: STREAM_FEED_VIEW,
+					view: served.view,
 					message:
 						`this cursor belongs to another view of the same stream, whose positions are not positions here. ` +
 						`Present a cursor this feed gave you, or read it from the beginning.`,
@@ -212,10 +430,10 @@ function refuse(c: Context<{Bindings: Env}>, refusal: FeedCursorRefusal, served:
 					// which stream is served now, and where its feed begins
 					stream: served.stream,
 					startCursor: encodeFeedCursor({
-						view: STREAM_FEED_VIEW,
+						view: served.view,
 						indexer: served.indexer,
 						stream: served.stream,
-						at: {seq: FEED_START_POSITION},
+						at: served.startAt,
 					}),
 					message:
 						`this cursor is a position in a stream this indexer no longer serves. A position in one stream is ` +
@@ -238,4 +456,74 @@ function refuse(c: Context<{Bindings: Env}>, refusal: FeedCursorRefusal, served:
 				400,
 			);
 	}
+}
+
+/**
+ * REWIND TO FORK BLOCK F: the canonical view's answer to a cursor whose block is
+ * no longer on the chain.
+ *
+ * ## Why it is `409` and not `400`
+ *
+ * Every OTHER cursor refusal on this surface is a `400`, because nothing the
+ * caller can do with the same cursor makes it right. This one is the exception,
+ * and it is the exception for exactly the reason `409` already exists in this
+ * system: ADR-0004 makes `409` the ONE RESUMABLE refusal on the ingest side --
+ * "your position is not where mine is, carry on from HERE" -- and this is that
+ * same sentence spoken to a consumer. Using the same number for the same meaning
+ * is what keeps a sender's contract and a consumer's contract legible together;
+ * `400` would file a correction the caller is MEANT to follow beside the ones it
+ * must not.
+ *
+ * ## Why it is not a `200` carrying an instruction
+ *
+ * A `200` with an empty page and a rewind field beside it is indistinguishable,
+ * to a consumer that ignores a field it does not know, from "you are caught up".
+ * That is the silent skip in a new costume, and it is the specific failure this
+ * whole validation exists to prevent, so it may not be reachable by ignoring
+ * something.
+ *
+ * ## What it carries
+ *
+ * - `forkBlock` -- F, the LOWEST block the consumer must read again, and the one
+ *   thing it cannot derive: it must also roll its OWN derived state back to
+ *   before F, and no cursor can say that for it.
+ * - `rewindCursor` -- a cursor at F, meant to be PRESENTED next. It is
+ *   deliberately named to say so, unlike the stream mismatch's `startCursor`,
+ *   which is a place to begin a NEW subscription and a decision a human takes.
+ *   Following this one is the correct, automatic behaviour: the consumer of this
+ *   view implements no reorg handling, and this is what that promise costs the
+ *   server.
+ * - `stream` -- the same identity the success path advertises, so a consumer
+ *   logging the refusal has the whole context.
+ *
+ * The rewind cursor carries NO block hash, because it names a position the
+ * consumer has not been served an entry at; there is nothing yet to validate,
+ * and minting a hash for it would be validating a claim nobody made. It is
+ * marked at the CURRENT high-water mark, so a further reorg arriving before the
+ * consumer acts is still measured from here.
+ */
+function rewind(c: Context<{Bindings: Env}>, at: {indexer: string; stream: string; forkBlock: number; mark: number}) {
+	logger.info(
+		`canonical: ${JSON.stringify(at.indexer)} answered a rewind to fork block ${at.forkBlock}: a cursor's block is no longer canonical`,
+	);
+	return c.json(
+		{
+			success: false,
+			error: 'rewind-required',
+			stream: at.stream,
+			forkBlock: at.forkBlock,
+			rewindCursor: encodeFeedCursor({
+				view: CANONICAL_FEED_VIEW,
+				indexer: at.indexer,
+				stream: at.stream,
+				at: positionOf({blockNumber: at.forkBlock, logIndex: -1}, {since: at.mark}),
+			}),
+			message:
+				`the block your cursor names is no longer on this chain: it was reorged out. Discard whatever you ` +
+				`derived from block ${at.forkBlock} onwards and resume by presenting \`rewindCursor\`, which reads this ` +
+				`view again from that block. You are told rather than served, because continuing from your position ` +
+				`would skip the replacement blocks below it -- exactly the events you never received.`,
+		} as const,
+		409,
+	);
 }

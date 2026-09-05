@@ -68,6 +68,16 @@ const SCRAMBLE_SEED = 0x9e37_79b9;
 export const STREAM_FEED_VIEW = 'stream';
 
 /**
+ * WHICH view a cursor addresses: the CANONICAL view, live entries only, ordered
+ * by `(blockNumber, logIndex)` under the caller's gate.
+ *
+ * Its `at` carries the position, the block HASH it is validated against, and
+ * the stream MARK the fork block is searched from -- all three inside the same
+ * envelope this file writes, which is what "one codec" means in practice.
+ */
+export const CANONICAL_FEED_VIEW = 'canonical';
+
+/**
  * A view's own position, which this codec carries and never interprets.
  *
  * The `seq` feed puts `{seq}` in it; the canonical view puts its block

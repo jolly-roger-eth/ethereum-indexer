@@ -42,6 +42,7 @@ It is optional because an indexer-server is useful before it ingests anything: `
 | `POST /{indexer}/ingest` | a `WireBatch` from a log-fetcher (ADR-0004), for ONE named indexer |
 | `POST /{indexer}/ingest/expected-from-block` | where that named indexer's next batch must start |
 | `GET /{indexer}/feed` | the RETRACTION-AWARE view over the stored emission stream: `seq`-ordered, `removed` entries included, resumed from an opaque `cursor` the caller holds, `limit` entries at a time |
+| `GET /{indexer}/canonical` | the CANONICAL view over the same stream: live entries only, ordered by `(blockNumber, logIndex)`, at or below the caller's REQUIRED `gate`, resumed from an opaque `cursor` whose block hash the server validates |
 
 **The indexer NAME is a ROUTE SEGMENT and is never in the envelope.** Carrying it in the payload was considered and rejected: it would make the wire FORMAT carry tenancy, and it would turn a misdirected batch into a payload error rather than a routing one. ADR-0004's envelope and its refusal families are unchanged, and one refusal sits beside them: a name this host was not built with is a `404 unknown-indexer`, never a default to the indexer it does happen to hold.
 
@@ -59,7 +60,7 @@ The write is on the ROUTE rather than inside the fold, which is the opposite pla
 
 ## The feed
 
-`GET /{indexer}/feed` is the first of ADR-0006's two views over the stored emission stream, and it is the one for a consumer that WANTS to see reorgs: it acts optimistically on a log and cancels the pending action when a retraction arrives. So retractions are DELIVERED and the `alive` flag is never consulted here. The canonical view (`alive` only, bounded by a caller-supplied block gate, no retraction ever) is a separate view for consumers that never want to hear the word reorg.
+`GET /{indexer}/feed` is the first of ADR-0006's two views over the stored emission stream, and it is the one for a consumer that WANTS to see reorgs: it acts optimistically on a log and cancels the pending action when a retraction arrives. So retractions are DELIVERED and the `alive` flag is never consulted here. The second view is `GET /{indexer}/canonical`, below.
 
 ```json
 {
@@ -91,6 +92,42 @@ The write is on the ROUTE rather than inside the fold, which is the opposite pla
 **The feed is a PUBLIC read**, unlike the ingest routes: `INGEST_TOKEN` is the fetcher's deployment secret and it guards the routes that can WRITE, so putting the feed behind it would mean handing every consumer the credential that moves the cursor. A deployment that needs the feed private puts it behind its own edge.
 
 It does need `getIndexer`, because validating a cursor's stream means knowing WHICH stream is served, and the only thing that knows is the receiver registered under the name. The table cannot answer it: one indexer's rows may span several streams over its life, nothing in them says which is current, and picking one by a heuristic is the plausible wrong answer this design refuses. So a host with no registry answers `501` here for the same reason it does on ingest, and `etherfold serve`, the read tier, does not serve the feed today.
+
+## The canonical view
+
+`GET /{indexer}/canonical?gate=<block>` is the second of ADR-0006's two views, and it is the one for a consumer that never wants to hear the word reorg: `WHERE alive AND blockNumber <= gate`, ordered by `(blockNumber, logIndex)`. Its entire sync state is one advancing position, and it implements no reorg handling of its own.
+
+```json
+{
+	"success": true,
+	"stream": "0x…",
+	"entries": [{"blockNumber": 101, "blockHash": "0x…", "logIndex": 0, "address": "0x…", "topics": ["0x…"], "data": "0x…", "transactionHash": "0x…", "transactionIndex": 0}],
+	"cursor": "<opaque>",
+	"hasMore": true
+}
+```
+
+**An entry here carries no `removed` field at all**, unlike the other view's. A flag that is false on every entry a view can ever serve is an invitation to write `if (entry.removed)` handling that can never fire, which is exactly the reorg handling this view exists to remove.
+
+**`gate` is REQUIRED and is never defaulted.** A consumer that only wants settled data passes a low gate and one that wants the tip passes a high one (ADR-0007's two lanes); how deep a consumer trusts the chain is the consumer's decision, and this system deliberately knows nothing else about a consumer (ADR-0005). Every candidate default is wrong for somebody and none of them says so, so an absent or malformed `gate` is a `400 invalid-gate`. Raising the gate on a later call serves what was withheld; nothing already delivered is repeated.
+
+**Because it hides reorgs, it owes the compensating guarantee: `409 rewind-required`.** The cursor carries the block HASH the consumer last saw, the server VALIDATES it on every request, and a cursor whose block is no longer canonical is answered with a rewind rather than a page:
+
+```json
+{"success": false, "error": "rewind-required", "stream": "0x…", "forkBlock": 103, "rewindCursor": "<opaque>", "message": "…"}
+```
+
+`forkBlock` is F, the LOWEST block the consumer must read again: it must also roll its own derived state back to before F, which no cursor can say for it. `rewindCursor` is a cursor at F, meant to be PRESENTED next -- following it is the correct automatic behaviour, which is what the "no reorg handling" promise costs the server. That is why it is named differently from the stream mismatch's `startCursor`, which is a place to BEGIN a new subscription and a decision a human takes.
+
+Continuing from the consumer's own position instead would serve the new branch from `(blockNumber, logIndex)` onward and silently skip the replacement blocks BELOW it -- exactly the events it never received, which is the failure this validation exists to prevent. So the answer is a non-2xx and never a `200` with an instruction beside an empty page: a consumer that ignores a field it does not know would read that as "caught up".
+
+**It is a `409` and not a `400` on purpose.** ADR-0004 already makes `409` the ONE RESUMABLE refusal in this system -- "your position is not where mine is, carry on from here" -- and this is that same sentence spoken to a consumer. Every other cursor refusal on this surface stays a `400`, because no amount of re-presenting the same cursor makes any of them right.
+
+**One hash check is provably enough.** A reorg invalidates a CONTIGUOUS SUFFIX of the chain, so if the block at the cursor is still canonical then the whole prefix behind it is too. Nothing walks back over the window. The fork block itself is the lowest block the stream has retracted anything at SINCE the cursor was minted, which is why the cursor carries a mark as well as a hash, and why a second, deeper reorg moves the answer DOWN rather than leaving a consumer stranded at the first fork.
+
+The read rides the partial index `EmissionStreamCanonical` (`(indexer, stream, blockNumber, logIndex) WHERE alive = 1`), which is what lets ADR-0006 keep ONE table with a flag instead of a second table: the retractions and the rows they killed cost nothing to skip.
+
+**ONE cursor codec across both views**, with the view carried inside the envelope and validated: presenting one view's cursor at the other is a `400 view-mismatch`, never a position read in the wrong space. Two encoders would be two refusal paths that drift, so the canonical view adds its block hash and its mark to the shared envelope rather than minting an encoding of its own. `limit`, the name and stream refusals, the `501`/`404` registry answers and the public-read stance are all the same as the feed's, for the same reasons.
 
 **`/{indexer}/ingest/expected-from-block` is a POST for a question**, deliberately. Answering it can WRITE, because reading the cursor reconciles one belonging to a different source, config or processor version. A `GET` that writes is a trap whatever its justification, so the method matches what it does.
 
