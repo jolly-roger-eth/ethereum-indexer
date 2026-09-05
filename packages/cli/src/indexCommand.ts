@@ -46,7 +46,7 @@ const logger = logs('etherfold');
 //     rather than on the process.
 //  3. **It authenticates or it refuses everyone.** The shared secret is REQUIRED
 //     (`src/config.ts`), so a receiver with none configured never binds a port:
-//     the guard on `/ingest` fails closed, and a process that came up
+//     the guard on `/{indexer}/ingest` fails closed, and a process that came up
 //     regardless would be an endpoint answering `401` to a sender that had no
 //     way to know why. The secret this command resolved is passed to the host
 //     rather than left to the ambient environment, so the flag and the variable
@@ -54,10 +54,13 @@ const logger = logs('etherfold');
 //  4. **It does not terminate.** A receiver has no tip to stop at -- what it
 //     folds arrives from somewhere else -- so it ends on a signal, exactly as
 //     `run` does, and never on a report.
-//
-// One thing deliberately absent: the indexer-NAME route segment a multi-indexer
-// host will need. This milestone is one indexer per process
-// (`the-server-and-cli-hold-generations-too` owns that).
+//  5. **It hosts a NAMED INDEXER**, and the name is the operator's
+//     (`--indexer`, `INDEXER_NAME`): this process registers exactly the one name
+//     it was given, and every other is refused with a `404` rather than served
+//     by the only indexer this host happens to hold (ADR-0036). ONE name per
+//     process is what this command builds today; a host registering SEVERAL is a
+//     registry with more entries in it and no change to the route
+//     (`ServerOptions.getIndexer`).
 // ---------------------------------------------------------------------------------------------------
 
 /** Starts the HTTP surface. Defaults to the Node platform adapter's `startServer`, imported lazily. */
@@ -219,9 +222,14 @@ export async function index<ABI extends Abi = Abi, ProcessResultType = unknown>(
 			// name means the same thing on both halves of a split deployment.
 			env: {INGEST_TOKEN: config.wire.token},
 			// What makes this command the RECEIVER: the capability is injected by the
-			// host, because which processor runs against which source is a deployment's
-			// choice and not an HTTP app's. Without it the same routes answer `501`.
-			getIngestion: () => streamBuilder,
+			// host, because which processor runs against which source -- and under which
+			// NAME -- is a deployment's choice and not an HTTP app's. Without it the same
+			// routes answer `501`; with it, they answer for this one name and refuse every
+			// other with a `404`.
+			// Written out rather than built with `indexerRegistry` (`@etherfold/server`)
+			// for the same reason the server is imported LAZILY below: this module's
+			// assembly must not pull hono into a process that only folds.
+			getIndexer: (_c, name) => (name === config.wire.indexer ? {ingestion: streamBuilder} : undefined),
 			// ...and this is what makes a split deployment observable: `index` owns the
 			// store, so it is the half that can say where the fold has got to. A read
 			// tier owns none and is given none.
@@ -239,7 +247,10 @@ export async function index<ABI extends Abi = Abi, ProcessResultType = unknown>(
 			controller.signal.addEventListener('abort', () => resolve(), {once: true});
 		});
 
-		log(`etherfold index: receiving pushes on ${server.url}/ingest, folding into ${config.destination.db}`);
+		log(
+			`etherfold index: receiving pushes for ${JSON.stringify(config.wire.indexer)} on ` +
+				`${server.url}/${config.wire.indexer}/ingest, folding into ${config.destination.db}`,
+		);
 		log(`  status: ${server.url}/status`);
 		logger.info(`index: listening on ${server.url}, folding into ${config.destination.db}`);
 

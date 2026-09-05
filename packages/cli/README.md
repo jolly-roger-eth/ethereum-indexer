@@ -57,7 +57,7 @@ Four numbers, deliberately, and never the cursor itself: the stored cursor is a 
 
 **All three folding shapes carry these counters, not just the one behind an HTTP route.** `run`, `build` and `index` all count the reverts they concluded, into the database they fold into, through one writer (ADR-0050) -- so `run` and `fetch` plus `index` agree about a reorg the way they already agree about state and the cursor, and `packages/cli/test/equivalence.test.ts` compares them directly. `serve` reports what its database holds, since it folds nothing and concludes nothing. A count that cannot be written (a database with no fixed tables, see `--no-auto-setup`) is a logged miscount and never a fold that stops.
 
-**A `run` process hosts no remote writer.** It fetches for itself, so no ingestion capability is injected into its server: an authenticated call to `/ingest` answers `501 ingestion-not-configured`, and an unauthenticated one answers `401`, exactly as on the read tier. A remote sender pushing into a process that is already fetching would be a second writer nobody asked for; the command that receives pushes is `index`. That is why `--ingest-endpoint` and `--ingest-token` are refused here: the two halves meet in this process through a direct in-process ingestion, so there is no wire to configure.
+**A `run` process hosts no remote writer.** It fetches for itself, so no registry is injected into its server: an authenticated call to `/{anything}/ingest` answers `501 ingestion-not-configured`, and an unauthenticated one answers `401`, exactly as on the read tier. A remote sender pushing into a process that is already fetching would be a second writer nobody asked for; the command that receives pushes is `index`. That is why `--indexer`, `--ingest-endpoint` and `--ingest-token` are refused here: the two halves meet in this process through a direct in-process ingestion, so there is no wire to configure.
 
 ## `etherfold build` -- one shot, to the tip, then exit
 
@@ -96,6 +96,7 @@ The processor module hands back the AUTHORING object (declarations plus handlers
 etherfold fetch \
   -n https://rpc.example \
   -d ./deployments \
+  --indexer my-indexer \
   --ingest-endpoint https://indexer.example
 ```
 
@@ -107,13 +108,14 @@ It is a front door onto [`@etherfold/platform-nodejs-fetcher`](https://github.co
 | --- | --- |
 | `-n, --node-url <url>` | the JSON-RPC endpoint (or `ETH_NODE_URI`) |
 | `-d, --deployments <folder>` | what to index, as a deployments folder, or `INDEXING_SOURCE` as JSON. REQUIRED here in one form or the other: there is no processor module to read contracts out of |
-| `--ingest-endpoint <url>` | the indexer-server to push to (or `INGEST_ENDPOINT`). `/ingest` hangs off it |
+| `--indexer <name>` | REQUIRED. The NAMED INDEXER on that server to push into (or `INDEXER_NAME`): one indexed answer set over one chain (ADR-0036), and the first segment of every ingest route. Never defaulted -- a name the receiver was not built with is refused with a `404` |
+| `--ingest-endpoint <url>` | the indexer-server to push to (or `INGEST_ENDPOINT`). `/{indexer}/ingest` hangs off it |
 | `--ingest-token <token>` | the wire's shared secret (or `INGEST_TOKEN`, which is preferable: a secret on a command line is visible to every process on the host) |
 | `--rps <n>` | cap the requests per second made to the node (or `REQUESTS_PER_SECOND`) |
 
 Everything else a fetcher deployment tunes -- `SUSPECT_RESULT_COUNT` (**read that package's README about this one**), the fetch bounds, the backoff, the stream identity -- stays in the environment the fetcher host already publishes, rather than growing a second name here.
 
-**It owns no state, and the flags that would imply otherwise are REFUSED rather than ignored.** No `--store` and no `--db`, because a fetcher holds no cursor and no database (ADR-0003); no `-p`, because the chain-facing half holds no processor and whatever folds these logs lives behind `--ingest-endpoint`. There is likewise no state file, no lock file and no `--from-block`: where the next batch starts is the RECEIVER's answer, and a `409` telling this process it asked from the wrong place is the ordinary correction path. So killing it costs nothing and running two of them needs no coordination.
+**It owns no state, and the flags that would imply otherwise are REFUSED rather than ignored.** No `--store` and no `--db`, because a fetcher holds no cursor and no database (ADR-0003); no `-p`, because the chain-facing half holds no processor and whatever folds these logs lives behind `--ingest-endpoint` under `--indexer`. There is likewise no state file, no lock file and no `--from-block`: where the next batch starts is the RECEIVER's answer, and a `409` telling this process it asked from the wrong place is the ordinary correction path. So killing it costs nothing and running two of them needs no coordination.
 
 **How it stops.** `SIGINT` / `SIGTERM` finish the cycle in flight and exit `0`. A refusal no waiting fixes -- a bad token, a `{source, config}` the server does not serve, a provider on the wrong chain, a suspected truncation -- exits non-zero, because a fetcher that stays up while achieving nothing is indistinguishable from a working one until somebody reads the state it is not producing. Everything else (an unreachable server, a `5xx`, a dropped socket) is retried on an escalating, capped backoff and never exits.
 
@@ -123,7 +125,7 @@ Everything else a fetcher deployment tunes -- `SUSPECT_RESULT_COUNT` (**read tha
 etherfold index \
   -p ./dist/processor.js \
   --store sqlite --db file:./etherfold.db \
-  -d ./deployments --port 2000
+  -d ./deployments --indexer my-indexer --port 2000
 ```
 
 **It folds what something else pushed at it.** It makes no chain call, receives contiguous ranges of raw logs over HTTP, folds them through your processor into the libSQL database you named, and keeps running. It is the other half of the pair `fetch` sends to, and together they are a split deployment: run `fetch` on a host near your node and this anywhere.
@@ -136,8 +138,9 @@ etherfold index \
 | `--store <sqlite>` / `--db <url>` | REQUIRED, exactly as on `build`: this command owns the database |
 | `--retention <blocks\|revert-only\|unbounded>` | as on `build`. Nothing prunes automatically (ADR-0022) |
 | `-d, --deployments <folder>` | what to index, or `INDEXING_SOURCE` as JSON. REQUIRED here in one form or the other -- see below |
+| `--indexer <name>` | REQUIRED. The NAMED INDEXER this process HOSTS (or `INDEXER_NAME`), which is the name a sender addresses it by. It registers exactly this one and refuses every other with a `404`, rather than serving a misdirected push from the only indexer it holds |
 | `--ingest-token <token>` | REQUIRED. The wire's shared secret, the same name on both sides (or `INGEST_TOKEN`, which is preferable: a secret on a command line is visible to every process on the host) |
-| `--port <port>` / `--host <hostname>` | where it LISTENS for pushes (or `PORT`). `/ingest` and `/status` hang off it |
+| `--port <port>` / `--host <hostname>` | where it LISTENS for pushes (or `PORT`). `/{indexer}/ingest` and `/status` hang off it |
 | `--no-auto-setup` | do not apply the fixed-table schema at startup |
 
 **It makes NO chain call, and that is why the source must be explicit.** `-n` and `--rps` are REFUSED naming what this command is instead: there is no node here. The source cannot be taken from a processor module that keys its contracts per chain either, because reading one costs an `eth_chainId` call -- so it comes from `-d` or `INDEXING_SOURCE`, and a module-only source is refused naming both forms. That is not fussiness: the wire identity is derived from the source and the stream config together, so a source this half discovered on its own could not be the sender's, and every push would be refused with a `400`.
@@ -162,7 +165,7 @@ etherfold serve --db file:./etherfold.db --port 2000
 
 **It answers `/status` WITHOUT a cursor, and that is correct rather than missing.** The cursor reaches `/status` only through a reporter the host injects, and only a process that OWNS the store can read one; a read tier owns none and is given none, so its `/status` carries no `cursor` field at all rather than an invented one. What it does report is what the server derives from the DATABASE itself -- health, the schema version, the reorg counters -- so those agree with what the writer of that database reports.
 
-It starts [`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server) on Node through [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs): `GET /status` (health, schema version, reorg counters, last error) and `POST /admin/setup`. Because it hosts no ingestion, the write path is a CAPABILITY it does not have rather than a route it lacks: an authenticated call to `/ingest` answers `501 ingestion-not-configured` (an unauthenticated one answers `401`, so the absence of a processor is not something an anonymous caller can probe). `platforms/nodejs/test/serve.test.ts` asserts both.
+It starts [`@etherfold/server`](https://github.com/wighawag/etherfold/tree/main/packages/server) on Node through [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs): `GET /status` (health, schema version, reorg counters, last error) and `POST /admin/setup`. Because it hosts no ingestion, the write path is a CAPABILITY it does not have rather than a route it lacks: an authenticated call to `/{anything}/ingest` answers `501 ingestion-not-configured` (an unauthenticated one answers `401`, so the absence of a processor is not something an anonymous caller can probe). `platforms/nodejs/test/serve.test.ts` asserts both.
 
 The one thing it does write is the fixed-table SCHEMA, applied at startup if it is not already there, because the Node host is the single-operator case; `--no-auto-setup` turns that off and leaves migration to the operator.
 
@@ -184,7 +187,7 @@ Every command resolves every input THE SAME WAY, which is what makes moving betw
 - **A refusal names the flag AND the variable** that would have satisfied it, and it happens before the chain is dialled or a database is opened.
 - **Nothing is accepted and ignored.** A flag a command does not own is refused with the reason it does not own it (`etherfold serve -p ./processor.js` says that a read tier holds no processor and points at `index` / `run` / `build`), rather than being taken and quietly having no effect. An ambient VARIABLE a command does not own is simply not read, so one host can run several commands side by side.
 
-Six inputs have a variable and six do not, and the line is deliberate: **the environment carries what varies between deployments of one image** -- the chain, the source, the database, the wire, the port -- while a flag carries what the image IS: which processor module, which store, which retention window, which interface.
+Seven inputs have a variable and six do not, and the line is deliberate: **the environment carries what varies between deployments of one image** -- the chain, the source, the database, the wire, the port -- while a flag carries what the image IS: which processor module, which store, which retention window, which interface.
 
 | variable | flag | |
 | --- | --- | --- |
@@ -192,6 +195,7 @@ Six inputs have a variable and six do not, and the line is deliberate: **the env
 | `ETH_NODE_URI` | `-n, --node-url` | the chain's JSON-RPC endpoint |
 | `DB` | `--db` | the libSQL database |
 | `PORT` | `--port` | the port an HTTP surface binds |
+| `INDEXER_NAME` | `--indexer` | the NAMED INDEXER the ingest wire addresses: `fetch` pushes into it, `index` hosts it |
 | `INGEST_ENDPOINT` | `--ingest-endpoint` | the indexer-server a `fetch` pushes to |
 | `INGEST_TOKEN` | `--ingest-token` | the ingest wire's shared secret, the same name on both sides. Prefer the variable: a secret on a command line is visible to every process on the host |
 | `REQUESTS_PER_SECOND` | `--rps` | the rate limit applied to the node |

@@ -58,6 +58,7 @@ export type ConfigInput =
 	| 'port'
 	| 'host'
 	| 'autoSetup'
+	| 'indexer'
 	| 'ingestEndpoint'
 	| 'ingestToken';
 
@@ -127,10 +128,18 @@ export const INPUTS: Readonly<Record<ConfigInput, InputSpec>> = {
 	port: {flag: '--port <port>', variable: 'PORT', describe: 'port to listen on'},
 	host: {flag: '--host <hostname>', describe: 'hostname to bind'},
 	autoSetup: {flag: '--no-auto-setup', describe: 'do not apply the fixed-table schema at startup'},
+	indexer: {
+		flag: '--indexer <name>',
+		variable: 'INDEXER_NAME',
+		describe:
+			'the NAMED INDEXER this half of the wire addresses: one indexed answer set over one chain, and ' +
+			'the first segment of every ingest route (/{indexer}/ingest). Never defaulted: a receiving host ' +
+			'registers the names it was built with',
+	},
 	ingestEndpoint: {
 		flag: '--ingest-endpoint <url>',
 		variable: 'INGEST_ENDPOINT',
-		describe: 'the indexer-server to push to: /ingest hangs off it',
+		describe: 'the indexer-server to push to: /{indexer}/ingest hangs off it',
 	},
 	ingestToken: {
 		flag: '--ingest-token <token>',
@@ -148,9 +157,18 @@ export const INPUTS: Readonly<Record<ConfigInput, InputSpec>> = {
  * | --- | --- | --- | --- | --- | --- | --- |
  * | `run` | required | required | required | store + database, required | port and host | none |
  * | `build` | required | required | required | store + database, required | none | none |
- * | `fetch` | NOT ACCEPTED | required | required | NOT ACCEPTED | none | endpoint + token, required |
- * | `index` | required | required, without a chain call | NOT ACCEPTED | store + database, required | port and host | token (it receives) |
+ * | `fetch` | NOT ACCEPTED | required | required | NOT ACCEPTED | none | indexer + endpoint + token, required |
+ * | `index` | required | required, without a chain call | NOT ACCEPTED | store + database, required | port and host | indexer + token (it receives) |
  * | `serve` | NOT ACCEPTED | none | NOT ACCEPTED | database, required | port and host | none |
+ *
+ * The INDEXER NAME belongs to the wire column and to the two commands in it,
+ * which is what makes a split deployment's two halves agree on one route:
+ * `fetch` addresses `/{indexer}/ingest` and `index` registers exactly that name.
+ * The three commands with no wire (`run`, `build`, `serve`) refuse it rather
+ * than accepting it: none of them routes a batch by name, and an
+ * accepted-and-ignored flag is a deployment believing something untrue. What
+ * they hold instead is one indexer per process, unnamed, which is what they have
+ * always held.
  *
  * Two of those rows are asymmetries rather than accidents, and both are load-bearing:
  *
@@ -180,6 +198,7 @@ export const OWNERSHIP: Readonly<Record<CommandName, Readonly<Record<ConfigInput
 		port: 'optional',
 		host: 'optional',
 		autoSetup: 'optional',
+		indexer: 'refused',
 		ingestEndpoint: 'refused',
 		ingestToken: 'refused',
 	},
@@ -194,6 +213,7 @@ export const OWNERSHIP: Readonly<Record<CommandName, Readonly<Record<ConfigInput
 		port: 'refused',
 		host: 'refused',
 		autoSetup: 'refused',
+		indexer: 'refused',
 		ingestEndpoint: 'refused',
 		ingestToken: 'refused',
 	},
@@ -208,6 +228,7 @@ export const OWNERSHIP: Readonly<Record<CommandName, Readonly<Record<ConfigInput
 		port: 'refused',
 		host: 'refused',
 		autoSetup: 'refused',
+		indexer: 'required',
 		ingestEndpoint: 'required',
 		ingestToken: 'required',
 	},
@@ -222,6 +243,7 @@ export const OWNERSHIP: Readonly<Record<CommandName, Readonly<Record<ConfigInput
 		port: 'optional',
 		host: 'optional',
 		autoSetup: 'optional',
+		indexer: 'required',
 		ingestEndpoint: 'refused',
 		ingestToken: 'required',
 	},
@@ -236,6 +258,7 @@ export const OWNERSHIP: Readonly<Record<CommandName, Readonly<Record<ConfigInput
 		port: 'optional',
 		host: 'optional',
 		autoSetup: 'optional',
+		indexer: 'refused',
 		ingestEndpoint: 'refused',
 		ingestToken: 'refused',
 	},
@@ -300,16 +323,26 @@ const NO_WIRE_SERVE =
 	'a read tier receives no pushes: its ingestion routes are mounted but answer 501, because holding a ' +
 	'processor is a CAPABILITY it does not have. The receiver is `index`.';
 
+const NO_NAME_COMBINED =
+	'this command runs both halves in ONE process and routes no batch by name, so there is no indexer NAME ' +
+	'to address: the name is a ROUTE SEGMENT on the ingest wire, and this process has no wire. It is ' +
+	'`fetch` (which pushes to /{indexer}/ingest) and `index` (which registers that name) that own it.';
+
+const NO_NAME_SERVE =
+	'a read tier receives no pushes, so it registers no named indexer and routes nothing by name: it answers ' +
+	'over the database something else wrote. The name belongs to the wire, whose halves are `fetch` and `index`.';
+
 const INDEX_RECEIVES =
 	'`index` RECEIVES pushes rather than sending them, so it has no endpoint to push to. The address it ' +
 	'listens on is --port / --host (PORT).';
 
 const REFUSALS: Readonly<Record<CommandName, Readonly<Partial<Record<ConfigInput, string>>>>> = {
-	run: {ingestEndpoint: NO_WIRE_COMBINED, ingestToken: NO_WIRE_COMBINED},
+	run: {indexer: NO_NAME_COMBINED, ingestEndpoint: NO_WIRE_COMBINED, ingestToken: NO_WIRE_COMBINED},
 	build: {
 		port: NOT_SERVING_BUILD,
 		host: NOT_SERVING_BUILD,
 		autoSetup: ALWAYS_MIGRATES_BUILD,
+		indexer: NO_NAME_COMBINED,
 		ingestEndpoint: NO_WIRE_COMBINED,
 		ingestToken: NO_WIRE_COMBINED,
 	},
@@ -330,6 +363,7 @@ const REFUSALS: Readonly<Record<CommandName, Readonly<Partial<Record<ConfigInput
 		rps: NO_CHAIN_SERVE,
 		store: NO_STORE_SERVE,
 		retention: NO_STORE_SERVE,
+		indexer: NO_NAME_SERVE,
 		ingestEndpoint: NO_WIRE_SERVE,
 		ingestToken: NO_WIRE_SERVE,
 	},
@@ -383,6 +417,8 @@ function flagValue(input: ConfigInput, options: Options): string | undefined {
 			// a NEGATED boolean: commander materialises `true` whether or not it was
 			// typed, so only an explicit `false` is something a user passed
 			return options.autoSetup === false ? 'false' : undefined;
+		case 'indexer':
+			return options.indexer;
 		case 'ingestEndpoint':
 			return options.ingestEndpoint;
 		case 'ingestToken':
@@ -653,6 +689,7 @@ export function resolveCommandConfig<C extends CommandName, ABI extends Abi = Ab
 					...(rps === undefined ? {} : {rps}),
 					wire: {
 						kind: 'sending',
+						indexer: requireIndexerName('fetch', options, env),
 						endpoint: requireInput(
 							'ingestEndpoint',
 							'fetch',
@@ -680,6 +717,7 @@ export function resolveCommandConfig<C extends CommandName, ABI extends Abi = Ab
 					serving: resolveServing(options, env),
 					wire: {
 						kind: 'receiving',
+						indexer: requireIndexerName('index', options, env),
 						token: requireInput(
 							'ingestToken',
 							'index',
@@ -712,6 +750,29 @@ function requireProcessor(command: CommandName, options: Options, env: EnvRecord
 		options,
 		env,
 		'the module this command folds: it must export a field named "createProcessor"',
+	);
+}
+
+/**
+ * The NAMED INDEXER this half of the wire addresses.
+ *
+ * Required by both halves and defaulted by neither, which is the whole of
+ * ADR-0036 at the command line: an operator supplies the name, a receiving host
+ * registers what it was built with, and nothing invents one. Defaulting it (to
+ * `default`, or to the database file's name) would make a typo on one half a
+ * batch that lands somewhere plausible on the other.
+ */
+function requireIndexerName(command: CommandName, options: Options, env: EnvRecord): string {
+	return requireInput(
+		'indexer',
+		command,
+		options,
+		env,
+		command === 'fetch'
+			? 'the named indexer this fetcher pushes into, which is the first segment of every ingest route it ' +
+					'calls. It must be a name the receiving server was built with, or every push is refused with a 404'
+			: 'the named indexer this server hosts, which is the route segment a fetcher addresses it by. A host ' +
+					'answers only for the names it registers, so a push to any other is refused rather than defaulted',
 	);
 }
 

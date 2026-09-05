@@ -31,9 +31,10 @@ const logger = logs('etherfold');
 //     cursor reporter that reads that store, so `/status` reports a cursor that
 //     ADVANCES while the process runs.
 //
-// And one thing it deliberately does NOT do: it injects no ingestion into its
-// server. A remote sender pushing into a process that is already fetching for
-// itself would be a second writer nobody asked for, so the ingestion routes
+// And one thing it deliberately does NOT do: it injects no registry of named
+// indexers into its server. A remote sender pushing into a process that is
+// already fetching for itself would be a second writer nobody asked for, so the
+// namespaced ingestion routes
 // answer `501` to an authenticated caller exactly as the read tier's do (`401`
 // to an unauthenticated one: the token guard sits on the PATH, ahead of the
 // capability lookup, so the absence of a processor is not something an anonymous
@@ -137,9 +138,10 @@ export async function run<ABI extends Abi = Abi, ProcessResultType = unknown>(
 			port: serving.port,
 			...(serving.hostname === undefined ? {} : {hostname: serving.hostname}),
 			autoSetup: serving.autoSetup,
-			// No `getIngestion`: this process fetches for itself, so its ingestion is
-			// the in-process direct wire and its HTTP ingestion routes are a capability
-			// it does not have.
+			// No `getIndexer`: this process fetches for itself, so its ingestion is the
+			// in-process direct wire and its HTTP ingestion routes are a capability it
+			// does not have. It registers NO named indexer either, which is why they
+			// answer `501` under every name rather than `404` under all but one.
 			getCursorReport: () => readCursorReport(prepared.store),
 		});
 

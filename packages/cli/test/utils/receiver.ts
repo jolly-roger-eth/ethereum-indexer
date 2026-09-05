@@ -1,6 +1,6 @@
 import {StreamBuilder, type FetchLike} from '@etherfold/core';
 import {EntityEventProcessor} from '@etherfold/processor-entities';
-import {createServer} from '@etherfold/server';
+import {createServer, indexerRegistry} from '@etherfold/server';
 import {VersionedStateStore} from '@etherfold/state-store-sqlite';
 import {createClient} from '@libsql/client';
 import type {RemoteSQL} from 'remote-sql';
@@ -33,6 +33,13 @@ export const ENDPOINT = 'http://indexer.test';
 /** Both halves hash `{source, config}` into the wire identity, so both must resolve this same number. */
 export const FINALITY = 3;
 
+/**
+ * The NAMED INDEXER both halves are deployed with: configuration on each side,
+ * a ROUTE SEGMENT between them (`/{indexer}/ingest`), and never a field in the
+ * envelope (ADR-0036).
+ */
+export const INDEXER = 'alpha';
+
 export type RunningReceiver = {
 	/** The in-process wire a test hands the command, in place of the runtime's own `fetch`. */
 	fetch: FetchLike;
@@ -51,7 +58,7 @@ export async function startReceiver(): Promise<RunningReceiver> {
 	const app = createServer<{INGEST_TOKEN?: string}>({
 		getDB: () => db,
 		getEnv: () => ({INGEST_TOKEN: TOKEN}),
-		getIngestion: () => builder,
+		getIndexer: indexerRegistry({[INDEXER]: builder}),
 	});
 	await app.request('/admin/setup', {method: 'POST'});
 	// the processor's own tables, which a real host gets when the first batch

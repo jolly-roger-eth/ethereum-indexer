@@ -117,7 +117,7 @@ describe('`run` is the follower, and the default thing to reach for', () => {
 		}
 		// this process runs both halves in ONE process, so there is no wire to
 		// configure: the flags parse and are refused with that reason
-		for (const notOwned of ['--ingest-endpoint', '--ingest-token']) {
+		for (const notOwned of ['--indexer', '--ingest-endpoint', '--ingest-token']) {
 			expect(help).not.toMatch(notOwned);
 		}
 	});
@@ -180,6 +180,8 @@ describe('`fetch` is the chain-facing half, and the only way to run a fetcher', 
 			'http://localhost:8545',
 			'-d',
 			'./deployments',
+			'--indexer',
+			'alpha',
 			'--ingest-endpoint',
 			'http://indexer:2000',
 			'--ingest-token',
@@ -192,6 +194,7 @@ describe('`fetch` is the chain-facing half, and the only way to run a fetcher', 
 		expect(cli.fetched[0]).toMatchObject({
 			nodeUrl: 'http://localhost:8545',
 			deployments: './deployments',
+			indexer: 'alpha',
 			ingestEndpoint: 'http://indexer:2000',
 			ingestToken: 'a-shared-secret',
 			rps: '20',
@@ -207,7 +210,7 @@ describe('`fetch` is the chain-facing half, and the only way to run a fetcher', 
 
 		await expect(cli.run(['fetch', '--help'])).rejects.toMatchObject({code: 'commander.helpDisplayed'});
 		const help = cli.output.join('');
-		for (const owned of ['--node-url', '--deployments', '--ingest-endpoint', '--ingest-token', '--rps']) {
+		for (const owned of ['--node-url', '--deployments', '--indexer', '--ingest-endpoint', '--ingest-token', '--rps']) {
 			expect(help).toMatch(owned);
 		}
 		// a fetcher holds no processor, no store and no database, and answers no
@@ -238,6 +241,8 @@ describe('`index` is the receiving half, and no longer the one-shot', () => {
 			'./deployments',
 			'--port',
 			'3000',
+			'--indexer',
+			'alpha',
 			'--ingest-token',
 			'a-shared-secret',
 		]);
@@ -249,6 +254,7 @@ describe('`index` is the receiving half, and no longer the one-shot', () => {
 			db: 'file:./etherfold.db',
 			deployments: './deployments',
 			port: '3000',
+			indexer: 'alpha',
 			ingestToken: 'a-shared-secret',
 		});
 		// the word means ONE thing, and it is no longer the one-shot: that is `build`
@@ -263,7 +269,7 @@ describe('`index` is the receiving half, and no longer the one-shot', () => {
 
 		await expect(cli.run(['index', '--help'])).rejects.toMatchObject({code: 'commander.helpDisplayed'});
 		const help = cli.output.join('');
-		for (const owned of ['--processor', '--deployments', '--store', '--db', '--port', '--ingest-token']) {
+		for (const owned of ['--processor', '--deployments', '--store', '--db', '--port', '--indexer', '--ingest-token']) {
 			expect(help).toMatch(owned);
 		}
 		// it makes NO chain call and it RECEIVES rather than sends, so those flags
@@ -340,6 +346,7 @@ describe('flags a command does not own reach the resolver, and are refused there
 		expect(help).toMatch(/--db/);
 		expect(help).toMatch(/--port/);
 		expect(help).not.toMatch(/--processor/);
+		expect(help).not.toMatch(/--indexer/);
 		expect(help).not.toMatch(/--ingest-token/);
 	});
 
@@ -351,7 +358,7 @@ describe('flags a command does not own reach the resolver, and are refused there
 		for (const owned of ['--processor', '--deployments', '--node-url', '--rps', '--store', '--db', '--retention']) {
 			expect(help).toMatch(owned);
 		}
-		for (const notOwned of ['--port', '--host', '--ingest-endpoint', '--ingest-token']) {
+		for (const notOwned of ['--port', '--host', '--indexer', '--ingest-endpoint', '--ingest-token']) {
 			expect(help).not.toMatch(notOwned);
 		}
 	});

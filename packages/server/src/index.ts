@@ -9,6 +9,8 @@ import {getIngestAPI} from './api/ingest.js';
 
 export type {Env, ServerOptions};
 export type {CursorReporter} from './types.js';
+export {indexerRegistry} from './registry.js';
+export type {IndexerRegistryEntry, IndexerResolver} from './registry.js';
 export type {CursorReport, StatusCursor} from './cursor.js';
 export {SCHEMA_VERSION, applySchema, readSchemaState} from './schema.js';
 export type {SchemaState} from './schema.js';

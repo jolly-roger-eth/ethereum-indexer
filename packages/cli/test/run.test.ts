@@ -243,10 +243,18 @@ describe('the store and the server share ONE database handle', () => {
 // ambient variable a command does not own is simply not read by the CLI. The
 // Node adapter reads `INGEST_TOKEN` for the app it starts, which is how a
 // deployment configures the guard on a process that receives no pushes.
+//
+// The routes are NAMESPACED on the indexer name now (`/{indexer}/ingest`), and
+// this process registers no name at all -- `--indexer` is refused by `run` for
+// the same reason `--ingest-token` is. So the `501` is answered under EVERY name,
+// which is the honest answer: the capability is missing, rather than one
+// particular tenant.
 // ---------------------------------------------------------------------------------------------------
 
 const TOKEN = 'a-shared-secret';
 const AUTHENTICATED = {Authorization: `Bearer ${TOKEN}`};
+/** Any name at all: this process registered none, so every one of them answers the same. */
+const SOME_NAME = 'whatever';
 
 describe('a run process refuses to be written to', () => {
 	afterEach(() => {
@@ -257,14 +265,14 @@ describe('a run process refuses to be written to', () => {
 		process.env.INGEST_TOKEN = TOKEN;
 		running = await run(RUN, depsFor(fakeChain().serve(SPREAD, TIP), oneDatabase()));
 
-		const asked = await fetch(`${running.url}/ingest/expected-from-block`, {
+		const asked = await fetch(`${running.url}/${SOME_NAME}/ingest/expected-from-block`, {
 			method: 'POST',
 			headers: AUTHENTICATED,
 		});
 		expect(asked.status).toBe(501);
 		expect(((await asked.json()) as {error: string}).error).toBe('ingestion-not-configured');
 
-		const pushed = await fetch(`${running.url}/ingest`, {
+		const pushed = await fetch(`${running.url}/${SOME_NAME}/ingest`, {
 			method: 'POST',
 			headers: {...AUTHENTICATED, 'Content-Type': 'application/json'},
 			body: JSON.stringify({fromBlock: START_BLOCK, toBlock: START_BLOCK + 1, latestBlock: TIP, logs: []}),
@@ -273,8 +281,8 @@ describe('a run process refuses to be written to', () => {
 		expect(((await pushed.json()) as {error: string}).error).toBe('ingestion-not-configured');
 
 		// the absence of a processor is not something an anonymous caller can probe
-		expect((await fetch(`${running.url}/ingest`, {method: 'POST', body: '{}'})).status).toBe(401);
-		expect((await fetch(`${running.url}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
+		expect((await fetch(`${running.url}/${SOME_NAME}/ingest`, {method: 'POST', body: '{}'})).status).toBe(401);
+		expect((await fetch(`${running.url}/${SOME_NAME}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
 
 		// the read half is untouched by the refusal of the write half
 		const status = await fetch(`${running.url}/status`);

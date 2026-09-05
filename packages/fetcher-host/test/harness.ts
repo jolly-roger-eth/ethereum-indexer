@@ -1,6 +1,6 @@
 import {createClient} from '@libsql/client';
 import {StreamBuilder, type Abi, type FetchLike, type IndexingSource, type WireBatch} from '@etherfold/core';
-import {createServer} from '@etherfold/server';
+import {createServer, indexerRegistry} from '@etherfold/server';
 import {VersionedStateEventProcessor, type EntityProcessor} from '@etherfold/processor-sqlite';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import type {RemoteSQL} from 'remote-sql';
@@ -43,6 +43,13 @@ export const START_BLOCK = 100;
 export const FINALITY = 3;
 export const TOKEN = 'a-shared-secret-nothing-may-log';
 export const ENDPOINT = 'http://indexer.test';
+
+/**
+ * The NAMED INDEXER both halves are deployed with: configuration on each side,
+ * a ROUTE SEGMENT between them (`/{indexer}/ingest`), and never a field in the
+ * envelope (ADR-0036).
+ */
+export const INDEXER = 'alpha';
 
 export const SOURCE: IndexingSource<TestABI> = {
 	chainId: '1',
@@ -194,7 +201,7 @@ export async function deployReceiver(): Promise<Receiver> {
 	const app = createServer<TestEnv>({
 		getDB: () => db,
 		getEnv: () => ({INGEST_TOKEN: TOKEN}),
-		getIngestion: () => builder,
+		getIndexer: indexerRegistry({[INDEXER]: builder}),
 	});
 	await app.request('/admin/setup', {method: 'POST'});
 	const requests: {path: string; status: number}[] = [];

@@ -50,6 +50,8 @@ export type Options = {
 	host?: string;
 	/** `--no-auto-setup` sets this to `false`; commander materialises `true` otherwise. */
 	autoSetup?: boolean;
+	/** `--indexer <name>`, behind it `INDEXER_NAME`: the named indexer the wire addresses. */
+	indexer?: string;
 	/** `--ingest-endpoint <url>`, behind it `INGEST_ENDPOINT`. */
 	ingestEndpoint?: string;
 	/** `--ingest-token <token>`, behind it `INGEST_TOKEN`. */
@@ -106,11 +108,26 @@ export type Destination = StoreTarget | DatabaseTarget;
 /** The address an HTTP surface binds, plus whether it applies the fixed-table schema at startup. */
 export type Serving = {readonly port: number; readonly hostname?: string; readonly autoSetup: boolean};
 
-/** The SENDING half of the ADR-0004 wire: a URL to push to, and the secret the receiver checks. */
-export type SendingWire = {readonly kind: 'sending'; readonly endpoint: string; readonly token: string};
+/**
+ * The SENDING half of the ADR-0004 wire: a URL to push to, the NAMED INDEXER on
+ * it, and the secret the receiver checks.
+ *
+ * The name is on the wire types rather than beside them because it is what the
+ * two halves have to agree on route-for-route: it is the first SEGMENT of every
+ * ingest path (`/{indexer}/ingest`), never a field in the envelope (ADR-0036).
+ */
+export type SendingWire = {
+	readonly kind: 'sending';
+	readonly indexer: string;
+	readonly endpoint: string;
+	readonly token: string;
+};
 
-/** The RECEIVING half: the same secret, under the same name, checked rather than presented. */
-export type ReceivingWire = {readonly kind: 'receiving'; readonly token: string};
+/**
+ * The RECEIVING half: the same secret and the same indexer name, under the same
+ * flags, registered rather than addressed.
+ */
+export type ReceivingWire = {readonly kind: 'receiving'; readonly indexer: string; readonly token: string};
 
 export type Wire = SendingWire | ReceivingWire;
 

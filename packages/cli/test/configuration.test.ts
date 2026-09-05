@@ -110,20 +110,55 @@ describe('a required input that is missing is refused, naming the flag and the v
 	});
 
 	it('refuses a fetcher with no ingest endpoint and no token, naming each', () => {
-		const wireless: Options = {nodeUrl: 'http://localhost:8545', deployments: './deployments'};
+		const wireless: Options = {nodeUrl: 'http://localhost:8545', deployments: './deployments', indexer: 'alpha'};
 		expect(() => resolveCommandConfig('fetch', wireless, {})).toThrow(/--ingest-endpoint \(INGEST_ENDPOINT\)/);
 		expect(() => resolveCommandConfig('fetch', {...wireless, ingestEndpoint: 'http://server'}, {})).toThrow(
 			/--ingest-token \(INGEST_TOKEN\)/,
 		);
 	});
 
+	it('refuses BOTH halves of the wire with no indexer NAME, since a host defaults none', () => {
+		// the name is a ROUTE SEGMENT (ADR-0036): the sender addresses `/{indexer}/ingest`
+		// and the receiver registers exactly that name, so neither half may invent one
+		const sending: Options = {
+			nodeUrl: 'http://localhost:8545',
+			deployments: './d',
+			ingestEndpoint: 'http://server',
+			ingestToken: 't',
+		};
+		expect(() => resolveCommandConfig('fetch', sending, {})).toThrow(/--indexer \(INDEXER_NAME\)/);
+		const receiving: Options = {
+			processor: './p.js',
+			store: 'sqlite',
+			db: ':memory:',
+			deployments: './d',
+			ingestToken: 't',
+		};
+		expect(() => resolveCommandConfig('index', receiving, {})).toThrow(/--indexer \(INDEXER_NAME\)/);
+		// and the variable stands behind the flag on both, like every other input
+		expect(resolveCommandConfig('fetch', sending, {INDEXER_NAME: 'alpha'}).wire.indexer).toBe('alpha');
+		expect(resolveCommandConfig('index', receiving, {INDEXER_NAME: 'alpha'}).wire.indexer).toBe('alpha');
+	});
+
 	it('refuses a receiver with no token, because the guard fails CLOSED without one', () => {
-		const receiver: Options = {processor: './p.js', store: 'sqlite', db: ':memory:', deployments: './deployments'};
+		const receiver: Options = {
+			processor: './p.js',
+			store: 'sqlite',
+			db: ':memory:',
+			deployments: './deployments',
+			indexer: 'alpha',
+		};
 		expect(() => resolveCommandConfig('index', receiver, {})).toThrow(/--ingest-token \(INGEST_TOKEN\).*401/s);
 	});
 
 	it('never quotes the token itself, only the name that held it', () => {
-		const receiver: Options = {processor: './p.js', store: 'sqlite', db: ':memory:', deployments: './deployments'};
+		const receiver: Options = {
+			processor: './p.js',
+			store: 'sqlite',
+			db: ':memory:',
+			deployments: './deployments',
+			indexer: 'alpha',
+		};
 		let message = '';
 		try {
 			resolveCommandConfig('index', receiver, {});
@@ -186,7 +221,7 @@ describe('the two asymmetries the table exists for', () => {
 		expect(() =>
 			resolveCommandConfig(
 				'index',
-				{processor: './p.js', store: 'sqlite', db: ':memory:', deployments: './d', ingestToken: 't'},
+				{processor: './p.js', store: 'sqlite', db: ':memory:', deployments: './d', ingestToken: 't', indexer: 'alpha'},
 				{},
 			),
 		).not.toThrow();
@@ -199,11 +234,26 @@ describe('the two asymmetries the table exists for', () => {
 					db: ':memory:',
 					deployments: './d',
 					ingestToken: 't',
+					indexer: 'alpha',
 					nodeUrl: 'http://node',
 				},
 				{},
 			),
 		).toThrow(/--node-url \(ETH_NODE_URI\) is not accepted by `etherfold index`.*NO chain call/s);
+	});
+
+	it('refuses an indexer NAME on the three commands that route no batch by name', () => {
+		// `run` and `build` hold both halves in one process and `serve` receives no
+		// push at all, so none of them addresses or registers a name
+		expect(() => resolveCommandConfig('run', {...FOLDING, indexer: 'alpha'}, {})).toThrow(
+			/--indexer \(INDEXER_NAME\) is not accepted by `etherfold run`.*ONE process/s,
+		);
+		expect(() => resolveCommandConfig('build', {...FOLDING, indexer: 'alpha'}, {})).toThrow(
+			/--indexer \(INDEXER_NAME\) is not accepted by `etherfold build`/,
+		);
+		expect(() => resolveCommandConfig('serve', {db: ':memory:', indexer: 'alpha'}, {})).toThrow(
+			/--indexer \(INDEXER_NAME\) is not accepted by `etherfold serve`.*read tier/s,
+		);
 	});
 
 	it('refuses a wire on `run` and on `build`, because the halves meet in one process', () => {
@@ -236,6 +286,7 @@ describe('the two asymmetries the table exists for', () => {
 			db: ':memory:',
 			deployments: './d',
 			ingestToken: 't',
+			indexer: 'alpha',
 		};
 		expect(() =>
 			resolveCommandConfig('index', receiver, {ETH_NODE_URI: 'http://node', INGEST_ENDPOINT: 'http://elsewhere'}),
@@ -302,20 +353,32 @@ describe('the source resolves without a chain call, or is refused naming both ex
 	});
 
 	it('refuses the module route on `index`, naming both explicit forms and the reason', () => {
-		const receiver: Options = {processor: './p.js', store: 'sqlite', db: ':memory:', ingestToken: 't'};
+		const receiver: Options = {
+			processor: './p.js',
+			store: 'sqlite',
+			db: ':memory:',
+			ingestToken: 't',
+			indexer: 'alpha',
+		};
 		expect(() => resolveCommandConfig('index', receiver, {})).toThrow(/--deployments \(INDEXING_SOURCE\)/);
 		expect(() => resolveCommandConfig('index', receiver, {})).toThrow(/NO chain call/);
 		expect(() => resolveCommandConfig('index', receiver, {})).toThrow(/INDEXING_SOURCE as JSON/);
 	});
 
 	it('refuses the module route on `fetch`, for the other reason: it holds no processor', () => {
-		const fetching: Options = {nodeUrl: 'http://n', ingestEndpoint: 'http://s', ingestToken: 't'};
+		const fetching: Options = {nodeUrl: 'http://n', ingestEndpoint: 'http://s', ingestToken: 't', indexer: 'alpha'};
 		expect(() => resolveCommandConfig('fetch', fetching, {})).toThrow(/holds NO processor/);
 		expect(() => resolveCommandConfig('fetch', fetching, {})).toThrow(/--deployments \(INDEXING_SOURCE\)/);
 	});
 
 	it('lets a chain-free command resolve from either explicit form', () => {
-		const receiver: Options = {processor: './p.js', store: 'sqlite', db: ':memory:', ingestToken: 't'};
+		const receiver: Options = {
+			processor: './p.js',
+			store: 'sqlite',
+			db: ':memory:',
+			ingestToken: 't',
+			indexer: 'alpha',
+		};
 		expect(resolveCommandConfig('index', {...receiver, deployments: './d'}, {}).source).toEqual({
 			from: 'deployments',
 			folder: './d',
@@ -405,12 +468,12 @@ describe('all five rows of the table resolve', () => {
 		{
 			command: 'fetch',
 			options: {nodeUrl: 'http://n', deployments: './d'},
-			env: {INGEST_ENDPOINT: 'http://server', INGEST_TOKEN: 'shared'},
+			env: {INGEST_ENDPOINT: 'http://server', INGEST_TOKEN: 'shared', INDEXER_NAME: 'alpha'},
 		},
 		{
 			command: 'index',
 			options: {processor: './p.js', store: 'sqlite', db: ':memory:', deployments: './d'},
-			env: {INGEST_TOKEN: 'shared'},
+			env: {INGEST_TOKEN: 'shared', INDEXER_NAME: 'alpha'},
 		},
 		{command: 'serve', options: {}, env: {DB: 'file:./etherfold.db'}},
 	];
@@ -425,17 +488,18 @@ describe('all five rows of the table resolve', () => {
 		const sender = resolveCommandConfig(
 			'fetch',
 			{nodeUrl: 'http://n', deployments: './d'},
-			{INGEST_ENDPOINT: 'http://server', INGEST_TOKEN: 'shared'},
+			{INGEST_ENDPOINT: 'http://server', INGEST_TOKEN: 'shared', INDEXER_NAME: 'alpha'},
 		);
 		const receiver = resolveCommandConfig(
 			'index',
 			{processor: './p.js', store: 'sqlite', db: ':memory:', deployments: './d'},
-			{INGEST_TOKEN: 'shared'},
+			{INGEST_TOKEN: 'shared', INDEXER_NAME: 'alpha'},
 		);
-		expect(sender.wire).toEqual({kind: 'sending', endpoint: 'http://server', token: 'shared'});
+		expect(sender.wire).toEqual({kind: 'sending', indexer: 'alpha', endpoint: 'http://server', token: 'shared'});
 		// the SAME name on both sides, which is what makes splitting a deployment
-		// change: the sender presents it, the receiver checks it
-		expect(receiver.wire).toEqual({kind: 'receiving', token: 'shared'});
+		// change: the sender presents it, the receiver checks it -- and the SAME indexer
+		// NAME, which is what makes them the two halves of ONE named indexer
+		expect(receiver.wire).toEqual({kind: 'receiving', indexer: 'alpha', token: 'shared'});
 	});
 
 	it('gives the three serving commands an address and the two others none', () => {
@@ -457,6 +521,7 @@ describe('all five rows of the table resolve', () => {
 				{
 					INGEST_ENDPOINT: 'http://s',
 					INGEST_TOKEN: 't',
+					INDEXER_NAME: 'alpha',
 				},
 			),
 		).not.toHaveProperty('destination');

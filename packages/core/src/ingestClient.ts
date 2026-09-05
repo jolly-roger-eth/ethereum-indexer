@@ -23,8 +23,23 @@ export type FetchLike = (
 ) => Response | Promise<Response>;
 
 export type HttpIngestionOptions = {
-	/** The indexer-server's base URL. `/ingest` and `/ingest/expected-from-block` hang off it. */
+	/**
+	 * The indexer-server's base URL. `/{indexer}/ingest` and
+	 * `/{indexer}/ingest/expected-from-block` hang off it.
+	 */
 	endpoint: string;
+	/**
+	 * The NAMED INDEXER on that server this fetcher pushes into: one indexed answer
+	 * set over one chain (ADR-0036), and the first SEGMENT of every ingest route.
+	 *
+	 * Required, and never defaulted: a host registers the N names it was built with,
+	 * and a sender that omitted one would be asking a multi-tenant server to guess
+	 * which tenant its logs belong to. It is deliberately NOT carried in the wire
+	 * envelope -- putting tenancy in the payload would turn a misdirected batch into
+	 * a payload error rather than a routing one -- so it appears here, beside the
+	 * URL, and nowhere in `WireBatch`.
+	 */
+	indexer: string;
 	/** The server's `INGEST_TOKEN`. Sent as a bearer token and never logged, thrown or reported. */
 	token: string;
 	/** Defaults to the global `fetch`, which every targeted runtime has. */
@@ -42,9 +57,10 @@ export type HttpIngestionOptions = {
  * - **409** -- the one RESUMABLE refusal. Returned as a `CursorCorrection`
  *   rather than thrown, because it is not an error: it is how a fetcher holding
  *   no cursor is told where it really is.
- * - **anything else 4xx (400 malformed or foreign, 401 bad token, 501 no
- *   processor)** -- `IngestionRefusedError`. No block number makes these right,
- *   so a sender that retried them would retry forever.
+ * - **anything else 4xx (400 malformed or foreign, 401 bad token, 404 a name
+ *   this server was not built with, 501 no processor)** --
+ *   `IngestionRefusedError`. No block number makes these right, so a sender that
+ *   retried them would retry forever.
  * - **5xx, or no answer at all** -- `IngestionUnavailableError`, which IS worth
  *   retrying. The batch may or may not have been applied; the sender does not
  *   need to know, because the cursor settles it on the next attempt.
@@ -55,6 +71,17 @@ export type HttpIngestionOptions = {
  */
 export function createHttpIngestion(options: HttpIngestionOptions): IngestionTarget {
 	const base = options.endpoint.replace(/\/+$/, '');
+	if (!options.indexer || options.indexer.trim() === '') {
+		// Refused HERE rather than left to produce a `//ingest` that 404s somewhere
+		// else: a name is supplied by an operator and never inferred, so the absence of
+		// one is a deployment that was never configured rather than a request that went
+		// wrong.
+		throw new Error(`createHttpIngestion needs the NAME of the indexer to push into: it is never defaulted`);
+	}
+	// encoded because the name is caller-supplied and lands in a URL PATH; the
+	// server matches one segment, so a name carrying a slash could not address a
+	// registry entry anyway
+	const prefix = `/${encodeURIComponent(options.indexer)}`;
 	const doFetch: FetchLike =
 		options.fetch ??
 		((url, init) => {
@@ -108,15 +135,17 @@ export function createHttpIngestion(options: HttpIngestionOptions): IngestionTar
 		const hint =
 			status === 401
 				? ` The server's INGEST_TOKEN is unset or does not match the one this fetcher presents.`
-				: status === 501
-					? ` This server hosts no processor, so it has no cursor to advance.`
-					: '';
+				: status === 404
+					? ` This server hosts no named indexer called ${JSON.stringify(options.indexer)}. A host registers the names it was built with, and none is ever defaulted.`
+					: status === 501
+						? ` This server hosts no processor, so it has no cursor to advance.`
+						: '';
 		return new IngestionRefusedError(status, code, `${messageOf(body, text)}${hint}`);
 	}
 
 	return {
 		async expectedFromBlock() {
-			const path = '/ingest/expected-from-block';
+			const path = `${prefix}/ingest/expected-from-block`;
 			const {status, body, text} = await post(path);
 			if (status !== 200) {
 				throw refusalFor(status, body, text, path);
@@ -132,7 +161,7 @@ export function createHttpIngestion(options: HttpIngestionOptions): IngestionTar
 		},
 
 		async send(batch: WireBatch<Abi>): Promise<IngestionResponse> {
-			const path = '/ingest';
+			const path = `${prefix}/ingest`;
 			const {status, body, text} = await post(path, serializeWireBatch(batch));
 
 			if (status === 200 && body?.success) {

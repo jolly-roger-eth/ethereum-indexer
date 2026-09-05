@@ -13,19 +13,21 @@ To simply RUN a read tier on Node, use [`etherfold serve`](https://github.com/wi
 ## What a host supplies
 
 ```ts
-import {createServer} from '@etherfold/server';
+import {createServer, indexerRegistry} from '@etherfold/server';
 
 export const app = createServer<MyEnv>({
 	getDB: (c) => myRemoteSQL(c.env), // resolved PER REQUEST: a Worker's binding arrives on `env`
 	getEnv: (c) => c.env,
-	// OPTIONAL: the stream-builder this deployment folds with, if it hosts one
-	getIngestion: (c) => myStreamBuilder(c),
+	// OPTIONAL: the NAMED INDEXERS this deployment hosts, resolved by name
+	getIndexer: indexerRegistry({alpha: myStreamBuilder, beta: myOtherStreamBuilder}),
 	// OPTIONAL: where this deployment's pipeline has got to, if it owns a store
 	getCursorReport: async (c) => ({lastToBlock: await myStore.howFar()}),
 });
 ```
 
-`getIngestion` is optional because an indexer-server is useful before it ingests anything: `/status` and `/admin/setup` answer on a server with no processor at all. When it is absent the ingestion routes answer `501`, which says "this server does not do that" rather than pretending the route is missing.
+`getIndexer` is the NAME-KEYED REGISTRY of the named indexers this host was built with. A **named indexer** is the multi-tenancy unit: one indexed answer set over one chain, fully isolated from every other (ADR-0036). It resolves an ENTRY OBJECT (`{ingestion}`) rather than a bare `LogIngestion`, so that what a name holds can grow -- a later generation model gives one entry several live wire contexts -- without every host's resolver changing shape. `indexerRegistry` builds one from a plain record; a host whose names depend on the request writes the function itself.
+
+It is optional because an indexer-server is useful before it ingests anything: `/status` and `/admin/setup` answer on a server with no processor at all. When it is absent the ingestion routes answer `501` under every name, which says "this server does not do that" rather than pretending the route is missing. That is deliberately a different answer from a registry that does not hold the name asked for, which is a `404`: one is a capability this host lacks, the other is a tenant it was not built with.
 
 `getCursorReport` is optional for the same kind of reason: only the process that OWNS the store can read a cursor, and this package has no store dependency. A host with none (the Cloudflare Worker host is one) injects no reporter and `/status` carries no `cursor` field, rather than an invented one.
 
@@ -37,18 +39,20 @@ export const app = createServer<MyEnv>({
 | --- | --- |
 | `GET /status` | health, database reachability, the fixed-schema version against the one this build expects, the reorg counters, the injected cursor report and the last error this PROCESS saw. `503` when the database is unreachable or the schema is not the expected version |
 | `POST /admin/setup` | apply the fixed-table schema |
-| `POST /ingest` | a `WireBatch` from a log-fetcher (ADR-0004) |
-| `POST /ingest/expected-from-block` | where the next batch must start |
+| `POST /{indexer}/ingest` | a `WireBatch` from a log-fetcher (ADR-0004), for ONE named indexer |
+| `POST /{indexer}/ingest/expected-from-block` | where that named indexer's next batch must start |
 
-**`/ingest` is the fetcher's private API and is guarded on the PATH**, read included. Authentication is `Authorization: Bearer <INGEST_TOKEN>`, compared without leaking where two secrets first differ, and it FAILS CLOSED: with no `INGEST_TOKEN` configured the server can authenticate nobody, so every ingestion call is refused with `401`.
+**The indexer NAME is a ROUTE SEGMENT and is never in the envelope.** Carrying it in the payload was considered and rejected: it would make the wire FORMAT carry tenancy, and it would turn a misdirected batch into a payload error rather than a routing one. ADR-0004's envelope and its refusal families are unchanged, and one refusal sits beside them: a name this host was not built with is a `404 unknown-indexer`, never a default to the indexer it does happen to hold.
+
+**The ingest routes are the fetcher's private API and are guarded on the PATH**, read included. Authentication is `Authorization: Bearer <INGEST_TOKEN>`, compared without leaking where two secrets first differ, and it FAILS CLOSED: with no `INGEST_TOKEN` configured the server can authenticate nobody, so every ingestion call is refused with `401`.
 
 **The status codes are the interesting part of the contract.** `409` is the one and only RESUMABLE refusal: it carries `expectedFromBlock`, and a sender's whole recovery is to re-send from there. `400` is a sender that is wrong in a way no block number fixes (a foreign `{source, config}`, a malformed range, a payload that is not the range it claims). Collapsing the two would make a misconfigured fetcher retry forever against a server that will never accept it.
 
 **There is no idempotency key and no dedupe table: the cursor IS the key.** A batch re-sent after a lost acknowledgement fails the `expectedFromBlock` check and is corrected, so at-least-once on the wire is exactly-once in effect.
 
-**This route COUNTS no reorgs, and that is deliberate.** It used to, which quietly made an operational counter a fact about the TRANSPORT: a combined process folds through `createDirectIngestion`, reaches no route, and reported no reverts at all. A revert is concluded by the FOLD, so it is counted once inside `StreamBuilder.receive` and persisted by whoever owns the store (ADR-0050) -- this package reads those counts for `/status` and writes none. A host that wants them supplies a `ReorgRecorder` to the stream-builder it builds, exactly as it already supplies the database, the environment, the ingestion and the cursor reporter.
+**This route COUNTS no reorgs, and that is deliberate.** It used to, which quietly made an operational counter a fact about the TRANSPORT: a combined process folds through `createDirectIngestion`, reaches no route, and reported no reverts at all. A revert is concluded by the FOLD, so it is counted once inside `StreamBuilder.receive` and persisted by whoever owns the store (ADR-0050) -- this package reads those counts for `/status` and writes none. A host that wants them supplies a `ReorgRecorder` to the stream-builder it builds, exactly as it already supplies the database, the environment, the registry and the cursor reporter.
 
-**`/ingest/expected-from-block` is a POST for a question**, deliberately. Answering it can WRITE, because reading the cursor reconciles one belonging to a different source, config or processor version. A `GET` that writes is a trap whatever its justification, so the method matches what it does.
+**`/{indexer}/ingest/expected-from-block` is a POST for a question**, deliberately. Answering it can WRITE, because reading the cursor reconciles one belonging to a different source, config or processor version. A `GET` that writes is a trap whatever its justification, so the method matches what it does.
 
 `/status` reports reverts concluded from ABSENCE separately from those concluded from a hash CONTRADICTION, because absence is an inference and a rising rate of it means truncation or misconfiguration rather than chain activity. It does not make the server unhealthy: it is a signal to investigate, not a fault.
 
@@ -73,7 +77,7 @@ The Hono RPC client type is computed at compile time from the app, so a route ch
 
 ## Related
 
-[`@etherfold/core`](https://github.com/wighawag/etherfold/tree/main/packages/core) for the `StreamBuilder` on the other side of `getIngestion` and the wire types, [`@etherfold/fetcher-host`](https://github.com/wighawag/etherfold/tree/main/packages/fetcher-host) for the sender, and [`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite) for what a host that DOES host a processor folds into.
+[`@etherfold/core`](https://github.com/wighawag/etherfold/tree/main/packages/core) for the `StreamBuilder` on the other side of `getIndexer` and the wire types, [`@etherfold/fetcher-host`](https://github.com/wighawag/etherfold/tree/main/packages/fetcher-host) for the sender, and [`@etherfold/state-store-sqlite`](https://github.com/wighawag/etherfold/tree/main/packages/state-store-sqlite) for what a host that DOES host a processor folds into.
 
 ## Tests
 

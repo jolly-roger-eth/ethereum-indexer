@@ -658,6 +658,9 @@ describe('the HTTP transport, on the answers a server should not give', () => {
 		const calls: string[] = [];
 		const target = createHttpIngestion({
 			endpoint: 'http://indexer.test/',
+			// the NAMED INDEXER, which is a ROUTE SEGMENT and never a field in the batch:
+			// the envelope asserted below is unchanged by it
+			indexer: 'alpha',
 			token: 'the-secret',
 			fetch: (url) => {
 				calls.push(url);
@@ -710,8 +713,38 @@ describe('the HTTP transport, on the answers a server should not give', () => {
 	it('asks the POST route, not a GET, because answering it can write', async () => {
 		const {target, calls} = clientOver({status: 200, body: {expectedFromBlock: 100}});
 		await target.expectedFromBlock();
-		// and the trailing slash on the endpoint did not become a double slash
-		expect(calls).toEqual(['http://indexer.test/ingest/expected-from-block']);
+		// namespaced on the indexer NAME, and the trailing slash on the endpoint did
+		// not become a double slash
+		expect(calls).toEqual(['http://indexer.test/alpha/ingest/expected-from-block']);
+	});
+
+	it('refuses to be built without a name, rather than posting to a path that addresses nobody', () => {
+		// a host registers the names it was built with and defaults none (ADR-0036), so
+		// a sender with no name has nothing to address and is refused where the
+		// deployment is configured rather than at the first push
+		expect(() =>
+			createHttpIngestion({
+				endpoint: 'http://indexer.test',
+				indexer: '  ',
+				token: 'the-secret',
+				fetch: () => new Response(),
+			}),
+		).toThrow(/never defaulted/);
+	});
+
+	it('posts to the name it was given, escaping it into the one segment the server matches', async () => {
+		const calls: string[] = [];
+		const target = createHttpIngestion({
+			endpoint: 'http://indexer.test',
+			indexer: 'a name/with a slash',
+			token: 'the-secret',
+			fetch: (url) => {
+				calls.push(url);
+				return new Response(JSON.stringify({expectedFromBlock: 100}), {status: 200});
+			},
+		});
+		await target.expectedFromBlock();
+		expect(calls).toEqual(['http://indexer.test/a%20name%2Fwith%20a%20slash/ingest/expected-from-block']);
 	});
 });
 

@@ -14,8 +14,8 @@ import type {CloudflareEnv} from './env.js';
  * there are many instances against one D1, so migration is an operator action
  * (`POST /admin/setup`, or wrangler), not something several isolates race to do.
  *
- * It also hosts no processor, so it passes no `getIngestion` and the ingestion
- * routes answer `501`; it owns no store either, so it passes no
+ * It also hosts no processor, so it passes no `getIndexer` (the registry of
+ * NAMED INDEXERS a host is built with) and the ingestion routes answer `501`; it owns no store either, so it passes no
  * `getCursorReport` and `/status` carries no `cursor` field rather than an
  * invented one. A deployment that DOES host one bundles its processor and
  * builds its store with `createD1Store` (`d1.ts`), which is where this host

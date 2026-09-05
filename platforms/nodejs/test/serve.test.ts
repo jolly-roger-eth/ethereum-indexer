@@ -28,14 +28,18 @@ let running: RunningServer | undefined;
 
 const TOKEN = 'a-shared-secret';
 
+/** The NAMED INDEXER this adapter is given, and the first segment of every ingest route. */
+const INDEXER = 'alpha';
+
 /**
- * The ingestion this adapter passes through, as the adapter sees it.
+ * The ingestion inside the registry entry this adapter passes through, as the
+ * adapter sees it.
  *
  * Spelled through `StartOptions` rather than imported from `@etherfold/core`,
  * because this package depends on no engine and no store and the test must not
  * be the thing that adds one.
  */
-type Ingestion = NonNullable<ReturnType<NonNullable<StartOptions['getIngestion']>>>;
+type Ingestion = NonNullable<ReturnType<NonNullable<StartOptions['getIndexer']>>>['ingestion'];
 
 /** A stand-in for a stream-builder: it records what reached it and nothing else. */
 function fakeIngestion(expected: number) {
@@ -161,17 +165,19 @@ describe('the adapter carries the host-supplied capabilities through to the app'
 			db: ':memory:',
 			port: 0,
 			env: {INGEST_TOKEN: TOKEN},
-			getIngestion: () => ingestion,
+			// the registry this host was built with: ONE named indexer, resolved per
+			// request and refusing every other name
+			getIndexer: (_c, name) => (name === INDEXER ? {ingestion} : undefined),
 		});
 
-		const asked = await fetch(`${running.url}/ingest/expected-from-block`, {
+		const asked = await fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {
 			method: 'POST',
 			headers: {Authorization: `Bearer ${TOKEN}`},
 		});
 		expect(asked.status).toBe(200);
 		expect(((await asked.json()) as {expectedFromBlock: number}).expectedFromBlock).toBe(105);
 
-		const pushed = await fetch(`${running.url}/ingest`, {
+		const pushed = await fetch(`${running.url}/${INDEXER}/ingest`, {
 			method: 'POST',
 			headers: {Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json'},
 			body: JSON.stringify({fromBlock: 105, toBlock: 110, latestBlock: 110, logs: [], context: ingestion.context}),
@@ -179,12 +185,21 @@ describe('the adapter carries the host-supplied capabilities through to the app'
 		expect(pushed.status).toBe(200);
 		expect(((await pushed.json()) as {applied: number}).applied).toBe(1);
 		expect(received).toEqual([{fromBlock: 105, toBlock: 110}]);
+
+		// and a name this host was NOT built with is refused rather than served by
+		// the one it holds
+		const elsewhere = await fetch(`${running.url}/beta/ingest/expected-from-block`, {
+			method: 'POST',
+			headers: {Authorization: `Bearer ${TOKEN}`},
+		});
+		expect(elsewhere.status).toBe(404);
+		expect(((await elsewhere.json()) as {error: string}).error).toBe('unknown-indexer');
 	});
 
 	it('answers 501 to an AUTHENTICATED caller when no ingestion is supplied, exactly as today', async () => {
 		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
 
-		const res = await fetch(`${running.url}/ingest/expected-from-block`, {
+		const res = await fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {
 			method: 'POST',
 			headers: {Authorization: `Bearer ${TOKEN}`},
 		});
@@ -195,8 +210,8 @@ describe('the adapter carries the host-supplied capabilities through to the app'
 	it('answers 401 to an unauthenticated caller, so the absence of a processor is not a probe', async () => {
 		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
 
-		expect((await fetch(`${running.url}/ingest`, {method: 'POST', body: '{}'})).status).toBe(401);
-		expect((await fetch(`${running.url}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
+		expect((await fetch(`${running.url}/${INDEXER}/ingest`, {method: 'POST', body: '{}'})).status).toBe(401);
+		expect((await fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
 	});
 });
 
@@ -204,7 +219,7 @@ describe('the adapter carries the host-supplied capabilities through to the app'
 // THIS IS THE READ TIER, AND IT REFUSES TO WRITE
 // ---------------------------------------------------------------------------------------------------
 // `etherfold serve` starts a server exactly this way: `{getDB, getEnv}` and no
-// `getIngestion` (`src/index.ts`). So it holds no processor, receives no logs,
+// `getIndexer` (`src/index.ts`). So it holds no processor, receives no logs,
 // and answers queries over a database something else writes -- which is what
 // `CONTEXT.md` reserves the word `serve` for.
 //
@@ -213,8 +228,9 @@ describe('the adapter carries the host-supplied capabilities through to the app'
 // together, because either alone would be misleading:
 //
 //   - an AUTHENTICATED caller gets `501 ingestion-not-configured`. It has to be
-//     authenticated: the token guard is registered on the PATH (`/ingest` and
-//     `/ingest/*`) AHEAD of the capability lookup and fails closed, exactly as
+//     authenticated: the token guard is registered on the PATH
+//     (`/:indexer/ingest` and `/:indexer/ingest/*`) AHEAD of the capability
+//     lookup and fails closed, exactly as
 //     `packages/server/test/ingest.test.ts` drives it;
 //   - an UNAUTHENTICATED one still gets `401`, and must keep doing so. Moving
 //     the capability check in front of the guard would make the prose literal at
@@ -231,14 +247,14 @@ describe('the tier `serve` starts holds no processor', () => {
 	it('answers 501 on the ingestion routes, while /status still answers', async () => {
 		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
 
-		const cursor = await fetch(`${running.url}/ingest/expected-from-block`, {
+		const cursor = await fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {
 			method: 'POST',
 			headers: AUTHENTICATED,
 		});
 		expect(cursor.status).toBe(501);
 		expect(((await cursor.json()) as {error: string}).error).toBe('ingestion-not-configured');
 
-		const pushed = await fetch(`${running.url}/ingest`, {
+		const pushed = await fetch(`${running.url}/${INDEXER}/ingest`, {
 			method: 'POST',
 			headers: AUTHENTICATED,
 			body: JSON.stringify({fromBlock: 100, toBlock: 105, latestBlock: 105, logs: []}),
@@ -255,10 +271,10 @@ describe('the tier `serve` starts holds no processor', () => {
 	it('refuses an unauthenticated caller first, so the absence is not a probe', async () => {
 		running = await startServer({db: ':memory:', port: 0, env: {INGEST_TOKEN: TOKEN}});
 
-		const cursor = await fetch(`${running.url}/ingest/expected-from-block`, {method: 'POST'});
+		const cursor = await fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {method: 'POST'});
 		expect(cursor.status).toBe(401);
 
-		const pushed = await fetch(`${running.url}/ingest`, {method: 'POST', body: '{}'});
+		const pushed = await fetch(`${running.url}/${INDEXER}/ingest`, {method: 'POST', body: '{}'});
 		expect(pushed.status).toBe(401);
 	});
 });

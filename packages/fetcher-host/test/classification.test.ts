@@ -21,7 +21,7 @@ import {
 	resolveFetcherHostConfig,
 	type CycleReport,
 } from '../src/index.js';
-import {abi, CONTRACT, deployReceiver, ENDPOINT, fakeChain, FINALITY, SOURCE, TOKEN} from './harness.js';
+import {abi, CONTRACT, deployReceiver, ENDPOINT, fakeChain, FINALITY, INDEXER, SOURCE, TOKEN} from './harness.js';
 
 // ---------------------------------------------------------------------------
 // WHAT THE HOST IS ALLOWED TO DECIDE, AND WHAT IT MUST BE TOLD
@@ -75,7 +75,10 @@ describe('a cycle outcome becomes one of five things a scheduler can do', () => 
 		const chain = fakeChain();
 		const receiver = await deployReceiver();
 		const host = createFetcherHost(
-			resolveFetcherHostConfig({}, {source: SOURCE, endpoint: ENDPOINT, token: TOKEN, nodeUrl: 'http://node.test'}),
+			resolveFetcherHostConfig(
+				{},
+				{source: SOURCE, endpoint: ENDPOINT, indexer: INDEXER, token: TOKEN, nodeUrl: 'http://node.test'},
+			),
 			{provider: chain.provider, fetch: receiver.fetch},
 		);
 		let call = 0;
@@ -214,6 +217,7 @@ describe('configuration a deployment gets wrong', () => {
 	const complete = {
 		INDEXING_SOURCE: JSON.stringify(SOURCE),
 		INGEST_ENDPOINT: ENDPOINT,
+		INDEXER_NAME: INDEXER,
 		INGEST_TOKEN: TOKEN,
 		ETH_NODE_URI: 'https://eth.example/v2/A-SECRET-API-KEY',
 	};
@@ -311,7 +315,10 @@ describe('the host holds nothing that outlives it', () => {
 		const receiver = await deployReceiver();
 		const chain = fakeChain();
 		const host = createFetcherHost(
-			resolveFetcherHostConfig({}, {source: SOURCE, endpoint: ENDPOINT, token: TOKEN, nodeUrl: 'http://node.test'}),
+			resolveFetcherHostConfig(
+				{},
+				{source: SOURCE, endpoint: ENDPOINT, indexer: INDEXER, token: TOKEN, nodeUrl: 'http://node.test'},
+			),
 			{provider: chain.provider, fetch: receiver.fetch},
 		);
 
@@ -335,6 +342,7 @@ describe('the host holds nothing that outlives it', () => {
 				{
 					source: SOURCE,
 					endpoint: ENDPOINT,
+					indexer: INDEXER,
 					token: TOKEN,
 					nodeUrl: 'http://node.test',
 					stream: {finality: FINALITY},
@@ -366,6 +374,7 @@ describe('the host holds nothing that outlives it', () => {
 				{
 					source: SOURCE,
 					endpoint: ENDPOINT,
+					indexer: INDEXER,
 					token: TOKEN,
 					nodeUrl: 'http://node.test',
 					// the receiver runs a finality of FINALITY: same source, DIFFERENT config, so
@@ -382,6 +391,6 @@ describe('the host holds nothing that outlives it', () => {
 		expect(report.kind).toBe('fatal');
 		// caught at ask-time, so no log was fetched and nothing was pushed
 		expect(chain.calls).not.toContain('eth_getLogs');
-		expect(receiver.requests.map((request) => request.path)).toEqual(['/ingest/expected-from-block']);
+		expect(receiver.requests.map((request) => request.path)).toEqual([`/${INDEXER}/ingest/expected-from-block`]);
 	});
 });

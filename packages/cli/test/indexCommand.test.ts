@@ -5,6 +5,7 @@ import {index, fetch as startFetch, type IndexDependencies, type RunningReceiver
 import type {StoreCursorReport} from '../src/cursorReport.js';
 import type {Options} from '../src/types.js';
 import {abi, ALICE, BOB, entityModule, fakeChain, SOURCE, START_BLOCK, transfer, ZERO} from './utils/chain.js';
+import {INDEXER} from './utils/receiver.js';
 
 // ---------------------------------------------------------------------------------------------------
 // `etherfold index`: THE RECEIVING HALF, AS A COMMAND
@@ -47,6 +48,9 @@ const AUTHENTICATED = {Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'applic
 const DEPLOYMENT = {
 	INDEXING_SOURCE: JSON.stringify(SOURCE),
 	INGEST_TOKEN: TOKEN,
+	// the NAMED INDEXER this process registers, and the one a sender addresses:
+	// both halves read it under the same name (ADR-0036)
+	INDEXER_NAME: INDEXER,
 	MAX_BLOCKS_PER_FETCH: '20',
 	POLL_INTERVAL_MS: '5',
 	CATCH_UP_DELAY_MS: '0',
@@ -97,7 +101,7 @@ async function senderAgainst(
 	token = TOKEN,
 ): Promise<RunningFetcher<typeof abi>> {
 	return startFetch<typeof abi>(
-		{nodeUrl: 'http://localhost:0', ingestEndpoint: receiver.url, ingestToken: token},
+		{nodeUrl: 'http://localhost:0', indexer: INDEXER, ingestEndpoint: receiver.url, ingestToken: token},
 		{provider: chain.provider, handleSignals: false, env: DEPLOYMENT},
 	);
 }
@@ -170,7 +174,7 @@ describe('the receiver runs, folds what is pushed to it, and keeps running', () 
 	it('hosts the ingestion CAPABILITY, so the wire routes work rather than answering 501', async () => {
 		running = await index(RECEIVING, depsFor());
 
-		const asked = await globalThis.fetch(`${running.url}/ingest/expected-from-block`, {
+		const asked = await globalThis.fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {
 			method: 'POST',
 			headers: AUTHENTICATED,
 		});
@@ -182,6 +186,27 @@ describe('the receiver runs, folds what is pushed to it, and keeps running', () 
 		// HOSTS, which is the difference between `index` and every other command
 		expect(answer.expectedFromBlock).toBe(START_BLOCK);
 		expect(answer.context).toEqual(running.streamBuilder.context);
+	});
+
+	it('registers exactly the NAME it was given, and refuses every other rather than defaulting', async () => {
+		// one indexer per process here, and it is still NAMED: a sender configured with
+		// another name is refused (404) instead of quietly feeding the only stream-builder
+		// this host holds
+		running = await index(RECEIVING, depsFor());
+
+		const elsewhere = await globalThis.fetch(`${running.url}/another-name/ingest/expected-from-block`, {
+			method: 'POST',
+			headers: AUTHENTICATED,
+		});
+
+		expect(elsewhere.status).toBe(404);
+		expect(((await elsewhere.json()) as {error: string}).error).toBe('unknown-indexer');
+		// and the UNNAMESPACED pair the old wire used is gone rather than left live
+		for (const path of ['/ingest', '/ingest/expected-from-block']) {
+			expect(
+				(await globalThis.fetch(`${running.url}${path}`, {method: 'POST', headers: AUTHENTICATED, body: '{}'})).status,
+			).toBe(404);
+		}
 	});
 
 	it('answers no query API beyond /status, because that is the whole query surface', async () => {
@@ -205,7 +230,7 @@ describe('a push nobody authenticated is refused', () => {
 	it('refuses the wrong secret with a 401 that names the variable, applying nothing', async () => {
 		running = await index(RECEIVING, depsFor());
 
-		const pushed = await globalThis.fetch(`${running.url}/ingest`, {
+		const pushed = await globalThis.fetch(`${running.url}/${INDEXER}/ingest`, {
 			method: 'POST',
 			headers: {Authorization: 'Bearer not-the-token', 'Content-Type': 'application/json'},
 			body: batchFor(running, START_BLOCK, START_BLOCK + 10),
@@ -215,7 +240,9 @@ describe('a push nobody authenticated is refused', () => {
 		expect(JSON.stringify(await pushed.json())).toMatch(/INGEST_TOKEN/);
 		// the same guard covers the question as well as the write: this surface is the
 		// fetcher's private API, and one rule for all of it is one rule to get wrong
-		expect((await globalThis.fetch(`${running.url}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
+		expect(
+			(await globalThis.fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {method: 'POST'})).status,
+		).toBe(401);
 		expect(await transfersIn(running)).toBe(0);
 	});
 
@@ -248,13 +275,13 @@ describe('a push nobody authenticated is refused', () => {
 		try {
 			running = await index({...RECEIVING, ingestToken: 'the-one-that-was-typed'}, depsFor());
 
-			const ambient = await globalThis.fetch(`${running.url}/ingest/expected-from-block`, {
+			const ambient = await globalThis.fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {
 				method: 'POST',
 				headers: {Authorization: 'Bearer the-ambient-one'},
 			});
 			expect(ambient.status).toBe(401);
 
-			const typed = await globalThis.fetch(`${running.url}/ingest/expected-from-block`, {
+			const typed = await globalThis.fetch(`${running.url}/${INDEXER}/ingest/expected-from-block`, {
 				method: 'POST',
 				headers: {Authorization: 'Bearer the-one-that-was-typed'},
 			});
@@ -301,7 +328,7 @@ describe('the pushed-batch path is idempotent by cursor', () => {
 
 		// the lost-acknowledgement case and the restarted-sender case in one: a batch
 		// that starts where the FIRST one started, long after the cursor moved past it
-		const replayed = await globalThis.fetch(`${running.url}/ingest`, {
+		const replayed = await globalThis.fetch(`${running.url}/${INDEXER}/ingest`, {
 			method: 'POST',
 			headers: AUTHENTICATED,
 			body: batchFor(running, START_BLOCK, START_BLOCK + 10),
@@ -315,7 +342,7 @@ describe('the pushed-batch path is idempotent by cursor', () => {
 
 		// ...and the refusal is RESUMABLE: re-sending from the block it named is
 		// accepted, which is the whole correction protocol and needs no operator
-		const corrected = await globalThis.fetch(`${running.url}/ingest`, {
+		const corrected = await globalThis.fetch(`${running.url}/${INDEXER}/ingest`, {
 			method: 'POST',
 			headers: AUTHENTICATED,
 			body: batchFor(running, refusal.expectedFromBlock, TIP),

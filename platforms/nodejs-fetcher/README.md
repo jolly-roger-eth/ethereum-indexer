@@ -10,7 +10,7 @@ This is the host that *drives* the chain, and it wants a runtime that can hold a
 
 ```sh
 npm i -g etherfold
-etherfold fetch -n https://rpc.example -d ./deployments --ingest-endpoint https://indexer.example
+etherfold fetch -n https://rpc.example -d ./deployments --indexer alpha --ingest-endpoint https://indexer.example
 ```
 
 (The standalone `etherfold-fetch` binary this package used to ship is RETIRED, along with its `bin` entry. It was a second front door onto the same loop, configured only from the environment. The CLI is the process now, which is the shape [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs) already had: a library with no binary, called by the command.)
@@ -61,12 +61,13 @@ There is no state file, no lock file and no `--from-block`, and their absence is
 
 ## Configuration
 
-Every variable below is read from the environment. Anything can also be passed to `startFetcher` directly, which wins -- and that is how `etherfold fetch` supplies the four an operator configures with flags (`-n`, `-d`, `--ingest-endpoint`, `--ingest-token`), each of which still falls back to the variable behind it. A `.env` file works when the CLI loads one (it uses `ldenv`).
+Every variable below is read from the environment. Anything can also be passed to `startFetcher` directly, which wins -- and that is how `etherfold fetch` supplies the five an operator configures with flags (`-n`, `-d`, `--indexer`, `--ingest-endpoint`, `--ingest-token`), each of which still falls back to the variable behind it. A `.env` file works when the CLI loads one (it uses `ldenv`).
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `INDEXING_SOURCE` | yes | The `IndexingSource` as JSON: `{"chainId":"1","contracts":[{"abi":[...],"address":"0x...","startBlock":123}]}`. Must match the server's. |
-| `INGEST_ENDPOINT` | split only | The indexer-server's base URL. `/ingest` and `/ingest/expected-from-block` hang off it. |
+| `INGEST_ENDPOINT` | split only | The indexer-server's base URL. `/{indexer}/ingest` and `/{indexer}/ingest/expected-from-block` hang off it. |
+| `INDEXER_NAME` | split only | The NAMED INDEXER to push into: one indexed answer set over one chain (ADR-0036), and the first segment of every ingest route. Never defaulted -- a receiving host registers the names it was built with, and any other is refused with a `404`. |
 | `INGEST_TOKEN` | split only | The server's `INGEST_TOKEN`. Sent as a bearer token, and never logged or included in an error. |
 | `ETH_NODE_URI` | yes | The JSON-RPC endpoint to read the chain from. Treated as a credential: only its host is ever logged. |
 | `SUSPECT_RESULT_COUNT` | **read this** | Your node's real `eth_getLogs` result cap. Defaults to `10000`. See below. |

@@ -65,6 +65,8 @@ import {
 // ---------------------------------------------------------------------------------------------------
 
 const TOKEN = 'a-shared-secret';
+/** The NAMED INDEXER the split deployment's two halves agree on (ADR-0036). */
+const INDEXER = 'alpha';
 
 /**
  * What varies between deployments of one image, and nothing else.
@@ -234,7 +236,7 @@ async function startCombined(
 /** `etherfold index`: the receiving half, owning the database the split writes. */
 async function startReceiver(db: string): Promise<RunningReceiver> {
 	return index(
-		{processor: './nfts.js', store: 'sqlite', db, port: '0', ingestToken: TOKEN},
+		{processor: './nfts.js', store: 'sqlite', db, port: '0', indexer: INDEXER, ingestToken: TOKEN},
 		{
 			importModule: async () => entityModule,
 			handleSignals: false,
@@ -246,7 +248,14 @@ async function startReceiver(db: string): Promise<RunningReceiver> {
 
 /** `etherfold fetch`: the chain-facing half, pushing over a real socket at a real port. */
 async function startSender(endpoint: string, chain: ReturnType<typeof fakeChain>): Promise<RunningFetcher<typeof abi>> {
-	const options: Options = {nodeUrl: 'http://localhost:0', ingestEndpoint: endpoint, ingestToken: TOKEN};
+	// the SAME name on both halves: the sender addresses `/{indexer}/ingest` and the
+	// receiver above registers exactly that name
+	const options: Options = {
+		nodeUrl: 'http://localhost:0',
+		indexer: INDEXER,
+		ingestEndpoint: endpoint,
+		ingestToken: TOKEN,
+	};
 	return startFetch<typeof abi>(options, {provider: chain.provider, handleSignals: false, env: DEPLOYMENT});
 }
 
@@ -560,7 +569,7 @@ describe('`index` plus `serve` against ONE database answer what `run` answers', 
 
 		// the read tier writes nothing: the write path is a CAPABILITY it does not
 		// have rather than a route table it lacks
-		const pushed = await globalThis.fetch(`${served.url}/ingest/expected-from-block`, {
+		const pushed = await globalThis.fetch(`${served.url}/${INDEXER}/ingest/expected-from-block`, {
 			method: 'POST',
 			headers: {Authorization: `Bearer ${TOKEN}`},
 		});
