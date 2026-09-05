@@ -1,5 +1,6 @@
 import {Hono} from 'hono';
 import type {Context} from 'hono';
+import {generationDigestOf} from '@etherfold/core';
 import {logs} from 'named-logs';
 import type {Env} from '../env.js';
 import {readStreamHighWaterMark} from '../emissions.js';
@@ -78,6 +79,28 @@ const MAX_PAGE_SIZE = 1000;
  * refuses. So a host built with no registry answers `501` here for the same
  * reason it does on ingest -- it was built with no named indexers at all -- and
  * `etherfold serve`, the read tier, therefore does not serve this feed today.
+ *
+ * ## Every response says WHICH GENERATION answered it
+ *
+ * `generation` is on every answer both views give, page and refusal alike, and
+ * it exists for the one change a cursor cannot catch. A `seq` is a position in a
+ * STREAM: a move to a generation over the SAME stream leaves every cursor valid,
+ * and a move to one on a DIFFERENT stream is already refused by the cursor's
+ * stream component. What is left is SAME LOGS, DIFFERENT FOLD -- nothing in the
+ * cursor can see it, and a consumer reading state alongside this feed has to be
+ * told, because a notifier that has already fired cannot unfire.
+ *
+ * It ADVERTISES and does not DICTATE. There is deliberately no rule here about
+ * what a consumer does when the value moves: pausing, re-scanning and carrying
+ * on are all legitimate, and only the consumer knows whether its own actions can
+ * be taken back. (For the record and NOT as a platform rule: pausing and letting
+ * an operator decide is the expected behaviour.)
+ *
+ * It is OPAQUE -- compared, never parsed (`generationDigestOf`) -- so what it is
+ * composed of can change without a consumer noticing; and it is deliberately NOT
+ * a column on the emission table, because the logs are IDENTICAL across a
+ * processor change, and keeping the fold out of that table is exactly what makes
+ * such a change free for a consumer following it.
  */
 export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomEnv>) {
 	return (
@@ -90,12 +113,27 @@ export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomE
 				// WHICH stream this name serves right now. Read once and used both to
 				// validate the cursor and to key the read, so the two cannot disagree.
 				const stream = resolved.entry.ingestion.streamDigest;
-				const served = {indexer: name, stream, view: STREAM_FEED_VIEW, startAt: {seq: FEED_START_POSITION}};
+				// WHICH FOLD is answering, read at the same moment as the stream so that one
+				// response never pairs one of them with the other's neighbour
+				const generation = generationDigestOf(resolved.entry.ingestion.generation);
+				const served = {
+					indexer: name,
+					stream,
+					generation,
+					view: STREAM_FEED_VIEW,
+					startAt: {seq: FEED_START_POSITION},
+				};
 
 				const limit = pageSizeOf(c.req.query('limit'));
 				if (!limit.ok) {
 					return c.json(
-						{success: false, error: 'invalid-limit', maxLimit: MAX_PAGE_SIZE, message: limit.message} as const,
+						{
+							success: false,
+							error: 'invalid-limit',
+							generation,
+							maxLimit: MAX_PAGE_SIZE,
+							message: limit.message,
+						} as const,
 						400,
 					);
 				}
@@ -123,6 +161,9 @@ export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomE
 					// confirm where it landed. It says WHICH LOGS and deliberately nothing
 					// about which FOLD produced any state beside them.
 					stream,
+					// which FOLD answered, which is the half the stream cannot say. Compare it
+					// across polls; never take it apart.
+					generation,
 					entries: page.entries,
 					// a cursor is ALWAYS handed back, including on an empty page, so a
 					// caught-up poller keeps a valid position rather than having to remember
@@ -164,9 +205,11 @@ export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomE
 				if (!resolved.ok) return resolved.response;
 				const {name} = resolved;
 				const stream = resolved.entry.ingestion.streamDigest;
+				const generation = generationDigestOf(resolved.entry.ingestion.generation);
 				const served = {
 					indexer: name,
 					stream,
+					generation,
 					view: CANONICAL_FEED_VIEW,
 					startAt: positionOf(CANONICAL_START_POSITION, {since: 0}),
 				};
@@ -175,13 +218,19 @@ export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomE
 				const limit = pageSizeOf(c.req.query('limit'));
 				if (!limit.ok) {
 					return c.json(
-						{success: false, error: 'invalid-limit', maxLimit: MAX_PAGE_SIZE, message: limit.message} as const,
+						{
+							success: false,
+							error: 'invalid-limit',
+							generation,
+							maxLimit: MAX_PAGE_SIZE,
+							message: limit.message,
+						} as const,
 						400,
 					);
 				}
 				const gate = gateOf(c.req.query('gate'));
 				if (!gate.ok) {
-					return c.json({success: false, error: 'invalid-gate', message: gate.message} as const, 400);
+					return c.json({success: false, error: 'invalid-gate', generation, message: gate.message} as const, 400);
 				}
 
 				// The stream's high-water mark, read BEFORE anything else touches the
@@ -215,7 +264,7 @@ export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomE
 							// the fork is the lowest block retracted since this cursor was minted,
 							// and never the cursor's own block: the chain can have changed BELOW it
 							const forkBlock = (await forkBlockSince(db, {indexer: name, stream, since: at.since})) ?? at.blockNumber;
-							return rewind(c as never, {indexer: name, stream, forkBlock, mark});
+							return rewind(c as never, {indexer: name, stream, generation, forkBlock, mark});
 						}
 						seenBlockHash = at.blockHash;
 					}
@@ -240,6 +289,7 @@ export function getFeedAPI<CustomEnv extends Env>(options: ServerOptions<CustomE
 				return c.json({
 					success: true,
 					stream,
+					generation,
 					entries: page.entries,
 					cursor: encodeFeedCursor({
 						view: CANONICAL_FEED_VIEW,
@@ -386,12 +436,18 @@ function pageSizeOf(asked: string | undefined): {ok: true; value: number} | {ok:
  * reason there is one codec: two copies would be two refusal contracts that
  * drift, and a consumer would have to learn each view's dialect of the same four
  * words.
+ *
+ * Each of them carries the GENERATION that would have answered, exactly as the
+ * page does: a refusal is still an answer this fold gave, and a consumer that
+ * logs one has the whole context rather than the context minus the one field
+ * that says which fold it was talking to.
  */
 function refuse(
 	c: Context<{Bindings: Env}>,
 	refusal: FeedCursorRefusal,
-	served: {indexer: string; stream: string; view: string; startAt: FeedCursorPosition},
+	served: {indexer: string; stream: string; generation: string; view: string; startAt: FeedCursorPosition},
 ) {
+	const generation = served.generation;
 	switch (refusal.kind) {
 		case 'foreign-indexer':
 			logger.info(`feed: a cursor minted at another named indexer was presented at ${JSON.stringify(served.indexer)}`);
@@ -400,6 +456,7 @@ function refuse(
 					success: false,
 					error: 'indexer-mismatch',
 					indexer: served.indexer,
+					generation,
 					message:
 						`this cursor was minted at a different named indexer and is not a position here. Two named ` +
 						`indexers can hold byte-identical streams, so a position in one means nothing in the other and ` +
@@ -414,6 +471,7 @@ function refuse(
 					success: false,
 					error: 'view-mismatch',
 					view: served.view,
+					generation,
 					message:
 						`this cursor belongs to another view of the same stream, whose positions are not positions here. ` +
 						`Present a cursor this feed gave you, or read it from the beginning.`,
@@ -429,6 +487,7 @@ function refuse(
 					// the two things a consumer needs in order to re-subscribe DELIBERATELY:
 					// which stream is served now, and where its feed begins
 					stream: served.stream,
+					generation,
 					startCursor: encodeFeedCursor({
 						view: served.view,
 						indexer: served.indexer,
@@ -449,6 +508,7 @@ function refuse(
 				{
 					success: false,
 					error: 'invalid-cursor',
+					generation,
 					message:
 						`this is not a cursor this server issued. A feed cursor is opaque and is only ever obtained from ` +
 						`a feed response: present one unchanged, or omit it to read from the beginning.`,
@@ -493,8 +553,8 @@ function refuse(
  *   Following this one is the correct, automatic behaviour: the consumer of this
  *   view implements no reorg handling, and this is what that promise costs the
  *   server.
- * - `stream` -- the same identity the success path advertises, so a consumer
- *   logging the refusal has the whole context.
+ * - `stream` and `generation` -- the same two identities the success path
+ *   advertises, so a consumer logging the refusal has the whole context.
  *
  * The rewind cursor carries NO block hash, because it names a position the
  * consumer has not been served an entry at; there is nothing yet to validate,
@@ -502,7 +562,10 @@ function refuse(
  * marked at the CURRENT high-water mark, so a further reorg arriving before the
  * consumer acts is still measured from here.
  */
-function rewind(c: Context<{Bindings: Env}>, at: {indexer: string; stream: string; forkBlock: number; mark: number}) {
+function rewind(
+	c: Context<{Bindings: Env}>,
+	at: {indexer: string; stream: string; generation: string; forkBlock: number; mark: number},
+) {
 	logger.info(
 		`canonical: ${JSON.stringify(at.indexer)} answered a rewind to fork block ${at.forkBlock}: a cursor's block is no longer canonical`,
 	);
@@ -511,6 +574,7 @@ function rewind(c: Context<{Bindings: Env}>, at: {indexer: string; stream: strin
 			success: false,
 			error: 'rewind-required',
 			stream: at.stream,
+			generation: at.generation,
 			forkBlock: at.forkBlock,
 			rewindCursor: encodeFeedCursor({
 				view: CANONICAL_FEED_VIEW,

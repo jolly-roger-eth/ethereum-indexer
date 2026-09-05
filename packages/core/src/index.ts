@@ -71,6 +71,16 @@ export {streamConfigHashOf} from './internal/engine/utils.js';
  */
 export {cursorSyncedThrough} from './internal/engine/utils.js';
 export * from './generation/registry.js';
+/**
+ * THE GENERATION IDENTITY AS ONE OPAQUE VALUE, exported because it is what a
+ * server ADVERTISES on every feed response.
+ *
+ * The registry keeps `{stream, processor}` as two fields because it KEYS on
+ * them; a host reporting "which fold answered you" to a consumer outside
+ * etherfold hands over one value instead, so that what a generation is composed
+ * of stays changeable. One rendering, here, rather than one per runtime.
+ */
+export * from './generation/identity.js';
 export * from './generation/memory.js';
 /**
  * THE PROMOTION POLICY: when the canonical pointer moves on its own.

@@ -66,11 +66,18 @@ The write is on the ROUTE rather than inside the fold, which is the opposite pla
 {
 	"success": true,
 	"stream": "0x…",
+	"generation": "<opaque>",
 	"entries": [{"removed": false, "blockNumber": 101, "blockHash": "0x…", "logIndex": 0, "address": "0x…", "topics": ["0x…"], "data": "0x…", "transactionHash": "0x…", "transactionIndex": 0}],
 	"cursor": "<opaque>",
 	"hasMore": true
 }
 ```
+
+**Every response says WHICH GENERATION answered it**, page and refusal alike, on both views. A generation is a stream plus the fold over it, and `generation` exists for the one change no cursor check can catch: a `seq` is a position in a STREAM, so moving to a generation over the SAME stream leaves every cursor valid, and moving to one on a DIFFERENT stream is already refused by the cursor's stream component. What is left is SAME LOGS, DIFFERENT FOLD, which nothing in a cursor can see and which a consumer reading state alongside the feed has to be told about.
+
+The value is OPAQUE: compare it against the last one you saw, never take it apart. Its composition is ours to change (it is `generationDigestOf` over the stream digest and the processor's version hash today) and a consumer that parsed it would be depending on something this project expects to replace. It is also stable while the fold is, so comparing it produces no false positives: more logs arriving does not move it.
+
+**The platform ADVERTISES and does not DICTATE.** There is no rule here about what to do when the value moves. Pausing, re-scanning and carrying on are all legitimate, and only the consumer knows whether its own actions can be taken back: a notifier that already fired cannot unfire. (For the record, and NOT as a rule: pausing and letting an operator decide is the expected behaviour.) Note what a change costs a follower of the FEED, which is nothing: the cursor stays valid and the delivered logs are identical, because the generation is deliberately not a column on the log table.
 
 **The cursor is OPAQUE, and it is VALIDATED rather than trusted.** It is a server-encoded string and not data a client parses: the same call ADR-0027 makes for the sync cursor, taken one step further out, because an encoding a client can read becomes a contract that can never change, and here the audience is not even ours (a consumer is built OUTSIDE etherfold, ADR-0005). It CARRIES the view, the indexer name, the stream and the position, and the first three are never used to route anything. The route already routed; those copies exist so that a MISMATCH is REFUSED rather than answered at a number that means something else:
 
@@ -101,6 +108,7 @@ It does need `getIndexer`, because validating a cursor's stream means knowing WH
 {
 	"success": true,
 	"stream": "0x…",
+	"generation": "<opaque>",
 	"entries": [{"blockNumber": 101, "blockHash": "0x…", "logIndex": 0, "address": "0x…", "topics": ["0x…"], "data": "0x…", "transactionHash": "0x…", "transactionIndex": 0}],
 	"cursor": "<opaque>",
 	"hasMore": true

@@ -215,13 +215,20 @@ describe('the hash is WIDE, SYNCHRONOUS, and rendered FIXED-LENGTH', () => {
 		expect(code).not.toMatch(/simple_hash\(/);
 	});
 
-	it('is the ONLY digest of its kind in the package', () => {
-		// One implementation, never a second one beside it: two that must agree BYTE
-		// FOR BYTE would put a stream at two different ADDRESSES, and the disagreement
-		// would show up as a re-fetch of the whole history rather than as an error.
+	it('is the ONLY implementation of ITSELF, and the only other digest identifies something else', () => {
+		// One implementation OF ONE DIGEST, never a second one beside it: two that must
+		// agree BYTE FOR BYTE would put a stream at two different ADDRESSES, and the
+		// disagreement would show up as a re-fetch of the whole history rather than as
+		// an error.
+		//
+		// `generation/identity.ts` is the one other digest site and is NOT a second
+		// implementation of this one: it identifies a stream PLUS THE FOLD OVER IT, a
+		// different value that nothing addresses storage by, and it is built ON this
+		// digest rather than beside it (a stream digest goes IN). Anything else
+		// appearing in this list is the failure above.
 		const root = fileURLToPath(new URL('../src/', import.meta.url));
 		const hashing = filesUnder(root).filter((file) => /\bsha256\b/.test(readFileSync(file, 'utf-8')));
-		expect(hashing.map((file) => file.slice(root.length))).toEqual(['stream/identity.ts']);
+		expect(hashing.map((file) => file.slice(root.length))).toEqual(['generation/identity.ts', 'stream/identity.ts']);
 	});
 
 	it('produces no collision across a corpus of realistic sources', () => {

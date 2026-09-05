@@ -202,6 +202,35 @@ describe('the receiver owns the cursor', () => {
 	});
 });
 
+describe('the receiver says WHICH GENERATION it is', () => {
+	// a HOST is who reports an answer's identity outward -- `@etherfold/server`
+	// advertises it on every feed response -- and the processor is the one thing a
+	// host cannot see: it hands one over at construction and then holds an
+	// interface that never mentions it again
+	it('is the stream it folds, plus the fold over it', () => {
+		const target = recordingProcessor('v1');
+		const builder = builderOn(target.processor);
+
+		expect(builder.generation).toEqual({stream: builder.streamDigest, processor: 'v1'});
+	});
+
+	it('reads the fold LIVE, so a processor reconfigured after construction is not misreported', () => {
+		// `getVersionHash()` covers a processor's CONFIG as well as its version, and
+		// `configure()` can move it after this object was built. A value snapshotted in
+		// the constructor would advertise a fold that is no longer running, which is
+		// worse than advertising nothing.
+		let version = 'v1';
+		const target = recordingProcessor();
+		const builder = builderOn({...target.processor, getVersionHash: () => version});
+		expect(builder.generation.processor).toBe('v1');
+
+		version = 'v2';
+
+		expect(builder.generation.processor).toBe('v2');
+		expect(builder.generation.stream).toBe(builder.streamDigest);
+	});
+});
+
 describe('the context is validated on every batch', () => {
 	it('refuses a batch belonging to another source, loudly and distinctly', async () => {
 		const target = recordingProcessor();

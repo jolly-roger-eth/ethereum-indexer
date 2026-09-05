@@ -23,6 +23,7 @@ import {
 	deploy,
 	pad,
 	post,
+	readFeed as read,
 	transfer,
 	type Deployment,
 	type TestEnv,
@@ -89,18 +90,13 @@ type FeedBody = {
 	startCursor?: string;
 };
 
+/** The harness's reader, at this suite's idea of what a feed response holds. */
 async function readFeed(
 	deployment: Deployment,
 	name: string,
 	query: {cursor?: string; limit?: number | string} = {},
 ): Promise<{status: number; body: FeedBody; text: string}> {
-	const params = new URLSearchParams();
-	if (query.cursor !== undefined) params.set('cursor', query.cursor);
-	if (query.limit !== undefined) params.set('limit', String(query.limit));
-	const suffix = params.toString() ? `?${params.toString()}` : '';
-	const res = await deployment.app.request(`/${name}/feed${suffix}`);
-	const text = await res.text();
-	return {status: res.status, body: JSON.parse(text), text};
+	return read<FeedBody>(deployment, name, query);
 }
 
 /** Follow the feed to its end, one page at a time, exactly as a consumer would. */
@@ -376,7 +372,9 @@ describe('the cursor is OPAQUE', () => {
 		// beside it: the position is the cursor's business and a consumer never
 		// handles one
 		expect(page.text.replace(page.body.cursor, '')).not.toContain('seq');
-		expect(Object.keys(page.body).sort()).toEqual(['cursor', 'entries', 'hasMore', 'stream', 'success']);
+		// `generation` is the one other identity a page carries: WHICH FOLD answered,
+		// advertised because no cursor check can see a fold change over one stream
+		expect(Object.keys(page.body).sort()).toEqual(['cursor', 'entries', 'generation', 'hasMore', 'stream', 'success']);
 		expect(Object.keys(page.body.entries[0] as object).sort()).toEqual([
 			'address',
 			'blockHash',
@@ -527,7 +525,14 @@ describe('a cursor whose STREAM is no longer served is REFUSED, and the refusal 
 
 		// nothing that would let a consumer read this as "go back to block F and
 		// carry on": a filter change produced logs that were never on the old stream
-		expect(Object.keys(refused.body).sort()).toEqual(['error', 'message', 'startCursor', 'stream', 'success']);
+		expect(Object.keys(refused.body).sort()).toEqual([
+			'error',
+			'generation',
+			'message',
+			'startCursor',
+			'stream',
+			'success',
+		]);
 		const withoutCursor = refused.text.replace(refused.body.startCursor as string, '');
 		expect(withoutCursor).not.toContain('rewind');
 		expect(withoutCursor).not.toContain('forkBlock');
