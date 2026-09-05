@@ -41,6 +41,7 @@ It is optional because an indexer-server is useful before it ingests anything: `
 | `POST /admin/setup` | apply the fixed-table schema |
 | `POST /{indexer}/ingest` | a `WireBatch` from a log-fetcher (ADR-0004), for ONE named indexer |
 | `POST /{indexer}/ingest/expected-from-block` | where that named indexer's next batch must start |
+| `GET /{indexer}/feed` | the RETRACTION-AWARE view over the stored emission stream: `seq`-ordered, `removed` entries included, resumed from an opaque `cursor` the caller holds, `limit` entries at a time |
 
 **The indexer NAME is a ROUTE SEGMENT and is never in the envelope.** Carrying it in the payload was considered and rejected: it would make the wire FORMAT carry tenancy, and it would turn a misdirected batch into a payload error rather than a routing one. ADR-0004's envelope and its refusal families are unchanged, and one refusal sits beside them: a name this host was not built with is a `404 unknown-indexer`, never a default to the indexer it does happen to hold.
 
@@ -55,6 +56,41 @@ It is optional because an indexer-server is useful before it ingests anything: `
 **What this route DOES write is the stored EMISSION STREAM** (ADR-0006): an append-only `EmissionStream` row per emitted log, retractions INCLUDED, superseded rows FLAGGED rather than deleted, so no retraction information is ever destroyed and the canonical view stays a cheap derived read. Every row carries two DISCRIMINATORS, both structurally part of every read and write and neither ever defaulted: the INDEXER NAME (this request's route segment) and the STREAM. The stream's value is `LogIngestion.streamDigest`, the wide digest over the fetch filter plus the stream config -- deliberately NOT the wire context's `{source, config}`, which is a 32-bit whole-entry hash kept whole as an identity check between two halves of a deployment (ADR-0034): as a key it would move on a decode-only ABI change and orphan every stored row, and it would collide. Nothing about the PROCESSOR is a column and there is no generation column, because a processor change is a new generation over the SAME stream.
 
 The write is on the ROUTE rather than inside the fold, which is the opposite placement from the reorg count above, and for a reason about the KEY rather than about the fact: half of it is the indexer name, and the route segment is the only place that value exists (an entry deliberately carries no name, and `run` / `build` refuse `--indexer` outright). The visible consequence is that a COMBINED `etherfold run`, which folds through the direct in-process wire, stores no emission stream today.
+
+## The feed
+
+`GET /{indexer}/feed` is the first of ADR-0006's two views over the stored emission stream, and it is the one for a consumer that WANTS to see reorgs: it acts optimistically on a log and cancels the pending action when a retraction arrives. So retractions are DELIVERED and the `alive` flag is never consulted here. The canonical view (`alive` only, bounded by a caller-supplied block gate, no retraction ever) is a separate view for consumers that never want to hear the word reorg.
+
+```json
+{
+	"success": true,
+	"stream": "0x…",
+	"entries": [{"removed": false, "blockNumber": 101, "blockHash": "0x…", "logIndex": 0, "address": "0x…", "topics": ["0x…"], "data": "0x…", "transactionHash": "0x…", "transactionIndex": 0}],
+	"cursor": "<opaque>",
+	"hasMore": true
+}
+```
+
+**The cursor is OPAQUE, and it is VALIDATED rather than trusted.** It is a server-encoded string and not data a client parses: the same call ADR-0027 makes for the sync cursor, taken one step further out, because an encoding a client can read becomes a contract that can never change, and here the audience is not even ours (a consumer is built OUTSIDE etherfold, ADR-0005). It CARRIES the view, the indexer name, the stream and the position, and the first three are never used to route anything. The route already routed; those copies exist so that a MISMATCH is REFUSED rather than answered at a number that means something else:
+
+| refusal | |
+| --- | --- |
+| `400 indexer-mismatch` | a cursor minted at one named indexer, presented at another. Two named indexers can hold byte-identical streams, so a position in one means nothing in the other. It names the indexer the caller ADDRESSED and never the one the cursor was minted at |
+| `400 view-mismatch` | a cursor from the other view, whose positions count in `(blockNumber, logIndex)` rather than in `seq` |
+| `400 stream-mismatch` | the cursor's stream is not the one served now. THE ONE THAT ANSWERS: it carries `stream` (the current stream's identity) and `startCursor` (a cursor at the position that stream's feed begins at), so a consumer can re-subscribe deliberately |
+| `400 invalid-cursor` | anything else, and it says nothing about WHY on purpose: telling an edited cursor from an invented one would tell a client about the encoding |
+
+**A stream mismatch is explicitly NOT a rewind.** There is no fork block to go back to, because the logs a filter change produces were never on the old stream at all. That is why it hands back a place to START rather than a place to RESUME, and why re-subscribing is a decision a consumer takes rather than a step it automates.
+
+**Holes in `seq` are LEGAL and the read is built for them.** A page is `seq > <position> LIMIT n`, and the next position is the `seq` of the last row ACTUALLY SERVED, never the previous position plus anything. Pair-compaction drops a retracted entry together with its retraction and leaves the surrounding numbers where they were, so contiguity was never available to assume, and a consumer that derived its next position by incrementing would break the day compaction is enabled.
+
+**No position is published anywhere**, which is the other half of the same rule: an entry carries the raw log and the `removed` verdict and no `seq`, because publishing one is how a consumer ends up incrementing it.
+
+`limit` defaults to 100 and is capped at 1000. A larger one is REFUSED rather than silently reduced, so a short page always means the stream is short and never that the server quietly served less.
+
+**The feed is a PUBLIC read**, unlike the ingest routes: `INGEST_TOKEN` is the fetcher's deployment secret and it guards the routes that can WRITE, so putting the feed behind it would mean handing every consumer the credential that moves the cursor. A deployment that needs the feed private puts it behind its own edge.
+
+It does need `getIndexer`, because validating a cursor's stream means knowing WHICH stream is served, and the only thing that knows is the receiver registered under the name. The table cannot answer it: one indexer's rows may span several streams over its life, nothing in them says which is current, and picking one by a heuristic is the plausible wrong answer this design refuses. So a host with no registry answers `501` here for the same reason it does on ingest, and `etherfold serve`, the read tier, does not serve the feed today.
 
 **`/{indexer}/ingest/expected-from-block` is a POST for a question**, deliberately. Answering it can WRITE, because reading the cursor reconciles one belonging to a different source, config or processor version. A `GET` that writes is a trap whatever its justification, so the method matches what it does.
 

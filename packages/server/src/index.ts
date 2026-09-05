@@ -6,6 +6,7 @@ import type {ServerOptions} from './types.js';
 import type {Env} from './env.js';
 import {getStatusAPI, recordError} from './api/status.js';
 import {getIngestAPI} from './api/ingest.js';
+import {getFeedAPI} from './api/feed.js';
 
 export type {Env, ServerOptions};
 export type {CursorReporter} from './types.js';
@@ -34,6 +35,16 @@ export type {RecordedReorg, ReorgCounters} from './reorgs.js';
  */
 export {appendEmissions, EMISSION_STREAM_TABLE} from './emissions.js';
 export type {EmissionAppend} from './emissions.js';
+/**
+ * THE RETRACTION-AWARE FEED's entry shape, exported because a consumer written
+ * in TypeScript reads these and the type is what it reads them as.
+ *
+ * The CURSOR CODEC is deliberately NOT exported. The cursor is opaque
+ * (ADR-0027): publishing a decoder would make the encoding a contract by the
+ * back door, which is the exact outcome opacity exists to prevent. It stays
+ * inside this package, where the two views share it.
+ */
+export type {FeedEntry} from './feed/stream.js';
 
 const corsSetup = cors({
 	origin: '*',
@@ -59,6 +70,7 @@ export function createServer<CustomEnv extends Env>(options: ServerOptions<Custo
 		.use('/*', corsSetup)
 		.route('/', getStatusAPI(options))
 		.route('/', getIngestAPI(options))
+		.route('/', getFeedAPI(options))
 		.onError((err, c) => {
 			const env = c.get('config')?.env || {};
 			recordError(err);
