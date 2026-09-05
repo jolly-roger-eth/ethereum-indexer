@@ -53,6 +53,10 @@ It is ASSEMBLY and not a fourth engine. A log-fetcher pushes into a stream-build
 
 Four numbers, deliberately, and never the cursor itself: the stored cursor is a serialized sync structure carrying a window of decoded events, and `/status` reports whatever a host hands it verbatim (ADR-0047). `lastToBlock` is what moves; `latestBlock - lastToBlock` is how far behind it is.
 
+**It also counts the reorgs it concluded**, in `reorgs: {absence, contradiction, last}`, and the split is the whole point. A `contradiction` is PROOF -- the same block height now carries a different hash -- and is ordinary chain activity. An `absence` is an INFERENCE: a block we held is simply not in the re-delivered range, which is indistinguishable from a node that under-delivered it. Both revert state, so folding them into one number would hide the only signal that says "your logs are being truncated or your filter is wrong" rather than "the chain reorged" (ADR-0004). Neither makes the process unhealthy: an absence-driven revert is a signal to investigate, not a fault.
+
+**All three folding shapes carry these counters, not just the one behind an HTTP route.** `run`, `build` and `index` all count the reverts they concluded, into the database they fold into, through one writer (ADR-0050) -- so `run` and `fetch` plus `index` agree about a reorg the way they already agree about state and the cursor, and `packages/cli/test/equivalence.test.ts` compares them directly. `serve` reports what its database holds, since it folds nothing and concludes nothing. A count that cannot be written (a database with no fixed tables, see `--no-auto-setup`) is a logged miscount and never a fold that stops.
+
 **A `run` process hosts no remote writer.** It fetches for itself, so no ingestion capability is injected into its server: an authenticated call to `/ingest` answers `501 ingestion-not-configured`, and an unauthenticated one answers `401`, exactly as on the read tier. A remote sender pushing into a process that is already fetching would be a second writer nobody asked for; the command that receives pushes is `index`. That is why `--ingest-endpoint` and `--ingest-token` are refused here: the two halves meet in this process through a direct in-process ingestion, so there is no wire to configure.
 
 ## `etherfold build` -- one shot, to the tip, then exit
@@ -69,6 +73,8 @@ Named for what it PRODUCES: a database. What it does: load the processor module,
 **It is `run` without the serving, stopping at the tip**, and that is true of the code rather than of this sentence: both commands assemble through one function and differ by whether the loop aborts on the first report that reached the tip.
 
 **It is a ONE-SHOT and nothing else.** It does not follow the chain, does not stay up, and cannot be reconfigured while it runs: to keep a database current, run it again (a cron, a loop, a job). It resumes rather than restarting, because the sync cursor is in the store, written in the same transaction as the block it describes (ADR-0027). Live reconfiguration is the browser package's ability, not this one's.
+
+**The database it emits carries its provenance**, which is why `build` applies the fixed-table schema even though it binds no port: the artifact records the schema version and the reorgs it concluded (`absence` versus `contradiction`, exactly as `run` and `index` record them -- ADR-0050), so a `serve` pointed at it, or a later process fed it, reads the same facts a `run` database carries. Nothing else in this command would ever create those tables, and a database that loses its provenance the moment it becomes an INPUT is the failure this prevents. `--no-auto-setup` is refused here: the one-shot answers no queries, and there is no startup to decline the tables at.
 
 | flag | |
 | --- | --- |
@@ -140,7 +146,7 @@ etherfold index \
 
 **A replayed or resumed push is safe, because the cursor IS the idempotency key.** A batch that does not start where this receiver says the next one must is refused with a `409` carrying that block, and the sender re-sends from there; a sender that fell behind is corrected with no operator involved, and a batch re-sent after a lost acknowledgement cannot be applied twice. There is no dedupe table and no idempotency header, deliberately.
 
-**`/status` reports the cursor here, exactly as on `run`**, because this is the half that owns the store. It also counts the reorgs it derived (`absence` versus `contradiction`, ADR-0004): a rising rate of the absence kind means truncation or misconfiguration rather than chain activity.
+**`/status` reports the cursor here, exactly as on `run`**, because this is the half that owns the store. It also counts the reorgs it derived (`absence` versus `contradiction`, ADR-0004): a rising rate of the absence kind means truncation or misconfiguration rather than chain activity. Those counts are taken by the FOLD and written by the process that owns the store (ADR-0050), so this half and a combined `run` over the same chain report the same numbers -- the ingest route is a caller of that path rather than the owner of it, and a receiver that both concludes a revert and serves the request that carried it counts it once.
 
 **How it stops.** `SIGINT` / `SIGTERM` shut the listener down and exit `0`. It never stops on its own: a receiver has no tip to reach, because what it folds arrives from somewhere else. A configuration it refuses, a module it cannot drive or a database it cannot open exits `1` without binding a port.
 
@@ -152,7 +158,7 @@ One thing it does not have yet: an indexer-NAME route segment. This is one index
 etherfold serve --db file:./etherfold.db --port 2000
 ```
 
-**It only serves.** It holds no processor, makes no chain call, receives no logs and writes no indexed state: it answers queries over a database something ELSE wrote, so a serving tier can scale or move without carrying an indexer with it. Point it at a database `etherfold build` produced, or at the one `etherfold index` is folding into.
+**It only serves.** It holds no processor, makes no chain call, receives no logs and writes no indexed state: it answers queries over a database something ELSE wrote, so a serving tier can scale or move without carrying an indexer with it. Point it at a database `etherfold build` produced, or at the one `etherfold index` is folding into -- both carry the fixed tables and both carry their reorg counters, so a read tier reports the same numbers whichever shape wrote the database.
 
 **It answers `/status` WITHOUT a cursor, and that is correct rather than missing.** The cursor reaches `/status` only through a reporter the host injects, and only a process that OWNS the store can read one; a read tier owns none and is given none, so its `/status` carries no `cursor` field at all rather than an invented one. What it does report is what the server derives from the DATABASE itself -- health, the schema version, the reorg counters -- so those agree with what the writer of that database reports.
 

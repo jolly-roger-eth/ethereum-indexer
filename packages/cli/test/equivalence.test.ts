@@ -1,12 +1,15 @@
 import {mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import type {ReorgCounters} from '@etherfold/core';
 import type {EnvRecord} from '@etherfold/fetcher-host';
 import {createNodeDB, startServer, type RunningServer} from '@etherfold/platform-nodejs';
 import type {RunningFetcher} from '@etherfold/platform-nodejs-fetcher';
+import {readReorgCounters, readSchemaState} from '@etherfold/server';
 import {createQuerySurface, VersionedStateStore} from '@etherfold/state-store-sqlite';
 import {afterEach, describe, expect, it} from 'vitest';
 import {
+	build,
 	fetch as startFetch,
 	index,
 	run,
@@ -141,10 +144,32 @@ async function until<T>(read: () => Promise<T>, done: (value: T) => boolean, wha
 
 type Status = {
 	healthy: boolean;
-	reorgs?: {absence: number; contradiction: number; last?: unknown};
+	reorgs?: ReorgCounters;
 	schema: {applied: boolean; version?: number; expected: number; matches?: boolean};
 	cursor?: {reported: boolean; value?: StoreCursorReport};
 };
+
+/**
+ * The counts alone, which is what two deployments can be compared on.
+ *
+ * `last.at` is a WALL CLOCK reading taken by whichever process wrote the row, so
+ * two shapes folding one chain agree about everything in it except that. Pinning
+ * it would make this comparison fail for a reason it does not care about; the
+ * classification and the block, which is what the field is FOR, are compared
+ * below and in full.
+ */
+function countsOf(reorgs: ReorgCounters | undefined): {absence: number; contradiction: number} {
+	expect(reorgs, 'a folding deployment reports its reorg counters on /status').toBeDefined();
+	return {absence: reorgs!.absence, contradiction: reorgs!.contradiction};
+}
+
+/** The last recorded reorg, minus the clock reading two processes cannot share. */
+function lastReorgOf(reorgs: ReorgCounters | undefined): Record<string, unknown> | undefined {
+	if (!reorgs?.last) return undefined;
+	const {at, ...detection} = reorgs.last;
+	expect(at, 'a recorded reorg says when it was written down').toEqual(expect.any(String));
+	return detection;
+}
 
 async function statusOf(url: string): Promise<Status> {
 	return (await (await globalThis.fetch(`${url}/status`)).json()) as Status;
@@ -185,9 +210,13 @@ async function readsOver(url: string): Promise<unknown> {
 const tokenID = (id: bigint) => id.toString().padStart(78, '0');
 
 /** `etherfold run`: the combined deployment, folding into a database it owns. */
-async function startCombined(db: string, chain: ReturnType<typeof fakeChain>): Promise<RunningIndexer> {
+async function startCombined(
+	db: string,
+	chain: ReturnType<typeof fakeChain>,
+	over: Partial<Options> = {},
+): Promise<RunningIndexer> {
 	return run(
-		{processor: './nfts.js', store: 'sqlite', db, nodeUrl: 'http://localhost:0', port: '0'},
+		{processor: './nfts.js', store: 'sqlite', db, nodeUrl: 'http://localhost:0', port: '0', ...over},
 		{
 			importModule: async () => entityModule,
 			provider: chain.provider,
@@ -288,9 +317,137 @@ describe('`run` and `fetch` plus `index` land on IDENTICAL state', () => {
 		expect(viaWire!.latestBlock).toBe(inOneProcess!.latestBlock);
 		expect(viaWire!.lastToBlock).toBe(TIP_B);
 
-		// the reorg was concluded on both sides from raw ranges alone, and on the
-		// split side it was concluded by the RECEIVER, which never saw a chain
-		expect((await statusOf(receiver.url)).reorgs).toMatchObject({contradiction: 1, absence: 0});
+		// -------------------------------------------------------------------------
+		// THE REORG COUNTERS, COMPARED DIRECTLY AND WITH NO EXCEPTION
+		// -------------------------------------------------------------------------
+		// This was the ONE `/status` field that could not be compared between the two
+		// shapes: the count was written by the HTTP ingest route, and a combined
+		// process folds through the direct in-process wire and never touches it, so
+		// `run` reported `{absence: 0, contradiction: 0}` for ever. The count is a fact
+		// about the FOLD, so it is taken inside `StreamBuilder.receive` now and written
+		// by whoever owns the store (ADR-0050) -- which makes it exactly as comparable
+		// as the state and the cursor above, and it is compared here as one.
+		// -------------------------------------------------------------------------
+		const countedViaWire = (await statusOf(receiver.url)).reorgs;
+		const countedInOneProcess = (await statusOf(combined.url)).reorgs;
+
+		// the SPLIT shape's count is UNCHANGED by the move, asserted rather than
+		// assumed: it is the number this test already pinned before `run` could count
+		// at all, and the reorg on that side was concluded by the RECEIVER, which never
+		// saw a chain
+		expect(countsOf(countedViaWire)).toEqual({contradiction: 1, absence: 0});
+
+		// ...and the combined process agrees, number for number
+		expect(countsOf(countedInOneProcess)).toEqual(countsOf(countedViaWire));
+
+		// ONCE-ONLY, in each shape, which is what `contradiction: 1` above says twice
+		// over: the combined process both concludes the revert and receives the batch
+		// that carried it, and counts it once; the split receiver concludes it and its
+		// route receives it, and counts it once. A second call site on either entrance
+		// would make one of these 2.
+		expect(countedInOneProcess!.contradiction + countedInOneProcess!.absence).toBe(1);
+		expect(countedViaWire!.contradiction + countedViaWire!.absence).toBe(1);
+
+		// and the same CLASSIFICATION of the same block: absence versus contradiction
+		// is what tells an operator their RPC provider is truncating results rather
+		// than that the chain reorged (ADR-0004), so the two shapes agreeing on the
+		// number while disagreeing on the kind would be no agreement at all
+		expect(lastReorgOf(countedInOneProcess)).toEqual(lastReorgOf(countedViaWire));
+		expect(lastReorgOf(countedInOneProcess)).toMatchObject({
+			cause: 'contradiction',
+			blockNumber: START_BLOCK + 90,
+		});
+	});
+
+	it('folds identically when it cannot write the counter at all', async () => {
+		// The guarantee `recordReorgSafely` gave on the ingest route, now owed by every
+		// shape that counts and asserted on the COMBINED one: a counter that cannot be
+		// persisted is a logged miscount, never a fold that stops.
+		//
+		// `--no-auto-setup` is the honest way to produce that: the operator has said
+		// somebody else migrates this database, so the fixed `Meta` table the counters
+		// live in is simply not there and every write against it fails.
+		directory = mkdtempSync(join(tmpdir(), 'etherfold-uncounted-'));
+		const uncountedDB = `file:${join(directory, 'uncounted.db')}`;
+		const chain = fakeChain();
+
+		combined = await startCombined(uncountedDB, chain, {autoSetup: false});
+
+		for (const state of CHAIN_STATES) {
+			chain.serve([...state.logs], state.tip);
+			await until(
+				() => cursorOf(combined!.url),
+				(cursor) => cursor?.lastToBlock === state.tip,
+				`the uncounted deployment to reach block ${state.tip}`,
+			);
+		}
+
+		// the write really could not land: no fixed tables, so no counters at all
+		const status = await statusOf(combined.url);
+		expect(status.schema.applied).toBe(false);
+		expect(status.reorgs).toBeUndefined();
+
+		// ...and the fold went through the reorg regardless, landing exactly where a
+		// counting deployment lands
+		expect(await readsOver(uncountedDB)).toMatchObject({
+			byId: {
+				1: {owner: ALICE.toLowerCase()},
+				2: {owner: BOB.toLowerCase()},
+				3: {owner: CAROL.toLowerCase()},
+				transfers: {value: 3},
+			},
+		});
+	});
+});
+
+// ---------------------------------------------------------------------------------------------------
+// `build` EMITS AN ARTIFACT, AND AN ARTIFACT CARRIES ITS PROVENANCE
+// ---------------------------------------------------------------------------------------------------
+// The one-shot terminates at the tip, so nobody polls `/status` on it -- which is
+// true and beside the point. The value is not the live poll, it is what the
+// produced DATABASE carries: `build` is meant to emit a publishable artifact that
+// is later fed into another process, so a database it produced must carry the
+// same facts as one `run` produced, or it silently loses its provenance the
+// moment it becomes an INPUT rather than an output.
+//
+// That is why `build` applies the fixed-table schema it used to lack: it binds no
+// port, so nothing else ever would.
+// ---------------------------------------------------------------------------------------------------
+
+describe('`build` emits a database carrying the reorgs it concluded', () => {
+	it('applies the Meta schema it once lacked, and counts through the same writer', async () => {
+		directory = mkdtempSync(join(tmpdir(), 'etherfold-artifact-'));
+		const artifact = `file:${join(directory, 'artifact.db')}`;
+		const chain = fakeChain();
+		const options: Options = {processor: './nfts.js', store: 'sqlite', db: artifact, nodeUrl: 'http://localhost:0'};
+		const deps = {
+			importModule: async () => entityModule,
+			provider: chain.provider,
+			sleep: async () => {},
+			env: DEPLOYMENT,
+		};
+
+		// two one-shots over ONE artifact: the second resumes from the cursor the
+		// first left and meets the replacement branch, which is the only way a
+		// stop-at-tip command sees a reorg at all
+		for (const state of CHAIN_STATES) {
+			chain.serve([...state.logs], state.tip);
+			await build(options, deps);
+		}
+
+		const emitted = createNodeDB(artifact);
+
+		// the fixed tables are IN the artifact, so a `serve` pointed at it reports a
+		// schema version rather than calling it unhealthy
+		expect(await readSchemaState(emitted)).toMatchObject({applied: true, matches: true});
+
+		// ...and the counters are the ones `run` and `index` reach on the same chain
+		expect(await readReorgCounters(emitted)).toMatchObject({contradiction: 1, absence: 0});
+
+		// the fold is the same fold, which is what makes the counter worth comparing
+		expect(await readsOver(artifact)).toMatchObject({
+			byId: {3: {owner: CAROL.toLowerCase()}, transfers: {value: 3}},
+		});
 	});
 });
 
@@ -308,16 +465,15 @@ describe('`run` and `fetch` plus `index` land on IDENTICAL state', () => {
 //
 //   asserted   the SCHEMA version, which the server reads out of the database
 //              itself, is the same on the read tier as on `run`.
-//   asserted   the REORG COUNTERS the read tier reports are the ones its
-//              database holds -- the same numbers the WRITER of that database
-//              reports. `run`'s counters are not the comparison object: the
-//              counter is written by the HTTP ingest route (`recordReorg`), and
-//              a combined process folds through the direct in-process wire and
-//              never touches that route, so it counts none. That gap is real
-//              and is recorded in
-//              `work/notes/observations/a-run-process-counts-no-reorgs-on-status.md`;
-//              it is not this task's to close, and asserting equality here
-//              would pin a number that means "nobody counted".
+//   asserted   the REORG COUNTERS. All THREE processes are compared, and that is
+//              new: the read tier reports what its database holds, the WRITER of
+//              that database reports the same, and so does `run`. This used to
+//              carry an exception -- the count was written by the HTTP ingest
+//              route, so a combined process, which folds through the direct
+//              in-process wire and never touches a route, counted none, and
+//              comparing against it would have pinned a number meaning "nobody
+//              counted". The count is a fact about the FOLD now (ADR-0050), so
+//              the exception and the observation it pointed at are both gone.
 //   NOT        the CURSOR. It reaches `/status` only through an INJECTED
 //              reporter, and a read tier owns no store and is given none, so
 //              `serve` reports no cursor. That is correct rather than a bug, and
@@ -390,9 +546,12 @@ describe('`index` plus `serve` against ONE database answer what `run` answers', 
 		expect(readTierStatus.healthy).toBe(true);
 
 		// so are the reorg counters, which the read tier reads out of the database its
-		// writer counted them into
+		// writer counted them into -- and which the COMBINED process now reports too,
+		// so all three agree about the reverts they concluded from one chain
 		expect(readTierStatus.reorgs).toEqual(writerStatus.reorgs);
-		expect(readTierStatus.reorgs).toMatchObject({contradiction: 1, absence: 0});
+		expect(countsOf(readTierStatus.reorgs)).toEqual({contradiction: 1, absence: 0});
+		expect(countsOf(combinedStatus.reorgs)).toEqual(countsOf(readTierStatus.reorgs));
+		expect(lastReorgOf(combinedStatus.reorgs)).toEqual(lastReorgOf(readTierStatus.reorgs));
 
 		// and the cursor is absent, because a read tier owns no store and is given no
 		// reporter. `run` reports one; this is the honest size of the read tier today

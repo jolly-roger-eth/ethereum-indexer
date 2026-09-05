@@ -3,6 +3,7 @@ import {beforeEach, describe, expect, it} from 'vitest';
 import {IndexerGeneration} from '../src/indexer.js';
 import {InvalidBatchError, UnexpectedFromBlockError, WireContextMismatchError} from '../src/errors.js';
 import {StreamBuilder, parseWireBatch, serializeWireBatch} from '../src/streamBuilder.js';
+import type {ReorgDetection} from '../src/index.js';
 import type {EventProcessor, IndexingSource, LastSync, LogEvent, WireBatch} from '../src/types.js';
 
 // ---------------------------------------------------------------------------
@@ -417,6 +418,142 @@ describe('reorgs are derived here, from raw logs alone', () => {
 		const identity = (events: LogEvent<TestABI>[]) =>
 			events.map((e) => `${e.removed ? '-' : '+'}${e.blockNumber}:${e.blockHash}:${e.transactionHash}`);
 		expect(identity(viaWire.flat())).toEqual(identity(viaEngine.flat()));
+	});
+});
+
+// ---------------------------------------------------------------------------
+// THE COUNT IS TAKEN HERE, ONCE, AND CANNOT TAKE THE FOLD DOWN (ADR-0050)
+// ---------------------------------------------------------------------------
+// The reorg counters used to be written by the HTTP ingest route, which made an
+// operational counter a fact about the TRANSPORT: `etherfold run` folds through
+// `createDirectIngestion`, reaches no route, and reported
+// `{absence: 0, contradiction: 0}` for ever. A revert is concluded HERE, so it is
+// counted here -- once per concluded revert, whichever entrance the batch came
+// in through -- and persisted by whoever owns the store.
+// ---------------------------------------------------------------------------
+
+describe('a concluded reorg is counted exactly once, by whoever owns the store', () => {
+	function recorder() {
+		const seen: ReorgDetection[] = [];
+		return {seen, record: (reorg: ReorgDetection) => void seen.push(reorg)};
+	}
+
+	async function upTo105(builder: StreamBuilder<TestABI, void>) {
+		await builder.receive(
+			batch(builder, {
+				fromBlock: 100,
+				toBlock: 105,
+				latestBlock: 105,
+				logs: [transfer(101, '0xa101', 1n), transfer(104, '0xa104', 2n)],
+			}),
+		);
+	}
+
+	it('reports the revert to the recorder ONCE, with what it reported to the caller', async () => {
+		const target = recordingProcessor();
+		const journal = recorder();
+		const builder = new StreamBuilder<TestABI, void>(target.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			recordReorg: journal.record,
+		});
+		await upTo105(builder);
+		expect(journal.seen).toHaveLength(0);
+
+		const result = await builder.receive(
+			batch(builder, {fromBlock: 102, toBlock: 106, latestBlock: 106, logs: [transfer(104, '0xb104', 3n)]}),
+		);
+
+		// once, and the SAME detection the outcome carries. A caller that counted
+		// `outcome.reorg` as well would double-count the shape that both concludes and
+		// receives, which is why the outcome is reported and never delegated.
+		expect(journal.seen).toEqual([result.reorg]);
+	});
+
+	it('counts nothing on a batch that concluded nothing, however many arrive', async () => {
+		const target = recordingProcessor();
+		const journal = recorder();
+		const builder = new StreamBuilder<TestABI, void>(target.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			recordReorg: journal.record,
+		});
+		await upTo105(builder);
+		await builder.receive(
+			batch(builder, {fromBlock: 102, toBlock: 108, latestBlock: 108, logs: [transfer(104, '0xa104', 2n)]}),
+		);
+		expect(journal.seen).toEqual([]);
+	});
+
+	it('applies the batch and answers the sender even when the counter cannot be written', async () => {
+		// The guarantee `recordReorgSafely` gave on the route, now owed by every shape:
+		// the state and the cursor already moved atomically, so a failed operational
+		// counter is a logged miscount and never a refusal that tells a sender to
+		// re-send a batch which was in fact applied.
+		const target = recordingProcessor();
+		const builder = new StreamBuilder<TestABI, void>(target.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			recordReorg: () => {
+				throw new Error('no such table: Meta');
+			},
+		});
+		await upTo105(builder);
+
+		const result = await builder.receive(
+			batch(builder, {fromBlock: 102, toBlock: 106, latestBlock: 106, logs: [transfer(104, '0xb104', 3n)]}),
+		);
+
+		expect(result.reorg).toMatchObject({cause: 'contradiction', blockNumber: 104});
+		expect(result.retracted).toBe(1);
+		expect(result.applied).toBe(1);
+		expect(target.lastSync?.lastToBlock).toBe(106);
+	});
+
+	it('rejects nothing when a recorder rejects ASYNCHRONOUSLY either', async () => {
+		const target = recordingProcessor();
+		const builder = new StreamBuilder<TestABI, void>(target.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			recordReorg: async () => {
+				throw new Error('the database went away');
+			},
+		});
+		await upTo105(builder);
+
+		await expect(
+			builder.receive(batch(builder, {fromBlock: 102, toBlock: 106, latestBlock: 106, logs: []})),
+		).resolves.toMatchObject({reorg: {cause: 'absence'}});
+	});
+
+	it('folds exactly the same with no recorder at all, which is a host with nowhere to write', async () => {
+		const counted = recordingProcessor();
+		const journal = recorder();
+		const withRecorder = new StreamBuilder<TestABI, void>(counted.processor, SOURCE, {
+			stream: {finality: FINALITY},
+			recordReorg: journal.record,
+		});
+		const blind = recordingProcessor();
+		const withoutRecorder = builderOn(blind.processor);
+
+		for (const round of [
+			{fromBlock: 100, toBlock: 105, latestBlock: 105, logs: [transfer(104, '0xa104', 2n)]},
+			{fromBlock: 102, toBlock: 106, latestBlock: 106, logs: [transfer(104, '0xb104', 3n)]},
+		]) {
+			await withRecorder.receive(batch(withRecorder, round));
+			await withoutRecorder.receive(batch(withoutRecorder, round));
+		}
+
+		const identity = (events: LogEvent<TestABI>[]) =>
+			events.map((e) => `${e.removed ? '-' : '+'}${e.blockNumber}:${e.blockHash}`);
+		expect(identity(blind.flat())).toEqual(identity(counted.flat()));
+		// ...and only one of them could say so afterwards
+		expect(journal.seen).toHaveLength(1);
+	});
+
+	it('hashes no recorder into the wire identity: where a count goes is not what a sender asserts', () => {
+		const plain = builderOn(recordingProcessor().processor);
+		const counting = new StreamBuilder<TestABI, void>(recordingProcessor().processor, SOURCE, {
+			stream: {finality: FINALITY},
+			recordReorg: () => undefined,
+		});
+		expect(counting.context).toEqual(plain.context);
 	});
 });
 

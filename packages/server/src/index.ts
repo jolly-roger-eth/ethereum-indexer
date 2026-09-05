@@ -13,8 +13,14 @@ export type {CursorReport, StatusCursor} from './cursor.js';
 export {SCHEMA_VERSION, applySchema, readSchemaState} from './schema.js';
 export type {SchemaState} from './schema.js';
 export type {Config} from './setup.js';
-export {readReorgCounters, recordReorg} from './reorgs.js';
-export type {ReorgCounters} from './reorgs.js';
+/**
+ * The counters are READ here and written nowhere in this package: a reorg is
+ * concluded by the fold, so the process that owns the store counts it through
+ * `ReorgRecorder` (`@etherfold/core`, ADR-0050). This server is one of the
+ * READERS, including on a read tier that owns no store at all.
+ */
+export {readReorgCounters} from './reorgs.js';
+export type {RecordedReorg, ReorgCounters} from './reorgs.js';
 
 const corsSetup = cors({
 	origin: '*',

@@ -2,6 +2,18 @@ export * from './types.js';
 export * from './errors.js';
 export * from './indexer.js';
 export * from './streamBuilder.js';
+/**
+ * THE REORG COUNTERS: what a fold says about the reverts it concluded.
+ *
+ * Exported from here, rather than from whichever package happens to hold a
+ * database, because the WRITER and the READER of these counts are deliberately
+ * different deployments (ADR-0050): the process that owns the store writes them
+ * through `ReorgRecorder`, and a read tier that owns no store at all reads them
+ * back off the database. Two packages have to name one key, and this is the only
+ * package both of them already depend on -- and the one that decides what a
+ * `ReorgCause` means in the first place.
+ */
+export * from './reorgCounters.js';
 export * from './logFetcher.js';
 export * from './ingestClient.js';
 export * from './directIngestion.js';
