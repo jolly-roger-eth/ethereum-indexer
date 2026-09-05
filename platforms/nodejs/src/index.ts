@@ -92,6 +92,31 @@ export function createNodeDB(url: string): RemoteSQL {
 }
 
 /**
+ * Apply the fixed-table schema if the database does not already carry it.
+ *
+ * Exposed for the same reason `createNodeDB` is: it is what a Node host does to
+ * a libSQL database before anything uses it, and `etherfold build` needs it
+ * WITHOUT starting a server. The one-shot binds no port, so nothing else would
+ * ever create the `Meta` table -- and a database it emitted would then be a
+ * publishable artifact that has lost its provenance the moment it becomes an
+ * input to another process (no schema version, no reorg counters). The fixed
+ * tables belong to the ARTIFACT rather than to whichever process happens to be
+ * serving it.
+ *
+ * Idempotent: the DDL is `IF NOT EXISTS` and the version row is an upsert, so
+ * `startServer`'s own auto-setup and a one-shot that already ran cost nothing.
+ *
+ * @returns whether it had to apply anything.
+ */
+export async function ensureFixedSchema(db: RemoteSQL, describedAs?: string): Promise<boolean> {
+	const state = await readSchemaState(db);
+	if (state.applied) return false;
+	logger.info(`applying fixed-table schema to ${describedAs ?? 'the database handle this process holds'}`);
+	await applySchema(db);
+	return true;
+}
+
+/**
  * Start the indexer-server on Node.
  *
  * This is the whole adapter: it decides what `getDB`, `getEnv`, `getIngestion`
@@ -119,11 +144,7 @@ export async function startServer(options: StartOptions = {}): Promise<RunningSe
 	}
 
 	if (options.autoSetup !== false) {
-		const state = await readSchemaState(db);
-		if (!state.applied) {
-			logger.info(`applying fixed-table schema to ${dbURL ?? 'the database handle this server was given'}`);
-			await applySchema(db);
-		}
+		await ensureFixedSchema(db, dbURL ?? 'the database handle this server was given');
 	}
 
 	const app = createServer<NodeEnv>({

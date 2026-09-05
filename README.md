@@ -28,6 +28,8 @@ NFT_CONTRACT=0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d NFT_START_BLOCK=21000000
 
 To keep that database CURRENT and answer over it, swap one word: `etherfold run` is the same assembly that follows the chain instead of stopping at the tip, and serves `/status` (health, reorg counters, and a cursor that advances) on the port you name. One process, no split to think about.
 
+Every folding shape counts the reorgs it concluded, and all three write the same two numbers into the database they fold into: `run`, `build` and `index` alike, through one writer (`docs/adr/0050`). A `contradiction` is PROOF -- the same block height now carries a different hash -- and is ordinary chain activity; an `absence` is an INFERENCE, a block we held that is simply not in the re-delivered range, which is indistinguishable from a node that under-delivered it. Both revert state, so they are never folded into one number: a rising absence rate says "your logs are being truncated or your filter is wrong", not "the chain reorged" (`docs/adr/0004`). `serve` reports what its database holds, so a read tier answers the same numbers its writer does, and a database `build` emitted carries them too.
+
 ## Main features:
 
 - written in typescript, run both in a browser context and node

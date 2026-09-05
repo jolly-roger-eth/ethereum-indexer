@@ -1,8 +1,9 @@
-import type {Abi, EventProcessor, IndexingSource, ProvidedStreamConfig} from '@etherfold/core';
+import type {Abi, EventProcessor, IndexingSource, ProvidedStreamConfig, ReorgRecorder} from '@etherfold/core';
 import {streamConfigFromEnv, type EnvRecord} from '@etherfold/fetcher-host';
 import type {EntityProcessor, StateStore} from '@etherfold/processor-entities';
 import {loadContracts} from '@etherfold/utils';
 import type {RemoteSQL} from 'remote-sql';
+import {reorgRecorderFor} from './reorgCounters.js';
 import type {ExplicitSource, StoreTarget} from './types.js';
 
 // ---------------------------------------------------------------------------------------------------
@@ -69,13 +70,23 @@ export async function openExplicitSource<ABI extends Abi>(origin: ExplicitSource
 
 /**
  * Build the `EventProcessor` a stream-builder drives, plus the store it writes
- * to and the ONE database handle underneath both.
+ * to, the ONE database handle underneath both, and the recorder that counts what
+ * a reorg did to them.
  *
  * The handle is returned rather than kept, because a command that also serves
  * hands this SAME object to the server (`platforms/nodejs`'s `StartOptions.db`
  * takes one): the store and the read surface then see one database rather than
  * two connections with two views of it -- against `:memory:` they would not even
  * be the same database.
+ *
+ * ## Why the reorg recorder is built HERE
+ *
+ * Because this is where the store is OWNED, and a concluded reorg is counted by
+ * whoever owns the store (ADR-0050). All three folding commands come through
+ * this function, so all three count, and none of them can bind the recorder to a
+ * different database than the one they fold into. `run` used to count nothing at
+ * all, because the write lived on an HTTP route a combined process never
+ * touches.
  *
  * The imports are dynamic so that a command which never opens a database does
  * not pay for libSQL, matching how `serve` keeps the server's dependency tree
@@ -84,15 +95,38 @@ export async function openExplicitSource<ABI extends Abi>(origin: ExplicitSource
 export async function buildProcessor<ABI extends Abi, ProcessResultType>(
 	declared: EntityProcessor<ABI, any>,
 	target: StoreTarget,
-	context: {finalityDepth: number; createDB?: (url: string) => RemoteSQL},
-): Promise<{processor: EventProcessor<ABI, ProcessResultType>; store: StateStore; db: RemoteSQL}> {
-	const [{EntityEventProcessor}, {VersionedStateStore}, {createNodeDB}] = await Promise.all([
+	context: {
+		finalityDepth: number;
+		createDB?: (url: string) => RemoteSQL;
+		/**
+		 * Create the fixed tables (`Meta`) if they are absent, rather than leaving it
+		 * to whatever binds a port.
+		 *
+		 * `build` sets it, because the one-shot starts no server and a database it
+		 * emitted is a publishable ARTIFACT: without this it would carry neither a
+		 * schema version nor a reorg count, and would lose its provenance the moment it
+		 * became an INPUT. `run` and `index` leave it alone -- they bind a port, and
+		 * `--no-auto-setup` is the operator saying somebody else migrates this
+		 * database, which this must not override.
+		 */
+		applyFixedSchema?: boolean;
+	},
+): Promise<{
+	processor: EventProcessor<ABI, ProcessResultType>;
+	store: StateStore;
+	db: RemoteSQL;
+	recordReorg: ReorgRecorder;
+}> {
+	const [{EntityEventProcessor}, {VersionedStateStore}, {createNodeDB, ensureFixedSchema}] = await Promise.all([
 		import('@etherfold/processor-entities'),
 		import('@etherfold/state-store-sqlite'),
 		import('@etherfold/platform-nodejs'),
 	]);
 
 	const handle = context.createDB ? context.createDB(target.db) : createNodeDB(target.db);
+	if (context.applyFixedSchema) {
+		await ensureFixedSchema(handle, target.db);
+	}
 	// The finality depth is the stream's own, resolved by the caller from
 	// `streamConfigFor`: a retention window is validated against the depth a reorg
 	// can actually reach, and a number written here instead would be a second
@@ -108,5 +142,10 @@ export async function buildProcessor<ABI extends Abi, ProcessResultType>(
 	const processor = new EntityEventProcessor<ABI, any>(store, declared, {
 		finalityDepth: context.finalityDepth,
 	});
-	return {processor: processor as unknown as EventProcessor<ABI, ProcessResultType>, store, db: handle};
+	return {
+		processor: processor as unknown as EventProcessor<ABI, ProcessResultType>,
+		store,
+		db: handle,
+		recordReorg: reorgRecorderFor(handle),
+	};
 }

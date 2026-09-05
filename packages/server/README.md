@@ -46,6 +46,8 @@ export const app = createServer<MyEnv>({
 
 **There is no idempotency key and no dedupe table: the cursor IS the key.** A batch re-sent after a lost acknowledgement fails the `expectedFromBlock` check and is corrected, so at-least-once on the wire is exactly-once in effect.
 
+**This route COUNTS no reorgs, and that is deliberate.** It used to, which quietly made an operational counter a fact about the TRANSPORT: a combined process folds through `createDirectIngestion`, reaches no route, and reported no reverts at all. A revert is concluded by the FOLD, so it is counted once inside `StreamBuilder.receive` and persisted by whoever owns the store (ADR-0050) -- this package reads those counts for `/status` and writes none. A host that wants them supplies a `ReorgRecorder` to the stream-builder it builds, exactly as it already supplies the database, the environment, the ingestion and the cursor reporter.
+
 **`/ingest/expected-from-block` is a POST for a question**, deliberately. Answering it can WRITE, because reading the cursor reconciles one belonging to a different source, config or processor version. A `GET` that writes is a trap whatever its justification, so the method matches what it does.
 
 `/status` reports reverts concluded from ABSENCE separately from those concluded from a hash CONTRADICTION, because absence is an inference and a rising rate of it means truncation or misconfiguration rather than chain activity. It does not make the server unhealthy: it is a signal to investigate, not a fault.

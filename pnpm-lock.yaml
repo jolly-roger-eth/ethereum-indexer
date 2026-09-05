@@ -720,6 +720,9 @@ importers:
         specifier: ^0.0.7
         version: 0.0.7(@libsql/core@0.17.4)
     devDependencies:
+      '@etherfold/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1

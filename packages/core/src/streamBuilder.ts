@@ -12,6 +12,7 @@ import {
 	wireContextOf,
 	type ReorgDetection,
 } from './internal/engine/utils.js';
+import type {ReorgRecorder} from './reorgCounters.js';
 import type {
 	EventProcessor,
 	IndexingSource,
@@ -39,7 +40,16 @@ export type IngestionOutcome = {
 	retracted: number;
 	/** Where the next batch must start. */
 	expectedFromBlock: number;
-	/** Present only when this batch concluded a reorg; `cause` says HOW it was concluded. */
+	/**
+	 * Present only when this batch concluded a reorg; `cause` says HOW it was
+	 * concluded.
+	 *
+	 * REPORTED, never delegated. A caller reads it to log, to answer a sender or
+	 * to decide what to do next; it is NOT how the revert gets counted, and a
+	 * caller that counted from it would count only on the shape it happens to be.
+	 * The count is taken once, inside `receive`, through the injected
+	 * `ReorgRecorder` (ADR-0050).
+	 */
 	reorg?: ReorgDetection;
 };
 
@@ -60,6 +70,24 @@ export type LogIngestion = {
 	readonly context: WireContext;
 	expectedFromBlock(): Promise<number>;
 	receive(batch: UntypedWireBatch): Promise<IngestionOutcome>;
+};
+
+/**
+ * What a receiver is built with: the stream configuration half of the wire
+ * identity, plus the one collaborator a receiver has that is not the processor.
+ *
+ * `stream` is HASHED into `context` and `recordReorg` deliberately is not: where
+ * a count is written down is a deployment's business, and a receiver that hashed
+ * it would refuse every batch from a sender configured identically but wired to
+ * a different database.
+ */
+export type StreamBuilderOptions<ABI extends Abi> = Pick<ProvidedIndexerConfig<ABI>, 'stream'> & {
+	/**
+	 * Where a concluded reorg is counted, supplied by whoever owns the store
+	 * (ADR-0050). Absent on a host with nowhere to write, and then nothing is
+	 * counted and nothing else changes.
+	 */
+	recordReorg?: ReorgRecorder;
 };
 
 /**
@@ -114,12 +142,14 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 	readonly context: WireContext;
 
 	private readonly finality: number;
+	private readonly recordReorg: ReorgRecorder | undefined;
 
 	constructor(
 		private readonly processor: EventProcessor<ABI, ProcessResultType>,
 		private readonly source: IndexingSource<ABI>,
-		config: Pick<ProvidedIndexerConfig<ABI>, 'stream'> = {},
+		config: StreamBuilderOptions<ABI> = {},
 	) {
+		this.recordReorg = config.recordReorg;
 		// The defaults MUST match `IndexerGeneration`'s and the sending `LogFetcher`'s,
 		// because the hash of the resolved config is half the wire identity: a
 		// receiver that defaulted `finality` differently would refuse every batch a
@@ -174,6 +204,15 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 
 		await this.processor.process(eventStream, newLastSync);
 
+		if (reorg) {
+			// ONCE per concluded revert, and HERE rather than in whatever called us. A
+			// combined process folds through `createDirectIngestion` and an HTTP one
+			// through a route; putting the count at either entrance leaves the other
+			// shape blind, and putting it at both double-counts the shape that does both.
+			// This is the one place every shape passes through exactly once (ADR-0050).
+			await this.noteReorg(reorg);
+		}
+
 		return {
 			applied: eventStream.filter((event) => !event.removed).length,
 			retracted: eventStream.filter((event) => event.removed).length,
@@ -184,6 +223,40 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 	}
 
 	// -- internals -----------------------------------------------------------
+
+	/**
+	 * Say what was reverted, and count it if this deployment gave us somewhere to.
+	 *
+	 * AFTER the batch was applied, and best-effort by design: the state and the
+	 * cursor already moved atomically inside the processor, so a failure here loses
+	 * a count rather than a block. An operational counter that could roll back the
+	 * state it describes -- or fail the request that earned it, telling a sender to
+	 * re-send a batch which was in fact applied -- would be a far worse trade. That
+	 * guarantee used to belong to the ingest route (`recordReorgSafely`); it is
+	 * here now, so every deployment shape has it.
+	 *
+	 * The log line is here for the same reason the count is: an absence-driven
+	 * revert is the one an operator must see, and a combined process has no route
+	 * to log it from.
+	 */
+	private async noteReorg(reorg: ReorgDetection): Promise<void> {
+		if (reorg.cause === 'absence') {
+			namedLogger.error(
+				`reverted state from an ABSENCE at block ${reorg.blockNumber} (${reorg.blockHash}) for ` +
+					`${JSON.stringify(this.context)}. Absence is an inference, not proof: it is indistinguishable from a ` +
+					`sender that under-delivered the range. A rising rate of these means truncation or misconfiguration.`,
+				reorg,
+			);
+		} else {
+			namedLogger.info(`reverted state from a hash contradiction at block ${reorg.blockNumber}`, reorg);
+		}
+		if (!this.recordReorg) return;
+		try {
+			await this.recordReorg(reorg);
+		} catch (err) {
+			namedLogger.error(`could not record the reorg counter: ${err instanceof Error ? err.message : String(err)}`);
+		}
+	}
 
 	private assertContext(received: WireContext | undefined): void {
 		if (!sameWireContext(this.context, received)) {

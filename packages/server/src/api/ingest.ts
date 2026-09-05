@@ -3,14 +3,12 @@ import {
 	UnexpectedFromBlockError,
 	WireContextMismatchError,
 	parseWireBatch,
-	type LogIngestion,
 	type UntypedWireBatch,
 } from '@etherfold/core';
 import {Hono} from 'hono';
 import type {Context} from 'hono';
 import {logs} from 'named-logs';
 import type {Env} from '../env.js';
-import {recordReorg} from '../reorgs.js';
 import {setup} from '../setup.js';
 import type {ServerOptions} from '../types.js';
 
@@ -61,7 +59,7 @@ function authorized(c: Context<{Bindings: Env}>): {ok: true} | {ok: false; messa
  * ## What this layer decides, and what it only reports
  *
  * Every RULE lives in the stream-builder (`@etherfold/core`), which is where the
- * engine's own cursor check already lives. This route decides three things a
+ * engine's own cursor check already lives. This route decides two things a
  * transport has to decide and the engine cannot:
  *
  * - **who may call it.** A caller with no token cannot advance the cursor.
@@ -71,16 +69,20 @@ function authorized(c: Context<{Bindings: Env}>): {ok: true} | {ok: false; messa
  *   fixes (a foreign `{source, config}`, a malformed range, a payload that is
  *   not the range it claims). Collapsing the two would make a misconfigured
  *   fetcher retry forever against a server that will never accept it.
- * - **what an operator can watch.** A revert concluded from ABSENCE is counted
- *   apart from one concluded from a hash CONTRADICTION, because absence is an
- *   inference and a rising rate of it means truncation or misconfiguration
- *   rather than chain activity (ADR-0004).
  *
  * ## What is deliberately absent
  *
  * No idempotency key and no dedupe table: the cursor IS the key. A re-sent batch
  * after a lost acknowledgement fails the `expectedFromBlock` check and is
  * corrected, so it cannot be applied twice.
+ *
+ * **And no reorg COUNTING.** This route used to own that write, which quietly
+ * made an operational counter a fact about the TRANSPORT: a combined process
+ * folds through `createDirectIngestion`, never reaches here, and reported no
+ * reverts at all. A revert is concluded by the fold, so it is counted inside
+ * `receive` through a `ReorgRecorder` the store's owner injected (ADR-0050), and
+ * this route is a CALLER of that path. Counting here as well would double-count
+ * the split shape, which both concludes and receives.
  */
 export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<CustomEnv>) {
 	return (
@@ -178,11 +180,10 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 				}
 
 				try {
+					// One call, and everything a concluded reorg costs -- the revert, the log
+					// line, the count -- happens inside it. `outcome.reorg` is REPORTED back to
+					// the sender below and acted on by nobody here.
 					const outcome = await ingestion.receive(batch);
-
-					if (outcome.reorg) {
-						await recordReorgSafely(c as never, ingestion, outcome.reorg);
-					}
 
 					return c.json({
 						success: true,
@@ -254,34 +255,4 @@ function refusal(c: Context<{Bindings: Env}>, err: unknown) {
 		return c.json({success: false, error: 'invalid-batch', message: err.message} as const, 400);
 	}
 	throw err;
-}
-
-/**
- * Count the revert, without letting the counter fail the request that earned it.
- *
- * The state and the cursor already moved atomically inside the processor. If
- * writing an operational counter afterwards fails, the correct outcome is a
- * logged miscount and a successful ingestion, not a `500` that tells the sender
- * to re-send a batch which was in fact applied.
- */
-async function recordReorgSafely(
-	c: Context<{Bindings: Env}>,
-	ingestion: LogIngestion,
-	reorg: NonNullable<Awaited<ReturnType<LogIngestion['receive']>>['reorg']>,
-): Promise<void> {
-	if (reorg.cause === 'absence') {
-		logger.error(
-			`ingest: reverted state from an ABSENCE at block ${reorg.blockNumber} (${reorg.blockHash}) for ` +
-				`${JSON.stringify(ingestion.context)}. Absence is an inference, not proof: it is indistinguishable from a ` +
-				`sender that under-delivered the range. A rising rate of these means truncation or misconfiguration.`,
-			reorg,
-		);
-	} else {
-		logger.info(`ingest: reverted state from a hash contradiction at block ${reorg.blockNumber}`, reorg);
-	}
-	try {
-		await recordReorg(c.get('config').db, reorg);
-	} catch (err) {
-		logger.error(`ingest: could not record the reorg counter: ${err instanceof Error ? err.message : String(err)}`);
-	}
 }

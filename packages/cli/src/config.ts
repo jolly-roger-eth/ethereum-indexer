@@ -284,6 +284,13 @@ const NOT_SERVING_BUILD =
 
 const NOT_SERVING_FETCH = 'a fetcher answers no queries: it pushes to one. The HTTP surface is the RECEIVER\u2019s.';
 
+const ALWAYS_MIGRATES_BUILD =
+	'the one-shot answers no queries, so there is no startup to decline the fixed-table schema at: it applies ' +
+	'it unconditionally, because it binds no port and nothing else in this process ever would. The database it ' +
+	'emits is a publishable ARTIFACT and has to carry its own schema version and the reorgs it concluded ' +
+	'(ADR-0050), or it loses its provenance the moment it becomes an INPUT. To decline the schema and let ' +
+	'something else migrate, that is `run` or `index`, which serve.';
+
 const NO_WIRE_COMBINED =
 	'this command runs both halves in ONE process, so they meet through a direct in-process ingestion and ' +
 	'there is no wire to configure (`CONTEXT.md`: the wire is a deployment choice, not two implementations). ' +
@@ -302,7 +309,7 @@ const REFUSALS: Readonly<Record<CommandName, Readonly<Partial<Record<ConfigInput
 	build: {
 		port: NOT_SERVING_BUILD,
 		host: NOT_SERVING_BUILD,
-		autoSetup: NOT_SERVING_BUILD,
+		autoSetup: ALWAYS_MIGRATES_BUILD,
 		ingestEndpoint: NO_WIRE_COMBINED,
 		ingestToken: NO_WIRE_COMBINED,
 	},

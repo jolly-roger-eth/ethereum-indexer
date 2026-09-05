@@ -13,6 +13,7 @@ import type {RemoteSQL} from 'remote-sql';
 import {beforeAll, describe, expect, it} from 'vitest';
 import {createServer} from '../src/index.js';
 import {clearLastError} from '../src/api/status.js';
+import {hostRecorderFor} from './utils/hostRecorder.js';
 
 // ---------------------------------------------------------------------------
 // THE INGESTION ENDPOINT (ADR-0004)
@@ -104,7 +105,12 @@ type Deployment = {
 async function deploy(env: TestEnv = {INGEST_TOKEN: TOKEN}, withIngestion = true): Promise<Deployment> {
 	const db: RemoteSQL = new RemoteLibSQL(createClient({url: ':memory:'}));
 	const processor = new VersionedStateEventProcessor<TestABI>(db, entityProcessor);
-	const builder = new StreamBuilder<TestABI, unknown>(processor, SOURCE, {stream: {finality: FINALITY}});
+	// the recorder is the HOST's, exactly as it is in a deployment: this package
+	// counts nothing itself any more (ADR-0050)
+	const builder = new StreamBuilder<TestABI, unknown>(processor, SOURCE, {
+		stream: {finality: FINALITY},
+		recordReorg: hostRecorderFor(db),
+	});
 	const app = createServer<TestEnv>({
 		getDB: () => db,
 		getEnv: () => env,

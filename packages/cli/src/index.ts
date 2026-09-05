@@ -30,6 +30,7 @@ export * from './config.js';
 export * from './types.js';
 export {readCursorReport, type StoreCursorReport} from './cursorReport.js';
 export {buildProcessor, openExplicitSource, streamConfigFor} from './folding.js';
+export {recordReorg, reorgRecorderFor} from './reorgCounters.js';
 export {fetch, fetchMain, prepareFetching, type FetchDependencies} from './fetch.js';
 export {index, indexMain, type IndexDependencies, type RunningReceiver} from './indexCommand.js';
 export {run, runMain, type RunDependencies, type RunningIndexer} from './run.js';
@@ -172,10 +173,20 @@ export async function prepareIndexing<
 	// receiving stream builder hash this same object into the wire identity
 	const providedStreamConfig = streamConfigFor(env);
 	const streamConfig = resolveStreamConfig(providedStreamConfig);
-	const {processor, store, db} = await buildProcessor<ABI, ProcessResultType>(declared, resolved.destination, {
-		finalityDepth: streamConfig.finality,
-		...(deps.createDB ? {createDB: deps.createDB} : {}),
-	});
+	const {processor, store, db, recordReorg} = await buildProcessor<ABI, ProcessResultType>(
+		declared,
+		resolved.destination,
+		{
+			finalityDepth: streamConfig.finality,
+			// The one-shot binds no port, so nothing else ever creates the fixed tables --
+			// and `build` exists to emit a publishable ARTIFACT, which must carry its
+			// schema version and the reverts it concluded or it loses its provenance the
+			// moment it becomes somebody's input. `run` gets the same tables from the
+			// server it starts, where `--no-auto-setup` can still decline them.
+			applyFixedSchema: command === 'build',
+			...(deps.createDB ? {createDB: deps.createDB} : {}),
+		},
+	);
 
 	const source: IndexingSource<ABI> | undefined = await openSource<ABI, ProcessResultType>(
 		resolved.source,
@@ -191,7 +202,13 @@ export async function prepareIndexing<
 	// The receiving half of ADR-0004: authoritative about the cursor, derives every reorg, makes no
 	// chain call. It reads the persisted cursor on every batch rather than holding one, which is what
 	// makes an interrupted run resume from the store instead of from the start block.
-	const streamBuilder = new StreamBuilder<ABI, ProcessResultType>(processor, source, {stream: providedStreamConfig});
+	// `recordReorg` is the store owner's, handed to the engine that concludes the
+	// reverts: the count is taken once, inside `receive`, on every deployment shape
+	// rather than only on the one behind an HTTP route (ADR-0050).
+	const streamBuilder = new StreamBuilder<ABI, ProcessResultType>(processor, source, {
+		stream: providedStreamConfig,
+		recordReorg,
+	});
 
 	const host = createFetcherHost<ABI>(
 		resolveFetcherHostConfig<ABI>(env, {

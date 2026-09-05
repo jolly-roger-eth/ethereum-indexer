@@ -1,6 +1,28 @@
 import {describe, it, expect, afterEach} from 'vitest';
-import {readSchemaState, recordReorg} from '@etherfold/server';
+import {REORG_COUNTER_KEY, REORG_LAST_KEY} from '@etherfold/core';
+import {readSchemaState} from '@etherfold/server';
 import {createNodeDB, startServer, type RunningServer, type StartOptions} from '../src/index.js';
+import type {RemoteSQL} from 'remote-sql';
+
+/**
+ * Count a revert the way the OWNER of a store does, which is deliberately not
+ * something this adapter or the server package can do for us.
+ *
+ * A concluded reorg is counted once, inside `StreamBuilder.receive`, through a
+ * recorder the process that opened the database supplies (ADR-0050) -- in this
+ * repository that is `etherfold`'s `recordReorg`, which no platform adapter may
+ * depend on. What the two ends share is the KEY, from `@etherfold/core`, which
+ * is why this can write a row the server will read back without either of them
+ * spelling the name twice.
+ */
+async function countAReorgOutsideTheServer(db: RemoteSQL, blockNumber: number): Promise<void> {
+	await db.batch([
+		db.prepare(`INSERT INTO Meta (key, value) VALUES (?1, '1')`).bind(REORG_COUNTER_KEY.absence),
+		db
+			.prepare(`INSERT INTO Meta (key, value) VALUES (?1, ?2)`)
+			.bind(REORG_LAST_KEY, JSON.stringify({cause: 'absence', blockNumber, blockHash: '0xdead', at: 'now'})),
+	]);
+}
 
 let running: RunningServer | undefined;
 
@@ -86,7 +108,7 @@ describe('the adapter starts on a database handle its caller built', () => {
 		// even carry the schema the server just applied through the handle it was given
 		expect((await readSchemaState(createNodeDB(':memory:'))).applied).toBe(false);
 
-		await recordReorg(db, {cause: 'absence', blockNumber: 4242, blockHash: '0xdead'});
+		await countAReorgOutsideTheServer(db, 4242);
 
 		const body = (await (await fetch(`${running.url}/status`)).json()) as {
 			reorgs: {absence: number; contradiction: number; last?: {blockNumber: number}};
