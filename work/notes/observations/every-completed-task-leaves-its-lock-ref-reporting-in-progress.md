@@ -73,3 +73,22 @@ Two of the 26 were created TODAY, by builds that completed normally: `task-a-rec
 That is a sharper statement of the cause than this note originally had, and it narrows where a fix would go: not in `do`'s claim/complete path, which behaves as described, but in whatever is supposed to reconcile a held lock against a merged PR. There is no `run` daemon on this machine to do it, and the repo is not registered (`dorfl remote add . --local`), which the note above already suspected. Whether registration alone would reconcile them is still UNTESTED.
 
 Still not fixed here, for the reasons above, and now for one more: the 26 refs are the evidence, and they are the only record of which builds this happened to.
+
+## Update 2026-09-04 — FIXED in dorfl 0.13.3, and this note is now dischargeable
+
+0.13.3 closes it, in the shape this note and its sibling both argued for: reconcile on read rather than a merge hook.
+
+`dorfl status` no longer reports these as in flight. They now appear under their own accurate heading, which states the reasoning inline:
+
+```
+Completed, lock not yet released (26; item is at rest on main, so this is NOT in flight)
+```
+
+The resolver behind it (`cwd-section.ts`) is READ-ONLY by default: stale locks are classified against `<arbiter>/main` and reported via `staleLocks`, and nothing on the arbiter is touched. Two further pieces complete it:
+
+- **`dorfl status --reconcile-locks`** is an opt-in WRITE that RELEASES the locks whose item is terminal on `<arbiter>/main`, reporting them via `reconciledLocks`. That is the manual drain lever for a backlog like this one.
+- **The claim path now sweeps on every unit of work**, which is the part that matters: the docstring says the lever is "not needed for routine convergence" precisely because of it. So the leak does not recur going forward, and the 26 here are historical residue rather than an ongoing accumulation.
+
+What was NOT done, correctly: the refs are not deleted behind the operator's back on a read. A stale lock is reported truthfully and drained deliberately, which is the same read-only-by-default posture `prune` and `compact` take elsewhere in this tree.
+
+The 26 refs are still present as of this note, deliberately: they were kept as the evidence corpus for exactly this fix. That rationale is now spent, so they can be drained with the lever above whenever the operator wants.

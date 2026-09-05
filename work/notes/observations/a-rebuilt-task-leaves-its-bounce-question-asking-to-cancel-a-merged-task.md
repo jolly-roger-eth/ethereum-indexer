@@ -85,3 +85,13 @@ It also names the mirror case, `needsAnswers-without-sidecar`, and is careful to
 That narrows a fix the same way the lock-leak note does: not in `surface`, which is correct and atomic, but in whatever should reconcile an item's question state when it reaches a terminal position. The same reconcile-on-read shape would serve both, since a done-move is exactly when both the lock and the sidecar become moot.
 
 **Cleaned up here:** the three flags above are cleared, so no terminal item advertises a gate it cannot need. `work/tasks/cancelled/snapshot-prune-script.md` KEEPS its flag deliberately: it has a real `## Open questions` section and was cancelled with them open, so there the flag is accurate history rather than residue.
+
+## Update 2026-09-04 — still present in dorfl 0.13.3, and the near-miss is instructive
+
+The sibling lock-leak defect is FIXED in 0.13.3 (reconcile on read, plus a sweep on the claim path). This one is NOT, and it is worth recording why a quick look suggests otherwise.
+
+`apply-persist.ts`'s `disposeToTerminal` does the right thing and always has: *"The sidecar is `git rm`-ed in the same commit as the mv. A disposed item is no longer in the question-loop (the answer settled it), so the sidecar has no reason to survive at the terminal folder. Same commit preserves the sidecar's `needsAnswers` equals `active sidecar` invariant."*
+
+So the ANSWERED-with-dispose path is clean, and reading only that function would suggest the defect is closed. It is not, because that is the wrong path. The bug is the bounce-then-SUCCEED case: the item is rebuilt, `complete` opens a PR, the PR merges, and the body done-moves through ORDINARY completion, which never enters `disposeToTerminal` and clears neither the sidecar nor the flag. A search of 0.13.3 for a sidecar sweep on the terminal/complete path (`reconcileSidecar`, `staleSidecar`, `sidecarSweep`) returns nothing.
+
+That the lock half was fixed by reconciling against `<arbiter>/main` on read is the strongest hint available for this half: the same resolver already computes, per item, whether it is terminal on main. A sidecar and a `needsAnswers` flag on a terminal item are decidable from exactly that fact, at the same moment, from the same fetch. The two should almost certainly share the pass rather than grow a second one.
