@@ -399,3 +399,233 @@ describe('generateStreamToAppend', () => {
 		expect(newLastSync.latestBlock).toBe(1001);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// A RE-FETCHED BLOCK IS NEW UNLESS THE WINDOW ALREADY HOLDS IT
+// ---------------------------------------------------------------------------
+// The rule that decides which incoming blocks are delivered, and the SILENT
+// PERMANENT LOSS it replaces.
+//
+// `unconfirmedBlocks` holds only EVENT-BEARING blocks, so it is SPARSE: its
+// lowest entry is usually far above the height the chain actually forked at. The
+// old rule was a scalar height (`reorgBlock.number` on a reorg, the window's top
+// plus one otherwise) and every incoming block below it was dropped, which
+// encodes the claim "we already hold everything below this". A sparse window
+// makes that claim false, so the replacement branch's logs in the gap were
+// fetched, dropped in memory, and never fetched again -- the next range starts
+// above them.
+//
+// The rule is now MEMBERSHIP: a block is new unless the RETAINED window (what
+// survived the retraction) already holds it by `(number, hash)`. It is the rule
+// the replay path in the same file already applies, and it is sound because a
+// re-fetch never starts below `latestBlock - finality`, so anything we applied
+// WITH EVENTS inside the re-fetched range is still in the window unless it was
+// retracted.
+//
+// Both halves are asserted here, and the once-only half as hard as the delivery
+// half: the scalar was what stopped a re-offered block being applied twice, so
+// the membership test has to keep doing that job.
+// ---------------------------------------------------------------------------
+
+describe('a re-fetched block is new unless the window already holds it', () => {
+	const finality = 12;
+
+	it('delivers the new branch logs BELOW the lowest block we held logs for', () => {
+		// We hold ONE event-bearing block, at 200. The chain forks at 195, where we
+		// held nothing because 195 carried no logs for our filter.
+		const ls = lastSync({
+			latestBlock: 205,
+			lastFromBlock: 190,
+			lastToBlock: 205,
+			unconfirmedBlocks: [block(200, '0xa200', [makeEvent(200, '0xa200')])],
+		});
+		// the re-fetch carries a log at 196 (in the gap) and a replacement at 200
+		const incoming = [makeEvent(196, '0xb196'), makeEvent(200, '0xb200')];
+		// = min(lastToBlock + 1, latestBlock - finality), so the gap block IS in range
+		expect(getFromBlock(ls, 0, finality)).toBe(193);
+
+		const {eventStream, reorg} = generateStreamToAppend(ls, 0, incoming, {
+			newLatestBlock: 210,
+			newLastFromBlock: 193,
+			newLastToBlock: 210,
+			finality,
+		});
+
+		expect(reorg).toEqual({cause: 'contradiction', blockNumber: 200, blockHash: '0xa200'});
+		const delivered = eventStream.filter((e) => !e.removed).map((e) => `${e.blockNumber}:${e.blockHash}`);
+		// the gap log, which the scalar threshold discarded for ever
+		expect(delivered).toContain('196:0xb196');
+		expect(delivered).toEqual(['196:0xb196', '200:0xb200']);
+		// and the retraction is unchanged: the block we held is still taken back
+		expect(eventStream.filter((e) => e.removed).map((e) => `${e.blockNumber}:${e.blockHash}`)).toEqual(['200:0xa200']);
+	});
+
+	it('delivers a block the window never held even when NOTHING reorged', () => {
+		// The same sparseness, without a fork: the window's lowest entry is 200 and
+		// the re-fetch reaches back to 193, so a log at 196 the window does not hold
+		// is a log we never applied. Under the scalar it was below `top + 1` and
+		// therefore assumed already held, which is the same false claim.
+		const ls = lastSync({
+			latestBlock: 205,
+			lastFromBlock: 190,
+			lastToBlock: 205,
+			unconfirmedBlocks: [block(200, '0xa200', [makeEvent(200, '0xa200')])],
+		});
+		const {eventStream, reorg} = generateStreamToAppend(
+			ls,
+			0,
+			[makeEvent(196, '0xc196'), makeEvent(200, '0xa200'), makeEvent(203, '0xa203')],
+			{
+				newLatestBlock: 206,
+				newLastFromBlock: getFromBlock(ls, 0, finality),
+				newLastToBlock: 206,
+				finality,
+			},
+		);
+
+		// nothing was contradicted and nothing vanished: 200 came back as itself
+		expect(reorg).toBeUndefined();
+		expect(eventStream.map((e) => `${e.blockNumber}:${e.blockHash}`)).toEqual(['196:0xc196', '203:0xa203']);
+	});
+
+	it('applies a block the window ALREADY HOLDS once, however often it is re-offered', () => {
+		// This is the job the discarded scalar was doing, and the reason a re-fetch
+		// re-reading the finality window every cycle does not double-apply: every
+		// cycle from `latestBlock - finality` re-offers blocks that are already in the
+		// window, at the same hashes.
+		const ls = lastSync({
+			latestBlock: 205,
+			lastFromBlock: 190,
+			lastToBlock: 205,
+			unconfirmedBlocks: [
+				block(196, '0xa196', [makeEvent(196, '0xa196')]),
+				block(200, '0xa200', [makeEvent(200, '0xa200')]),
+			],
+		});
+		const {eventStream, newLastSync, reorg} = generateStreamToAppend(
+			ls,
+			0,
+			[makeEvent(196, '0xa196'), makeEvent(200, '0xa200'), makeEvent(205, '0xa205')],
+			{
+				newLatestBlock: 206,
+				newLastFromBlock: getFromBlock(ls, 0, finality),
+				newLastToBlock: 206,
+				finality,
+			},
+		);
+
+		expect(reorg).toBeUndefined();
+		// only the genuinely new block, and each held block exactly once in the window
+		expect(eventStream.map((e) => `${e.blockNumber}:${e.blockHash}`)).toEqual(['205:0xa205']);
+		expect(newLastSync.unconfirmedBlocks.map((b) => `${b.number}:${b.hash}`)).toEqual([
+			'196:0xa196',
+			'200:0xa200',
+			'205:0xa205',
+		]);
+	});
+
+	it('does not deliver the gap block a SECOND time once the window holds it', () => {
+		// The delivery half and the once-only half in one run: the gap block is
+		// delivered on the cycle that discovers it, enters the window, and the very
+		// next cycle re-fetches the same range and delivers nothing.
+		const ls = lastSync({
+			latestBlock: 205,
+			lastFromBlock: 190,
+			lastToBlock: 205,
+			unconfirmedBlocks: [block(200, '0xa200', [makeEvent(200, '0xa200')])],
+		});
+		const forked = [makeEvent(196, '0xb196'), makeEvent(200, '0xb200')];
+		const first = generateStreamToAppend(ls, 0, forked, {
+			newLatestBlock: 206,
+			newLastFromBlock: getFromBlock(ls, 0, finality),
+			newLastToBlock: 206,
+			finality,
+		});
+		expect(first.eventStream.filter((e) => !e.removed)).toHaveLength(2);
+		expect(first.newLastSync.unconfirmedBlocks.map((b) => b.number)).toEqual([196, 200]);
+
+		// the same range again, exactly as the next cycle re-reads it
+		const second = generateStreamToAppend(first.newLastSync, 0, [...forked, makeEvent(206, '0xb206')], {
+			newLatestBlock: 207,
+			newLastFromBlock: getFromBlock(first.newLastSync, 0, finality),
+			newLastToBlock: 207,
+			finality,
+		});
+
+		expect(second.reorg).toBeUndefined();
+		expect(second.eventStream.map((e) => `${e.blockNumber}:${e.blockHash}`)).toEqual(['206:0xb206']);
+		expect(second.newLastSync.unconfirmedBlocks.map((b) => `${b.number}:${b.hash}`)).toEqual([
+			'196:0xb196',
+			'200:0xb200',
+			'206:0xb206',
+		]);
+	});
+
+	it('still re-applies a block that was RETRACTED and then re-offered under the same hash', () => {
+		// A reorg concluded at the FIRST window block retracts every later one too,
+		// and a re-fetch that still contains one of them re-applies it under the same
+		// hash. That is why the membership test reads the RETAINED window and not the
+		// whole one: a retracted block has left it, so its re-offer is new again.
+		const ls = lastSync({
+			latestBlock: 205,
+			lastFromBlock: 190,
+			lastToBlock: 205,
+			unconfirmedBlocks: [
+				block(196, '0xa196', [makeEvent(196, '0xa196')]),
+				block(200, '0xa200', [makeEvent(200, '0xa200')]),
+			],
+		});
+		// 196's logs vanished (an absence); 200 is still there, unchanged
+		const {eventStream, reorg} = generateStreamToAppend(ls, 0, [makeEvent(200, '0xa200')], {
+			newLatestBlock: 206,
+			newLastFromBlock: getFromBlock(ls, 0, finality),
+			newLastToBlock: 206,
+			finality,
+		});
+
+		expect(reorg).toEqual({cause: 'absence', blockNumber: 196, blockHash: '0xa196'});
+		expect(eventStream.map((e) => `${e.removed ? 'removed' : 'applied'} ${e.blockNumber}:${e.blockHash}`)).toEqual([
+			'removed 196:0xa196',
+			'removed 200:0xa200',
+			'applied 200:0xa200',
+		]);
+	});
+
+	it('keeps the rebuilt window ASCENDING when a delivered block sits below a retained one', () => {
+		// The window is read in block order by the next cycle's reorg walk, so the
+		// membership rule must not leave it unordered: a block below the lowest
+		// RETAINED one can now be delivered, and it is appended after the blocks
+		// carried forward.
+		const ls = lastSync({
+			latestBlock: 205,
+			lastFromBlock: 190,
+			lastToBlock: 205,
+			unconfirmedBlocks: [
+				block(195, '0xa195', [makeEvent(195, '0xa195')]),
+				block(200, '0xa200', [makeEvent(200, '0xa200')]),
+			],
+		});
+		const {eventStream, newLastSync} = generateStreamToAppend(
+			ls,
+			0,
+			[makeEvent(193, '0xc193'), makeEvent(195, '0xa195'), makeEvent(200, '0xb200')],
+			{
+				// the tip did not move this cycle, so 193 is still inside the finality
+				// window and enters the rebuilt one
+				newLatestBlock: 205,
+				newLastFromBlock: getFromBlock(ls, 0, finality),
+				newLastToBlock: 205,
+				finality,
+			},
+		);
+
+		// 195 is retained (its hash came back), so it is neither retracted nor
+		// re-delivered; 193 and the replacement at 200 are both new
+		expect(eventStream.map((e) => `${e.removed ? 'removed' : 'applied'} ${e.blockNumber}:${e.blockHash}`)).toEqual([
+			'removed 200:0xa200',
+			'applied 193:0xc193',
+			'applied 200:0xb200',
+		]);
+		expect(newLastSync.unconfirmedBlocks.map((b) => b.number)).toEqual([193, 195, 200]);
+	});
+});
