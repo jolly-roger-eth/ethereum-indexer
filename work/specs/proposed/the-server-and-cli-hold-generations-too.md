@@ -7,16 +7,19 @@ taskedAfter: [a-reconfigure-is-not-an-outage, indexer-server-feed]
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 
 > **FORWARD-POINTER, ordering: task this AFTER `every-deployment-shape-counts-the-reorgs-it-concluded`
-> has landed.** That is a TASK rather than a spec, so it cannot be expressed as a `taskedAfter` edge,
-> which is why it is written here where whoever tasks this will read it.
+> has landed. SATISFIED — that task landed on 2026-09-05, so this ordering gate is now clear and
+> nothing here is left to build for it.** That is a TASK rather than a spec, so it cannot be
+> expressed as a `taskedAfter` edge, which is why it is written here where whoever tasks this will
+> read it.
 >
 > Both change the SHAPE OF THE DATABASE `build` PRODUCES, so they must be serialised or the second
-> retrofits the first. That task gives `build` the `Meta` table it currently lacks and writes the
-> reorg counters through one writer; this spec makes `build` hold a generation. And the two are
+> retrofits the first. That task ALREADY gave `build` the fixed-table schema it lacked and writes the
+> reorg counters through one writer; this spec makes `build` hold a generation. (That table was
+> called `Meta` when this was written and is now `_meta`, renamed into the store's reserved `_`
+> namespace so a processor-declared entity cannot silently collide with it.) And the two are
 > already coupled by an argument, not merely by a file: the answer to open question 3 below turns on
 > a `build`-produced database being indistinguishable from a `run`-produced one, which is exactly
-> what that task establishes. Tasked in the other order, this spec's `build` work would land without
-> the `Meta` table and that task would then have to reopen it.
+> what that task established. Do NOT emit a task to add that table: it exists.
 >
 > `indexer-server-feed`, the `taskedAfter` edge above, is a separate and already-satisfied question:
 > both of ITS deps (`historical-state-database`, `a-reconfigure-is-not-an-outage`) are in
@@ -138,8 +141,9 @@ filesystem storage is not supported.
    `indexer-server-feed` was ungated and created that table with no discriminator in it, so tasked
    first it would have shipped a primary key AND a public feed cursor and route with no tenant.
    **That is fixed**: that spec now carries BOTH discriminators (the indexer NAME and the STREAM) as
-   columns from the first migration, and it is no longer ungated — it sits in `specs/proposed/` with
-   a `taskedAfter` edge onto `a-reconfigure-is-not-an-outage`. So there is nothing left to do here;
+   columns from the first migration, and it is no longer ungated — it has since been tasked and now
+   sits in `work/specs/tasked/`, its `taskedAfter` edge onto `a-reconfigure-is-not-an-outage`
+   satisfied. So there is nothing left to do here;
    do not go and re-fix it. (The original note said this was "recorded as a finding against that
    spec". It was recorded IN that spec, which is what actually happened and the right home; `finding`
    is a pinned term for verified EXTERNAL ground truth in `work/notes/findings/` and no such file
@@ -151,7 +155,7 @@ filesystem storage is not supported.
    **The EVIDENCE below is written in the PRE-RENAME command vocabulary and the engine it names is
    being retired — re-check it before answering.** `CONTEXT.md` now pins a five-command set in which
    the one-shot is **`build`**, `index` is the RECEIVING half of a split, and `serve` is read-only;
-   and `work/specs/ready/one-command-runs-the-whole-pipeline.md` moves all server-side folding onto
+   and `work/specs/tasked/one-command-runs-the-whole-pipeline.md` moves all server-side folding onto
    `StreamBuilder`, so `indexToTip` and `EthereumIndexer` stop being the CLI's engine. The shape of
    the argument survives — different HOSTS over shared machinery is still where the difference would
    live — but the nouns do not.
