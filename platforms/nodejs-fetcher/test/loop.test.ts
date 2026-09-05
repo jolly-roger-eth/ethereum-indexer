@@ -7,6 +7,7 @@ import {
 	ALICE,
 	fakeChain,
 	FINALITY,
+	INDEXER,
 	SOURCE,
 	START_BLOCK,
 	startReceiver,
@@ -33,6 +34,9 @@ function envFor(url: string, extra: Record<string, string> = {}) {
 	return {
 		INDEXING_SOURCE: JSON.stringify(SOURCE),
 		INGEST_ENDPOINT: url,
+		// the NAMED INDEXER this fetcher addresses: the route segment on the other
+		// end, and a name that host registered
+		INDEXER_NAME: INDEXER,
 		INGEST_TOKEN: TOKEN,
 		// never used: the provider is injected below. It is set anyway because
 		// resolving configuration is part of what these tests drive, and a fetcher

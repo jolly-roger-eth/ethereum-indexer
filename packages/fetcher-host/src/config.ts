@@ -37,8 +37,8 @@ export type FetcherHostConfig<ABI extends Abi> = {
 	/** What to index. MUST be the same source the receiver was built with. */
 	source: IndexingSource<ABI>;
 	/**
-	 * The indexer-server's base URL. `/ingest` and `/ingest/expected-from-block`
-	 * hang off it.
+	 * The indexer-server's base URL. `/{indexer}/ingest` and
+	 * `/{indexer}/ingest/expected-from-block` hang off it.
 	 *
 	 * Optional, and required in practice for a SPLIT deployment only. A combined
 	 * host, which feeds a stream-builder in its own process through
@@ -48,6 +48,20 @@ export type FetcherHostConfig<ABI extends Abi> = {
 	 * an endpoint, which is the moment both facts are known.
 	 */
 	endpoint?: string;
+	/**
+	 * The NAMED INDEXER this fetcher pushes into (`INDEXER_NAME`): one indexed
+	 * answer set over one chain, and the first segment of every ingest route.
+	 *
+	 * Supplied by the operator and NEVER defaulted (ADR-0036): a receiving host
+	 * registers the N named indexers it was built with, so a name this deployment
+	 * invented would be refused with a `404` at best, and would push another
+	 * tenant's logs at worst.
+	 *
+	 * Optional here for exactly the same reason `endpoint` and `token` are: a
+	 * COMBINED host has no route to address, because its target is a stream-builder
+	 * in this same process. `FetcherHost` demands it where the answer is known.
+	 */
+	indexer?: string;
 	/**
 	 * The server's `INGEST_TOKEN`, presented as a bearer token.
 	 *
@@ -280,6 +294,7 @@ export function resolveFetcherHostConfig<ABI extends Abi>(
 		// this function cannot see, namely whether the caller is handing over its own
 		// ingestion target. `FetcherHost` makes that check where the answer is known.
 		endpoint: overrides.endpoint ?? env.INGEST_ENDPOINT,
+		indexer: overrides.indexer ?? env.INDEXER_NAME,
 		token: overrides.token ?? env.INGEST_TOKEN,
 		nodeUrl: overrides.nodeUrl ?? required(env.ETH_NODE_URI, 'ETH_NODE_URI', "the chain's JSON-RPC endpoint"),
 		suspectResultCount,

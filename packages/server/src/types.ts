@@ -1,14 +1,14 @@
-import type {LogIngestion} from '@etherfold/core';
 import type {Context} from 'hono';
 import type {Bindings} from 'hono/types';
 import type {RemoteSQL} from 'remote-sql';
 import type {CursorReport} from './cursor.js';
+import type {IndexerResolver} from './registry.js';
 
 /**
  * How a host tells `/status` where its pipeline has got to.
  *
  * Async because reading a cursor is a STORE read (`StateStore.readCursor`),
- * unlike `getDB` / `getEnv` / `getIngestion`, which hand back handles a host
+ * unlike `getDB` / `getEnv` / `getIndexer`, which hand back handles a host
  * already holds.
  */
 export type CursorReporter<Env extends Bindings = Bindings> = (
@@ -19,22 +19,29 @@ export type ServerOptions<Env extends Bindings = Bindings> = {
 	getDB: (c: Context<{Bindings: Env}>) => RemoteSQL;
 	getEnv: (c: Context<{Bindings: Env}>) => Env;
 	/**
-	 * The stream-builder this deployment hosts, if it hosts one.
+	 * The NAME-KEYED REGISTRY of the named indexers this deployment hosts.
 	 *
 	 * Injected exactly like the database, and for the same reason: WHICH processor
-	 * runs, against WHICH source, is a deployment's choice, and a server package
-	 * that constructed one would have to know how to load a processor module,
-	 * which is the CLI's job and not an HTTP app's. The resolved `{db, env}` is on
-	 * the context by the time this is called (`c.get('config')`), so a host can
-	 * build its processor from the same database the rest of the app uses.
+	 * runs, against WHICH source, under WHICH name, is a deployment's choice, and a
+	 * server package that constructed one would have to know how to load a processor
+	 * module, which is the CLI's job and not an HTTP app's. The resolved `{db, env}`
+	 * is on the context by the time this is called (`c.get('config')`), so a host can
+	 * build its processors from the same database the rest of the app uses.
+	 *
+	 * It resolves an ENTRY rather than a bare `LogIngestion` so that what a name
+	 * holds can grow without every host's resolver changing shape; see
+	 * `IndexerRegistryEntry`.
 	 *
 	 * OPTIONAL, because an indexer-server is useful before it ingests anything:
 	 * `/status` and `/admin/setup` answer on a server with no processor at all,
-	 * and every existing host builds one that way. When it is absent the ingestion
-	 * routes answer `501`, which says "this server does not do that" rather than
-	 * pretending the route is missing.
+	 * and a read tier is built exactly that way. When it is absent the ingestion
+	 * routes answer `501` under EVERY name, which says "this server does not do
+	 * that" rather than pretending the route is missing. That is deliberately a
+	 * different answer from a registry that does not hold the name asked for, which
+	 * is a `404`: one is a capability this host lacks, the other is a tenant it was
+	 * not built with.
 	 */
-	getIngestion?: (c: Context<{Bindings: Env}>) => LogIngestion | undefined;
+	getIndexer?: IndexerResolver<Env>;
 	/**
 	 * Where this deployment's pipeline has got to, if this deployment can say.
 	 *

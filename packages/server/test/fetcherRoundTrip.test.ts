@@ -15,7 +15,7 @@ import {VersionedStateEventProcessor, type EntityProcessor} from '@etherfold/pro
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import type {RemoteSQL} from 'remote-sql';
 import {beforeAll, describe, expect, it} from 'vitest';
-import {createServer} from '../src/index.js';
+import {createServer, indexerRegistry} from '../src/index.js';
 import {clearLastError} from '../src/api/status.js';
 import {hostRecorderFor} from './utils/hostRecorder.js';
 
@@ -71,6 +71,14 @@ const START_BLOCK = 100;
 const FINALITY = 3;
 const TOKEN = 'a-shared-secret';
 const ENDPOINT = 'http://indexer.test';
+/**
+ * The NAMED INDEXER both halves are deployed with.
+ *
+ * It is configuration on each half and a ROUTE SEGMENT between them, and it is
+ * NOT in the envelope: the assertion that nothing but `{context, fromBlock,
+ * toBlock, latestBlock, logs}` crosses is what pins that.
+ */
+const INDEXER = 'alpha';
 
 const SOURCE: IndexingSource<TestABI> = {
 	chainId: '1',
@@ -206,7 +214,8 @@ async function deployReceiver(): Promise<Deployment> {
 	const app = createServer<TestEnv>({
 		getDB: () => db,
 		getEnv: () => ({INGEST_TOKEN: TOKEN}),
-		getIngestion: () => builder,
+		// the registry a host is built with: one name here, and every other refused
+		getIndexer: indexerRegistry({[INDEXER]: builder}),
 	});
 	await app.request('/admin/setup', {method: 'POST'});
 	return {app, builder, processor};
@@ -222,6 +231,7 @@ async function deployReceiver(): Promise<Deployment> {
 function ingestionFor(deployment: Deployment, spy?: {batches: WireBatch<Abi>[]}): IngestionTarget {
 	const http = createHttpIngestion({
 		endpoint: ENDPOINT,
+		indexer: INDEXER,
 		token: TOKEN,
 		fetch: (url, init) => deployment.app.request(url, init as RequestInit),
 	});
@@ -389,12 +399,40 @@ describe('a misconfigured fetcher', () => {
 		expect(await transferCount(deployment)).toBe(0);
 	});
 
+	it('is refused with a 404 it must not retry either, when it pushes to a name this host does not have', async () => {
+		// the same fetcher, the same source, the same secret: only the NAME is one this
+		// host was not built with. It is a ROUTING refusal rather than a payload one,
+		// which is exactly what carrying the name in the envelope would have cost.
+		const chain = fakeChain();
+		const deployment = await deployReceiver();
+		chain.serve(BRANCH_A, 110);
+		const elsewhere = createHttpIngestion({
+			endpoint: ENDPOINT,
+			indexer: 'beta',
+			token: TOKEN,
+			fetch: (url, init) => deployment.app.request(url, init as RequestInit),
+		});
+
+		const failure = await fetcherFor(chain, elsewhere)
+			.fetchAndPush()
+			.catch((err) => err);
+
+		expect(failure).toBeInstanceOf(IngestionRefusedError);
+		expect(failure.status).toBe(404);
+		expect(failure.retryable).toBe(false);
+		expect(failure.message).toMatch(/no named indexer called "beta"/);
+		// and nothing reached the receiver this host DOES hold: its cursor is where it
+		// started, which is the assertion the store cannot make (nothing ever opened it)
+		expect(await deployment.builder.expectedFromBlock()).toBe(START_BLOCK);
+	});
+
 	it('is refused with a 401 that names the variable, when its token is wrong', async () => {
 		const chain = fakeChain();
 		const deployment = await deployReceiver();
 		chain.serve(BRANCH_A, 110);
 		const wrongToken = createHttpIngestion({
 			endpoint: ENDPOINT,
+			indexer: INDEXER,
 			token: 'not-the-token',
 			fetch: (url, init) => deployment.app.request(url, init as RequestInit),
 		});

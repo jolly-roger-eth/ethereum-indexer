@@ -19,6 +19,7 @@ import {
 	ENDPOINT,
 	fakeChain,
 	FINALITY,
+	INDEXER,
 	ownerOf,
 	SOURCE,
 	START_BLOCK,
@@ -66,6 +67,7 @@ function hostFor(
 			{
 				source: SOURCE,
 				endpoint: ENDPOINT,
+				indexer: INDEXER,
 				token: TOKEN,
 				nodeUrl: 'http://node.test',
 				stream: {finality: FINALITY},
@@ -158,6 +160,7 @@ describe('a loop follows the tip and backs off when there is nothing to do', () 
 				{
 					source: SOURCE,
 					endpoint: ENDPOINT,
+					indexer: INDEXER,
 					token: TOKEN,
 					nodeUrl: 'http://node.test',
 					stream: {finality: FINALITY},
@@ -438,7 +441,10 @@ describe('a combined host and a split one', () => {
 		})();
 
 		expect(failure).toBeInstanceOf(FetcherConfigError);
-		expect((failure as Error).message).toMatch(/INGEST_ENDPOINT and INGEST_TOKEN are unset/);
+		// all three of the wire's variables, including the NAMED INDEXER the route
+		// segment carries: a split host addresses `/{indexer}/ingest` and none of the
+		// three is defaulted
+		expect((failure as Error).message).toMatch(/INGEST_ENDPOINT, INDEXER_NAME and INGEST_TOKEN are unset/);
 		// and it names the way out for a host that has no wire on purpose
 		expect((failure as Error).message).toMatch(/createDirectIngestion/);
 		expect((failure as {retryable: boolean}).retryable).toBe(false);

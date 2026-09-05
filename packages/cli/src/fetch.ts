@@ -67,7 +67,7 @@ export type FetchDependencies = {
  * dialled or a loop is started, and what comes back is the argument to
  * `startFetcher`.
  *
- * Only the four inputs that a CLI is asked about are overridden. Everything else
+ * Only the inputs that a CLI is asked about are overridden. Everything else
  * a fetcher deployment configures -- `SUSPECT_RESULT_COUNT`, the fetch bounds,
  * the backoff, the stream identity -- is left to the environment the adapter
  * already reads, because those are the fetcher host's published contract and a
@@ -93,6 +93,10 @@ export async function prepareFetching<ABI extends Abi = Abi>(
 		source: await openExplicitSource<ABI>(config.source),
 		nodeUrl: config.nodeUrl,
 		endpoint: config.wire.endpoint,
+		// the NAMED INDEXER on that server: the first segment of every ingest route
+		// this fetcher calls, and a name the receiver was built with or every push is a
+		// 404 (ADR-0036)
+		indexer: config.wire.indexer,
 		token: config.wire.token,
 		...(config.rps === undefined ? {} : {requestsPerSecond: config.rps}),
 		...(deps.handleSignals === undefined ? {} : {handleSignals: deps.handleSignals}),

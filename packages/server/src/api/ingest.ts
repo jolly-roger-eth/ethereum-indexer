@@ -9,6 +9,7 @@ import {Hono} from 'hono';
 import type {Context} from 'hono';
 import {logs} from 'named-logs';
 import type {Env} from '../env.js';
+import type {IndexerRegistryEntry} from '../registry.js';
 import {setup} from '../setup.js';
 import type {ServerOptions} from '../types.js';
 
@@ -41,7 +42,7 @@ function secretEquals(a: string, b: string): boolean {
 function authorized(c: Context<{Bindings: Env}>): {ok: true} | {ok: false; message: string} {
 	const configured = c.get('config')?.env?.INGEST_TOKEN;
 	if (!configured) {
-		logger.error(`/ingest called with no INGEST_TOKEN configured: refusing every caller`);
+		logger.error(`an ingest route was called with no INGEST_TOKEN configured: refusing every caller`);
 		return {ok: false, message: `no INGEST_TOKEN is configured on this server, so no caller can be authenticated`};
 	}
 	const header = c.req.header('Authorization');
@@ -55,6 +56,17 @@ function authorized(c: Context<{Bindings: Env}>): {ok: true} | {ok: false; messa
 /**
  * The log ingestion endpoint: where raw logs enter the server, and the half of
  * the wire contract that makes losing an event structurally difficult.
+ *
+ * ## The NAME is a ROUTE SEGMENT
+ *
+ * Every route here hangs off `/{indexer}`, the NAMED INDEXER a host was built
+ * with (ADR-0036), and the segment is the ONLY thing that selects which receiver
+ * a batch reaches. Carrying the name in the ADR-0004 envelope instead was
+ * considered and rejected: it would make the wire FORMAT carry tenancy, and it
+ * would turn a misdirected batch into a payload error rather than a routing one.
+ * So the envelope and its refusal families are untouched, and one more refusal
+ * exists beside them -- a name this host was not built with, which is a `404` and
+ * never a batch that quietly landed somewhere plausible.
  *
  * ## What this layer decides, and what it only reports
  *
@@ -91,16 +103,21 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			/**
 			 * The token guard, on the PATH rather than inside each handler.
 			 *
-			 * "The endpoint requires authentication" is then a property of `/ingest`
+			 * "The endpoint requires authentication" is then a property of `/{indexer}/ingest`
 			 * itself: a route added here later inherits it instead of needing somebody
 			 * to remember. It covers the read as well as the write, because this whole
 			 * surface is the fetcher's private API, and one rule for all of it is one
 			 * rule to get wrong.
 			 *
+			 * It runs AHEAD of the registry lookup, which is why an unknown name answers
+			 * `401` and not `404` to a caller with no token: which names a host was built
+			 * with is not something an unauthenticated caller may enumerate.
+			 *
 			 * BOTH patterns are registered on purpose, but NOT for the reason this comment
 			 * used to give. It claimed the wildcard does not cover the bare path and that
 			 * each registration guards half the surface; that is not true of the Hono
-			 * version in use, where `/ingest/*` already answers for `/ingest` too. Removing
+			 * version in use, where `/:indexer/ingest/*` already answers for
+			 * `/:indexer/ingest` too. Removing
 			 * the exact-path registration leaves the whole server suite green, so it is
 			 * redundant rather than load-bearing, and the tests below cannot tell which of
 			 * the two answered.
@@ -113,14 +130,14 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			 * path, which is the property that matters; which registration produces it is
 			 * deliberately not asserted.
 			 */
-			.use('/ingest', async (c, next) => {
+			.use('/:indexer/ingest', async (c, next) => {
 				const auth = authorized(c as never);
 				if (!auth.ok) {
 					return c.json({success: false, error: 'unauthorized', message: auth.message} as const, 401);
 				}
 				return next();
 			})
-			.use('/ingest/*', async (c, next) => {
+			.use('/:indexer/ingest/*', async (c, next) => {
 				const auth = authorized(c as never);
 				if (!auth.ok) {
 					return c.json({success: false, error: 'unauthorized', message: auth.message} as const, 401);
@@ -148,9 +165,10 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			 * question; the alternative was an endpoint whose safety depended on nobody
 			 * ever pointing a crawler at it.
 			 */
-			.post('/ingest/expected-from-block', async (c) => {
-				const ingestion = options.getIngestion?.(c as never);
-				if (!ingestion) return notConfigured(c as never);
+			.post('/:indexer/ingest/expected-from-block', async (c) => {
+				const resolved = resolve(options, c as never);
+				if (!resolved.ok) return resolved.response;
+				const {ingestion} = resolved.entry;
 
 				return c.json({
 					success: true,
@@ -158,9 +176,10 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 					context: ingestion.context,
 				} as const);
 			})
-			.post('/ingest', async (c) => {
-				const ingestion = options.getIngestion?.(c as never);
-				if (!ingestion) return notConfigured(c as never);
+			.post('/:indexer/ingest', async (c) => {
+				const resolved = resolve(options, c as never);
+				if (!resolved.ok) return resolved.response;
+				const {ingestion} = resolved.entry;
 
 				let batch: UntypedWireBatch;
 				try {
@@ -203,15 +222,64 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 	);
 }
 
-function notConfigured(c: Context<{Bindings: Env}>) {
-	return c.json(
-		{
-			success: false,
-			error: 'ingestion-not-configured',
-			message: `this server hosts no processor: pass getIngestion to createServer to accept logs`,
-		} as const,
-		501,
-	);
+/**
+ * The named indexer this request addressed, or the refusal to send back.
+ *
+ * TWO refusals, and keeping them apart is the point of doing this in one place:
+ *
+ * - **`501`, no registry at all.** This host hosts no processor -- a read tier,
+ *   or a combined process whose ingestion is the in-process direct wire -- so
+ *   there is no name it could answer under. It is a CAPABILITY statement, and it
+ *   is what this route has always said when nothing was injected.
+ * - **`404`, a name this host was not built with.** A ROUTING refusal, matching
+ *   what the name IS: a route segment. It is deliberately not a `400`, because
+ *   ADR-0004's `400` family is about the PAYLOAD (a foreign `{source, config}`,
+ *   a malformed range) and nothing is wrong with this payload; and deliberately
+ *   not a `409`, because no block number makes it right. A sender must not retry
+ *   either of them, which is what `createHttpIngestion` does with the whole 4xx
+ *   family bar the `409`.
+ *
+ * What it is NEVER is a default. Falling back to "the only indexer this host
+ * has" would make a typo in a fetcher's configuration land another tenant's logs
+ * in a database that will never be able to tell.
+ */
+function resolve<CustomEnv extends Env>(
+	options: ServerOptions<CustomEnv>,
+	c: Context<{Bindings: Env}>,
+): {ok: true; entry: IndexerRegistryEntry} | {ok: false; response: Response} {
+	const name = c.req.param('indexer') as string;
+	if (!options.getIndexer) {
+		return {
+			ok: false,
+			response: c.json(
+				{
+					success: false,
+					error: 'ingestion-not-configured',
+					message: `this server hosts no processor: pass getIndexer to createServer to accept logs`,
+				} as const,
+				501,
+			),
+		};
+	}
+	const entry = options.getIndexer(c as never, name);
+	if (!entry) {
+		logger.error(`ingest: a batch arrived for ${JSON.stringify(name)}, which this host was not built with`);
+		return {
+			ok: false,
+			response: c.json(
+				{
+					success: false,
+					error: 'unknown-indexer',
+					indexer: name,
+					message:
+						`this server hosts no named indexer called ${JSON.stringify(name)}. A host registers the names it ` +
+						`was built with, and no name is ever defaulted: check the name this sender was deployed with.`,
+				} as const,
+				404,
+			),
+		};
+	}
+	return {ok: true, entry};
 }
 
 /**

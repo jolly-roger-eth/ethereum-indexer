@@ -7,7 +7,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import {fetch as startFetch, fetchMain, prepareFetching, type FetchDependencies} from '../src/index.js';
 import type {Options} from '../src/types.js';
 import {abi, ALICE, BOB, CONTRACT, fakeChain, noChain, START_BLOCK, transfer, ZERO} from './utils/chain.js';
-import {ENDPOINT, FINALITY, SOURCE, startReceiver, TOKEN, type RunningReceiver} from './utils/receiver.js';
+import {ENDPOINT, FINALITY, INDEXER, SOURCE, startReceiver, TOKEN, type RunningReceiver} from './utils/receiver.js';
 
 // ---------------------------------------------------------------------------------------------------
 // `etherfold fetch`: THE CHAIN-FACING HALF, AS A COMMAND
@@ -52,6 +52,9 @@ const DEPLOYMENT = {
 /** The flags: a node to read, and a server to push to. No processor, no store, no database. */
 const FETCHING: Options = {
 	nodeUrl: 'http://localhost:0',
+	// the NAMED INDEXER on the receiver: the first segment of every ingest route
+	// this fetcher calls, and a name that receiver registers (ADR-0036)
+	indexer: INDEXER,
 	ingestEndpoint: ENDPOINT,
 	ingestToken: TOKEN,
 };
@@ -115,7 +118,9 @@ describe('the command runs a real fetch loop against a node and pushes to a remo
 			if (index === 0) continue;
 			expect(range.from).toBeLessThanOrEqual(ranges[index - 1]!.to + 1);
 		}
-		expect(receiver.requests.some((request) => request.path === '/ingest' && request.status === 200)).toBe(true);
+		expect(receiver.requests.some((request) => request.path === `/${INDEXER}/ingest` && request.status === 200)).toBe(
+			true,
+		);
 
 		// stopping is a SIGNAL and never a report: it reached the tip several cycles
 		// ago and it is still cycling
@@ -163,7 +168,7 @@ describe('the command runs a real fetch loop against a node and pushes to a remo
 describe('the resolution reaching the host', () => {
 	it('takes the flag when both are there, and the variable when the flag is absent', async () => {
 		const start = await prepareFetching<typeof abi>(
-			{nodeUrl: 'http://from.the.flag', ingestEndpoint: ENDPOINT},
+			{nodeUrl: 'http://from.the.flag', ingestEndpoint: ENDPOINT, indexer: INDEXER},
 			{
 				env: {
 					...DEPLOYMENT,
@@ -230,14 +235,18 @@ describe('the refusals', () => {
 		const without = (options: Options) =>
 			startFetch(options, {provider: chain.provider, env: {INDEXING_SOURCE: DEPLOYMENT.INDEXING_SOURCE}});
 
-		await expect(without({ingestEndpoint: ENDPOINT, ingestToken: TOKEN})).rejects.toThrow(
+		await expect(without({indexer: INDEXER, ingestEndpoint: ENDPOINT, ingestToken: TOKEN})).rejects.toThrow(
 			/--node-url \(ETH_NODE_URI\) is required by `etherfold fetch`/,
 		);
-		await expect(without({nodeUrl: 'http://n', ingestToken: TOKEN})).rejects.toThrow(
+		await expect(without({nodeUrl: 'http://n', indexer: INDEXER, ingestToken: TOKEN})).rejects.toThrow(
 			/--ingest-endpoint \(INGEST_ENDPOINT\) is required by `etherfold fetch`/,
 		);
-		await expect(without({nodeUrl: 'http://n', ingestEndpoint: ENDPOINT})).rejects.toThrow(
+		await expect(without({nodeUrl: 'http://n', indexer: INDEXER, ingestEndpoint: ENDPOINT})).rejects.toThrow(
 			/--ingest-token \(INGEST_TOKEN\) is required by `etherfold fetch`/,
+		);
+		// and the indexer NAME, which a host defaults for nobody
+		await expect(without({nodeUrl: 'http://n', ingestEndpoint: ENDPOINT, ingestToken: TOKEN})).rejects.toThrow(
+			/--indexer \(INDEXER_NAME\) is required by `etherfold fetch`/,
 		);
 		expect(chain.calls).toEqual([]);
 	});
@@ -308,7 +317,7 @@ describe('the process exits on the code the fetcher resolved', () => {
 		const errors: unknown[] = [];
 
 		await fetchMain(
-			{ingestEndpoint: ENDPOINT, ingestToken: TOKEN},
+			{indexer: INDEXER, ingestEndpoint: ENDPOINT, ingestToken: TOKEN},
 			{
 				provider: chain.provider,
 				env: {INDEXING_SOURCE: DEPLOYMENT.INDEXING_SOURCE},

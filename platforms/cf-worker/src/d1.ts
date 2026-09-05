@@ -157,7 +157,7 @@ export type D1StoreOptions = Omit<VersionedStateStoreOptions, 'bounds'> & {
  * const db = createD1DB(env);
  * const store = createD1Store(db, processor.entities, {plan: resolveD1Plan(env), retention});
  * const ingestion = new StreamBuilder(new EntityEventProcessor(store, processor), source, {stream});
- * createServer({getDB: () => db, getEnv: (c) => c.env, getIngestion: () => ingestion});
+ * createServer({getDB: () => db, getEnv: (c) => c.env, getIndexer: indexerRegistry({alpha: ingestion})});
  * ```
  *
  * and schedules its pruning separately with

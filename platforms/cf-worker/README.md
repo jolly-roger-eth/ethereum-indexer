@@ -6,7 +6,7 @@ The Cloudflare Worker host for [`@etherfold/server`](https://github.com/wighawag
 
 ## When you want this
 
-A Worker is a good home for the RECEIVING half of a split deployment: `/ingest` is short, per-request work. It is a poor home for the chain-facing half, because a cron fires on a schedule rather than continuously and an invocation is capped well below a first sync. So the fetcher runs somewhere that can hold a process ([`@etherfold/platform-nodejs-fetcher`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs-fetcher)) and pushes here.
+A Worker is a good home for the RECEIVING half of a split deployment: `/{indexer}/ingest` is short, per-request work. It is a poor home for the chain-facing half, because a cron fires on a schedule rather than continuously and an invocation is capped well below a first sync. So the fetcher runs somewhere that can hold a process ([`@etherfold/platform-nodejs-fetcher`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs-fetcher)) and pushes here.
 
 To run a server on Node instead, use [`@etherfold/platform-nodejs`](https://github.com/wighawag/etherfold/tree/main/platforms/nodejs) or [`etherfold serve`](https://github.com/wighawag/etherfold/tree/main/packages/cli).
 
@@ -25,7 +25,7 @@ The D1 binding arrives on the PER-REQUEST `env`, which is exactly why the server
 Two things this host deliberately does NOT do:
 
 - **It does not apply the schema on boot.** The Node adapter does, because there is one process owning one file. Here there are many instances against one D1, so migration is an operator action: `POST /admin/setup`, or wrangler.
-- **It hosts no processor**, so it passes no `getIngestion` and the ingestion routes answer `501`. A deployment that DOES host one bundles its processor and builds its store with `createD1Store` (`src/d1.ts`).
+- **It hosts no processor**, so it passes no `getIndexer` and the ingestion routes answer `501` under every name. A deployment that DOES host one bundles its processor and builds its store with `createD1Store` (`src/d1.ts`).
 
 ## D1's limits live here, and nowhere else
 

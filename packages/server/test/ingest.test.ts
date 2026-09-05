@@ -11,18 +11,24 @@ import {VersionedStateEventProcessor, type EntityProcessor} from '@etherfold/pro
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import type {RemoteSQL} from 'remote-sql';
 import {beforeAll, describe, expect, it} from 'vitest';
-import {createServer} from '../src/index.js';
+import {createServer, indexerRegistry} from '../src/index.js';
 import {clearLastError} from '../src/api/status.js';
 import {hostRecorderFor} from './utils/hostRecorder.js';
 
 // ---------------------------------------------------------------------------
-// THE INGESTION ENDPOINT (ADR-0004)
+// THE INGESTION ENDPOINT (ADR-0004), PER NAMED INDEXER (ADR-0036)
 // ---------------------------------------------------------------------------
 // The HTTP surface where raw logs enter the indexer-server. The rules it
 // enforces are the stream-builder's, and they are tested at THAT level in
 // `@etherfold/core`. What is tested here is what only this layer can get wrong:
-// the status codes a sender steers by, the token that guards the cursor, and the
-// counters an operator watches.
+// the status codes a sender steers by, the token that guards the cursor, the
+// counters an operator watches, and WHICH named indexer a batch reached.
+//
+// Every route is namespaced on the indexer NAME (`/{indexer}/ingest`), because a
+// host registers the N named indexers it was built with. The name is a ROUTE
+// SEGMENT and never a field in the envelope: carrying it in the payload would
+// make the wire format carry tenancy, and would turn a misdirected batch into a
+// payload error rather than a routing one.
 //
 // The whole sequence runs against a REAL processor over a REAL local libSQL
 // database, because the acceptance the task states is "state and the cursor
@@ -95,35 +101,79 @@ function transfer(blockNumber: number, blockHash: string, to: string, id: bigint
 
 type TestEnv = {DEV?: string; INGEST_TOKEN?: string};
 
+/** The name every single-indexer case in this file is deployed under. */
+const NAME = 'alpha';
+
+type Hosted = {
+	builder: StreamBuilder<TestABI, unknown>;
+	processor: VersionedStateEventProcessor<TestABI>;
+};
+
 type Deployment = {
 	app: ReturnType<typeof createServer<TestEnv>>;
 	db: RemoteSQL;
 	builder: StreamBuilder<TestABI, unknown>;
 	processor: VersionedStateEventProcessor<TestABI>;
+	hosted: Record<string, Hosted>;
 };
 
-async function deploy(env: TestEnv = {INGEST_TOKEN: TOKEN}, withIngestion = true): Promise<Deployment> {
+/**
+ * A host built with the named indexers it was told about.
+ *
+ * `names: null` is the host that hosts NO processor at all -- no registry is
+ * injected, which is a different thing from a registry that does not hold the
+ * name asked for, and the two answer differently below.
+ *
+ * Each named indexer gets its OWN database, because this task's isolation is
+ * about which receiver a batch reaches: partitioning what they store is the
+ * emission table's, and there is no shared table here to partition yet.
+ */
+async function deploy(env: TestEnv = {INGEST_TOKEN: TOKEN}, names: string[] | null = [NAME]): Promise<Deployment> {
 	const db: RemoteSQL = new RemoteLibSQL(createClient({url: ':memory:'}));
-	const processor = new VersionedStateEventProcessor<TestABI>(db, entityProcessor);
-	// the recorder is the HOST's, exactly as it is in a deployment: this package
-	// counts nothing itself any more (ADR-0050)
-	const builder = new StreamBuilder<TestABI, unknown>(processor, SOURCE, {
-		stream: {finality: FINALITY},
-		recordReorg: hostRecorderFor(db),
+	const hosted: Record<string, Hosted> = {};
+	const ingestions: Record<string, StreamBuilder<TestABI, unknown>> = {};
+	(names ?? []).forEach((name, order) => {
+		// the FIRST named indexer folds into the same database the app answers over,
+		// which is the ordinary single-indexer deployment; a second one gets its own
+		const indexerDB: RemoteSQL = order === 0 ? db : new RemoteLibSQL(createClient({url: ':memory:'}));
+		const processor = new VersionedStateEventProcessor<TestABI>(indexerDB, entityProcessor);
+		// the recorder is the HOST's, exactly as it is in a deployment: this package
+		// counts nothing itself any more (ADR-0050)
+		const builder = new StreamBuilder<TestABI, unknown>(processor, SOURCE, {
+			stream: {finality: FINALITY},
+			recordReorg: hostRecorderFor(indexerDB),
+		});
+		hosted[name] = {processor, builder};
+		ingestions[name] = builder;
 	});
 	const app = createServer<TestEnv>({
 		getDB: () => db,
 		getEnv: () => env,
-		getIngestion: withIngestion ? () => builder : undefined,
+		// the shipped helper, so what a host writes is what is under test here
+		...(names === null ? {} : {getIndexer: indexerRegistry(ingestions)}),
 	});
 	// the fixed tables the counters live in; the entity tables are the store's own
 	// and it creates them on its first load
 	await app.request('/admin/setup', {method: 'POST'});
-	return {app, db, builder, processor};
+	const first = hosted[(names ?? [])[0] as string];
+	return {
+		app,
+		db,
+		hosted,
+		// the single-indexer cases below read these; a host with no registry has
+		// neither, and asks nothing of them
+		builder: first?.builder as StreamBuilder<TestABI, unknown>,
+		processor: first?.processor as VersionedStateEventProcessor<TestABI>,
+	};
 }
 
-async function post(deployment: Deployment, batch: unknown, headers: Record<string, string> = {}): Promise<Response> {
-	return deployment.app.request('/ingest', {
+async function post(
+	deployment: Deployment,
+	batch: unknown,
+	headers: Record<string, string> = {},
+	name = NAME,
+): Promise<Response> {
+	return deployment.app.request(`/${name}/ingest`, {
 		method: 'POST',
 		headers: {'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`, ...headers},
 		body: typeof batch === 'string' ? batch : serializeWireBatch(batch as WireBatch<TestABI>),
@@ -138,8 +188,8 @@ async function post(deployment: Deployment, batch: unknown, headers: Record<stri
  * `GET` that writes is a trap for proxies, prefetchers and retrying clients
  * whatever the justification. See the route.
  */
-async function expectedFromBlock(deployment: Deployment): Promise<Response> {
-	return deployment.app.request('/ingest/expected-from-block', {
+async function expectedFromBlock(deployment: Deployment, name = NAME): Promise<Response> {
+	return deployment.app.request(`/${name}/ingest/expected-from-block`, {
 		method: 'POST',
 		headers: {Authorization: `Bearer ${TOKEN}`},
 	});
@@ -151,16 +201,23 @@ function batchOf(
 	toBlock: number,
 	latestBlock: number,
 	logs: LogEvent<TestABI>[],
+	name = NAME,
 ): WireBatch<TestABI> {
-	return {context: deployment.builder.context, fromBlock, toBlock, latestBlock, logs};
+	return {context: (deployment.hosted[name] as Hosted).builder.context, fromBlock, toBlock, latestBlock, logs};
 }
 
-async function ownerOf(deployment: Deployment, id: string): Promise<string | undefined> {
-	return (await deployment.processor.state.getCurrent<{owner: string}>('token', {id}))?.owner;
+async function ownerOf(deployment: Deployment, id: string, name = NAME): Promise<string | undefined> {
+	return (await (deployment.hosted[name] as Hosted).processor.state.getCurrent<{owner: string}>('token', {id}))?.owner;
 }
 
-async function transferCount(deployment: Deployment): Promise<number> {
-	return (await deployment.processor.state.getCurrent<{value: number}>('counter', {name: 'transfers'}))?.value ?? 0;
+async function transferCount(deployment: Deployment, name = NAME): Promise<number> {
+	return (
+		(
+			await (deployment.hosted[name] as Hosted).processor.state.getCurrent<{value: number}>('counter', {
+				name: 'transfers',
+			})
+		)?.value ?? 0
+	);
 }
 
 async function statusOf(deployment: Deployment): Promise<any> {
@@ -308,12 +365,112 @@ describe('the full ingestion sequence: apply, re-send, gap, mismatch, reorg', ()
 	});
 });
 
+// ---------------------------------------------------------------------------
+// THE NAME IS A ROUTE SEGMENT, AND THE UNNAMESPACED PAIR IS GONE
+// ---------------------------------------------------------------------------
+
+describe('several named indexers on one host', () => {
+	it('answers per name, each from its own receiver', async () => {
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, ['alpha', 'beta']);
+
+		for (const name of ['alpha', 'beta']) {
+			const res = await expectedFromBlock(deployment, name);
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual({
+				success: true,
+				expectedFromBlock: START_BLOCK,
+				context: (deployment.hosted[name] as Hosted).builder.context,
+			});
+		}
+	});
+
+	it('cannot see each other\u2019s batches: a push to one leaves the other exactly where it was', async () => {
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, ['alpha', 'beta']);
+		// each named indexer's store is opened by its first request, so ask both where
+		// they start before anything is pushed: that is also the baseline the assertions
+		// below are against
+		for (const name of ['alpha', 'beta']) {
+			expect((await (await expectedFromBlock(deployment, name)).json()).expectedFromBlock).toBe(START_BLOCK);
+		}
+
+		const pushed = await post(
+			deployment,
+			batchOf(deployment, 100, 105, 105, [transfer(101, '0xa101', ALICE, 1n)], 'alpha'),
+			{},
+			'alpha',
+		);
+		expect(pushed.status).toBe(200);
+
+		expect(await ownerOf(deployment, '1', 'alpha')).toBe(ALICE);
+		expect(await ownerOf(deployment, '1', 'beta')).toBeUndefined();
+		expect(await transferCount(deployment, 'beta')).toBe(0);
+		// and the cursor, which is the thing a sender steers by, moved for one only
+		expect((await (await expectedFromBlock(deployment, 'alpha')).json()).expectedFromBlock).toBe(102);
+		expect((await (await expectedFromBlock(deployment, 'beta')).json()).expectedFromBlock).toBe(START_BLOCK);
+	});
+
+	it('routes on the SEGMENT and never on the envelope, so a misdirected batch is refused', async () => {
+		// the same `{source, config}` a sibling accepts, posted to the wrong name. It
+		// reaches BETA's receiver -- the route chose it -- and beta refuses it exactly as
+		// it refuses any foreign context. Nothing in the payload could have redirected it.
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, ['alpha', 'beta']);
+		const forBeta = new StreamBuilder<TestABI, unknown>((deployment.hosted['beta'] as Hosted).processor, SOURCE, {
+			stream: {finality: FINALITY + 1},
+		});
+		const res = await post(
+			deployment,
+			{...batchOf(deployment, 100, 105, 105, [], 'beta'), context: forBeta.context},
+			{},
+			'beta',
+		);
+		expect(res.status).toBe(400);
+		expect((await res.json()).error).toBe('context-mismatch');
+	});
+
+	it('refuses a name this host was not built with, rather than defaulting to one it was', async () => {
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, ['alpha', 'beta']);
+		expect((await (await expectedFromBlock(deployment, 'alpha')).json()).expectedFromBlock).toBe(START_BLOCK);
+
+		const asked = await expectedFromBlock(deployment, 'gamma');
+		expect(asked.status).toBe(404);
+		expect((await asked.json()).error).toBe('unknown-indexer');
+
+		const pushed = await post(deployment, batchOf(deployment, 100, 105, 105, [], 'alpha'), {}, 'gamma');
+		expect(pushed.status).toBe(404);
+		// and it went nowhere: the name it was NOT sent to did not receive it either
+		expect(await transferCount(deployment, 'alpha')).toBe(0);
+	});
+
+	it('guards an unknown name too, so the registry cannot be probed without the token', async () => {
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, ['alpha', 'beta']);
+		const res = await deployment.app.request('/gamma/ingest/expected-from-block', {method: 'POST'});
+		expect(res.status).toBe(401);
+	});
+});
+
+describe('the unnamespaced routes', () => {
+	it('no longer answer, so the old surface is GONE rather than left live beside the new one', async () => {
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, ['alpha']);
+
+		for (const path of ['/ingest', '/ingest/expected-from-block']) {
+			const res = await deployment.app.request(path, {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`},
+				body: serializeWireBatch(batchOf(deployment, 100, 105, 105, [])),
+			});
+			expect(res.status).toBe(404);
+		}
+		// nothing was applied by an old caller that never noticed
+		expect(await deployment.builder.expectedFromBlock()).toBe(START_BLOCK);
+	});
+});
+
 describe('the endpoint requires authentication', () => {
 	it('refuses an unauthenticated caller, and the cursor does not move', async () => {
 		const deployment = await deploy();
 		const batch = batchOf(deployment, 100, 105, 105, [transfer(101, '0xa101', ALICE, 1n)]);
 
-		const res = await deployment.app.request('/ingest', {
+		const res = await deployment.app.request(`/${NAME}/ingest`, {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
 			body: serializeWireBatch(batch),
@@ -346,25 +503,31 @@ describe('the endpoint requires authentication', () => {
 
 	it('guards the cursor READ as well, since it is the fetcher-facing surface', async () => {
 		const deployment = await deploy();
-		expect((await deployment.app.request('/ingest/expected-from-block', {method: 'POST'})).status).toBe(401);
+		expect((await deployment.app.request(`/${NAME}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
 	});
 });
 
 describe('a server hosting no processor', () => {
+	// no registry at all, which is NOT the same as a registry without the name:
+	// this host has no ingestion CAPABILITY, and says so under every name
 	it('says so instead of pretending to have a cursor', async () => {
-		const deployment = await deploy({INGEST_TOKEN: TOKEN}, false);
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, null);
 
 		const get = await expectedFromBlock(deployment);
 		expect(get.status).toBe(501);
 		expect((await get.json()).error).toBe('ingestion-not-configured');
 
-		const posted = await post(deployment, batchOf(deployment, 100, 105, 105, []));
+		const posted = await deployment.app.request(`/${NAME}/ingest`, {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`},
+			body: '{}',
+		});
 		expect(posted.status).toBe(501);
 	});
 
 	it('still refuses an unauthenticated caller first, so the absence is not a probe', async () => {
-		const deployment = await deploy({INGEST_TOKEN: TOKEN}, false);
-		expect((await deployment.app.request('/ingest/expected-from-block', {method: 'POST'})).status).toBe(401);
+		const deployment = await deploy({INGEST_TOKEN: TOKEN}, null);
+		expect((await deployment.app.request(`/${NAME}/ingest/expected-from-block`, {method: 'POST'})).status).toBe(401);
 	});
 });
 

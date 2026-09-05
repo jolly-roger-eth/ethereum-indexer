@@ -2,7 +2,7 @@ import {serve} from '@hono/node-server';
 import {createClient} from '@libsql/client';
 import {StreamBuilder, type Abi, type IndexingSource} from '@etherfold/core';
 import {VersionedStateEventProcessor, type EntityProcessor} from '@etherfold/processor-sqlite';
-import {createServer} from '@etherfold/server';
+import {createServer, indexerRegistry} from '@etherfold/server';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import type {RemoteSQL} from 'remote-sql';
 
@@ -43,6 +43,13 @@ export const ALICE = '0x0000000000000000000000000000000000000011';
 export const START_BLOCK = 100;
 export const FINALITY = 3;
 export const TOKEN = 'the-node-fetchers-shared-secret';
+
+/**
+ * The NAMED INDEXER both halves are deployed with: configuration on each side,
+ * a ROUTE SEGMENT between them (`/{indexer}/ingest`), and never a field in the
+ * envelope (ADR-0036).
+ */
+export const INDEXER = 'alpha';
 
 export const SOURCE: IndexingSource<TestABI> = {
 	chainId: '1',
@@ -149,7 +156,7 @@ export async function startReceiver(): Promise<RunningReceiver> {
 	const app = createServer<{INGEST_TOKEN?: string}>({
 		getDB: () => db,
 		getEnv: () => ({INGEST_TOKEN: TOKEN}),
-		getIngestion: () => builder,
+		getIndexer: indexerRegistry({[INDEXER]: builder}),
 	});
 	await app.request('/admin/setup', {method: 'POST'});
 	// the processor's own tables, which a real host gets when the first batch lands.

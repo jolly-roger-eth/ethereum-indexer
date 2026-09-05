@@ -47,20 +47,22 @@ export type StartOptions = {
 	autoSetup?: boolean;
 	env?: Partial<NodeEnv>;
 	/**
-	 * The stream-builder this process hosts, if it hosts one, handed to the app
+	 * The NAMED INDEXERS this process hosts, if it hosts any, handed to the app
 	 * unchanged.
 	 *
-	 * Passthrough, in the server's own shape (resolved per REQUEST, since that is
-	 * what the Workers model forces on the app and one server that runs unmodified
-	 * on both hosts is worth a closure call on Node). This adapter builds no
-	 * processor and knows nothing about one: what it decides is what the app's
-	 * database, environment, ingestion and reporter ARE.
+	 * Passthrough, in the server's own shape (a resolver from a NAME to a registry
+	 * entry, called per REQUEST, since that is what the Workers model forces on the
+	 * app and one server that runs unmodified on both hosts is worth a closure call
+	 * on Node). This adapter builds no processor and knows nothing about one: what
+	 * it decides is what the app's database, environment, registry and reporter ARE.
+	 * `indexerRegistry` (`@etherfold/server`) builds one from a plain record of names
+	 * for a host that knows them all up front.
 	 *
 	 * Absent by default, and that absence is what the read tier is: the ingestion
-	 * routes then answer `501` to an authenticated caller, exactly as a server
-	 * started with a URL and nothing else does today.
+	 * routes then answer `501` to an authenticated caller under every name, exactly
+	 * as a server started with a URL and nothing else does today.
 	 */
-	getIngestion?: ServerOptions<NodeEnv>['getIngestion'];
+	getIndexer?: ServerOptions<NodeEnv>['getIndexer'];
 	/**
 	 * Where this process's pipeline has got to, if this process can say, handed to
 	 * the app unchanged.
@@ -119,7 +121,7 @@ export async function ensureFixedSchema(db: RemoteSQL, describedAs?: string): Pr
 /**
  * Start the indexer-server on Node.
  *
- * This is the whole adapter: it decides what `getDB`, `getEnv`, `getIngestion`
+ * This is the whole adapter: it decides what `getDB`, `getEnv`, `getIndexer`
  * and `getCursorReport` return and hands them to the platform-agnostic app. No
  * route, no chain logic and no storage decision lives here, and the two
  * capabilities are carried through untouched because only a HOST can build them
@@ -150,7 +152,7 @@ export async function startServer(options: StartOptions = {}): Promise<RunningSe
 	const app = createServer<NodeEnv>({
 		getDB: () => db,
 		getEnv: () => env,
-		getIngestion: options.getIngestion,
+		getIndexer: options.getIndexer,
 		getCursorReport: options.getCursorReport,
 	});
 

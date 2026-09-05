@@ -154,7 +154,7 @@ export function createProgram(deps: ProgramDependencies = {}): Command {
 			'follow the chain and push contiguous ranges of raw logs to an indexer-server elsewhere: ' +
 				'the chain-facing half, which folds nothing and holds no state',
 		)
-		.usage('-n http://localhost:8545 -d <deployment folder> --ingest-endpoint http://indexer:2000');
+		.usage('-n http://localhost:8545 -d <deployment folder> --indexer <name> --ingest-endpoint http://indexer:2000');
 	registerInputs(fetchCommand, 'fetch');
 	fetchCommand.action(async (options: Options) => {
 		await runFetch(options);

@@ -90,17 +90,29 @@ function messageOf(error: unknown): string {
 function httpOptions<ABI extends Abi>(
 	config: FetcherHostConfig<ABI>,
 	dependencies: FetcherHostDependencies,
-): {endpoint: string; token: string; fetch?: FetchLike} {
-	const missing = [...(config.endpoint ? [] : ['INGEST_ENDPOINT']), ...(config.token ? [] : ['INGEST_TOKEN'])];
+): {endpoint: string; indexer: string; token: string; fetch?: FetchLike} {
+	const missing = [
+		...(config.endpoint ? [] : ['INGEST_ENDPOINT']),
+		// the NAMED INDEXER the route segment carries: a receiving host registers the
+		// names it was built with and defaults none, so a fetcher that has no name has
+		// nothing to address (ADR-0036)
+		...(config.indexer ? [] : ['INDEXER_NAME']),
+		...(config.token ? [] : ['INGEST_TOKEN']),
+	];
 	if (missing.length > 0) {
+		// "A", "A and B", "A, B and C": an Oxford-less list, so the two-variable case
+		// reads exactly as it did before a third variable existed
+		const named =
+			missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}` : missing[0];
 		throw new FetcherConfigError(
-			`${missing.join(' and ')} ${missing.length > 1 ? 'are' : 'is'} unset, and this host pushes over HTTP. ` +
+			`${named} ${missing.length > 1 ? 'are' : 'is'} unset, and this host pushes over HTTP. ` +
 				`Set ${missing.length > 1 ? 'them' : 'it'}, or hand this host an ingestion target of its own ` +
 				`(createDirectIngestion, for a process that also runs the stream-builder).`,
 		);
 	}
 	return {
 		endpoint: config.endpoint as string,
+		indexer: config.indexer as string,
 		token: config.token as string,
 		...(dependencies.fetch ? {fetch: dependencies.fetch} : {}),
 	};
