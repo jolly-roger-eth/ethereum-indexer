@@ -6,6 +6,22 @@ taskedAfter: [a-reconfigure-is-not-an-outage, indexer-server-feed]
 
 > Launch snapshot, records intent at creation, NOT maintained. Current truth: `docs/adr/` (decisions) + the code; remaining work: `work/tasks/ready/` tasks.
 
+> **FORWARD-POINTER, ordering: task this AFTER `every-deployment-shape-counts-the-reorgs-it-concluded`
+> has landed.** That is a TASK rather than a spec, so it cannot be expressed as a `taskedAfter` edge,
+> which is why it is written here where whoever tasks this will read it.
+>
+> Both change the SHAPE OF THE DATABASE `build` PRODUCES, so they must be serialised or the second
+> retrofits the first. That task gives `build` the `Meta` table it currently lacks and writes the
+> reorg counters through one writer; this spec makes `build` hold a generation. And the two are
+> already coupled by an argument, not merely by a file: the answer to open question 3 below turns on
+> a `build`-produced database being indistinguishable from a `run`-produced one, which is exactly
+> what that task establishes. Tasked in the other order, this spec's `build` work would land without
+> the `Meta` table and that task would then have to reopen it.
+>
+> `indexer-server-feed`, the `taskedAfter` edge above, is a separate and already-satisfied question:
+> both of ITS deps (`historical-state-database`, `a-reconfigure-is-not-an-outage`) are in
+> `specs/tasked/`, so it is unblocked and is the head of this chain.
+
 > **ALSO ABSORBS `indexer-server-feed`'s rebuild stories (9-11), which it supersedes.** That spec
 > owns the STORAGE and the FEED — the ADR-0006 emission table, the two views, cursor semantics,
 > compaction, the indexed topic columns — and this spec is `taskedAfter` it because it needs that
