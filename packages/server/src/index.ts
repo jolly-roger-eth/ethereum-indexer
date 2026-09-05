@@ -36,15 +36,21 @@ export type {RecordedReorg, ReorgCounters} from './reorgs.js';
 export {appendEmissions, EMISSION_STREAM_TABLE} from './emissions.js';
 export type {EmissionAppend} from './emissions.js';
 /**
- * THE RETRACTION-AWARE FEED's entry shape, exported because a consumer written
- * in TypeScript reads these and the type is what it reads them as.
+ * THE TWO VIEWS' entry shapes, exported because a consumer written in
+ * TypeScript reads these and the type is what it reads them as.
+ *
+ * Two types and not one, because the difference is real: the retraction-aware
+ * feed's `FeedEntry` carries the fold's `removed` VERDICT, and the canonical
+ * view's `CanonicalEntry` does not, because that view never serves a retraction
+ * and a flag that is false on every entry invites reorg handling that can never
+ * fire.
  *
  * The CURSOR CODEC is deliberately NOT exported. The cursor is opaque
  * (ADR-0027): publishing a decoder would make the encoding a contract by the
  * back door, which is the exact outcome opacity exists to prevent. It stays
  * inside this package, where the two views share it.
  */
-export type {FeedEntry} from './feed/stream.js';
+export type {CanonicalEntry, FeedEntry} from './feed/entries.js';
 
 const corsSetup = cors({
 	origin: '*',

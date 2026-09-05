@@ -1,21 +1,32 @@
 import {createClient} from '@libsql/client';
-import {
-	StreamBuilder,
-	resolveStreamConfig,
-	serializeWireBatch,
-	streamDigestOf,
-	type Abi,
-	type IndexingSource,
-	type LogEvent,
-	type WireBatch,
-} from '@etherfold/core';
-import {VersionedStateEventProcessor, type EntityProcessor} from '@etherfold/processor-sqlite';
 import {RemoteLibSQL} from 'remote-sql-libsql';
 import type {RemoteSQL} from 'remote-sql';
 import {beforeEach, describe, expect, it} from 'vitest';
-import {createServer, indexerRegistry} from '../src/index.js';
+import {createServer} from '../src/index.js';
 import {clearLastError} from '../src/api/status.js';
 import {decodeFeedCursor, encodeFeedCursor, STREAM_FEED_VIEW} from '../src/feed/cursor.js';
+import {
+	ALICE,
+	BOB,
+	CAROL,
+	CONTRACT,
+	IDENTICAL_SOURCE,
+	OTHER_CONTRACT,
+	RECONFIGURED_DIGEST,
+	RECONFIGURED_SOURCE,
+	SOURCE,
+	STREAM_DIGEST,
+	TOKEN,
+	TRANSFER_TOPIC0,
+	ZERO,
+	batchOf,
+	deploy,
+	pad,
+	post,
+	transfer,
+	type Deployment,
+	type TestEnv,
+} from './utils/feedHarness.js';
 
 // ---------------------------------------------------------------------------
 // THE RETRACTION-AWARE FEED (ADR-0006, the first of the two views)
@@ -38,158 +49,10 @@ import {decodeFeedCursor, encodeFeedCursor, STREAM_FEED_VIEW} from '../src/feed/
 //  - HOLES in `seq` are LEGAL, so a consumer's next position is the `seq` it was
 //    actually served and never that number plus one. Compaction will create the
 //    holes later; this is what has to already be true when it does.
+//
+// The fixture (the ABI, the sources, `deploy`, `post`, `batchOf`) lives in
+// `utils/feedHarness.ts`, shared with the canonical view's suite.
 // ---------------------------------------------------------------------------
-
-const abi = [
-	{
-		type: 'event',
-		name: 'Transfer',
-		anonymous: false,
-		inputs: [
-			{indexed: true, name: 'from', type: 'address'},
-			{indexed: true, name: 'to', type: 'address'},
-			{indexed: false, name: 'id', type: 'uint256'},
-		],
-	},
-] as const satisfies Abi;
-
-type TestABI = typeof abi;
-
-const CONTRACT = '0x0000000000000000000000000000000000000099' as const;
-/** A DIFFERENT fetch filter, and therefore a different STREAM. */
-const OTHER_CONTRACT = '0x0000000000000000000000000000000000000077' as const;
-const ALICE = '0x0000000000000000000000000000000000000011';
-const BOB = '0x0000000000000000000000000000000000000022';
-const CAROL = '0x0000000000000000000000000000000000000033';
-const ZERO = '0x0000000000000000000000000000000000000000';
-
-const TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' as const;
-
-const START_BLOCK = 100;
-const FINALITY = 3;
-const TOKEN = 'a-shared-secret';
-
-const SOURCE: IndexingSource<TestABI> = {
-	chainId: '1',
-	contracts: [{abi, address: CONTRACT, startBlock: START_BLOCK}],
-};
-
-/** Byte-identical to `SOURCE`: the same STREAM under a different NAME. */
-const IDENTICAL_SOURCE: IndexingSource<TestABI> = {
-	chainId: '1',
-	contracts: [{abi, address: CONTRACT, startBlock: START_BLOCK}],
-};
-
-/** Another address, so `streamDigestOf` moves: this is a new stream, not a fork. */
-const RECONFIGURED_SOURCE: IndexingSource<TestABI> = {
-	chainId: '1',
-	contracts: [{abi, address: OTHER_CONTRACT, startBlock: START_BLOCK}],
-};
-
-const STREAM_CONFIG = {finality: FINALITY};
-
-const STREAM_DIGEST = streamDigestOf(SOURCE, resolveStreamConfig(STREAM_CONFIG));
-const RECONFIGURED_DIGEST = streamDigestOf(RECONFIGURED_SOURCE, resolveStreamConfig(STREAM_CONFIG));
-
-const entityProcessor: EntityProcessor<TestABI> = {
-	version: '1.0.0',
-	entities: [{name: 'token', id: ['id'], fields: {owner: 'text'}}],
-	async onTransfer(state, event) {
-		state.set('token', {id: (event.args as {id: bigint}).id.toString()}, {owner: event.args.to});
-	},
-};
-
-let logCounter = 0;
-
-function transfer(
-	blockNumber: number,
-	blockHash: string,
-	to: string,
-	id: bigint,
-	logIndex = 0,
-	address: string = CONTRACT,
-): LogEvent<TestABI> {
-	logCounter++;
-	return {
-		blockNumber,
-		blockHash: blockHash as `0x${string}`,
-		blockTimestamp: 1_700_000_000 + blockNumber * 12,
-		transactionIndex: 0,
-		removed: false,
-		address,
-		data: `0x${id.toString(16).padStart(64, '0')}`,
-		topics: [TRANSFER_TOPIC0, pad(ZERO), pad(to)],
-		transactionHash: `0x${logCounter.toString(16).padStart(64, '0')}` as `0x${string}`,
-		logIndex,
-		extra: undefined,
-		eventName: 'Transfer',
-		args: {from: ZERO, to, id},
-	} as unknown as LogEvent<TestABI>;
-}
-
-function pad(address: string): `0x${string}` {
-	return `0x${address.slice(2).padStart(64, '0')}` as `0x${string}`;
-}
-
-type TestEnv = {DEV?: string; INGEST_TOKEN?: string};
-
-type Hosted = {builder: StreamBuilder<TestABI, unknown>};
-
-type Deployment = {
-	app: ReturnType<typeof createServer<TestEnv>>;
-	db: RemoteSQL;
-	hosted: Record<string, Hosted>;
-};
-
-/** A host built with several named indexers over ONE database. */
-async function deploy(sources: Record<string, IndexingSource<TestABI>>, db?: RemoteSQL): Promise<Deployment> {
-	const database: RemoteSQL = db ?? new RemoteLibSQL(createClient({url: ':memory:'}));
-	const hosted: Record<string, Hosted> = {};
-	const ingestions: Record<string, StreamBuilder<TestABI, unknown>> = {};
-	for (const [name, source] of Object.entries(sources)) {
-		const processor = new VersionedStateEventProcessor<TestABI>(
-			new RemoteLibSQL(createClient({url: ':memory:'})),
-			entityProcessor,
-		);
-		const builder = new StreamBuilder<TestABI, unknown>(processor, source, {stream: STREAM_CONFIG});
-		hosted[name] = {builder};
-		ingestions[name] = builder;
-	}
-	const app = createServer<TestEnv>({
-		getDB: () => database,
-		getEnv: () => ({INGEST_TOKEN: TOKEN}),
-		getIndexer: indexerRegistry(ingestions),
-	});
-	await app.request('/admin/setup', {method: 'POST'});
-	return {app, db: database, hosted};
-}
-
-/**
- * Push a batch, and REFUSE to carry on if it was not accepted.
- *
- * Every batch in this file is meant to land: a `409` correction here would leave
- * the table short and make a feed assertion fail somewhere far away, describing
- * the wrong problem.
- */
-async function post(deployment: Deployment, name: string, batch: WireBatch<TestABI>): Promise<void> {
-	const res = await deployment.app.request(`/${name}/ingest`, {
-		method: 'POST',
-		headers: {'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`},
-		body: serializeWireBatch(batch),
-	});
-	expect(res.status, `pushing to ${name}: ${await res.clone().text()}`).toBe(200);
-}
-
-function batchOf(
-	deployment: Deployment,
-	name: string,
-	fromBlock: number,
-	toBlock: number,
-	latestBlock: number,
-	logs: LogEvent<TestABI>[],
-): WireBatch<TestABI> {
-	return {context: (deployment.hosted[name] as Hosted).builder.context, fromBlock, toBlock, latestBlock, logs};
-}
 
 type FeedEntryShape = {
 	removed: boolean;

@@ -1,5 +1,6 @@
 import type {RemoteSQL} from 'remote-sql';
 import {EMISSION_STREAM_TABLE} from '../emissions.js';
+import {EMISSION_COLUMNS, entryOf, type EmissionRow, type FeedEntry} from './entries.js';
 
 // ---------------------------------------------------------------------------------------------------
 // THE RETRACTION-AWARE VIEW: THE STORED STREAM IN `seq` ORDER, RETRACTIONS INCLUDED
@@ -25,35 +26,6 @@ import {EMISSION_STREAM_TABLE} from '../emissions.js';
 // something else there, which is what the discriminators exist to prevent.
 // ---------------------------------------------------------------------------------------------------
 
-/**
- * ONE entry as a consumer receives it: the raw log the node reported, plus the
- * verdict the fold reached about it.
- *
- * The same shape as `EmittedLog` in `@etherfold/core` (a `NumberifiedLog`), so
- * what goes in the table and what comes out of the feed are one vocabulary,
- * minus the `0x`-branded types: a row read back out of SQLite carries no proof
- * of its own shape, and claiming one would be a cast pretending to be a check.
- *
- * There is deliberately NO `seq` on it, and no `alive`. `seq` is the CURSOR's
- * business -- publishing it is how a consumer ends up incrementing it, which
- * holes make wrong -- and `alive` is a derived flag the other view reads; a
- * retraction-aware consumer learns the same fact from the retraction ARRIVING.
- */
-export type FeedEntry = {
-	/** `true` when this entry TAKES BACK an earlier one, at that entry's original block. */
-	removed: boolean;
-	blockNumber: number;
-	blockHash: string;
-	logIndex: number;
-	transactionHash: string;
-	transactionIndex: number;
-	/** Present only when the node put it on the log itself. */
-	blockTimestamp?: number;
-	address: string;
-	topics: string[];
-	data: string;
-};
-
 /** One page, plus the position to resume from and whether anything is left. */
 export type FeedPage = {
 	entries: FeedEntry[];
@@ -67,23 +39,6 @@ export type FeedPage = {
 
 /** The position a feed starts at: "everything, since `seq` is one-based". */
 export const FEED_START_POSITION = 0;
-
-type EmissionRow = {
-	seq: number;
-	removed: number;
-	blockNumber: number;
-	blockHash: string;
-	logIndex: number;
-	transactionHash: string;
-	transactionIndex: number;
-	blockTimestamp: number | null;
-	address: string;
-	topic0: string | null;
-	topic1: string | null;
-	topic2: string | null;
-	topic3: string | null;
-	data: string;
-};
 
 /**
  * Read one page of the `seq`-ordered stream, strictly after `after`.
@@ -99,8 +54,7 @@ export async function readStreamFeed(
 	const rows = (
 		await db
 			.prepare(
-				`SELECT seq, removed, blockNumber, blockHash, logIndex, transactionHash, transactionIndex,
-				        blockTimestamp, address, topic0, topic1, topic2, topic3, data
+				`SELECT ${EMISSION_COLUMNS}
 				 FROM ${EMISSION_STREAM_TABLE}
 				 WHERE indexer = ?1 AND stream = ?2 AND seq > ?3
 				 ORDER BY seq
@@ -114,7 +68,7 @@ export async function readStreamFeed(
 	const page = hasMore ? rows.slice(0, query.limit) : rows;
 
 	return {
-		entries: page.map(entryOf),
+		entries: page.map(feedEntryOf),
 		// the LAST `seq` served, which is the whole hole-tolerance of this view in
 		// one expression
 		position: page.length > 0 ? Number((page[page.length - 1] as EmissionRow).seq) : query.after,
@@ -123,32 +77,12 @@ export async function readStreamFeed(
 }
 
 /**
- * One stored row, back in the shape it arrived in.
+ * One stored row as THIS view hands it back: the raw log, plus the verdict.
  *
- * The topics are re-gathered from their columns and TRAILING absences are
- * dropped rather than sent as `null`: a log carries however many topics it
- * carries, and an anonymous one carries none at all, so a fixed-length array
- * with holes in it would be a shape no node ever emits.
+ * The verdict is the whole difference between the two views, which is why it is
+ * added here rather than carried through the shared mapper: the canonical view
+ * has no entry to put a `false` on.
  */
-function entryOf(row: EmissionRow): FeedEntry {
-	const topics: string[] = [];
-	for (const topic of [row.topic0, row.topic1, row.topic2, row.topic3]) {
-		if (topic === null || topic === undefined) break;
-		topics.push(topic);
-	}
-	const entry: FeedEntry = {
-		removed: row.removed === 1,
-		blockNumber: Number(row.blockNumber),
-		blockHash: row.blockHash,
-		logIndex: Number(row.logIndex),
-		transactionHash: row.transactionHash,
-		transactionIndex: Number(row.transactionIndex),
-		address: row.address,
-		topics,
-		data: row.data,
-	};
-	if (row.blockTimestamp !== null && row.blockTimestamp !== undefined) {
-		entry.blockTimestamp = Number(row.blockTimestamp);
-	}
-	return entry;
+function feedEntryOf(row: EmissionRow): FeedEntry {
+	return {...entryOf(row), removed: row.removed === 1};
 }

@@ -89,11 +89,7 @@ export async function appendEmissions(db: RemoteSQL, append: EmissionAppend): Pr
 	const {indexer, stream, emissions} = append;
 	if (emissions.length === 0) return;
 
-	const highWaterMark = await db
-		.prepare(`SELECT COALESCE(MAX(seq), 0) AS lastSeq FROM ${EMISSION_STREAM_TABLE} WHERE indexer = ?1 AND stream = ?2`)
-		.bind(indexer, stream)
-		.all<{lastSeq: number}>();
-	let seq = Number(highWaterMark.results[0]?.lastSeq ?? 0);
+	let seq = await readStreamHighWaterMark(db, {indexer, stream});
 
 	const statements: SQLPreparedStatement[] = [];
 	for (const emission of emissions) {
@@ -113,6 +109,23 @@ export async function appendEmissions(db: RemoteSQL, append: EmissionAppend): Pr
 	}
 
 	await db.batch(statements);
+}
+
+/**
+ * The highest `seq` allocated for one `(indexer, stream)` pair, or `0` when
+ * nothing has been appended under it yet.
+ *
+ * Read by the APPEND to number a batch from, and by the CANONICAL view to mark
+ * the point a cursor was minted at, so that "what has been retracted since you
+ * last looked" is answerable later. One expression, because the two must agree
+ * about what a position in this stream means.
+ */
+export async function readStreamHighWaterMark(db: RemoteSQL, at: {indexer: string; stream: string}): Promise<number> {
+	const read = await db
+		.prepare(`SELECT COALESCE(MAX(seq), 0) AS lastSeq FROM ${EMISSION_STREAM_TABLE} WHERE indexer = ?1 AND stream = ?2`)
+		.bind(at.indexer, at.stream)
+		.all<{lastSeq: number}>();
+	return Number(read.results[0]?.lastSeq ?? 0);
 }
 
 /**
