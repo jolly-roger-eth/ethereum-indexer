@@ -52,7 +52,26 @@ import type {EntityId, FieldType, EntityDeclaration, NormalizedEntity} from './t
  */
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]*$/;
 
-/** The store owns the `_` prefix: version columns, and its own fixed tables. */
+/**
+ * The `_` prefix means NOT A USER ENTITY: a version column, or a FIXED table
+ * belonging to whoever composed this database.
+ *
+ * It is deliberately not "the store's", because two packages put tables there.
+ * The store's own are `_blocks` and `_cursor` (`@etherfold/state-store-sqlite`),
+ * and the indexer-server's are `_meta` and `_emissions`, which share ONE database
+ * handle with the entity tables in every combined shape. An entity named after
+ * one of those would have been created as `CREATE TABLE IF NOT EXISTS "<name>"`
+ * against the existing table, succeeded silently, and failed much later as a
+ * column error on a write.
+ *
+ * The namespace is what closes that, and it closes it WITHOUT this package
+ * learning anything about the packages composed above it: the rule stays "a name
+ * starting with `_` is not yours", and a fixed table earns its protection by
+ * being named inside it. Parameterising the reserved set so a host declares its
+ * own fixed names was considered and refused: it grows optional API here for a
+ * guard that is off by default (a browser uses this store with no server at all)
+ * and relocates the discipline rather than removing it.
+ */
 function isReserved(name: string): boolean {
 	return name.startsWith('_');
 }
@@ -72,7 +91,7 @@ function fold(name: string): string {
 function assertIdentifier(name: unknown, what: string): asserts name is string {
 	if (typeof name === 'string' && isReserved(name)) {
 		throw new Error(
-			`reserved identifier for ${what}: ${JSON.stringify(name)}. Names starting with "_" belong to the store.`,
+			`reserved identifier for ${what}: ${JSON.stringify(name)}. Names starting with "_" are not user entities.`,
 		);
 	}
 	if (typeof name !== 'string' || !IDENTIFIER.test(name)) {

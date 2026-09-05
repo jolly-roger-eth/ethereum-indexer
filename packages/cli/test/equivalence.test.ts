@@ -374,7 +374,7 @@ describe('`run` and `fetch` plus `index` land on IDENTICAL state', () => {
 		// persisted is a logged miscount, never a fold that stops.
 		//
 		// `--no-auto-setup` is the honest way to produce that: the operator has said
-		// somebody else migrates this database, so the fixed `Meta` table the counters
+		// somebody else migrates this database, so the fixed `_meta` table the counters
 		// live in is simply not there and every write against it fails.
 		directory = mkdtempSync(join(tmpdir(), 'etherfold-uncounted-'));
 		const uncountedDB = `file:${join(directory, 'uncounted.db')}`;
@@ -424,7 +424,7 @@ describe('`run` and `fetch` plus `index` land on IDENTICAL state', () => {
 // ---------------------------------------------------------------------------------------------------
 
 describe('`build` emits a database carrying the reorgs it concluded', () => {
-	it('applies the Meta schema it once lacked, and counts through the same writer', async () => {
+	it('applies the _meta schema it once lacked, and counts through the same writer', async () => {
 		directory = mkdtempSync(join(tmpdir(), 'etherfold-artifact-'));
 		const artifact = `file:${join(directory, 'artifact.db')}`;
 		const chain = fakeChain();

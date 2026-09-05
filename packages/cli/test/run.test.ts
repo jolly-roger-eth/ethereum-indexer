@@ -212,7 +212,7 @@ describe('the store and the server share ONE database handle', () => {
 		// fixed table through the STORE's handle: the server applies that schema at
 		// startup, and a server that had opened `:memory:` for itself would not even
 		// be talking to this database
-		const meta = await db.prepare(`SELECT value FROM Meta WHERE key = 'schemaVersion'`).all<{value: string}>();
+		const meta = await db.prepare(`SELECT value FROM _meta WHERE key = 'schemaVersion'`).all<{value: string}>();
 		expect(meta.results.length).toBe(1);
 
 		// the other half of "one database": the cursor `/status` reports is READ

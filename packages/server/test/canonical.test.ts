@@ -139,7 +139,7 @@ describe('the view serves only LIVE entries, in block and log-index order', () =
 		// which is what the other view exists to deliver
 		const stored = (
 			await deployment.db
-				.prepare(`SELECT COUNT(*) AS n FROM EmissionStream WHERE removed = 1 OR alive = 0`)
+				.prepare(`SELECT COUNT(*) AS n FROM _emissions WHERE removed = 1 OR alive = 0`)
 				.all<{n: number}>()
 		).results[0]?.n;
 		expect(stored).toBe(6);
@@ -200,7 +200,7 @@ describe('the view serves only LIVE entries, in block and log-index order', () =
 		// INVERT the storage order. `seq` is the OTHER view's axis and this one must
 		// not be reading it: after this the two orders disagree everywhere, so a read
 		// that fell back to insertion order answers backwards.
-		await deployment.db.prepare(`UPDATE EmissionStream SET seq = 1000 - seq`).all();
+		await deployment.db.prepare(`UPDATE _emissions SET seq = 1000 - seq`).all();
 
 		const followed = await follow(deployment, 'alpha', 110, 2);
 		expect(followed.entries.map((entry) => [entry.blockNumber, entry.logIndex])).toEqual([

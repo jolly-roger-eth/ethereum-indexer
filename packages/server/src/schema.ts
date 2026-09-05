@@ -7,6 +7,14 @@ import db from './schema/ts/db.sql.js';
  * stored against the value this build expects, so a server running against a
  * database someone else migrated says so instead of failing later at a random
  * query.
+ *
+ * Renaming the fixed tables into the reserved `_` namespace was NOT such a
+ * change, which is why this still reads 2. The version row lives IN the table
+ * that was renamed, so a database migrated by an older build has no `_meta` for
+ * this to read and reports `applied: false` -- a stronger signal than a number
+ * mismatch, and the correct one, since those tables really did change. No
+ * database can hold a `_meta` row this build did not write, so version 2 there
+ * is unambiguous.
  */
 export const SCHEMA_VERSION = 2;
 
@@ -57,10 +65,10 @@ export type SchemaState =
  */
 export async function readSchemaState(db: RemoteSQL): Promise<SchemaState> {
 	try {
-		const result = await db.prepare(`SELECT value FROM Meta WHERE key = ?1`).bind(SCHEMA_VERSION_KEY).all();
+		const result = await db.prepare(`SELECT value FROM _meta WHERE key = ?1`).bind(SCHEMA_VERSION_KEY).all();
 		const row = result.results[0] as {value?: string} | undefined;
 		if (!row?.value) {
-			return {applied: false, reason: 'no schemaVersion recorded in Meta'};
+			return {applied: false, reason: 'no schemaVersion recorded in _meta'};
 		}
 		const version = Number(row.value);
 		return {applied: true, version, expected: SCHEMA_VERSION, matches: version === SCHEMA_VERSION};

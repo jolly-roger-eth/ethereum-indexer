@@ -236,8 +236,8 @@ type Row = {
 /** Every row of the table, in `seq` order, which is the order the feed will read. */
 async function rowsOf(db: RemoteSQL, indexer?: string): Promise<Row[]> {
 	const statement = indexer
-		? db.prepare(`SELECT * FROM EmissionStream WHERE indexer = ?1 ORDER BY seq`).bind(indexer)
-		: db.prepare(`SELECT * FROM EmissionStream ORDER BY indexer, seq`);
+		? db.prepare(`SELECT * FROM _emissions WHERE indexer = ?1 ORDER BY seq`).bind(indexer)
+		: db.prepare(`SELECT * FROM _emissions ORDER BY indexer, seq`);
 	return (await statement.all<Row>()).results;
 }
 
@@ -356,7 +356,7 @@ describe('a reorg FLAGS the superseded rows and deletes nothing', () => {
 		const canonical = (
 			await deployment.db
 				.prepare(
-					`SELECT blockNumber, blockHash FROM EmissionStream
+					`SELECT blockNumber, blockHash FROM _emissions
 					 WHERE indexer = ?1 AND stream = ?2 AND alive = 1 AND blockNumber <= ?3
 					 ORDER BY blockNumber, logIndex`,
 				)
@@ -459,8 +459,7 @@ describe('two named indexers with identical sources are isolated by the name col
 
 describe('the columns a later log API depends on, and the ONE index over them', () => {
 	async function indexesOf(db: RemoteSQL): Promise<{name: string; columns: string[]; partial: boolean}[]> {
-		const list = (await db.prepare(`PRAGMA index_list('EmissionStream')`).all<{name: string; partial: number}>())
-			.results;
+		const list = (await db.prepare(`PRAGMA index_list('_emissions')`).all<{name: string; partial: number}>()).results;
 		const indexes = [];
 		for (const entry of list) {
 			const info = (await db.prepare(`PRAGMA index_info('${entry.name}')`).all<{seqno: number; name: string}>())
@@ -516,7 +515,7 @@ describe('the table is in the FIXED schema, so both application paths produce it
 			await db
 				.prepare(
 					`SELECT type, name, sql FROM sqlite_master
-					 WHERE tbl_name = 'EmissionStream' ORDER BY type, name`,
+					 WHERE tbl_name = '_emissions' ORDER BY type, name`,
 				)
 				.all<{type: string; name: string; sql: string | null}>()
 		).results;
@@ -540,13 +539,13 @@ describe('the table is in the FIXED schema, so both application paths produce it
 		await applySchema(applied);
 
 		const fromMigration = await schemaOf(migrated);
-		expect(fromMigration.some((entry) => entry.type === 'table' && entry.name === 'EmissionStream')).toBe(true);
+		expect(fromMigration.some((entry) => entry.type === 'table' && entry.name === '_emissions')).toBe(true);
 		expect(fromMigration).toEqual(await schemaOf(applied));
 	});
 
 	it('is static SQL and not dynamic DDL: the statements come from db.sql', () => {
-		const ddl = schemaStatements.filter((statement) => statement.includes('EmissionStream'));
-		expect(ddl.some((statement) => /CREATE TABLE IF NOT EXISTS EmissionStream/.test(statement))).toBe(true);
+		const ddl = schemaStatements.filter((statement) => statement.includes('_emissions'));
+		expect(ddl.some((statement) => /CREATE TABLE IF NOT EXISTS _emissions/.test(statement))).toBe(true);
 		expect(ddl.filter((statement) => /CREATE INDEX/.test(statement))).toHaveLength(2);
 	});
 });

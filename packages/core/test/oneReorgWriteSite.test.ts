@@ -26,7 +26,7 @@ import {REORG_COUNTER_KEY, REORG_LAST_KEY} from '../src/index.js';
 
 const ROOT = new URL('../../../', import.meta.url).pathname;
 
-/** Where SHIPPED code lives. A test may write a Meta row to set a scenario up; shipped code may not. */
+/** Where SHIPPED code lives. A test may write a `_meta` row to set a scenario up; shipped code may not. */
 const GROUPS = ['packages', 'platforms'];
 
 /** The DURABLE key names, however a file happens to reach them. */
@@ -63,7 +63,7 @@ const shippedSources = GROUPS.flatMap((group) =>
 const writeSites = shippedSources
 	.map((path) => ({path, text: readFileSync(path, 'utf-8')}))
 	.filter(({text}) => KEY_NAMES.some((key) => text.includes(key)))
-	.filter(({text}) => /INSERT\s+INTO|UPDATE\s+Meta|writeCursor|\.put\(/i.test(text))
+	.filter(({text}) => /INSERT\s+INTO|UPDATE\s+_meta|writeCursor|\.put\(/i.test(text))
 	.map(({path}) => path.slice(ROOT.length));
 
 describe('a concluded reorg has ONE writer', () => {
@@ -87,7 +87,7 @@ describe('a concluded reorg has ONE writer', () => {
 		// the shape it happens to be, and twice on the shape that is both.
 		const callers = ['packages/server/src/api/ingest.ts', 'packages/core/src/directIngestion.ts'];
 		for (const caller of callers) {
-			expect(readFileSync(join(ROOT, caller), 'utf-8')).not.toMatch(/INSERT\s+INTO\s+Meta/i);
+			expect(readFileSync(join(ROOT, caller), 'utf-8')).not.toMatch(/INSERT\s+INTO\s+_meta/i);
 		}
 	});
 });

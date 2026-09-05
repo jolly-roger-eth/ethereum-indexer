@@ -240,7 +240,7 @@ describe('retractions are DELIVERED, in seq order beside what they retract', () 
 		await post(deployment, 'alpha', batchOf(deployment, 'alpha', 102, 106, 106, [transfer(104, '0xb104', CAROL, 3n)]));
 
 		const alive = (
-			await deployment.db.prepare(`SELECT COUNT(*) AS n FROM EmissionStream WHERE alive = 1`).all<{n: number}>()
+			await deployment.db.prepare(`SELECT COUNT(*) AS n FROM _emissions WHERE alive = 1`).all<{n: number}>()
 		).results[0]?.n;
 		expect(alive).toBe(1);
 
@@ -259,7 +259,7 @@ describe('HOLES in seq are legal and are followed to the end', () => {
 	 */
 	async function punch(db: RemoteSQL, seqs: number[]): Promise<void> {
 		for (const seq of seqs) {
-			await db.prepare(`DELETE FROM EmissionStream WHERE seq = ?1`).bind(seq).all();
+			await db.prepare(`DELETE FROM _emissions WHERE seq = ?1`).bind(seq).all();
 		}
 	}
 
@@ -285,7 +285,7 @@ describe('HOLES in seq are legal and are followed to the end', () => {
 		await punch(deployment.db, [1, 3, 4, 5, 7]);
 
 		const remaining = (
-			await deployment.db.prepare(`SELECT seq FROM EmissionStream ORDER BY seq`).all<{seq: number}>()
+			await deployment.db.prepare(`SELECT seq FROM _emissions ORDER BY seq`).all<{seq: number}>()
 		).results.map((row) => row.seq);
 		expect(remaining).toEqual([2, 6, 8]);
 

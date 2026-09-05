@@ -11,7 +11,7 @@ import {EMISSION_COLUMNS, entryOf, type CanonicalEntry, type EmissionRow} from '
 // its ENTIRE sync state is one advancing position and it implements no reorg
 // handling of its own.
 //
-// The read is exactly the partial index `EmissionStreamCanonical` was created
+// The read is exactly the partial index `_emissions_canonical` was created
 // for -- `(indexer, stream, blockNumber, logIndex) WHERE alive = 1` -- so the
 // retractions and the rows they killed cost nothing to skip. That index is why
 // ADR-0006 could keep ONE table with a flag rather than a second table: this
