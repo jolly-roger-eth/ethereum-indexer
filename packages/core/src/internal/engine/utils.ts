@@ -156,9 +156,10 @@ export function groupStreamPerBlock<ABI extends Abi>(
  * point, which reaches back over the finality window and therefore re-offers
  * blocks that state already applied -- and those are exactly the blocks in its
  * window. So an applied block whose hash is already there is SKIPPED rather than
- * delivered twice. That is the same job `startingBlockForNewEvent` does on the
- * fetch path, decided by block HASH instead of by block NUMBER, because a stream
- * says which block it means and a re-fetched range only says where it looked.
+ * delivered twice. That is the same job the fetch path's window-membership test
+ * does (`generateStreamToAppend`), and the two are decided the same way for the
+ * same reason: a held block is named by its hash, never by a height, because a
+ * height names whichever branch won.
  */
 export function generateStreamFromReplay<ABI extends Abi>(
 	lastSync: LastSync<ABI>,
@@ -254,6 +255,51 @@ export function generateStreamFromReplay<ABI extends Abi>(
 	};
 }
 
+/**
+ * The identity of a block in the unconfirmed window: its HEIGHT and its HASH.
+ *
+ * Both halves, because neither alone answers "have we already applied this". A
+ * height names whichever branch won, which is the thing under dispute during a
+ * reorg; a hash alone would let a block be matched at a height nothing claims.
+ * It is the key `generateStreamFromReplay` walks its window by, spelled here so
+ * the two paths cannot drift into two ideas of what a held block is.
+ */
+function windowKeyOf(number: number, hash: string): string {
+	return `${number}:${hash}`;
+}
+
+/**
+ * Shape a FETCH -- a complete re-read of a block range -- into the stream to
+ * append, deriving every retraction from the unconfirmed window.
+ *
+ * ## A re-fetched block is NEW unless the window already holds it
+ *
+ * The rule that decides which incoming blocks are DELIVERED is MEMBERSHIP of the
+ * retained window, by `(number, hash)`. It is not a height threshold, and it was
+ * one: the function used to admit a block only at or above
+ * `startingBlockForNewEvent` (`reorgBlock.number` on a reorg, the window's top
+ * plus one otherwise). That threshold encodes the claim "we already hold
+ * everything below this height", and the claim is FALSE, because
+ * `unconfirmedBlocks` holds only EVENT-BEARING blocks and is therefore SPARSE:
+ * its lowest entry is usually far above the height the chain actually forked at.
+ * So when the fork was below the lowest block we held logs for, every log the
+ * replacement branch carried in that gap was inside the re-fetched range,
+ * dropped by the comparison, and never fetched again -- the next range starts
+ * above it. Silent, permanent loss (`docs/adr/0051`).
+ *
+ * Membership is SOUND because of an invariant `getFromBlock` maintains: a
+ * re-fetch never starts below `latestBlock - finality`, and a block that carried
+ * events inside that window entered `unconfirmedBlocks` when it was applied. So
+ * every incoming block we have already applied is still in the window -- unless
+ * it was RETRACTED, which is why the test reads the window that SURVIVED the
+ * retraction rather than the one we arrived with. "The window holds it" is
+ * therefore a complete test for "we already applied it", and nothing is
+ * delivered twice.
+ *
+ * It is also the rule the REPLAY path in this file already applies, by hash, for
+ * the same de-duplication reason. The two were meant to agree; only one of them
+ * got the sparse-window case right.
+ */
 export function generateStreamToAppend<ABI extends Abi>(
 	lastSync: LastSync<ABI>,
 	defaultFromBlock: number,
@@ -353,31 +399,34 @@ export function generateStreamToAppend<ABI extends Abi>(
 		}
 	}
 
-	const startingBlockForNewEvent = reorgBlock
-		? reorgBlock.number
-		: lastUnconfirmedBlocks.length > 0
-			? lastUnconfirmedBlocks[lastUnconfirmedBlocks.length - 1].number + 1
-			: logEventsGroupedPerBlock.length > 0
-				? logEventsGroupedPerBlock[0].number
-				: 0;
-	// the case for 0 is a void case as none of the loop below will be triggered
+	// THE RETAINED WINDOW: the blocks we applied and did NOT just take back.
+	//
+	// The retraction above re-emitted `reorgedBlockIndex` onward as `removed`, so
+	// they have left the window and a re-offer of one of them is NEW again -- which
+	// is exactly what a reorg concluded at the first window block produces, where
+	// every later block is retracted and the re-fetch still carries some of them
+	// under their own hashes. Where nothing reorged the walk above ran to the end,
+	// so `reorgedBlockIndex` is the window's length and this is all of it.
+	const retainedBlocks = lastUnconfirmedBlocks.slice(0, reorgedBlockIndex);
+	const retained = new Set(retainedBlocks.map((block) => windowKeyOf(block.number, block.hash)));
 
 	// new events and new unconfirmed blocks
 	const newUnconfirmedBlocks: EventBlock<ABI>[] = [];
 
 	// re-add older unconfirmed blocks that might get reorg later still
 	// only if they are new enough (finality check)
-	for (const unconfirmedBlock of lastUnconfirmedBlocks) {
-		if (unconfirmedBlock.number < startingBlockForNewEvent) {
-			if (newLastToBlock - unconfirmedBlock.number <= finality) {
-				newUnconfirmedBlocks.push(unconfirmedBlock);
-			}
+	for (const unconfirmedBlock of retainedBlocks) {
+		if (newLastToBlock - unconfirmedBlock.number <= finality) {
+			newUnconfirmedBlocks.push(unconfirmedBlock);
 		}
 	}
 
 	for (const block of logEventsGroupedPerBlock) {
 		const isUnconfirmedBlock = newLatestBlock - block.number <= finality;
-		if (block.events.length > 0 && block.number >= startingBlockForNewEvent) {
+		// A block is NEW unless the retained window already holds it, hash included.
+		// Never "new because it is above some height", which is the claim a SPARSE
+		// window cannot support: see the function's own doc comment.
+		if (block.events.length > 0 && !retained.has(windowKeyOf(block.number, block.hash))) {
 			const newEventsPerBlock: LogEvent<ABI>[] = [];
 			for (const event of block.events) {
 				eventStream.push(event);
@@ -394,6 +443,17 @@ export function generateStreamToAppend<ABI extends Abi>(
 			}
 		}
 	}
+
+	// ASCENDING, which is what every reader of this window assumes: the next
+	// cycle's reorg walk stops at the first block the incoming range contradicts,
+	// and `cursorSyncedThrough` cuts the window as a PREFIX. Under the old height
+	// threshold the order fell out for free, because nothing below a retained block
+	// could be delivered. Membership removes that guarantee -- a block the window
+	// never held can now be delivered from below the lowest retained one -- so the
+	// order is stated rather than assumed, exactly as `generateStreamFromReplay`
+	// states it. The sort is stable, so a retained block stays ahead of a delivered
+	// block at the same height.
+	newUnconfirmedBlocks.sort((a, b) => a.number - b.number);
 
 	return {
 		eventStream,
@@ -415,12 +475,20 @@ export function generateStreamToAppend<ABI extends Abi>(
  * The block numbers of a payload must ASCEND, and a payload that does not is
  * REFUSED rather than quietly repaired.
  *
- * The engine reads a payload in order. `generateStreamToAppend` takes the first
- * group's number as the boundary above which events are new when the window is
- * empty, and builds the next window in payload order, so a group appearing after
- * a higher-numbered one is DROPPED -- silently, and with the window left
- * unordered so the next cycle's boundary is wrong too. Losing logs is the one
- * outcome an indexer must never produce quietly.
+ * The engine reads a payload in order and DELIVERS it in that order, so an
+ * unordered payload becomes an unordered stream: a processor reverts once at the
+ * fork point and then applies each block as it comes, and a block arriving after
+ * a higher-numbered one is applied out of order, against a store that has
+ * already recorded blocks above it. Losing or misplacing logs is the one outcome
+ * an indexer must never produce quietly.
+ *
+ * It used to be worse than misordered: while a HEIGHT decided which incoming
+ * blocks were new, a group appearing after a higher-numbered one was DROPPED
+ * outright, and the window it left behind put the next cycle's boundary wrong
+ * too. Window membership (`generateStreamToAppend`) removed that particular
+ * damage -- a block is judged by what the window holds and not by where it sits
+ * in the payload -- which is why this refusal is now about ORDER OF DELIVERY
+ * alone. It is not a reason to relax it.
  *
  * Refusing rather than sorting is deliberate. `eth_getLogs` returns logs in
  * ascending order, and no node has a reason to do otherwise, so an unordered
