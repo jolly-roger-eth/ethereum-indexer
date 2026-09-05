@@ -10,7 +10,7 @@ import type {Context} from 'hono';
 import {logs} from 'named-logs';
 import {appendEmissions} from '../emissions.js';
 import type {Env} from '../env.js';
-import type {IndexerRegistryEntry} from '../registry.js';
+import {resolveIndexer} from './resolve.js';
 import {setup} from '../setup.js';
 import type {ServerOptions} from '../types.js';
 
@@ -176,7 +176,7 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 			 * ever pointing a crawler at it.
 			 */
 			.post('/:indexer/ingest/expected-from-block', async (c) => {
-				const resolved = resolve(options, c as never);
+				const resolved = resolveIndexer(options, c as never, 'ingest');
 				if (!resolved.ok) return resolved.response;
 				const {ingestion} = resolved.entry;
 
@@ -187,7 +187,7 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 				} as const);
 			})
 			.post('/:indexer/ingest', async (c) => {
-				const resolved = resolve(options, c as never);
+				const resolved = resolveIndexer(options, c as never, 'ingest');
 				if (!resolved.ok) return resolved.response;
 				const {ingestion} = resolved.entry;
 				const {name} = resolved;
@@ -250,69 +250,6 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 				}
 			})
 	);
-}
-
-/**
- * The named indexer this request addressed, or the refusal to send back.
- *
- * TWO refusals, and keeping them apart is the point of doing this in one place:
- *
- * - **`501`, no registry at all.** This host hosts no processor -- a read tier,
- *   or a combined process whose ingestion is the in-process direct wire -- so
- *   there is no name it could answer under. It is a CAPABILITY statement, and it
- *   is what this route has always said when nothing was injected.
- * - **`404`, a name this host was not built with.** A ROUTING refusal, matching
- *   what the name IS: a route segment. It is deliberately not a `400`, because
- *   ADR-0004's `400` family is about the PAYLOAD (a foreign `{source, config}`,
- *   a malformed range) and nothing is wrong with this payload; and deliberately
- *   not a `409`, because no block number makes it right. A sender must not retry
- *   either of them, which is what `createHttpIngestion` does with the whole 4xx
- *   family bar the `409`.
- *
- * What it is NEVER is a default. Falling back to "the only indexer this host
- * has" would make a typo in a fetcher's configuration land another tenant's logs
- * in a database that will never be able to tell.
- */
-function resolve<CustomEnv extends Env>(
-	options: ServerOptions<CustomEnv>,
-	c: Context<{Bindings: Env}>,
-): {ok: true; entry: IndexerRegistryEntry; name: string} | {ok: false; response: Response} {
-	const name = c.req.param('indexer') as string;
-	if (!options.getIndexer) {
-		return {
-			ok: false,
-			response: c.json(
-				{
-					success: false,
-					error: 'ingestion-not-configured',
-					message: `this server hosts no processor: pass getIndexer to createServer to accept logs`,
-				} as const,
-				501,
-			),
-		};
-	}
-	const entry = options.getIndexer(c as never, name);
-	if (!entry) {
-		logger.error(`ingest: a batch arrived for ${JSON.stringify(name)}, which this host was not built with`);
-		return {
-			ok: false,
-			response: c.json(
-				{
-					success: false,
-					error: 'unknown-indexer',
-					indexer: name,
-					message:
-						`this server hosts no named indexer called ${JSON.stringify(name)}. A host registers the names it ` +
-						`was built with, and no name is ever defaulted: check the name this sender was deployed with.`,
-				} as const,
-				404,
-			),
-		};
-	}
-	// the NAME travels back beside the entry, because it is not merely how the entry
-	// was found: it is a DISCRIMINATOR the write path keys on, and this request's
-	// segment is the one source of its value
-	return {ok: true, entry, name};
 }
 
 /**
