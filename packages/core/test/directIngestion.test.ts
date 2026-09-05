@@ -257,8 +257,10 @@ describe('a cursor refusal', () => {
 		});
 		const target = createDirectIngestion({
 			context: {source: 'x', config: 'y'} as never,
-			// a receiver identifies the stream it folds; this one folds nothing real
+			// a receiver identifies the stream it folds and the generation it is; this
+			// one folds nothing real
 			streamDigest: 'a-stream',
+			generation: {stream: 'a-stream', processor: 'a-fold'},
 			expectedFromBlock: async () => 42,
 			receive: async () => {
 				throw foreign;

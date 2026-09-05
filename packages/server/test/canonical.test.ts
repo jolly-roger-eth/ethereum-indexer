@@ -26,6 +26,9 @@ import {
 	deploy,
 	pad,
 	post,
+	readCanonical as read,
+	reorgAt103,
+	indexedThroughBlock105,
 	transfer,
 	type Deployment,
 	type TestEnv,
@@ -87,19 +90,13 @@ type CanonicalBody = {
 	message?: string;
 };
 
+/** The harness's reader, at this suite's idea of what a canonical response holds. */
 async function readCanonical(
 	deployment: Deployment,
 	name: string,
 	query: {gate?: number | string; cursor?: string; limit?: number | string} = {},
 ): Promise<{status: number; body: CanonicalBody; text: string}> {
-	const params = new URLSearchParams();
-	if (query.gate !== undefined) params.set('gate', String(query.gate));
-	if (query.cursor !== undefined) params.set('cursor', query.cursor);
-	if (query.limit !== undefined) params.set('limit', String(query.limit));
-	const suffix = params.toString() ? `?${params.toString()}` : '';
-	const res = await deployment.app.request(`/${name}/canonical${suffix}`);
-	const text = await res.text();
-	return {status: res.status, body: JSON.parse(text), text};
+	return read<CanonicalBody>(deployment, name, query);
 }
 
 /**
@@ -129,43 +126,6 @@ async function follow(
 /** What identifies ONE entry for "nothing skipped and nothing repeated". */
 function identityOf(entry: CanonicalEntryShape): string {
 	return `${entry.blockHash}:${entry.logIndex}`;
-}
-
-/**
- * A stream carrying a REAL reorg, driven through `/{indexer}/ingest`.
- *
- * Batch one indexes 101, 103, 104 and 105. Batch two re-scans from 102 (which is
- * where the stream-builder says the next batch must start, `lastToBlock -
- * finality`) and reports a DIFFERENT hash at 103, so the fold concludes a
- * contradiction there and retracts 103, 104 and 105 before applying the new
- * branch. The fork block is therefore 103, and a consumer that had reached 105
- * must go back to it.
- */
-async function indexedThroughBlock105(): Promise<Deployment> {
-	const deployment = await deploy({alpha: SOURCE});
-	await post(
-		deployment,
-		'alpha',
-		batchOf(deployment, 'alpha', 100, 105, 105, [
-			transfer(101, '0xa101', ALICE, 1n),
-			transfer(103, '0xa103', BOB, 2n),
-			transfer(104, '0xa104', CAROL, 3n),
-			transfer(105, '0xa105', ALICE, 4n),
-		]),
-	);
-	return deployment;
-}
-
-async function reorgAt103(deployment: Deployment): Promise<void> {
-	await post(
-		deployment,
-		'alpha',
-		batchOf(deployment, 'alpha', 102, 106, 106, [
-			transfer(103, '0xb103', CAROL, 13n),
-			transfer(104, '0xb104', ALICE, 14n),
-			transfer(106, '0xb106', BOB, 16n),
-		]),
-	);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +178,7 @@ describe('the view serves only LIVE entries, in block and log-index order', () =
 			topics: [TRANSFER_TOPIC0, pad(ZERO), pad(ALICE)],
 			data: `0x${1n.toString(16).padStart(64, '0')}`,
 		});
-		expect(Object.keys(page.body).sort()).toEqual(['cursor', 'entries', 'hasMore', 'stream', 'success']);
+		expect(Object.keys(page.body).sort()).toEqual(['cursor', 'entries', 'generation', 'hasMore', 'stream', 'success']);
 		// no `seq` outside the opaque cursor: this view does not count in that space
 		expect(page.text.replace(page.body.cursor, '')).not.toContain('seq');
 	});
@@ -379,6 +339,7 @@ describe('a cursor whose block is no longer canonical answers REWIND TO FORK BLO
 		expect(Object.keys(answer.body).sort()).toEqual([
 			'error',
 			'forkBlock',
+			'generation',
 			'message',
 			'rewindCursor',
 			'stream',

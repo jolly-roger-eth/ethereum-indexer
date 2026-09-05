@@ -49,6 +49,9 @@ function fakeIngestion(expected: number) {
 		// WHICH stream this folds, which is what the server keys the stored emission
 		// stream on. A fixed string here: this adapter routes batches and stores none.
 		streamDigest: '0123456789abcdef0123456789abcdef',
+		// and WHICH GENERATION it is, which the feed advertises. Fixed here for the
+		// same reason: this adapter routes batches and folds nothing.
+		generation: {stream: '0123456789abcdef0123456789abcdef', processor: '1.0.0-fake'},
 		expectedFromBlock: async () => expected,
 		receive: async (batch) => {
 			received.push({fromBlock: batch.fromBlock, toBlock: batch.toBlock});

@@ -12,6 +12,7 @@ import {
 	wireContextOf,
 	type ReorgDetection,
 } from './internal/engine/utils.js';
+import type {GenerationId} from './generation/registry.js';
 import type {ReorgRecorder} from './reorgCounters.js';
 import {streamDigestOf} from './stream/identity.js';
 import type {
@@ -100,6 +101,23 @@ export type LogIngestion = {
 	 * (ADR-0035), so one stream has one name everywhere.
 	 */
 	readonly streamDigest: string;
+	/**
+	 * WHICH GENERATION this receiver is: the stream above, plus the fold over it.
+	 *
+	 * Here because the processor is the one thing a host CANNOT see -- it hands one
+	 * over at construction and then holds an interface that never mentions it again
+	 * -- while a host is exactly who has to report the answer's identity outward
+	 * (`@etherfold/server` advertises it on every feed response, so a consumer can
+	 * notice that the fold behind the feed changed; no cursor check can, because
+	 * the stream did not move).
+	 *
+	 * DERIVED on every read, never a snapshot: `getVersionHash()` covers the
+	 * processor's configuration as well as its version, and `configure()` can move
+	 * it after construction. A field captured once would then advertise a fold that
+	 * is no longer running, which is worse than not advertising at all. Its `stream`
+	 * half is `streamDigest` itself, so the two can never disagree.
+	 */
+	readonly generation: GenerationId;
 	expectedFromBlock(): Promise<number>;
 	receive(batch: UntypedWireBatch): Promise<IngestionOutcome>;
 };
@@ -182,6 +200,18 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 	readonly context: WireContext;
 	/** WHICH stream this folds, as everything that stores its emissions keys them. See `LogIngestion`. */
 	readonly streamDigest: string;
+
+	/**
+	 * WHICH generation this is: the stream it folds, and the fold itself.
+	 *
+	 * A GETTER rather than a field, so the processor half is read at the moment it
+	 * is asked for -- exactly as `currentLastSync` reads it on every call, and for
+	 * the same reason: `getVersionHash()` covers the processor's config too, so a
+	 * value captured in the constructor can stop being true. See `LogIngestion`.
+	 */
+	get generation(): GenerationId {
+		return {stream: this.streamDigest, processor: this.processor.getVersionHash()};
+	}
 
 	private readonly finality: number;
 	private readonly recordReorg: ReorgRecorder | undefined;
