@@ -188,6 +188,15 @@ export async function isStillCanonical(
  * happen for a cursor that failed validation -- the retraction that killed it is
  * by definition above the mark it was minted at. The caller treats it as the
  * refusal it is rather than serving a page.
+ *
+ * PAIR-COMPACTION is visible here, and only to a consumer already outside its
+ * window: it deletes retraction rows below the configured depth, so a reorg whose
+ * pair has been reclaimed can no longer be named as a fork block. That requires a
+ * consumer holding a cursor minted before a reorg and presenting it only after
+ * that reorg fell BELOW the compaction depth -- one lagging further behind than
+ * finality, which is why the finality depth is that setting's floor
+ * (`../compaction.ts`). A deployment that never compacts never reaches this at
+ * all, which is the default.
  */
 export async function forkBlockSince(
 	db: RemoteSQL,
