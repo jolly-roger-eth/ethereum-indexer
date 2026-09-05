@@ -4,7 +4,6 @@ slug: the-stream-appends-in-segments-on-indexeddb
 spec: appending-to-the-stream-costs-the-batch
 blockedBy: [the-indexer-and-its-stream-cache-agree-on-who-is-ahead]
 covers: [1, 2, 3, 4, 5, 6, 7]
-needsAnswers: true
 ---
 
 ## What to build

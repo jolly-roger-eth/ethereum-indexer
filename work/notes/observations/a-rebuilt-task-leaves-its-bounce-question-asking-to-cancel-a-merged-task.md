@@ -59,3 +59,29 @@ All four are deleted as of this note; git history is the archive, per the contra
 This note therefore stays LIVE: the dorfl behaviour is unchanged, and the next task that bounces will strand its sidecar exactly the same way. Discharge it when dorfl retires an item's questions on landing (or scopes an answer to the attempt that raised it), not because these instances were tidied up.
 
 Given the four-for-four rate, the fix shape suggested above should be read as the MINIMUM. "Retire the sidecar when the item reaches its terminal" closes the rebuild path; it does not by itself explain why an explicitly answered sidecar survived, which is the second, likelier-to-bite defect: an answer a human wrote is only as good as the rung that drains it, and here that rung did not run.
+
+## Update 2026-09-04 — the diagnosis, read off dorfl 0.13.2's own source
+
+Re-checked against dorfl 0.13.2 (the npm package ships `src/`, so this is read rather than inferred). Three things are now established, and together they sharpen this note considerably.
+
+**1. It is not only the sidecar. The FLAG is stranded too.** `surface-persist.ts` states the invariant it maintains: *"the item body's `needsAnswers` flag is set to `true` in the SAME commit the sidecar is written, so the `needsAnswers:true ⟺ active sidecar` invariant holds the instant the commit lands."* Both halves are written atomically on the bounce, and NEITHER is cleared when the item later succeeds. Three tasks were sitting in `work/tasks/done/` carrying `needsAnswers: true` with no `## Open questions` section anywhere in the body:
+
+```
+work/tasks/done/a-follower-replays-a-retraction-a-paused-writer-appended.md
+work/tasks/done/the-one-shot-is-build-and-serve-is-only-the-read-tier.md
+work/tasks/done/the-stream-appends-in-segments-on-indexeddb.md
+```
+
+So shipped, merged work was advertising that open questions block autonomous work on it. That is worse than the stranded sidecar, because `needsAnswers` is a GATE: the readiness computation excludes a flagged item from the agent-buildable set, so the flag on a terminal item is a gate left armed on something that can never need it.
+
+**2. dorfl ALREADY knows this state is illegal, and has a name for it.** `advance-classify.ts` refuses to classify a contradictory input and returns an explicit `invariant-violation` kind with a machine-stable reason tag, one of which is exactly this case:
+
+> `sidecar-without-needsAnswers` — a sidecar exists but `needsAnswers` is not `true` (invariant 1 broken — the flag and the sidecar disagree).
+
+It also names the mirror case, `needsAnswers-without-sidecar`, and is careful to say that one is NORMAL before the first surface (an authored item with open questions has the flag and no sidecar until `surface` runs). That distinction matters for anyone cleaning this up by hand: a pre-surface item must keep its flag.
+
+**3. So the detector exists and never runs on this path.** `advance-classify.ts` is the `advance` tick's classifier. A human driving `dorfl do` and merging a PR never enters that loop, and there is no `run` daemon on this machine. The surface path sets flag and sidecar atomically; the SUCCESS path (re-dispatch → build → `complete` → PR merge → done-move) clears neither; and the one thing that would notice sits in a code path that path never reaches. That is why four sidecars and three flags accumulated silently.
+
+That narrows a fix the same way the lock-leak note does: not in `surface`, which is correct and atomic, but in whatever should reconcile an item's question state when it reaches a terminal position. The same reconcile-on-read shape would serve both, since a done-move is exactly when both the lock and the sidecar become moot.
+
+**Cleaned up here:** the three flags above are cleared, so no terminal item advertises a gate it cannot need. `work/tasks/cancelled/snapshot-prune-script.md` KEEPS its flag deliberately: it has a real `## Open questions` section and was cancelled with them open, so there the flag is accurate history rather than residue.
