@@ -58,7 +58,7 @@ type Row = {
 async function rowsOf(db: RemoteSQL): Promise<Row[]> {
 	return (
 		await db
-			.prepare(`SELECT seq, removed, alive, blockNumber, blockHash, logIndex FROM EmissionStream ORDER BY seq`)
+			.prepare(`SELECT seq, removed, alive, blockNumber, blockHash, logIndex FROM _emissions ORDER BY seq`)
 			.all<Row>()
 	).results.map((row) => ({...row, seq: Number(row.seq)}));
 }
@@ -280,7 +280,7 @@ describe('a retracted entry and its retraction go TOGETHER, and only below the d
 		// what is under test is that the rule is PAIRING and not "delete the dead rows".
 		await deployment.db
 			.prepare(
-				`INSERT INTO EmissionStream (
+				`INSERT INTO _emissions (
 					indexer, stream, seq, removed, alive, blockNumber, blockHash, logIndex,
 					transactionHash, transactionIndex, address, topic0, data
 				 ) VALUES ('alpha', ?1, 13, 1, 0, 120, '0xa120', 0, '0xdead', 0, '0xcafe', '0xtopic', '0x')`,

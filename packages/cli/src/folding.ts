@@ -99,7 +99,7 @@ export async function buildProcessor<ABI extends Abi, ProcessResultType>(
 		finalityDepth: number;
 		createDB?: (url: string) => RemoteSQL;
 		/**
-		 * Create the fixed tables (`Meta`) if they are absent, rather than leaving it
+		 * Create the fixed tables (`_meta`) if they are absent, rather than leaving it
 		 * to whatever binds a port.
 		 *
 		 * `build` sets it, because the one-shot starts no server and a database it

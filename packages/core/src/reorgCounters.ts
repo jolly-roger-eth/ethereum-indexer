@@ -33,7 +33,7 @@ export type ReorgCounters = {
  * already depend on is the one that decides what a `ReorgCause` IS. Spelling the
  * strings twice is how the two silently stop describing the same database.
  *
- * They are opaque keys, not a schema: WHERE they are stored (today a `Meta`
+ * They are opaque keys, not a schema: WHERE they are stored (today a `_meta`
  * row per key in the libSQL artifact) is the store owner's business, and nothing
  * here knows about SQL.
  */

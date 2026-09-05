@@ -17,9 +17,9 @@ import type {RemoteSQL} from 'remote-sql';
  */
 async function countAReorgOutsideTheServer(db: RemoteSQL, blockNumber: number): Promise<void> {
 	await db.batch([
-		db.prepare(`INSERT INTO Meta (key, value) VALUES (?1, '1')`).bind(REORG_COUNTER_KEY.absence),
+		db.prepare(`INSERT INTO _meta (key, value) VALUES (?1, '1')`).bind(REORG_COUNTER_KEY.absence),
 		db
-			.prepare(`INSERT INTO Meta (key, value) VALUES (?1, ?2)`)
+			.prepare(`INSERT INTO _meta (key, value) VALUES (?1, ?2)`)
 			.bind(REORG_LAST_KEY, JSON.stringify({cause: 'absence', blockNumber, blockHash: '0xdead', at: 'now'})),
 	]);
 }

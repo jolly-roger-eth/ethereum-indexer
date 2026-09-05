@@ -30,7 +30,7 @@ export type {RecordedReorg, ReorgCounters};
  */
 export async function readReorgCounters(db: RemoteSQL): Promise<ReorgCounters> {
 	const result = await db
-		.prepare(`SELECT key, value FROM Meta WHERE key IN (?1, ?2, ?3)`)
+		.prepare(`SELECT key, value FROM _meta WHERE key IN (?1, ?2, ?3)`)
 		.bind(REORG_COUNTER_KEY.absence, REORG_COUNTER_KEY.contradiction, REORG_LAST_KEY)
 		.all<{key: string; value: string}>();
 

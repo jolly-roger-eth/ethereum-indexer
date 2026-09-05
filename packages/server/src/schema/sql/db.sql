@@ -1,11 +1,29 @@
--- FIXED tables only.
+-- FIXED tables only, and every one of them lives in the reserved `_` namespace.
 --
 -- Entity tables are NOT here and never will be: the versioned-row state store
 -- creates them at runtime from whatever entities a processor declares, so its
 -- DDL is dynamic by construction. See docs/design/historical-state-database.md
 -- and the state-store-sqlite package. This file is the part of the schema the
 -- SERVER owns and can therefore ship as static SQL.
-CREATE TABLE IF NOT EXISTS Meta (
+--
+-- ## Why every name here begins with `_`
+--
+-- Those entity tables are created as `CREATE TABLE IF NOT EXISTS "<entity>"`
+-- against the SAME database handle this file's tables live in -- `buildProcessor`
+-- hands one handle to both the store and the server in every combined shape --
+-- so a table here whose name a processor could also declare is a SILENT
+-- collision: `IF NOT EXISTS` makes the entity's DDL succeed against our table,
+-- and the failure surfaces much later as a column error on a write, nowhere near
+-- the declaration that caused it.
+--
+-- `@etherfold/state-store` already closes that by REFUSING an entity whose name
+-- starts with `_` (`isReserved`, `entities.ts`), and the store's own fixed tables
+-- already sit there as `_blocks` and `_cursor`. The server's are the same KIND of
+-- thing, so they sit there too, and the collision becomes impossible by
+-- construction rather than by a second refusal that would have to be told these
+-- names. `packages/server/test/reservedNamespace.test.ts` scans this file and
+-- fails if a table or index here ever forgets the prefix.
+CREATE TABLE IF NOT EXISTS _meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
@@ -64,7 +82,7 @@ CREATE TABLE IF NOT EXISTS Meta (
 -- what the NODE said. The decoded `args` are what SOME ABI made of those bytes
 -- and are re-derived on replay against the source running now, so persisting
 -- them would persist an opinion that a decode-only change invalidates.
-CREATE TABLE IF NOT EXISTS EmissionStream (
+CREATE TABLE IF NOT EXISTS _emissions (
     -- the NAMED INDEXER, from the route segment: the tenancy discriminator
     indexer TEXT NOT NULL,
     -- WHICH stream, as `streamDigestOf` renders it (NOT the wire identity)
@@ -99,8 +117,8 @@ CREATE TABLE IF NOT EXISTS EmissionStream (
 -- THE CANONICAL VIEW's index, and the reason a flag beats a second table: it
 -- covers only the live rows, so the retractions and the rows they killed cost
 -- nothing to skip.
-CREATE INDEX IF NOT EXISTS EmissionStreamCanonical
-    ON EmissionStream (indexer, stream, blockNumber, logIndex)
+CREATE INDEX IF NOT EXISTS _emissions_canonical
+    ON _emissions (indexer, stream, blockNumber, logIndex)
     WHERE alive = 1;
 
 -- THE LOG API's index, whose shape is decided by `work/specs/proposed/node-log-api.md`
@@ -111,8 +129,8 @@ CREATE INDEX IF NOT EXISTS EmissionStreamCanonical
 --
 -- It leads with the two discriminators for the reason they exist: a range scan
 -- that could omit one would cross into another tenant's rows.
-CREATE INDEX IF NOT EXISTS EmissionStreamByAddressTopic
-    ON EmissionStream (indexer, stream, address, topic0, blockNumber);
+CREATE INDEX IF NOT EXISTS _emissions_by_address_topic
+    ON _emissions (indexer, stream, address, topic0, blockNumber);
 
-INSERT INTO Meta (key, value) VALUES ('schemaVersion', '2')
+INSERT INTO _meta (key, value) VALUES ('schemaVersion', '2')
     ON CONFLICT (key) DO UPDATE SET value = excluded.value;

@@ -71,7 +71,7 @@ describe('the server runs with no platform adapter', () => {
 		const db = freshDB();
 		const app = serverOn(db);
 		await app.request('/admin/setup', {method: 'POST'});
-		await db.prepare(`UPDATE Meta SET value = ?1 WHERE key = ?2`).bind('999', 'schemaVersion').all();
+		await db.prepare(`UPDATE _meta SET value = ?1 WHERE key = ?2`).bind('999', 'schemaVersion').all();
 
 		const res = await app.request('/status');
 		expect(res.status).toBe(503);
@@ -210,7 +210,7 @@ describe('the SQL and the code agree about the schema version', () => {
 		// run the SQL and never call applySchema. This test is what keeps the
 		// TypeScript constant honest about what the SQL does.
 		const {default: sql} = await import('../src/schema/ts/db.sql.js');
-		const match = /INSERT INTO Meta \(key, value\) VALUES \('schemaVersion', '(\d+)'\)/.exec(sql);
+		const match = /INSERT INTO _meta \(key, value\) VALUES \('schemaVersion', '(\d+)'\)/.exec(sql);
 		expect(match, 'db.sql must insert a schemaVersion row').toBeTruthy();
 		expect(Number(match![1])).toBe(SCHEMA_VERSION);
 	});

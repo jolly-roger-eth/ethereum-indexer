@@ -32,8 +32,16 @@ import type {RemoteSQL, SQLPreparedStatement} from 'remote-sql';
 // this becomes the caller of that path.
 // ---------------------------------------------------------------------------------------------------
 
-/** The table's name, spelled once so a read and a write cannot drift apart. */
-export const EMISSION_STREAM_TABLE = 'EmissionStream';
+/**
+ * The table's name, spelled once so a read and a write cannot drift apart.
+ *
+ * In the reserved `_` namespace like every other FIXED table, because the entity
+ * tables of a processor are created in this same database and an entity named
+ * after this one would have collided with it silently. `@etherfold/state-store`
+ * refuses a declaration whose name starts with `_`, so being here is what makes
+ * that impossible; see the note at the top of `schema/sql/db.sql`.
+ */
+export const EMISSION_STREAM_TABLE = '_emissions';
 
 /** One append: the two discriminators every row carries, and the emissions to write under them. */
 export type EmissionAppend = {

@@ -521,7 +521,7 @@ describe('a concluded reorg is counted exactly once, by whoever owns the store',
 		const builder = new StreamBuilder<TestABI, void>(target.processor, SOURCE, {
 			stream: {finality: FINALITY},
 			recordReorg: () => {
-				throw new Error('no such table: Meta');
+				throw new Error('no such table: _meta');
 			},
 		});
 		await upTo105(builder);

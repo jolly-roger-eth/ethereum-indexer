@@ -22,13 +22,13 @@ export function hostRecorderFor(db: RemoteSQL): ReorgRecorder {
 		await db.batch([
 			db
 				.prepare(
-					`INSERT INTO Meta (key, value) VALUES (?1, '1')
-					 ON CONFLICT (key) DO UPDATE SET value = CAST(Meta.value AS INTEGER) + 1`,
+					`INSERT INTO _meta (key, value) VALUES (?1, '1')
+					 ON CONFLICT (key) DO UPDATE SET value = CAST(_meta.value AS INTEGER) + 1`,
 				)
 				.bind(REORG_COUNTER_KEY[reorg.cause]),
 			db
 				.prepare(
-					`INSERT INTO Meta (key, value) VALUES (?1, ?2)
+					`INSERT INTO _meta (key, value) VALUES (?1, ?2)
 					 ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
 				)
 				.bind(REORG_LAST_KEY, JSON.stringify({...reorg, at: new Date().toISOString()})),

@@ -99,7 +99,7 @@ export function createNodeDB(url: string): RemoteSQL {
  * Exposed for the same reason `createNodeDB` is: it is what a Node host does to
  * a libSQL database before anything uses it, and `etherfold build` needs it
  * WITHOUT starting a server. The one-shot binds no port, so nothing else would
- * ever create the `Meta` table -- and a database it emitted would then be a
+ * ever create the `_meta` table -- and a database it emitted would then be a
  * publishable artifact that has lost its provenance the moment it becomes an
  * input to another process (no schema version, no reorg counters). The fixed
  * tables belong to the ARTIFACT rather than to whichever process happens to be

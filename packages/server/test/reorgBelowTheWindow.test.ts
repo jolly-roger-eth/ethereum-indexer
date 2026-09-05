@@ -53,7 +53,7 @@ type Row = {seq: number; blockNumber: number; blockHash: string; removed: number
 async function emissions(db: RemoteSQL): Promise<Row[]> {
 	return (
 		await db
-			.prepare(`SELECT seq, blockNumber, blockHash, removed, alive FROM EmissionStream WHERE stream = ?1 ORDER BY seq`)
+			.prepare(`SELECT seq, blockNumber, blockHash, removed, alive FROM _emissions WHERE stream = ?1 ORDER BY seq`)
 			.bind(STREAM_DIGEST)
 			.all<Row>()
 	).results;

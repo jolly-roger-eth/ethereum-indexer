@@ -57,14 +57,14 @@ describe('the reorg counter write', () => {
 		const db = await freshDatabase();
 		await recordReorg(db, {cause: 'absence', blockNumber: 7, blockHash: '0xa7'});
 
-		const rows = await db.prepare(`SELECT key FROM Meta ORDER BY key`).all<{key: string}>();
+		const rows = await db.prepare(`SELECT key FROM _meta ORDER BY key`).all<{key: string}>();
 		expect(rows.results.map((row) => row.key)).toContain(REORG_COUNTER_KEY.absence);
 		expect(rows.results.map((row) => row.key)).toContain(REORG_LAST_KEY);
 	});
 
 	it('REJECTS on a database with no fixed tables, which is why the fold catches it', async () => {
 		// `--no-auto-setup` is the operator saying somebody else migrates this
-		// database, so `Meta` may simply not be there. The write must fail loudly
+		// database, so `_meta` may simply not be there. The write must fail loudly
 		// enough for `StreamBuilder` to log a miscount -- and the fold must survive it,
 		// which `test/equivalence.test.ts` asserts on a running deployment.
 		const unmigrated = new RemoteLibSQL(createClient({url: ':memory:'}));
