@@ -36,6 +36,26 @@ export type {RecordedReorg, ReorgCounters} from './reorgs.js';
 export {appendEmissions, EMISSION_STREAM_TABLE} from './emissions.js';
 export type {EmissionAppend} from './emissions.js';
 /**
+ * PAIR-COMPACTION (ADR-0006): the one thing that ever DELETES from that stream,
+ * and a call the HOST SCHEDULES rather than something an append does on its way
+ * past (ADR-0022).
+ *
+ * Exported as a verb and a resolver, and wired to no route and no timer: OFF BY
+ * DEFAULT is not a flag this package reads, it is nobody calling this. A host
+ * that wants it validates its configured depth at startup with
+ * `resolvePairCompaction` and schedules `compactEmissionPairs` on the cadence it
+ * chooses -- a browser tab, a backfilling CLI and a long-running server want
+ * three different ones, and this package must not pick for them.
+ */
+export {compactEmissionPairs, resolvePairCompaction, COMPACTION_OFF, DEFAULT_MAX_PAIRS} from './compaction.js';
+export type {
+	PairCompaction,
+	PairCompactionOptions,
+	PairCompactionQuery,
+	PairCompactionReport,
+	PairCompactionSetting,
+} from './compaction.js';
+/**
  * THE TWO VIEWS' entry shapes, exported because a consumer written in
  * TypeScript reads these and the type is what it reads them as.
  *

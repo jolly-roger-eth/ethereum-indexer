@@ -150,6 +150,35 @@ The read rides the partial index `EmissionStreamCanonical` (`(indexer, stream, b
 
 The envelope is the server's and the `value` is the host's, untouched. It is an object so that the GENERATION dimension can grow INSIDE it later (an indexer already holds several generations and reports progress per generation; the server does not hold them yet, so it reports one cursor and a later host adds a key beside `value`), and so that a broken reporter is distinguishable from a host that simply has no store: **a reporter that throws, rejects, reports nothing or returns something unserialisable degrades to `reported: false` with a reason** and never fails the request or changes `healthy`, exactly as the reorg counters degrade.
 
+## Pair-compaction (off by default)
+
+The stored emission stream is append-only, and the ONE thing that ever deletes from it is pair-compaction: a retracted entry reclaimed TOGETHER WITH its retraction, far below finality (ADR-0006). It is a call a HOST SCHEDULES and it is wired to no route and no timer, so **off by default is nobody calling it** rather than a flag this package reads.
+
+```ts
+import {compactEmissionPairs, resolvePairCompaction} from '@etherfold/server';
+
+// at startup, so a depth this deployment cannot honour is a boot failure
+resolvePairCompaction({blocks: 50_000}, {finality: 64});
+
+// on whatever cadence THIS host wants
+const report = await compactEmissionPairs(db, {
+	indexer: 'alpha',
+	stream: ingestion.streamDigest,
+	compaction: {blocks: 50_000},
+	finality: 64,
+	latestBlock: tip,
+});
+// {floor: tip - 50_000, pairsCompacted: 12, rowsDeleted: 24, scanned: 24, complete: true}
+```
+
+**It is ANSWER-PRESERVING for the canonical view by construction**, which is why it may exist at all: it only ever removes rows that are already `alive = 0`, which that view already excludes, so `GET /{indexer}/canonical` answers BYTE-IDENTICALLY over the same gate before and after. The only consumer that can observe it is one following the `seq` feed further behind than finality, which is already outside the window it may rely on. A from-genesis replay is unaffected too, since an apply/retract pair has no net effect on a reducer whose revert is exact.
+
+**The depth is BLOCK NUMBERS and no other unit, with the finality depth as its FLOOR** (ADR-0019, the rule retention already lives under). A duration would compact on wall-clock progress rather than chain progress. A depth that would compact at or above `latestBlock - finality` is **REFUSED naming both numbers, never clamped**: inside that window a retraction can still arrive, and a silent correction would leave an operator believing something untrue. A depth exactly AT the floor is legal and compacts strictly below it.
+
+**One call does BOUNDED work** (ADR-0022): at most `maxPairs * 2` candidate rows read and `maxPairs` pairs deleted, every row named by its `seq`, in statements chunked to 100 bound parameters inside one batch. `complete` says whether the scan reached the end, so an amortised policy (a small budget, often) and a whole sweep (loop while `complete` is false) are both expressible without this package inventing a cadence.
+
+**A pair goes together or not at all**, and `seq` is never renumbered: the holes left behind are legal by contract and both cursors already tolerate them. An unmatched row is left alone, and a LIVE row is never a candidate however old.
+
 ## Typed client
 
 ```ts

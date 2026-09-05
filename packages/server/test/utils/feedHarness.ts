@@ -208,6 +208,41 @@ export async function readFeed<Body>(
 	return request(deployment, `/${name}/feed`, query);
 }
 
+/**
+ * FOLLOW the retraction-aware feed to its end, one page at a time, exactly as a
+ * consumer does: hold the cursor, do arithmetic on nothing.
+ *
+ * Here rather than in one suite because two files now assert that a consumer
+ * REACHES THE END -- the feed's own suite over a stream with holes punched into
+ * it, and the compaction suite over the holes a real compaction left -- and two
+ * hand-written loops would be two ideas of what following means. Generic in the
+ * entry so each suite keeps its own idea of what an entry holds.
+ *
+ * The guard is what makes a STALL fail as a test rather than hang as one.
+ */
+export async function followFeed<Entry>(
+	deployment: Deployment,
+	name: string,
+	limit: number,
+): Promise<{entries: Entry[]; pages: number; cursor: string}> {
+	const entries: Entry[] = [];
+	let cursor: string | undefined;
+	let pages = 0;
+	for (let guard = 0; guard < 50; guard++) {
+		const page = await readFeed<{entries: Entry[]; cursor: string; hasMore: boolean}>(deployment, name, {
+			...(cursor === undefined ? {} : {cursor}),
+			limit,
+		});
+		expect(page.status, page.text).toBe(200);
+		pages++;
+		entries.push(...page.body.entries);
+		// the caller holds the cursor and nothing else: no arithmetic on a position
+		cursor = page.body.cursor;
+		if (!page.body.hasMore) return {entries, pages, cursor};
+	}
+	throw new Error(`the feed never reported itself caught up: it stalled or repeated`);
+}
+
 /** Read the CANONICAL view. Its `gate` is required by the route, never defaulted here. */
 export async function readCanonical<Body>(
 	deployment: Deployment,

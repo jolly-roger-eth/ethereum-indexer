@@ -21,6 +21,7 @@ import {
 	ZERO,
 	batchOf,
 	deploy,
+	followFeed,
 	pad,
 	post,
 	readFeed as read,
@@ -99,26 +100,19 @@ async function readFeed(
 	return read<FeedBody>(deployment, name, query);
 }
 
-/** Follow the feed to its end, one page at a time, exactly as a consumer would. */
+/**
+ * Follow the feed to its end, one page at a time, exactly as a consumer would.
+ *
+ * The loop itself is the harness's (`followFeed`), shared with the compaction
+ * suite, which follows the holes a REAL compaction leaves: one definition of
+ * what following means, at this suite's idea of what an entry holds.
+ */
 async function follow(
 	deployment: Deployment,
 	name: string,
 	limit: number,
 ): Promise<{entries: FeedEntryShape[]; pages: number; cursor: string}> {
-	const entries: FeedEntryShape[] = [];
-	let cursor: string | undefined;
-	let pages = 0;
-	// bounded so a STALL fails as a test rather than as a hang
-	for (let guard = 0; guard < 50; guard++) {
-		const page = await readFeed(deployment, name, {cursor, limit});
-		expect(page.status).toBe(200);
-		pages++;
-		entries.push(...page.body.entries);
-		// the caller holds the cursor and nothing else: no arithmetic on a position
-		cursor = page.body.cursor;
-		if (!page.body.hasMore) return {entries, pages, cursor};
-	}
-	throw new Error(`the feed never reported itself caught up: it stalled or repeated`);
+	return followFeed<FeedEntryShape>(deployment, name, limit);
 }
 
 /** What identifies ONE entry for "nothing skipped and nothing repeated". */
