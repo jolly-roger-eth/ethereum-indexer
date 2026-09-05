@@ -29,6 +29,25 @@ export type LogEvent<ABI extends Abi, Extra extends JSONObject | undefined = und
 	| ParsedLogEvent<ABI, Extra>
 	| LogEventWithParsingFailure<Extra>;
 
+/**
+ * ONE entry of the EMISSION STREAM, as a host that STORES it sees it: the raw
+ * log the node reported, plus the verdict the fold reached about it (`removed`).
+ *
+ * This is `LogEvent` with the ABI taken away, and taking it away is the point. A
+ * host storing the stream (`@etherfold/server`'s emission table, ADR-0006) reads
+ * the address, the topics, the data and the block coordinates -- every one of
+ * which is a fact about the LOG rather than about the ABI it happened to be
+ * decoded against. Typing the outcome with this rather than `LogEvent<ABI>` is
+ * what keeps that host free of an ABI type parameter it has no way to know, the
+ * same reason `UntypedWireBatch` exists on the way in.
+ *
+ * It deliberately does NOT promise the decoded half. `args` is what SOME ABI
+ * made of those bytes and is re-derived by `LogEventFetcher.reparse` against the
+ * source running now, so a store that persisted it would be persisting an
+ * opinion; what survives a decode-only change is exactly what is here.
+ */
+export type EmittedLog = NumberifiedLog;
+
 export type EventProcessor<ABI extends Abi, ProcessResultType = void> = {
 	getVersionHash(): string;
 	/**

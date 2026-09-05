@@ -13,7 +13,9 @@ import {
 	type ReorgDetection,
 } from './internal/engine/utils.js';
 import type {ReorgRecorder} from './reorgCounters.js';
+import {streamDigestOf} from './stream/identity.js';
 import type {
+	EmittedLog,
 	EventProcessor,
 	IndexingSource,
 	LastSync,
@@ -38,6 +40,21 @@ export type IngestionOutcome = {
 	applied: number;
 	/** Events handed to the processor as retractions, derived here and by nobody else. */
 	retracted: number;
+	/**
+	 * The EMISSION STREAM this batch produced, in order: what was applied and what
+	 * was taken back, retractions carrying their ORIGINAL block.
+	 *
+	 * Reported for the same reason `reorg` is, and with the same discipline: a host
+	 * that STORES the stream (ADR-0006) must not re-derive it, because a second
+	 * derivation is a second answer, and the one thing this receiver is
+	 * authoritative about is what the fold concluded. The counts above are this
+	 * list partitioned on `removed`, kept because a caller that only reports
+	 * progress should not have to walk it.
+	 *
+	 * Untyped in the ABI (`EmittedLog`), because a host that stores logs is not a
+	 * host that decodes them.
+	 */
+	emissions: EmittedLog[];
 	/** Where the next batch must start. */
 	expectedFromBlock: number;
 	/**
@@ -68,6 +85,21 @@ export type IngestionResult<ABI extends Abi> = IngestionOutcome & {lastSync: Las
  */
 export type LogIngestion = {
 	readonly context: WireContext;
+	/**
+	 * WHICH STREAM this receiver folds, as `streamDigestOf` renders it, and the
+	 * value anything storing its emissions keys them on.
+	 *
+	 * Deliberately NOT `context`. The wire identity is a CHANGE DETECTOR between
+	 * two halves of one deployment: its source half is 32-bit `simple_hash` per
+	 * entry over the whole entry, kept that way on purpose (ADR-0034), so it moves
+	 * on a decode-only change the fetch filter never saw. Keyed on it, a
+	 * regenerated ABI would orphan every row already stored -- and 32 bits is ruled
+	 * out as a KEY anyway, because a collision there is one indexer adopting
+	 * another's logs. This is the wide digest over the fetch filter plus the stream
+	 * config, and it is the same value the browser addresses a stream by
+	 * (ADR-0035), so one stream has one name everywhere.
+	 */
+	readonly streamDigest: string;
 	expectedFromBlock(): Promise<number>;
 	receive(batch: UntypedWireBatch): Promise<IngestionOutcome>;
 };
@@ -129,9 +161,17 @@ export type StreamBuilderOptions<ABI extends Abi> = Pick<ProvidedIndexerConfig<A
  * `IndexerGeneration.feed` does. A batch is one HTTP request and the sender chose
  * its size; splitting it here would add a second place where a partially-applied
  * range is possible, and the processor already applies block by block
- * atomically. It also does not store the emission stream: that arrives with
- * ADR-0006, in the `indexer-server-feed` spec, and belongs to this same
- * component when it does.
+ * atomically.
+ *
+ * It also does not STORE the emission stream (ADR-0006). It REPORTS one
+ * (`IngestionOutcome.emissions`) and says which stream it belongs to
+ * (`streamDigest`); a HOST writes it down, and today that is
+ * `@etherfold/server`'s ingest route. Deliberately not the shape ADR-0050 gave
+ * the reorg count, which is injected and written from in here: the difference is
+ * the KEY rather than the fact, since half of that table's key is the INDEXER
+ * NAME and a route segment is the only place that value exists -- a receiver
+ * told its own name would be exactly the duplicate discriminator
+ * `IndexerRegistryEntry` refuses to carry.
  */
 export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> implements LogIngestion {
 	/** The earliest block this source can have anything to say about. */
@@ -140,6 +180,8 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 	readonly streamConfig: UsedStreamConfig;
 	/** The `{source, config}` a sender must assert to be talking to this receiver. */
 	readonly context: WireContext;
+	/** WHICH stream this folds, as everything that stores its emissions keys them. See `LogIngestion`. */
+	readonly streamDigest: string;
 
 	private readonly finality: number;
 	private readonly recordReorg: ReorgRecorder | undefined;
@@ -159,6 +201,10 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 		this.finality = this.streamConfig.finality;
 		this.defaultFromBlock = defaultFromBlockOf(source);
 		this.context = wireContextOf(source, this.streamConfig);
+		// The RESOLVED config again, not the provided one: the digest is what a stored
+		// stream is addressed by, so an unset `finality` and the default written out
+		// have to be one stream here exactly as they are one config everywhere else.
+		this.streamDigest = streamDigestOf(source, this.streamConfig);
 	}
 
 	/**
@@ -216,6 +262,10 @@ export class StreamBuilder<ABI extends Abi, ProcessResultType = unknown> impleme
 		return {
 			applied: eventStream.filter((event) => !event.removed).length,
 			retracted: eventStream.filter((event) => event.removed).length,
+			// handed over rather than re-derivable: this is the one place that knows what
+			// the fold concluded, and a host storing the stream must not compute a second
+			// opinion of it
+			emissions: eventStream,
 			lastSync: newLastSync,
 			expectedFromBlock: getFromBlock(newLastSync, this.defaultFromBlock, this.finality),
 			reorg,

@@ -8,6 +8,7 @@ import {
 import {Hono} from 'hono';
 import type {Context} from 'hono';
 import {logs} from 'named-logs';
+import {appendEmissions} from '../emissions.js';
 import type {Env} from '../env.js';
 import type {IndexerRegistryEntry} from '../registry.js';
 import {setup} from '../setup.js';
@@ -95,6 +96,15 @@ function authorized(c: Context<{Bindings: Env}>): {ok: true} | {ok: false; messa
  * `receive` through a `ReorgRecorder` the store's owner injected (ADR-0050), and
  * this route is a CALLER of that path. Counting here as well would double-count
  * the split shape, which both concludes and receives.
+ *
+ * ## What this route DOES write: the stored emission stream
+ *
+ * The append-only log of ADR-0006, and the one write here that is not an
+ * exception to the paragraph above but a consequence of what it is KEYED on. Its
+ * key carries the INDEXER NAME, and the route segment is the only place that
+ * value exists: an entry deliberately does not carry one, and `run` and `build`
+ * refuse `--indexer` outright. See `../emissions.ts`, which spells out what that
+ * costs and what would move the write into the fold.
  */
 export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<CustomEnv>) {
 	return (
@@ -180,6 +190,7 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 				const resolved = resolve(options, c as never);
 				if (!resolved.ok) return resolved.response;
 				const {ingestion} = resolved.entry;
+				const {name} = resolved;
 
 				let batch: UntypedWireBatch;
 				try {
@@ -203,6 +214,25 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 					// line, the count -- happens inside it. `outcome.reorg` is REPORTED back to
 					// the sender below and acted on by nobody here.
 					const outcome = await ingestion.receive(batch);
+
+					// The APPEND-ONLY EMISSION STREAM (ADR-0006), under the two discriminators:
+					// the NAME this request addressed, and the STREAM this receiver folds as
+					// `streamDigestOf` renders it -- never the wire context, which is a change
+					// detector rather than a key.
+					//
+					// It is NOT swallowed the way a reorg count is. A count that fails costs an
+					// operational number; this failing costs the STREAM ITSELF, and a stream
+					// silently missing a batch the state already applied is a HOLE -- invisible,
+					// permanent and self-consistent, since the rows that would prove it are the
+					// ones that never arrived. So it raises, becomes a `500` with `lastError` set,
+					// and the sender's own recovery is unaffected: the batch WAS applied, so its
+					// next attempt is the ordinary `409` carrying the cursor that already moved,
+					// and nothing is applied twice.
+					await appendEmissions(c.get('config').db, {
+						indexer: name,
+						stream: ingestion.streamDigest,
+						emissions: outcome.emissions,
+					});
 
 					return c.json({
 						success: true,
@@ -246,7 +276,7 @@ export function getIngestAPI<CustomEnv extends Env>(options: ServerOptions<Custo
 function resolve<CustomEnv extends Env>(
 	options: ServerOptions<CustomEnv>,
 	c: Context<{Bindings: Env}>,
-): {ok: true; entry: IndexerRegistryEntry} | {ok: false; response: Response} {
+): {ok: true; entry: IndexerRegistryEntry; name: string} | {ok: false; response: Response} {
 	const name = c.req.param('indexer') as string;
 	if (!options.getIndexer) {
 		return {
@@ -279,7 +309,10 @@ function resolve<CustomEnv extends Env>(
 			),
 		};
 	}
-	return {ok: true, entry};
+	// the NAME travels back beside the entry, because it is not merely how the entry
+	// was found: it is a DISCRIMINATOR the write path keys on, and this request's
+	// segment is the one source of its value
+	return {ok: true, entry, name};
 }
 
 /**

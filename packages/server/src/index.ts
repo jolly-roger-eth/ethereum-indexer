@@ -23,6 +23,17 @@ export type {Config} from './setup.js';
  */
 export {readReorgCounters} from './reorgs.js';
 export type {RecordedReorg, ReorgCounters} from './reorgs.js';
+/**
+ * THE STORED EMISSION STREAM (ADR-0006): append-only, retractions included,
+ * superseded rows flagged rather than deleted.
+ *
+ * The WRITE is exported because it is this package's, and because the two views
+ * over the table are the same package's reads: what a caller outside gets from
+ * it is the ability to append under a name it holds, which is what a host that
+ * routes batches some other way (a queue consumer) would need.
+ */
+export {appendEmissions, EMISSION_STREAM_TABLE} from './emissions.js';
+export type {EmissionAppend} from './emissions.js';
 
 const corsSetup = cors({
 	origin: '*',

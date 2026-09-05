@@ -17,5 +17,102 @@ CREATE TABLE IF NOT EXISTS Meta (
 -- database came up with the table present and no version row, and reported
 -- itself unhealthy forever. Keep this row in step with SCHEMA_VERSION in
 -- schema.ts; a test asserts they agree.
-INSERT INTO Meta (key, value) VALUES ('schemaVersion', '1')
+-- ---------------------------------------------------------------------------
+-- THE EMISSION STREAM (ADR-0006)
+-- ---------------------------------------------------------------------------
+-- The append-only log of what this server was told and what it took back: one
+-- row per emitted log, retractions INCLUDED, superseded rows FLAGGED rather
+-- than deleted. Nothing is ever updated here except `alive`, and nothing is
+-- ever deleted. The canonical view is then a cheap derived read
+-- (`WHERE alive AND blockNumber <= gate` ordered by `(blockNumber, logIndex)`)
+-- and the retraction-aware feed is the same rows in `seq` order.
+--
+-- It is in the FIXED schema and not dynamic DDL, unlike the entity tables,
+-- because two application paths must produce the SAME database and one of them
+-- is wrangler's D1 migration, which executes this file and nothing else.
+--
+-- ## The KEY: two discriminators, both on every row
+--
+-- `indexer` is the NAMED INDEXER (ADR-0036), the multi-tenancy unit, which
+-- arrives as the route segment a batch was posted to. `stream` is WHICH stream
+-- those logs belong to, as `streamDigestOf` renders it: a wide digest over the
+-- deduplicated per-entry stream hashes plus the stream config hash.
+--
+-- `stream` is deliberately NOT the wire context's `{source, config}`. That is a
+-- 32-bit whole-entry hash kept whole on purpose (ADR-0034) as an identity check
+-- between the two halves of a deployment, and it fails as a KEY twice over: a
+-- decode-only change (a regenerated ABI, an added view function, a renamed
+-- non-indexed parameter) moves it while the fetch filter is untouched, which
+-- would orphan every row already stored; and 32 bits collide, which here means
+-- one indexer silently adopting another's logs.
+--
+-- ## What is NOT a column, and never will be
+--
+-- Nothing about the PROCESSOR, and no GENERATION. The stream is keyed on
+-- `{source, config}` and only the STATE on `{source, config, processor}`, so a
+-- processor-only change is a new generation over the SAME stream. A column
+-- carrying the processor would FORK this whole history on a processor change --
+-- precisely the case the generation model promises is free.
+--
+-- `chainId` is not one either: it is already inside `stream`, via the block-0
+-- skeleton entry that hashes the chain id, the genesis hash and each contract's
+-- address and start block.
+--
+-- ## The raw log, and only the raw log
+--
+-- `address`, `topic0..topic3`, `data` and the block/transaction coordinates are
+-- what the NODE said. The decoded `args` are what SOME ABI made of those bytes
+-- and are re-derived on replay against the source running now, so persisting
+-- them would persist an opinion that a decode-only change invalidates.
+CREATE TABLE IF NOT EXISTS EmissionStream (
+    -- the NAMED INDEXER, from the route segment: the tenancy discriminator
+    indexer TEXT NOT NULL,
+    -- WHICH stream, as `streamDigestOf` renders it (NOT the wire identity)
+    stream TEXT NOT NULL,
+    -- the position a feed cursor addresses, monotonic within (indexer, stream).
+    -- HOLES IN IT ARE LEGAL by contract, so that enabling pair-compaction later
+    -- cannot break a consumer that assumed contiguity.
+    seq INTEGER NOT NULL,
+    -- 1 when this row IS a retraction of an earlier emission
+    removed INTEGER NOT NULL,
+    -- 1 while this emission is canonical. A retraction is never alive itself, and
+    -- it sets the row it retracts to 0. This flag is the whole reason the
+    -- canonical view is a read rather than a second table.
+    alive INTEGER NOT NULL,
+    blockNumber INTEGER NOT NULL,
+    blockHash TEXT NOT NULL,
+    logIndex INTEGER NOT NULL,
+    transactionHash TEXT NOT NULL,
+    transactionIndex INTEGER NOT NULL,
+    -- present only when the node put it on the log; not every node does
+    blockTimestamp INTEGER,
+    address TEXT NOT NULL,
+    -- NULL on an anonymous event, which carries no topic0 at all
+    topic0 TEXT,
+    topic1 TEXT,
+    topic2 TEXT,
+    topic3 TEXT,
+    data TEXT NOT NULL,
+    PRIMARY KEY (indexer, stream, seq)
+);
+
+-- THE CANONICAL VIEW's index, and the reason a flag beats a second table: it
+-- covers only the live rows, so the retractions and the rows they killed cost
+-- nothing to skip.
+CREATE INDEX IF NOT EXISTS EmissionStreamCanonical
+    ON EmissionStream (indexer, stream, blockNumber, logIndex)
+    WHERE alive = 1;
+
+-- THE LOG API's index, whose shape is decided by `work/specs/proposed/node-log-api.md`
+-- and honoured here rather than re-derived. ONE index and not five:
+-- `topic1..topic3` are stored and left UNINDEXED, filtered after the range
+-- scan, because indexing all four roughly doubles this table's index footprint
+-- against D1's 10GB ceiling for little practical gain.
+--
+-- It leads with the two discriminators for the reason they exist: a range scan
+-- that could omit one would cross into another tenant's rows.
+CREATE INDEX IF NOT EXISTS EmissionStreamByAddressTopic
+    ON EmissionStream (indexer, stream, address, topic0, blockNumber);
+
+INSERT INTO Meta (key, value) VALUES ('schemaVersion', '2')
     ON CONFLICT (key) DO UPDATE SET value = excluded.value;
