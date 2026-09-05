@@ -46,10 +46,13 @@ function fakeIngestion(expected: number) {
 	const received: {fromBlock: number; toBlock: number}[] = [];
 	const ingestion: Ingestion = {
 		context: {source: [{startBlock: 100, hash: '0xsource'}], config: '{}'},
+		// WHICH stream this folds, which is what the server keys the stored emission
+		// stream on. A fixed string here: this adapter routes batches and stores none.
+		streamDigest: '0123456789abcdef0123456789abcdef',
 		expectedFromBlock: async () => expected,
 		receive: async (batch) => {
 			received.push({fromBlock: batch.fromBlock, toBlock: batch.toBlock});
-			return {applied: 1, retracted: 0, expectedFromBlock: batch.toBlock + 1};
+			return {applied: 1, retracted: 0, emissions: [], expectedFromBlock: batch.toBlock + 1};
 		},
 	};
 	return {ingestion, received};

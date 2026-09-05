@@ -8,7 +8,7 @@ import db from './schema/ts/db.sql.js';
  * database someone else migrated says so instead of failing later at a random
  * query.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA_VERSION_KEY = 'schemaVersion';
 
